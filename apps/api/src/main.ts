@@ -1,28 +1,28 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { buildApp } from "./app";
+import { buildApp } from "./app.js";
 import {
   createPrismaMaterialRepository,
   createPrismaWarehouseRepository,
-} from "./prismaMaterialsWarehousesRepository";
-import { createPrismaPartyRepository } from "./prismaPartyRepository";
+} from "./prismaMaterialsWarehousesRepository.js";
+import { createPrismaPartyRepository } from "./prismaPartyRepository.js";
 import {
   createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
   createPrismaUserAccountRepository,
-} from "./prismaPeoplePermissionsRepository";
+} from "./prismaPeoplePermissionsRepository.js";
 import {
   createPrismaPurchaseRecordRepository,
   createPrismaPurchaseRequestRepository,
-} from "./prismaPurchasesRepository";
-import { createPrismaReplenishmentSuggestionRepository } from "./prismaReplenishmentRepository";
-import { createPrismaInventoryRepository } from "./prismaInventoryRepository";
+} from "./prismaPurchasesRepository.js";
+import { createPrismaReplenishmentSuggestionRepository } from "./prismaReplenishmentRepository.js";
+import { createPrismaInventoryRepository } from "./prismaInventoryRepository.js";
 import {
   createPrismaProjectSiteRepository,
   createPrismaProjectUsageRequestRepository,
-} from "./prismaProjectSitesRepository";
-import { createPrismaContractRepository } from "./prismaContractsRepository";
+} from "./prismaProjectSitesRepository.js";
+import { createPrismaContractRepository } from "./prismaContractsRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";

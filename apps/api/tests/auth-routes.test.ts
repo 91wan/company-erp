@@ -85,6 +85,18 @@ async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin",
 }
 
 describe("auth API", () => {
+  it("fails closed when auth is enabled without a real session secret", () => {
+    expect(() => buildApp({ auth: { enabled: true }, authRepository: createFakeAuthRepository([]) })).toThrow(
+      /AUTH_SESSION_SECRET/,
+    );
+    expect(() =>
+      buildApp({
+        auth: { enabled: true, sessionSecret: "change-me-long-random-local-secret" },
+        authRepository: createFakeAuthRepository([]),
+      }),
+    ).toThrow(/AUTH_SESSION_SECRET/);
+  });
+
   it("logs in active accounts, sets an HttpOnly session cookie, and never leaks password hashes", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const account = makeAuthAccount({ passwordHash, roles: ["admin", "viewer"] });

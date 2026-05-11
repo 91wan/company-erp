@@ -5,7 +5,7 @@ import type {
   PartyTypeCode,
   UpdatePartyInput,
 } from "@company-erp/shared";
-import { PartyConflictError, type PartyListFilters, type PartyRepository } from "./parties";
+import { PartyConflictError, type PartyListFilters, type PartyRepository } from "./parties.js";
 
 type PrismaParty = Awaited<ReturnType<PrismaClient["party"]["findFirstOrThrow"]>>;
 

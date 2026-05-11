@@ -9,7 +9,7 @@ import {
   type ReplenishmentConversionResult,
   type ReplenishmentSuggestionListFilters,
   type ReplenishmentSuggestionRepository,
-} from "./replenishment";
+} from "./replenishment.js";
 
 type AnyPrisma = Record<string, any>;
 

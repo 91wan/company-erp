@@ -17,7 +17,7 @@ import {
   type ProjectSiteRepository,
   type ProjectUsageRequestListFilters,
   type ProjectUsageRequestRepository,
-} from "./projectSites";
+} from "./projectSites.js";
 
 type AnyPrisma = PrismaClient & Record<string, any>;
 

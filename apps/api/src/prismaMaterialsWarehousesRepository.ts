@@ -14,7 +14,7 @@ import {
   type MaterialRepository,
   type WarehouseListFilters,
   type WarehouseRepository,
-} from "./materialsWarehouses";
+} from "./materialsWarehouses.js";
 
 type PrismaMaterial = Prisma.MaterialGetPayload<{
   include: {

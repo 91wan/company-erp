@@ -14,7 +14,7 @@ import {
   type PurchaseRecordRepository,
   type PurchaseRequestListFilters,
   type PurchaseRequestRepository,
-} from "./purchases";
+} from "./purchases.js";
 
 type PrismaPurchaseRequest = Prisma.PurchaseRequestGetPayload<{
   include: {

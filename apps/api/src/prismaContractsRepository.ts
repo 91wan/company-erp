@@ -13,7 +13,7 @@ import {
   getContractExpiryState,
   type ContractListFilters,
   type ContractRepository,
-} from "./contracts";
+} from "./contracts.js";
 
 type PrismaContract = Prisma.ContractGetPayload<{
   include: {

@@ -13,7 +13,7 @@ import {
   normalizePartyFilters,
   normalizePartyInput,
   type PartyRepository,
-} from "./parties";
+} from "./parties.js";
 import {
   MaterialConflictError,
   MaterialValidationError,
@@ -25,7 +25,7 @@ import {
   normalizeWarehouseInput,
   type MaterialRepository,
   type WarehouseRepository,
-} from "./materialsWarehouses";
+} from "./materialsWarehouses.js";
 import {
   DepartmentConflictError,
   DepartmentValidationError,
@@ -42,7 +42,7 @@ import {
   type DepartmentRepository,
   type EmployeeRepository,
   type UserAccountRepository,
-} from "./peoplePermissions";
+} from "./peoplePermissions.js";
 import {
   PurchaseRecordConflictError,
   PurchaseRecordValidationError,
@@ -54,7 +54,7 @@ import {
   normalizePurchaseRequestInput,
   type PurchaseRecordRepository,
   type PurchaseRequestRepository,
-} from "./purchases";
+} from "./purchases.js";
 import {
   InventoryMovementConflictError,
   InventoryMovementValidationError,
@@ -62,7 +62,7 @@ import {
   normalizeInventoryMovementFilters,
   normalizeInventoryMovementInput,
   type InventoryRepository,
-} from "./inventory";
+} from "./inventory.js";
 import {
   ReplenishmentSuggestionConflictError,
   ReplenishmentSuggestionValidationError,
@@ -70,7 +70,7 @@ import {
   normalizeReplenishmentSuggestionFilters,
   normalizeUpdateReplenishmentSuggestionInput,
   type ReplenishmentSuggestionRepository,
-} from "./replenishment";
+} from "./replenishment.js";
 import {
   ProjectSiteConflictError,
   ProjectSiteValidationError,
@@ -83,7 +83,7 @@ import {
   normalizeProjectUsageRequestInput,
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
-} from "./projectSites";
+} from "./projectSites.js";
 import {
   ContractConflictError,
   ContractValidationError,
@@ -91,8 +91,8 @@ import {
   normalizeContractFilters,
   normalizeContractInput,
   type ContractRepository,
-} from "./contracts";
-import { registerAuth, type AuthOptions, type AuthRepository } from "./auth";
+} from "./contracts.js";
+import { registerAuth, type AuthOptions, type AuthRepository } from "./auth.js";
 
 type BuildAppOptions = {
   auth?: AuthOptions;
