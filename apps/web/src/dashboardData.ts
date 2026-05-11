@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  Building2,
   Box,
   ClipboardCheck,
   FileSpreadsheet,
@@ -33,6 +34,7 @@ export type MetricCard = {
 
 export const navigationItems: NavigationItem[] = [
   { label: "Dashboard", icon: Home, active: true },
+  { label: "基础资料", icon: Building2 },
   { label: "采购", icon: ShoppingCart },
   { label: "库存", icon: Warehouse },
   { label: "合同", icon: FileText },

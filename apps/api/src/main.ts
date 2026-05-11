@@ -1,10 +1,21 @@
 import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app";
+import { createPrismaPartyRepository } from "./prismaPartyRepository";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
+const prisma = process.env.DATABASE_URL ? new PrismaClient() : null;
 
-const app = buildApp();
+const app = buildApp({
+  partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
+});
+
+if (prisma) {
+  app.addHook("onClose", async () => {
+    await prisma.$disconnect();
+  });
+}
 
 try {
   await app.listen({ port, host });
