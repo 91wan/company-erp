@@ -152,7 +152,7 @@ export const systemStatus = [
   { label: "应用版本", detail: "v0.1.0", side: "当前版本", tone: "info" },
 ];
 
-export const inventoryTabs = ["物料管理", "入库登记", "出库登记", "当前库存查询", "项目点领用记录"] as const;
+export const inventoryTabs = ["物料管理", "入库登记", "出库登记", "当前库存查询", "项目点领用记录", "补货建议"] as const;
 
 export const inventoryMaterials = [
   { code: "MAT0001", name: "定制员工工服", specification: "夏装 L 码", unit: "套", category: "定制物料", status: "启用" },

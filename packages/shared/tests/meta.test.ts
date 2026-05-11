@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   canIssueStock,
   calculateCurrentInventory,
+  INVENTORY_MOVEMENT_TYPES,
+  INVENTORY_SOURCE_TYPES,
+  ISSUE_TARGET_TYPES,
   MVP_DICTIONARIES,
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
@@ -16,6 +19,7 @@ import {
   USER_ACCOUNT_STATUSES,
   WAREHOUSE_TYPES,
   USER_ROLE_ASSIGNMENT_POLICY,
+  calculateReplenishmentSuggestionQuantity,
 } from "../src/index";
 
 describe("MVP role constants", () => {
@@ -62,8 +66,62 @@ describe("MVP inventory helpers", () => {
   });
 });
 
+describe("MVP replenishment helpers", () => {
+  it("creates a replenishment gap when safe stock is above current stock", () => {
+    expect(
+      calculateReplenishmentSuggestionQuantity({
+        safeStock: 50,
+        currentStock: 18,
+        reservedUsageQty: 0,
+        openPurchaseQty: 0,
+      }),
+    ).toBe(32);
+  });
+
+  it("subtracts open purchase quantity and adds reserved usage quantity", () => {
+    expect(
+      calculateReplenishmentSuggestionQuantity({
+        safeStock: 50,
+        currentStock: 18,
+        reservedUsageQty: 12,
+        openPurchaseQty: 20,
+      }),
+    ).toBe(24);
+  });
+
+  it("returns zero when stock and in-flight purchase cover the threshold", () => {
+    expect(
+      calculateReplenishmentSuggestionQuantity({
+        safeStock: 50,
+        currentStock: 30,
+        reservedUsageQty: 5,
+        openPurchaseQty: 30,
+      }),
+    ).toBe(0);
+  });
+});
+
 describe("MVP inventory dictionaries", () => {
   it("defines the fixed inventory status and movement dictionaries", () => {
+    expect(INVENTORY_MOVEMENT_TYPES.map((movementType) => movementType.code)).toEqual([
+      "opening",
+      "inbound",
+      "outbound",
+      "adjustment_in",
+      "adjustment_out",
+    ]);
+    expect(INVENTORY_SOURCE_TYPES.map((sourceType) => sourceType.code)).toEqual([
+      "purchase",
+      "return_material",
+      "inventory_gain",
+      "opening",
+      "other",
+    ]);
+    expect(ISSUE_TARGET_TYPES.map((targetType) => targetType.code)).toEqual([
+      "internal_office",
+      "project_site",
+      "subcontractor",
+    ]);
     expect(MVP_DICTIONARIES.warehouseType.values).toEqual(["总部仓", "项目点仓", "临时仓"]);
     expect(MVP_DICTIONARIES.inventoryMovementType.values).toEqual([
       "入库",
