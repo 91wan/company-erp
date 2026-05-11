@@ -12,4 +12,8 @@ Required MVP module plans:
 - `project-site-usage.md` - created
 - `excel-import.md`
 
+Later-phase module plans:
+
+- `certificates-compliance.md` - created
+
 The existing files under `docs/chat-prompts/` are prompts for producing plans, not final module plans.

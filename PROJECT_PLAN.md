@@ -237,6 +237,30 @@ MVP content:
 
 This is not a full HR system in v1.
 
+## Later Roadmap
+
+These modules are useful after the core purchase, inventory, project-site, personnel, counterparty, and contract foundations are stable. They must not block the MVP operational workflow.
+
+### Certificates and Qualification Archive
+
+Purpose: keep company, personnel, supplier, and project-site certificates traceable and visible for expiry risk.
+
+Later-phase content:
+
+- Business licenses, food operation permits, personnel health certificates, supplier qualification files, project-site permits, system certifications, credit certificates, honor certificates, bank account permits, and contract-related qualification files
+- Owner types: person, project site, supplier or counterparty, and company
+- Fixed-expiry, long-term, and no-visible-expiry validity handling
+- Attachment path, source file path, and source page number for multi-certificate PDF packs
+- Dashboard counts for expired, expiring-soon, and review-due certificates
+
+Out of scope for this later module:
+
+- OCR
+- External government platform verification
+- Approval workflow
+- SMS, WeChat, email, or push notification delivery
+- Automatic bidding document generation
+
 ## Recommended Repo Structure
 
 Use this structure when development begins:

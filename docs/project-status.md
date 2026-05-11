@@ -1,5 +1,27 @@
 # Project Status
 
+## 2026-05-11 Certificates and Compliance Scope Confirmed
+
+Confirmed business scope:
+
+- The certificates module is a later-phase certificate and qualification archive plus expiry-risk reminder, not a legal compliance workflow.
+- It does not block the current purchase, inventory, project-site, personnel, counterparty, or contract MVP chain.
+- Certificate owners are limited to person, project site, supplier or counterparty, and company.
+- Real certificate packs may include hard compliance certificates, system certifications, credit certificates, honor certificates, and archive-only bank/business documents.
+- The later certificate module must support fixed-expiry certificates and long-term/no-visible-expiry certificates without forcing fake expiry dates.
+- Multi-certificate PDF packs should be traceable through source file path and page number.
+- OCR, external government verification, approval workflow, and SMS/WeChat reminders remain out of the later certificate module.
+
+Updated artifacts:
+
+- `docs/module-plans/certificates-compliance.md`
+- `docs/module-plans/README.md`
+- `docs/data-import-templates/mvp_data_templates_and_cleaning_rules.md`
+
+Next safe data-model task:
+
+Define the certificate ledger schema after the current core modules and shared owner references are stable enough to support owner links.
+
 ## 2026-05-11 Initial Technical Check
 
 Scope checked:

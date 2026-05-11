@@ -85,6 +85,9 @@ contracts N -> 1 project_sites
 Rules:
 
 - A contract can link to one project site in MVP.
+- One project site can have multiple contracts with our company, including multiple client service contracts with the same client or service unit.
+- Do not add a unique constraint on `project_site_id` or on `(project_site_id, contract_direction)`.
+- Do not add `is_primary_for_site` to the current schema. If the UI later needs one contract to appear as the main summary contract for a project site, add it through a separate future migration.
 - If a contract applies company-wide or to headquarters purchasing, `project_site_id` may be empty.
 - A direct project site may have a `client_service_contract`.
 - A subcontracted project site may have both a `client_service_contract` and a `subcontract_contract`.
@@ -173,6 +176,7 @@ The manual Excel import template for contracts should include:
 | Counterparty Name | Yes | Used to match or create supplier, client, or subcontractor reference depending on import policy. |
 | Contract Direction | Yes | Purchase contract, client service contract, subcontract contract, framework contract, or other. |
 | Project Site Name | Optional | Empty means headquarters-level or general contract. |
+| Primary Site Contract | Future optional | Yes/No. Do not include in current import until `is_primary_for_site` is implemented. |
 | Start Date | Yes | Contract start date. |
 | End Date | Yes | Contract end date. |
 | Amount | Optional | Fixed amount. |
@@ -189,6 +193,8 @@ Minimum validation:
 - `contract_name` must not be empty.
 - `counterparty_party_id` must be present after import or manual entry.
 - `contract_direction` must use a fixed dictionary value.
+- Multiple contracts may share the same `project_site_id`, `counterparty_party_id`, and `contract_direction`.
+- If a future `is_primary_for_site` field is added and several contracts are marked primary for the same project site and direction, the UI or import review should ask the user to choose one main display contract, but the records themselves remain valid.
 - `start_date` must not be later than `end_date`.
 - At least one of `amount` or `budget_amount` may be present, but neither is mandatory.
 - `amount` and `budget_amount` cannot be negative.
