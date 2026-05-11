@@ -3,11 +3,12 @@ import type { AuthenticatedUserDto, LoginInput } from "@company-erp/shared";
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
 export async function requestJson<TPayload>(url: string, init?: RequestInit): Promise<TPayload> {
+  const shouldSetJsonContentType = Boolean(init?.body) && !(init?.body instanceof FormData);
   const response = await fetch(url, {
     ...init,
     credentials: "include",
     headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(shouldSetJsonContentType ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
   });

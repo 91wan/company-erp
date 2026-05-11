@@ -147,3 +147,13 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed password verification uses the existing `scrypt$salt$hash` format already used by user account creation and reset.
 - Confirmed sessions are signed HttpOnly cookies; no JWT/session table, SSO, or dynamic permission table is added.
 - Added a shared `masterData` permission area for parties, materials, and warehouses; permissions remain shared-code constants.
+
+## 2026-05-11 Excel Import Foundation
+
+- Added `ImportTemplateType`, `ImportJobStatus`, and `ImportRowStatus` enums for the first Excel import slice.
+- Added `import_jobs` to record template type, original file name, file hash, aggregate row counts, preview/confirm status, and confirmation timestamp.
+- Added `import_job_rows` to store row-level raw JSON, normalized JSON, validation issues JSON, target record reference, and row status.
+- Confirmed uploaded Excel files are not persisted by the app; only filename, hash, row JSON, and import results are stored.
+- Confirmed duplicate existing business codes are skipped by default and recorded as warning/skipped rows; production data is not overwritten.
+- Confirmed opening inventory import writes `inventory_movements` records with `movement_type=opening`; no inventory balance table is added.
+- Added migration `20260511233000_excel_import_foundation`.

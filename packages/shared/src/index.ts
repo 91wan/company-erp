@@ -113,6 +113,56 @@ export type ProjectSiteStatusCode = "preparing" | "active" | "paused" | "ended";
 
 export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
 
+export type ImportTemplateTypeCode =
+  | "parties"
+  | "materials"
+  | "employees"
+  | "project_sites"
+  | "opening_inventory";
+
+export type ImportJobStatusCode = "previewed" | "confirmed" | "failed";
+
+export type ImportRowStatusCode = "valid" | "warning" | "error" | "skipped" | "imported";
+
+export type ImportRowIssueDto = {
+  level: "error" | "warning";
+  field?: string;
+  message: string;
+};
+
+export type ImportJobRowDto = {
+  id: string;
+  rowNumber: number;
+  rawData: Record<string, unknown>;
+  normalizedData: Record<string, unknown> | null;
+  issues: readonly ImportRowIssueDto[];
+  status: ImportRowStatusCode;
+  targetRecordType?: string | null;
+  targetRecordId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ImportJobSummaryDto = {
+  id: string;
+  templateType: ImportTemplateTypeCode;
+  originalFileName: string;
+  fileHash: string;
+  status: ImportJobStatusCode;
+  totalRows: number;
+  validRows: number;
+  warningRows: number;
+  errorRows: number;
+  skippedRows: number;
+  importedRows: number;
+  createdAt: string;
+  confirmedAt?: string | null;
+};
+
+export type ImportJobDto = ImportJobSummaryDto & {
+  rows: readonly ImportJobRowDto[];
+};
+
 export type StatusMeta<TCode extends string = string> = {
   code: TCode;
   label: string;
@@ -894,6 +944,28 @@ export const PROJECT_USAGE_STATUSES = [
   { code: "rejected", label: "已驳回" },
 ] as const satisfies readonly StatusMeta<ProjectUsageStatusCode>[];
 
+export const IMPORT_TEMPLATE_TYPES = [
+  { code: "parties", label: "往来方/供应商" },
+  { code: "materials", label: "物料" },
+  { code: "employees", label: "部门与员工" },
+  { code: "project_sites", label: "项目点" },
+  { code: "opening_inventory", label: "期初库存" },
+] as const satisfies readonly StatusMeta<ImportTemplateTypeCode>[];
+
+export const IMPORT_JOB_STATUSES = [
+  { code: "previewed", label: "已预检" },
+  { code: "confirmed", label: "已确认导入" },
+  { code: "failed", label: "失败" },
+] as const satisfies readonly StatusMeta<ImportJobStatusCode>[];
+
+export const IMPORT_ROW_STATUSES = [
+  { code: "valid", label: "可导入" },
+  { code: "warning", label: "有警告" },
+  { code: "error", label: "有错误" },
+  { code: "skipped", label: "已跳过" },
+  { code: "imported", label: "已导入" },
+] as const satisfies readonly StatusMeta<ImportRowStatusCode>[];
+
 export const WAREHOUSE_TYPES = [
   { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
   { code: "project_site", label: "项目点仓", description: "Reserved lightweight project-site warehouse type" },
@@ -1067,6 +1139,18 @@ export const MVP_DICTIONARIES = {
   projectSiteStatus: {
     label: "项目点状态",
     values: ["筹备中", "服务中", "暂停", "已结束"],
+  },
+  importTemplateType: {
+    label: "Excel 导入模板类型",
+    values: ["往来方/供应商", "物料", "部门与员工", "项目点", "期初库存"],
+  },
+  importJobStatus: {
+    label: "Excel 导入批次状态",
+    values: ["已预检", "已确认导入", "失败"],
+  },
+  importRowStatus: {
+    label: "Excel 导入行状态",
+    values: ["可导入", "有警告", "有错误", "已跳过", "已导入"],
   },
   commonUnit: {
     label: "常用单位",

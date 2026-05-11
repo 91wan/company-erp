@@ -1,0 +1,338 @@
+import ExcelJS from "exceljs";
+import { describe, expect, it } from "vitest";
+import { buildApp } from "../src/app";
+import type { ImportJobDto, ImportJobSummaryDto, ImportTemplateTypeCode } from "@company-erp/shared";
+import type { AuthAccountRecord, AuthRepository } from "../src/auth";
+import { ImportJobValidationError, type ImportJobPreviewInput, type ImportJobRepository } from "../src/importJobs";
+import { hashPassword } from "../src/password";
+
+const now = "2026-05-11T12:00:00.000Z";
+
+async function workbookBuffer(headers: string[], rows: readonly (readonly unknown[])[]) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("导入模板");
+  sheet.addRow(headers);
+  rows.forEach((row) => sheet.addRow([...row]));
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+function multipartPayload(fields: { templateType?: string; file?: Buffer; fileName?: string }) {
+  const boundary = "----company-erp-test-boundary";
+  const chunks: Buffer[] = [];
+  function push(value: string | Buffer) {
+    chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
+  }
+
+  if (fields.templateType !== undefined) {
+    push(`--${boundary}\r\n`);
+    push('Content-Disposition: form-data; name="templateType"\r\n\r\n');
+    push(`${fields.templateType}\r\n`);
+  }
+  if (fields.file) {
+    push(`--${boundary}\r\n`);
+    push(`Content-Disposition: form-data; name="file"; filename="${fields.fileName ?? "import.xlsx"}"\r\n`);
+    push("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n");
+    push(fields.file);
+    push("\r\n");
+  }
+  push(`--${boundary}--\r\n`);
+  return {
+    payload: Buffer.concat(chunks),
+    headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+  };
+}
+
+function makeJob(overrides: Partial<ImportJobDto> = {}): ImportJobDto {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    templateType: "parties",
+    originalFileName: "suppliers.xlsx",
+    fileHash: "hash",
+    status: "previewed",
+    totalRows: 2,
+    validRows: 1,
+    warningRows: 0,
+    errorRows: 0,
+    skippedRows: 1,
+    importedRows: 0,
+    createdAt: now,
+    confirmedAt: null,
+    rows: [
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        rowNumber: 2,
+        rawData: { 供应商编码: "SUP0001", 供应商名称: "晨光贸易有限公司" },
+        normalizedData: { partyCode: "SUP0001", partyName: "晨光贸易有限公司", partyTypes: ["supplier"] },
+        issues: [],
+        status: "valid",
+        targetRecordType: null,
+        targetRecordId: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        rowNumber: 3,
+        rawData: { 供应商编码: "SUP0002", 供应商名称: "已存在供应商" },
+        normalizedData: { partyCode: "SUP0002", partyName: "已存在供应商", partyTypes: ["supplier"] },
+        issues: [{ level: "warning", field: "供应商编码", message: "编码已存在，确认导入时会跳过" }],
+        status: "skipped",
+        targetRecordType: "party",
+        targetRecordId: "44444444-4444-4444-8444-444444444444",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createFakeRepository(seed: ImportJobDto[] = []): ImportJobRepository {
+  const jobs = [...seed];
+
+  return {
+    async list(filters) {
+      return jobs
+        .filter((job) => (filters.templateType ? job.templateType === filters.templateType : true))
+        .filter((job) => (filters.status ? job.status === filters.status : true))
+        .map(({ rows: _rows, ...summary }): ImportJobSummaryDto => summary);
+    },
+    async getById(id) {
+      return jobs.find((job) => job.id === id) ?? null;
+    },
+    async preview(input: ImportJobPreviewInput) {
+      if (input.templateType === "materials") {
+        throw new ImportJobValidationError(["Missing required headers: 物料编码", "第 2 行：物料名称必填"]);
+      }
+      const job = makeJob({
+        id: "55555555-5555-4555-8555-555555555555",
+        templateType: input.templateType,
+        originalFileName: input.originalFileName,
+        totalRows: input.fileBuffer.length > 0 ? 2 : 0,
+      });
+      jobs.unshift(job);
+      return job;
+    },
+    async confirm(id) {
+      const index = jobs.findIndex((job) => job.id === id);
+      if (index === -1) return null;
+      const job = jobs[index];
+      if (job.status !== "previewed") throw new Error("Import job cannot be confirmed again");
+      if (job.errorRows > 0) throw new Error("Import job has error rows");
+      const confirmed = {
+        ...job,
+        status: "confirmed" as const,
+        importedRows: job.validRows,
+        confirmedAt: now,
+        rows: job.rows.map((row) => (row.status === "valid" ? { ...row, status: "imported" as const } : row)),
+      };
+      jobs[index] = confirmed;
+      return confirmed;
+    },
+  };
+}
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    username: "admin",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: null,
+    employeeNo: null,
+    employeeName: null,
+    employeeStatus: null,
+    roles: ["admin"],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>, username: string, password = "ChangeMe123!") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+}
+
+describe("import jobs API", () => {
+  it("reports import API as unavailable when no repository is configured", async () => {
+    const app = buildApp();
+    const response = await app.inject({ method: "GET", url: "/api/import-jobs" });
+    await app.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "IMPORT_REPOSITORY_NOT_CONFIGURED" });
+  });
+
+  it("lists and reads import jobs with filters", async () => {
+    const job = makeJob();
+    const app = buildApp({ importJobRepository: createFakeRepository([job]) });
+
+    const listResponse = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=parties&status=previewed" });
+    const detailResponse = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}` });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({ importJobs: [{ id: job.id, templateType: "parties", status: "previewed" }] });
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json()).toMatchObject({ importJob: { id: job.id, rows: expect.any(Array) } });
+  });
+
+  it("previews a multipart xlsx upload and returns row-level statuses", async () => {
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "晨光贸易有限公司", "启用"]]);
+    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const multipart = multipartPayload({ templateType: "parties", file, fileName: "suppliers.xlsx" });
+
+    const response = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...multipart });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      importJob: {
+        templateType: "parties",
+        originalFileName: "suppliers.xlsx",
+        rows: [{ status: "valid" }, { status: "skipped" }],
+      },
+    });
+  });
+
+  it("rejects unsupported template types and missing files", async () => {
+    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const unsupported = multipartPayload({ templateType: "contracts", file: Buffer.from("x"), fileName: "bad.xlsx" });
+    const missingFile = multipartPayload({ templateType: "parties" });
+
+    const unsupportedResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...unsupported });
+    const missingFileResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...missingFile });
+    await app.close();
+
+    expect(unsupportedResponse.statusCode).toBe(400);
+    expect(unsupportedResponse.json()).toMatchObject({ error: "IMPORT_VALIDATION_FAILED" });
+    expect(missingFileResponse.statusCode).toBe(400);
+    expect(missingFileResponse.json()).toMatchObject({ error: "IMPORT_VALIDATION_FAILED" });
+  });
+
+  it("returns structured validation errors for invalid headers or rows", async () => {
+    const file = await workbookBuffer(["错误表头"], [["bad"]]);
+    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const multipart = multipartPayload({ templateType: "materials", file, fileName: "materials.xlsx" });
+
+    const response = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...multipart });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "IMPORT_VALIDATION_FAILED",
+      issues: ["Missing required headers: 物料编码", "第 2 行：物料名称必填"],
+    });
+  });
+
+  it("confirms previewed jobs and blocks repeated confirmation or jobs with errors", async () => {
+    const previewed = makeJob();
+    const withErrors = makeJob({
+      id: "66666666-6666-4666-8666-666666666666",
+      errorRows: 1,
+      rows: [
+        {
+          ...makeJob().rows[0],
+          status: "error",
+          issues: [{ level: "error", field: "供应商名称", message: "供应商名称必填" }],
+        },
+      ],
+    });
+    const app = buildApp({ importJobRepository: createFakeRepository([previewed, withErrors]) });
+
+    const confirmed = await app.inject({ method: "POST", url: `/api/import-jobs/${previewed.id}/confirm` });
+    const repeated = await app.inject({ method: "POST", url: `/api/import-jobs/${previewed.id}/confirm` });
+    const blocked = await app.inject({ method: "POST", url: `/api/import-jobs/${withErrors.id}/confirm` });
+    const missing = await app.inject({ method: "POST", url: "/api/import-jobs/99999999-9999-4999-8999-999999999999/confirm" });
+    await app.close();
+
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.json()).toMatchObject({ importJob: { status: "confirmed", importedRows: 1 } });
+    expect(repeated.statusCode).toBe(400);
+    expect(blocked.statusCode).toBe(400);
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it("validates list filters for template and status", async () => {
+    const app = buildApp({ importJobRepository: createFakeRepository() });
+
+    const response = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=contracts&status=bad" });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: "IMPORT_VALIDATION_FAILED" });
+  });
+
+  it("guards import write actions while allowing viewer read access", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const job = makeJob();
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          username: "viewer",
+          passwordHash,
+          roles: ["viewer"],
+        }),
+      ]),
+      importJobRepository: createFakeRepository([job]),
+    });
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "晨光贸易有限公司", "启用"]]);
+    const upload = multipartPayload({ templateType: "parties", file, fileName: "suppliers.xlsx" });
+    const viewerCookie = await loginCookie(app, "viewer");
+    const adminCookie = await loginCookie(app, "admin");
+
+    const viewerRead = await app.inject({
+      method: "GET",
+      url: "/api/import-jobs",
+      cookies: { company_erp_session: viewerCookie },
+    });
+    const viewerPreview = await app.inject({
+      method: "POST",
+      url: "/api/import-jobs/preview",
+      cookies: { company_erp_session: viewerCookie },
+      ...upload,
+    });
+    const adminConfirm = await app.inject({
+      method: "POST",
+      url: `/api/import-jobs/${job.id}/confirm`,
+      cookies: { company_erp_session: adminCookie },
+    });
+    await app.close();
+
+    expect(viewerRead.statusCode).toBe(200);
+    expect(viewerPreview.statusCode).toBe(403);
+    expect(viewerPreview.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "systemSettings" });
+    expect(adminConfirm.statusCode).toBe(200);
+  });
+
+  it("exposes all first-slice template codes in route-level types", () => {
+    const templateTypes: ImportTemplateTypeCode[] = ["parties", "materials", "employees", "project_sites", "opening_inventory"];
+    expect(templateTypes).toHaveLength(5);
+  });
+});

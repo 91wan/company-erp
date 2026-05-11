@@ -97,6 +97,28 @@ enum ContractStatus {
   terminated
 }
 
+enum ImportTemplateType {
+  parties
+  materials
+  employees
+  project_sites
+  opening_inventory
+}
+
+enum ImportJobStatus {
+  previewed
+  confirmed
+  failed
+}
+
+enum ImportRowStatus {
+  valid
+  warning
+  error
+  skipped
+  imported
+}
+
 model Party {
   id                      String        @id @default(uuid()) @db.Uuid
   partyCode               String        @unique @map("party_code")
@@ -619,4 +641,46 @@ model ContractAttachment {
 
   @@index([contractId])
   @@map("contract_attachments")
+}
+
+model ImportJob {
+  id               String             @id @default(uuid()) @db.Uuid
+  templateType     ImportTemplateType @map("template_type")
+  originalFileName String             @map("original_file_name")
+  fileHash         String             @map("file_hash")
+  status           ImportJobStatus    @default(previewed)
+  totalRows        Int                @default(0) @map("total_rows")
+  validRows        Int                @default(0) @map("valid_rows")
+  warningRows      Int                @default(0) @map("warning_rows")
+  errorRows        Int                @default(0) @map("error_rows")
+  skippedRows      Int                @default(0) @map("skipped_rows")
+  importedRows     Int                @default(0) @map("imported_rows")
+  confirmedAt      DateTime?          @map("confirmed_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  rows             ImportJobRow[]
+
+  @@index([templateType, status])
+  @@index([createdAt])
+  @@map("import_jobs")
+}
+
+model ImportJobRow {
+  id               String          @id @default(uuid()) @db.Uuid
+  importJobId      String          @map("import_job_id") @db.Uuid
+  rowNumber        Int             @map("row_number")
+  rawData          Json            @map("raw_data")
+  normalizedData   Json?           @map("normalized_data")
+  issues           Json
+  status           ImportRowStatus
+  targetRecordType String?         @map("target_record_type")
+  targetRecordId   String?         @map("target_record_id") @db.Uuid
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  importJob        ImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
+  @@unique([importJobId, rowNumber])
+  @@index([status])
+  @@index([targetRecordType, targetRecordId])
+  @@map("import_job_rows")
 }
