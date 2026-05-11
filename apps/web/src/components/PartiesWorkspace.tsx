@@ -6,37 +6,24 @@ import {
   type PartyDto,
   type PartyTypeCode,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
   createParty?: (input: CreatePartyInput) => Promise<PartyDto>;
+  canManage?: boolean;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
-
 async function defaultLoadParties(): Promise<PartyDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/parties`);
-
-  if (!response.ok) {
-    throw new Error(`Parties request failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { parties: PartyDto[] };
+  const payload = await requestJson<{ parties: PartyDto[] }>(`${apiBaseUrl}/api/parties`);
   return payload.parties;
 }
 
 async function defaultCreateParty(input: CreatePartyInput): Promise<PartyDto> {
-  const response = await fetch(`${apiBaseUrl}/api/parties`, {
+  const payload = await requestJson<{ party: PartyDto }>(`${apiBaseUrl}/api/parties`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-
-  if (!response.ok) {
-    throw new Error(`Party create failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { party: PartyDto };
   return payload.party;
 }
 
@@ -46,6 +33,7 @@ const statusLabel = new Map(PARTY_METADATA.statuses.map((status) => [status.code
 export function PartiesWorkspace({
   loadParties = defaultLoadParties,
   createParty = defaultCreateParty,
+  canManage = true,
 }: PartiesWorkspaceProps) {
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -182,7 +170,7 @@ export function PartiesWorkspace({
           {status === "ready" && filteredParties.length > 0 ? <PartiesTable parties={filteredParties} /> : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
           <div className="panel-header">
             <h3>新增往来方</h3>
             <button type="submit" disabled={submitState === "saving"}>
@@ -256,7 +244,7 @@ export function PartiesWorkspace({
           </label>
 
           {submitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </div>
     </section>
   );

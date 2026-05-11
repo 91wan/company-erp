@@ -7,6 +7,7 @@ import type {
   ReplenishmentSuggestionDto,
   UpdateReplenishmentSuggestionInput,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type ConvertResult = {
   replenishmentSuggestion: ReplenishmentSuggestionDto;
@@ -18,6 +19,7 @@ type ReplenishmentSuggestionsWorkspaceProps = {
   generateSuggestions?: () => Promise<GenerateReplenishmentSuggestionsResult>;
   updateSuggestion?: (id: string, input: UpdateReplenishmentSuggestionInput) => Promise<ReplenishmentSuggestionDto>;
   convertSuggestion?: (id: string, input: ConvertReplenishmentSuggestionInput) => Promise<ConvertResult>;
+  canManage?: boolean;
 };
 
 type ConvertFormState = {
@@ -27,19 +29,18 @@ type ConvertFormState = {
   expectedArrivalDate: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
-
 async function defaultLoadSuggestions(): Promise<ReplenishmentSuggestionDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/replenishment-suggestions?status=open`);
-  if (!response.ok) throw new Error(`Replenishment suggestions failed with ${response.status}`);
-  const payload = (await response.json()) as { replenishmentSuggestions: ReplenishmentSuggestionDto[] };
+  const payload = await requestJson<{ replenishmentSuggestions: ReplenishmentSuggestionDto[] }>(
+    `${apiBaseUrl}/api/replenishment-suggestions?status=open`,
+  );
   return payload.replenishmentSuggestions;
 }
 
 async function defaultGenerateSuggestions(): Promise<GenerateReplenishmentSuggestionsResult> {
-  const response = await fetch(`${apiBaseUrl}/api/replenishment-suggestions/generate`, { method: "POST" });
-  if (!response.ok) throw new Error(`Replenishment generate failed with ${response.status}`);
-  const payload = (await response.json()) as { result: GenerateReplenishmentSuggestionsResult };
+  const payload = await requestJson<{ result: GenerateReplenishmentSuggestionsResult }>(
+    `${apiBaseUrl}/api/replenishment-suggestions/generate`,
+    { method: "POST" },
+  );
   return payload.result;
 }
 
@@ -47,13 +48,13 @@ async function defaultUpdateSuggestion(
   id: string,
   input: UpdateReplenishmentSuggestionInput,
 ): Promise<ReplenishmentSuggestionDto> {
-  const response = await fetch(`${apiBaseUrl}/api/replenishment-suggestions/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) throw new Error(`Replenishment update failed with ${response.status}`);
-  const payload = (await response.json()) as { replenishmentSuggestion: ReplenishmentSuggestionDto };
+  const payload = await requestJson<{ replenishmentSuggestion: ReplenishmentSuggestionDto }>(
+    `${apiBaseUrl}/api/replenishment-suggestions/${id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
   return payload.replenishmentSuggestion;
 }
 
@@ -61,13 +62,10 @@ async function defaultConvertSuggestion(
   id: string,
   input: ConvertReplenishmentSuggestionInput,
 ): Promise<ConvertResult> {
-  const response = await fetch(`${apiBaseUrl}/api/replenishment-suggestions/${id}/convert-to-purchase-request`, {
+  return requestJson<ConvertResult>(`${apiBaseUrl}/api/replenishment-suggestions/${id}/convert-to-purchase-request`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Replenishment convert failed with ${response.status}`);
-  return (await response.json()) as ConvertResult;
 }
 
 export function ReplenishmentSuggestionsWorkspace({
@@ -75,6 +73,7 @@ export function ReplenishmentSuggestionsWorkspace({
   generateSuggestions = defaultGenerateSuggestions,
   updateSuggestion = defaultUpdateSuggestion,
   convertSuggestion = defaultConvertSuggestion,
+  canManage = true,
 }: ReplenishmentSuggestionsWorkspaceProps) {
   const [suggestions, setSuggestions] = useState<ReplenishmentSuggestionDto[]>([]);
   const [convertedRequests, setConvertedRequests] = useState<PurchaseRequestDto[]>([]);
@@ -167,10 +166,10 @@ export function ReplenishmentSuggestionsWorkspace({
           <h2>补货建议</h2>
           <p>低库存先生成补货建议，人工确认后再转采购需求。</p>
         </div>
-        <button className="primary-action" type="button" onClick={handleGenerate} disabled={actionStatus === "saving"}>
+        {canManage ? <button className="primary-action" type="button" onClick={handleGenerate} disabled={actionStatus === "saving"}>
           <RotateCw aria-hidden="true" size={16} />
           生成补货建议
-        </button>
+        </button> : null}
       </div>
 
       <div className="party-summary material-summary" aria-label="补货建议摘要">
@@ -233,7 +232,7 @@ export function ReplenishmentSuggestionsWorkspace({
               onChange={(event) => setForm((current) => ({ ...current, expectedArrivalDate: event.target.value }))}
             />
           </label>
-          <div className="replenishment-actions">
+          {canManage ? <div className="replenishment-actions">
             <button type="button" onClick={() => handleDismiss(suggestion.id)} disabled={actionStatus === "saving"}>
               <XCircle aria-hidden="true" size={15} />
               忽略
@@ -242,7 +241,7 @@ export function ReplenishmentSuggestionsWorkspace({
               <Send aria-hidden="true" size={15} />
               转采购需求
             </button>
-          </div>
+          </div> : null}
         </form>
       ))}
 

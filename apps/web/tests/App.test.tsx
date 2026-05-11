@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
 import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
@@ -28,6 +28,63 @@ import type {
   UserAccountDto,
   WarehouseDto,
 } from "@company-erp/shared";
+
+const adminUser = {
+  id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  username: "admin",
+  employeeId: null,
+  employeeNo: null,
+  employeeName: null,
+  roles: ["admin"] as const,
+  lastLoginAt: null,
+};
+
+const viewerUser = {
+  ...adminUser,
+  id: "abababab-abab-4bab-8bab-abababababab",
+  username: "viewer",
+  roles: ["viewer"] as const,
+};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Response {
+  return {
+    ok,
+    status,
+    json: () => Promise.resolve(payload),
+  } as Response;
+}
+
+function mockShellFetch(user: typeof adminUser | typeof viewerUser | null = adminUser) {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+
+    if (url.endsWith("/api/auth/me")) return Promise.resolve(jsonResponse({ user }));
+    if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
+    if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
+    if (url.endsWith("/health")) return Promise.resolve(jsonResponse({ status: "ok", service: "company-erp-api" }));
+    if (url.includes("/api/parties")) return Promise.resolve(jsonResponse({ parties: [] }));
+    if (url.includes("/api/materials")) return Promise.resolve(jsonResponse({ materials: [] }));
+    if (url.includes("/api/warehouses")) return Promise.resolve(jsonResponse({ warehouses: [] }));
+    if (url.includes("/api/departments")) return Promise.resolve(jsonResponse({ departments: [] }));
+    if (url.includes("/api/employees")) return Promise.resolve(jsonResponse({ employees: [] }));
+    if (url.includes("/api/user-accounts")) return Promise.resolve(jsonResponse({ userAccounts: [] }));
+    if (url.includes("/api/purchase-requests")) return Promise.resolve(jsonResponse({ purchaseRequests: [] }));
+    if (url.includes("/api/purchase-records")) return Promise.resolve(jsonResponse({ purchaseRecords: [] }));
+    if (url.includes("/api/inventory-movements")) return Promise.resolve(jsonResponse({ inventoryMovements: [] }));
+    if (url.includes("/api/inventory-balances")) return Promise.resolve(jsonResponse({ inventoryBalances: [] }));
+    if (url.includes("/api/replenishment-suggestions")) return Promise.resolve(jsonResponse({ replenishmentSuggestions: [] }));
+    if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
+    if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
+    if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
+
+    return Promise.resolve(jsonResponse({}));
+  });
+}
 
 const party: PartyDto = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -365,24 +422,75 @@ const projectUsageRequest: ProjectUsageRequestDto = {
 };
 
 describe("Company ERP app shell", () => {
-  it("renders the Apple-style dashboard navigation and top bar", () => {
+  it("renders login screen when there is no active session", async () => {
+    mockShellFetch(null);
+
     render(<App />);
 
+    expect(await screen.findByText("内网 ERP 登录")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Company ERP" })).toBeInTheDocument();
+    expect(screen.getByLabelText("用户名")).toBeInTheDocument();
+    expect(screen.getByLabelText("密码")).toBeInTheDocument();
+  });
+
+  it("logs in and enters the dashboard", async () => {
+    mockShellFetch(null);
+
+    render(<App />);
+
+    await screen.findByText("内网 ERP 登录");
+    fireEvent.change(screen.getByLabelText("用户名"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "ChangeMe123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "退出登录" })).toBeInTheDocument();
+  });
+
+  it("shows login failure state", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.endsWith("/api/auth/me")) return Promise.resolve(jsonResponse({ user: null }));
+      if (url.endsWith("/api/auth/login") && init?.method === "POST") {
+        return Promise.resolve(jsonResponse({ error: "INVALID_CREDENTIALS" }, false, 401));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+
+    render(<App />);
+
+    await screen.findByText("内网 ERP 登录");
+    fireEvent.change(screen.getByLabelText("用户名"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByText("登录失败，请检查账号状态、用户名或密码。")).toBeInTheDocument();
+  });
+
+  it("renders the Apple-style dashboard navigation and top bar", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Company ERP" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Dashboard/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByPlaceholderText("搜索菜单、功能、物料、供应商、单据号...")).toBeInTheDocument();
     expect(screen.getByText("数据库已连接")).toBeInTheDocument();
-    expect(screen.getByText("系统管理员")).toBeInTheDocument();
+    expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
 
     for (const label of ["基础资料", "采购", "库存", "合同", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
   });
 
-  it("renders the dashboard workflow, metrics, and operational panels", () => {
+  it("renders the dashboard workflow, metrics, and operational panels", async () => {
+    mockShellFetch(adminUser);
+
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     for (const step of ["采购需求", "待审批", "采购执行", "入库", "库存", "项目点领用"]) {
       expect(screen.getAllByText(step).length).toBeGreaterThan(0);
     }
@@ -404,10 +512,12 @@ describe("Company ERP app shell", () => {
     expect(screen.getAllByText("科技园一期项目部").length).toBeGreaterThan(0);
   });
 
-  it("renders the lightweight inventory MVP workspace", () => {
+  it("renders the lightweight inventory MVP workspace", async () => {
+    mockShellFetch(adminUser);
+
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "库存管理" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
     expect(screen.getByText("采购记录 -> 仓库入库 -> 库存流水 -> 当前库存余额")).toBeInTheDocument();
 
     for (const tab of ["入库登记", "库存流水", "当前库存查询"]) {
@@ -417,6 +527,19 @@ describe("Company ERP app shell", () => {
     expect(screen.getByRole("button", { name: "出库登记 后续开放" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "项目点领用记录 后续开放" })).toBeDisabled();
     expect(screen.getByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).toBeInTheDocument();
+  });
+
+  it("hides management forms for viewer sessions", async () => {
+    mockShellFetch(viewerUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(screen.getAllByText("viewer").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "保存往来方" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存物料" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存采购需求" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
   });
 
   it("shows API health success state", async () => {

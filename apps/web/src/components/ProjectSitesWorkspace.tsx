@@ -14,6 +14,7 @@ import {
   type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -24,6 +25,7 @@ type ProjectSitesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
+  canManage?: boolean;
 };
 
 type SiteFormState = {
@@ -64,16 +66,9 @@ type IssueFormState = {
   receivedByName: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (!response.ok) throw new Error(`Request failed with ${response.status}`);
-  return (await response.json()) as T;
-}
 
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
   const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
@@ -105,7 +100,6 @@ async function defaultLoadWarehouses(): Promise<WarehouseDto[]> {
 async function defaultCreateProjectSite(input: CreateProjectSiteInput): Promise<ProjectSiteDto> {
   const payload = await requestJson<{ projectSite: ProjectSiteDto }>(`${apiBaseUrl}/api/project-sites`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   return payload.projectSite;
@@ -116,7 +110,6 @@ async function defaultCreateUsageRequest(input: CreateProjectUsageRequestInput):
     `${apiBaseUrl}/api/project-usage-requests`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   );
@@ -131,7 +124,6 @@ async function defaultIssueUsageRequest(
     `${apiBaseUrl}/api/project-usage-requests/${id}/issue`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   );
@@ -147,6 +139,7 @@ export function ProjectSitesWorkspace({
   loadParties = defaultLoadParties,
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
+  canManage = true,
 }: ProjectSitesWorkspaceProps) {
   const [sites, setSites] = useState<ProjectSiteDto[]>([]);
   const [usageRequests, setUsageRequests] = useState<ProjectUsageRequestDto[]>([]);
@@ -517,7 +510,7 @@ export function ProjectSitesWorkspace({
           )}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
           <div className="panel-header people-panel-title">
             <h3>
               <MapPin aria-hidden="true" size={16} />
@@ -615,7 +608,7 @@ export function ProjectSitesWorkspace({
           </label>
           {masterStatus === "error" ? <p className="form-error">基础资料接口暂不可用，项目点可先保存文本字段。</p> : null}
           {siteSubmitState === "error" ? <p className="form-error">项目点保存失败，请检查编码是否重复或服务模式规则。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
       <div className="people-section-grid">
@@ -646,7 +639,7 @@ export function ProjectSitesWorkspace({
           )}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
           <div className="panel-header people-panel-title">
             <h3>
               <ClipboardList aria-hidden="true" size={16} />
@@ -737,10 +730,10 @@ export function ProjectSitesWorkspace({
           </label>
           {masterStatus === "error" ? <p className="form-error">项目点、物料或仓库接口暂不可用，暂不能登记领用。</p> : null}
           {usageSubmitState === "error" ? <p className="form-error">领用申请保存失败，请检查必填项或单号是否重复。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
-      <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单">
+      {canManage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单">
         <div className="panel-header people-panel-title">
           <h3>
             <PackageMinus aria-hidden="true" size={16} />
@@ -798,7 +791,7 @@ export function ProjectSitesWorkspace({
           />
         </label>
         {issueSubmitState === "error" ? <p className="form-error">出库失败，请检查库存余额、单号或申请状态。</p> : null}
-      </form>
+      </form> : null}
     </section>
   );
 }

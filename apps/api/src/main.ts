@@ -7,6 +7,7 @@ import {
 } from "./prismaMaterialsWarehousesRepository";
 import { createPrismaPartyRepository } from "./prismaPartyRepository";
 import {
+  createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
   createPrismaUserAccountRepository,
@@ -28,6 +29,14 @@ const host = process.env.API_HOST ?? "0.0.0.0";
 const prisma = process.env.DATABASE_URL ? new PrismaClient() : null;
 
 const app = buildApp({
+  auth: prisma
+    ? {
+        enabled: true,
+        sessionSecret: process.env.AUTH_SESSION_SECRET,
+        cookieSecure: process.env.AUTH_COOKIE_SECURE === "true",
+      }
+    : { enabled: false },
+  authRepository: prisma ? createPrismaAuthRepository(prisma) : undefined,
   partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
   materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,
   warehouseRepository: prisma ? createPrismaWarehouseRepository(prisma) : undefined,

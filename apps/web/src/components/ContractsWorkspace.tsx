@@ -14,6 +14,7 @@ import {
   type PartyDto,
   type ProjectSiteDto,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
@@ -25,6 +26,7 @@ type ContractsWorkspaceProps = {
   ) => Promise<ContractAttachmentDto>;
   loadParties?: () => Promise<PartyDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
+  canManage?: boolean;
 };
 
 type ContractFormState = {
@@ -51,32 +53,26 @@ type AttachmentFormState = {
   remark: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
 const expiryLabel = new Map(CONTRACT_EXPIRY_STATES.map((state) => [state.code, state.label]));
 
 async function defaultLoadContracts(): Promise<ContractDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/contracts`);
-  if (!response.ok) throw new Error(`Contracts failed with ${response.status}`);
-  const payload = (await response.json()) as { contracts: ContractDto[] };
+  const payload = await requestJson<{ contracts: ContractDto[] }>(`${apiBaseUrl}/api/contracts`);
   return payload.contracts;
 }
 
 async function defaultCreateContract(input: CreateContractInput): Promise<ContractDto> {
-  const response = await fetch(`${apiBaseUrl}/api/contracts`, {
+  const payload = await requestJson<{ contract: ContractDto }>(`${apiBaseUrl}/api/contracts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Contract create failed with ${response.status}`);
-  const payload = (await response.json()) as { contract: ContractDto };
   return payload.contract;
 }
 
 async function defaultLoadContractAttachments(contractId: string): Promise<ContractAttachmentDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/contracts/${contractId}/attachments`);
-  if (!response.ok) throw new Error(`Contract attachments failed with ${response.status}`);
-  const payload = (await response.json()) as { contractAttachments: ContractAttachmentDto[] };
+  const payload = await requestJson<{ contractAttachments: ContractAttachmentDto[] }>(
+    `${apiBaseUrl}/api/contracts/${contractId}/attachments`,
+  );
   return payload.contractAttachments;
 }
 
@@ -84,27 +80,23 @@ async function defaultCreateContractAttachment(
   contractId: string,
   input: CreateContractAttachmentInput,
 ): Promise<ContractAttachmentDto> {
-  const response = await fetch(`${apiBaseUrl}/api/contracts/${contractId}/attachments`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) throw new Error(`Contract attachment create failed with ${response.status}`);
-  const payload = (await response.json()) as { contractAttachment: ContractAttachmentDto };
+  const payload = await requestJson<{ contractAttachment: ContractAttachmentDto }>(
+    `${apiBaseUrl}/api/contracts/${contractId}/attachments`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return payload.contractAttachment;
 }
 
 async function defaultLoadParties(): Promise<PartyDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/parties`);
-  if (!response.ok) throw new Error(`Parties failed with ${response.status}`);
-  const payload = (await response.json()) as { parties: PartyDto[] };
+  const payload = await requestJson<{ parties: PartyDto[] }>(`${apiBaseUrl}/api/parties`);
   return payload.parties;
 }
 
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/project-sites`);
-  if (!response.ok) throw new Error(`Project sites failed with ${response.status}`);
-  const payload = (await response.json()) as { projectSites: ProjectSiteDto[] };
+  const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
   return payload.projectSites;
 }
 
@@ -115,6 +107,7 @@ export function ContractsWorkspace({
   createContractAttachment = defaultCreateContractAttachment,
   loadParties = defaultLoadParties,
   loadProjectSites = defaultLoadProjectSites,
+  canManage = true,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
   const [attachments, setAttachments] = useState<ContractAttachmentDto[]>([]);
@@ -350,7 +343,7 @@ export function ContractsWorkspace({
           {contractStatus === "ready" && filteredContracts.length > 0 ? <ContractsTable contracts={filteredContracts} /> : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleContractSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleContractSubmit}>
           <div className="panel-header">
             <h3>新增合同</h3>
             <button type="submit" disabled={contractSubmitState === "saving" || !hasCounterparties}>
@@ -430,7 +423,7 @@ export function ContractsWorkspace({
           </label>
           {contractSubmitState === "saved" ? <p className="form-success">合同已保存。</p> : null}
           {contractSubmitState === "error" ? <p className="form-error">合同保存失败，请检查编号、日期或金额。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
       <div className="people-section-grid">
@@ -448,7 +441,7 @@ export function ContractsWorkspace({
           {attachmentStatus === "ready" && attachments.length > 0 ? <AttachmentsTable attachments={attachments} /> : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit}>
           <div className="panel-header">
             <h3>登记附件路径</h3>
             <button type="submit" disabled={attachmentSubmitState === "saving" || contracts.length === 0}>
@@ -488,7 +481,7 @@ export function ContractsWorkspace({
           </label>
           {attachmentSubmitState === "saved" ? <p className="form-success">附件路径已保存。</p> : null}
           {attachmentSubmitState === "error" ? <p className="form-error">附件路径保存失败，请检查合同和路径。</p> : null}
-        </form>
+        </form> : null}
       </div>
     </section>
   );

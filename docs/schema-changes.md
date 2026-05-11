@@ -139,3 +139,11 @@ Before creating migrations, confirm the MVP data model for:
 - Added optional `purchase_records.contract_id` so purchase execution can reference a contract without making contracts mandatory.
 - Confirmed expiry display state remains derived from `contracts.end_date` and manual `terminated` status; no reminder or renewal workflow is added.
 - Added migration `20260511223000_contracts_foundation`.
+
+## 2026-05-11 Login and Permission Guard Foundation
+
+- Reused existing `user_accounts`, `user_role_assignments`, `employees`, and `departments` schema for login and fixed-role authorization.
+- Confirmed no additional database tables, columns, indexes, enum values, or Prisma migration were required for this slice.
+- Confirmed password verification uses the existing `scrypt$salt$hash` format already used by user account creation and reset.
+- Confirmed sessions are signed HttpOnly cookies; no JWT/session table, SSO, or dynamic permission table is added.
+- Added a shared `masterData` permission area for parties, materials, and warehouses; permissions remain shared-code constants.

@@ -1,5 +1,3 @@
-import { randomBytes, scrypt as scryptCallback } from "node:crypto";
-import { promisify } from "node:util";
 import { Prisma, PrismaClient, type RoleCode as PrismaRoleCode } from "@prisma/client";
 import type {
   CreateDepartmentInput,
@@ -24,8 +22,8 @@ import {
   type UserAccountListFilters,
   type UserAccountRepository,
 } from "./peoplePermissions";
-
-const scrypt = promisify(scryptCallback);
+import { hashPassword } from "./password";
+import type { AuthRepository, AuthAccountRecord } from "./auth";
 
 type PrismaDepartment = Prisma.DepartmentGetPayload<{
   include: {
@@ -48,6 +46,13 @@ type PrismaUserAccount = Prisma.UserAccountGetPayload<{
   };
 }>;
 
+type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
+  include: {
+    employee: true;
+    roles: true;
+  };
+}>;
+
 function dateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
@@ -55,12 +60,6 @@ function dateOnly(value: Date | null): string | null {
 function parseDate(value: string | null | undefined): Date | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : new Date(`${value}T00:00:00.000Z`);
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const derivedKey = (await scrypt(password, salt, 64)) as Buffer;
-  return `scrypt$${salt}$${derivedKey.toString("hex")}`;
 }
 
 function toDepartmentDto(department: PrismaDepartment): DepartmentDto {
@@ -111,6 +110,24 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
     employeeName: account.employee?.name ?? null,
     username: account.username,
     status: account.status,
+    roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
+    lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
+    passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
+    createdAt: account.createdAt.toISOString(),
+    updatedAt: account.updatedAt.toISOString(),
+  };
+}
+
+function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
+  return {
+    id: account.id,
+    username: account.username,
+    passwordHash: account.passwordHash,
+    status: account.status,
+    employeeId: account.employeeId,
+    employeeNo: account.employee?.employeeNo ?? null,
+    employeeName: account.employee?.name ?? null,
+    employeeStatus: account.employee?.employmentStatus ?? null,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
@@ -404,6 +421,27 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
         mapUserAccountConflict(error);
       }
+    },
+  };
+}
+
+export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository {
+  const include = { employee: true, roles: true } satisfies Prisma.UserAccountInclude;
+
+  return {
+    async findByUsername(username: string) {
+      const account = await prisma.userAccount.findUnique({ where: { username }, include });
+      return account ? toAuthAccountRecord(account) : null;
+    },
+    async findById(id: string) {
+      const account = await prisma.userAccount.findUnique({ where: { id }, include });
+      return account ? toAuthAccountRecord(account) : null;
+    },
+    async updateLastLogin(id: string, at: Date) {
+      await prisma.userAccount.update({
+        where: { id },
+        data: { lastLoginAt: at },
+      });
     },
   };
 }

@@ -13,6 +13,7 @@ import {
   type PurchaseRequestStatusCode,
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -20,6 +21,7 @@ type PurchaseWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
   createPurchaseRequest?: (input: CreatePurchaseRequestInput) => Promise<PurchaseRequestDto>;
   createPurchaseRecord?: (input: CreatePurchaseRecordInput) => Promise<PurchaseRecordDto>;
+  canManage?: boolean;
 };
 
 type RequestFormState = {
@@ -46,51 +48,38 @@ type RecordFormState = {
   unit: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
 const sourceTypeLabel = new Map(PURCHASE_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
 
 async function defaultLoadPurchaseRequests(): Promise<PurchaseRequestDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/purchase-requests`);
-  if (!response.ok) throw new Error(`Purchase requests failed with ${response.status}`);
-  const payload = (await response.json()) as { purchaseRequests: PurchaseRequestDto[] };
+  const payload = await requestJson<{ purchaseRequests: PurchaseRequestDto[] }>(`${apiBaseUrl}/api/purchase-requests`);
   return payload.purchaseRequests;
 }
 
 async function defaultLoadPurchaseRecords(): Promise<PurchaseRecordDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/purchase-records`);
-  if (!response.ok) throw new Error(`Purchase records failed with ${response.status}`);
-  const payload = (await response.json()) as { purchaseRecords: PurchaseRecordDto[] };
+  const payload = await requestJson<{ purchaseRecords: PurchaseRecordDto[] }>(`${apiBaseUrl}/api/purchase-records`);
   return payload.purchaseRecords;
 }
 
 async function defaultLoadContracts(): Promise<ContractDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/contracts`);
-  if (!response.ok) throw new Error(`Contracts failed with ${response.status}`);
-  const payload = (await response.json()) as { contracts: ContractDto[] };
+  const payload = await requestJson<{ contracts: ContractDto[] }>(`${apiBaseUrl}/api/contracts`);
   return payload.contracts;
 }
 
 async function defaultCreatePurchaseRequest(input: CreatePurchaseRequestInput): Promise<PurchaseRequestDto> {
-  const response = await fetch(`${apiBaseUrl}/api/purchase-requests`, {
+  const payload = await requestJson<{ purchaseRequest: PurchaseRequestDto }>(`${apiBaseUrl}/api/purchase-requests`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Purchase request create failed with ${response.status}`);
-  const payload = (await response.json()) as { purchaseRequest: PurchaseRequestDto };
   return payload.purchaseRequest;
 }
 
 async function defaultCreatePurchaseRecord(input: CreatePurchaseRecordInput): Promise<PurchaseRecordDto> {
-  const response = await fetch(`${apiBaseUrl}/api/purchase-records`, {
+  const payload = await requestJson<{ purchaseRecord: PurchaseRecordDto }>(`${apiBaseUrl}/api/purchase-records`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Purchase record create failed with ${response.status}`);
-  const payload = (await response.json()) as { purchaseRecord: PurchaseRecordDto };
   return payload.purchaseRecord;
 }
 
@@ -100,6 +89,7 @@ export function PurchaseWorkspace({
   loadContracts = defaultLoadContracts,
   createPurchaseRequest = defaultCreatePurchaseRequest,
   createPurchaseRecord = defaultCreatePurchaseRecord,
+  canManage = true,
 }: PurchaseWorkspaceProps) {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDto[]>([]);
   const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordDto[]>([]);
@@ -343,7 +333,7 @@ export function PurchaseWorkspace({
           {requestStatus === "ready" && filteredRequests.length > 0 ? <PurchaseRequestsTable requests={filteredRequests} /> : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit}>
           <div className="panel-header">
             <h3>新增采购需求</h3>
             <button type="submit" disabled={requestSubmitState === "saving"}>
@@ -380,7 +370,7 @@ export function PurchaseWorkspace({
             <input type="date" value={requestForm.expectedArrivalDate} onChange={(event) => setRequestForm((current) => ({ ...current, expectedArrivalDate: event.target.value }))} />
           </label>
           {requestSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
       <div className="people-section-grid">
@@ -405,7 +395,7 @@ export function PurchaseWorkspace({
           {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} /> : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit}>
           <div className="panel-header">
             <h3>新增采购记录</h3>
             <button type="submit" disabled={recordSubmitState === "saving"}>
@@ -471,7 +461,7 @@ export function PurchaseWorkspace({
             <input required value={recordForm.unit} onChange={(event) => setRecordForm((current) => ({ ...current, unit: event.target.value }))} />
           </label>
           {recordSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </div>
     </section>
   );
