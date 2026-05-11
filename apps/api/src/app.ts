@@ -71,6 +71,19 @@ import {
   normalizeUpdateReplenishmentSuggestionInput,
   type ReplenishmentSuggestionRepository,
 } from "./replenishment";
+import {
+  ProjectSiteConflictError,
+  ProjectSiteValidationError,
+  ProjectUsageRequestConflictError,
+  ProjectUsageRequestValidationError,
+  normalizeIssueProjectUsageRequestInput,
+  normalizeProjectSiteFilters,
+  normalizeProjectSiteInput,
+  normalizeProjectUsageRequestFilters,
+  normalizeProjectUsageRequestInput,
+  type ProjectSiteRepository,
+  type ProjectUsageRequestRepository,
+} from "./projectSites";
 
 type BuildAppOptions = {
   partyRepository?: PartyRepository;
@@ -83,6 +96,8 @@ type BuildAppOptions = {
   purchaseRecordRepository?: PurchaseRecordRepository;
   inventoryRepository?: InventoryRepository;
   replenishmentSuggestionRepository?: ReplenishmentSuggestionRepository;
+  projectSiteRepository?: ProjectSiteRepository;
+  projectUsageRequestRepository?: ProjectUsageRequestRepository;
 };
 
 export function buildApp(options: BuildAppOptions = {}) {
@@ -859,6 +874,168 @@ export function buildApp(options: BuildAppOptions = {}) {
       }
       if (error instanceof ReplenishmentSuggestionConflictError) {
         return reply.status(409).send({ error: "REPLENISHMENT_CONFLICT", reason: error.reason });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-sites", async (request, reply) => {
+    if (!options.projectSiteRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeProjectSiteFilters(request.query as Record<string, unknown>);
+      const projectSites = await options.projectSiteRepository.list(filters);
+      return { projectSites };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-sites/:id", async (request, reply) => {
+    if (!options.projectSiteRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const projectSite = await options.projectSiteRepository.getById(id);
+    if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    return { projectSite };
+  });
+
+  app.post("/api/project-sites", async (request, reply) => {
+    if (!options.projectSiteRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeProjectSiteInput(request.body, "create");
+      const projectSite = await options.projectSiteRepository.create(input);
+      return reply.status(201).send({ projectSite });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ProjectSiteConflictError) {
+        return reply.status(409).send({ error: "PROJECT_SITE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/project-sites/:id", async (request, reply) => {
+    if (!options.projectSiteRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeProjectSiteInput(request.body, "update");
+      const projectSite = await options.projectSiteRepository.update(id, input);
+      if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      return { projectSite };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ProjectSiteConflictError) {
+        return reply.status(409).send({ error: "PROJECT_SITE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-usage-requests", async (request, reply) => {
+    if (!options.projectUsageRequestRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeProjectUsageRequestFilters(request.query as Record<string, unknown>);
+      const projectUsageRequests = await options.projectUsageRequestRepository.list(filters);
+      return { projectUsageRequests };
+    } catch (error) {
+      if (error instanceof ProjectUsageRequestValidationError) {
+        return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-usage-requests/:id", async (request, reply) => {
+    if (!options.projectUsageRequestRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const projectUsageRequest = await options.projectUsageRequestRepository.getById(id);
+    if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+    return { projectUsageRequest };
+  });
+
+  app.post("/api/project-usage-requests", async (request, reply) => {
+    if (!options.projectUsageRequestRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeProjectUsageRequestInput(request.body, "create");
+      const projectUsageRequest = await options.projectUsageRequestRepository.create(input);
+      return reply.status(201).send({ projectUsageRequest });
+    } catch (error) {
+      if (error instanceof ProjectUsageRequestValidationError) {
+        return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ProjectUsageRequestConflictError) {
+        return reply.status(409).send({ error: "PROJECT_USAGE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/project-usage-requests/:id", async (request, reply) => {
+    if (!options.projectUsageRequestRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeProjectUsageRequestInput(request.body, "update");
+      const projectUsageRequest = await options.projectUsageRequestRepository.update(id, input);
+      if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      return { projectUsageRequest };
+    } catch (error) {
+      if (error instanceof ProjectUsageRequestValidationError) {
+        return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ProjectUsageRequestConflictError) {
+        return reply.status(409).send({ error: "PROJECT_USAGE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-usage-requests/:id/issue", async (request, reply) => {
+    if (!options.projectUsageRequestRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeIssueProjectUsageRequestInput(request.body);
+      const projectUsageRequest = await options.projectUsageRequestRepository.issue(id, input);
+      if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      return reply.status(201).send({ projectUsageRequest });
+    } catch (error) {
+      if (error instanceof ProjectUsageRequestValidationError) {
+        return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ProjectUsageRequestConflictError) {
+        return reply.status(409).send({ error: "PROJECT_USAGE_CONFLICT", field: error.field });
       }
       throw error;
     }

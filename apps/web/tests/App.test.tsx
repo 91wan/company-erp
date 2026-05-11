@@ -6,6 +6,7 @@ import { InventoryWorkspace } from "../src/components/InventoryWorkspace";
 import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
 import { PeoplePermissionsWorkspace } from "../src/components/PeoplePermissionsWorkspace";
+import { ProjectSitesWorkspace } from "../src/components/ProjectSitesWorkspace";
 import { PurchaseWorkspace } from "../src/components/PurchaseWorkspace";
 import { ReplenishmentSuggestionsWorkspace } from "../src/components/ReplenishmentSuggestionsWorkspace";
 import type {
@@ -16,6 +17,8 @@ import type {
   InventoryMovementDto,
   MaterialDto,
   PartyDto,
+  ProjectSiteDto,
+  ProjectUsageRequestDto,
   PurchaseRecordDto,
   PurchaseRequestDto,
   ReplenishmentSuggestionDto,
@@ -252,6 +255,61 @@ const inventoryBalance: InventoryBalanceDto = {
   safeStock: material.safeStock,
   isLowStock: true,
   lastMovementAt: "2026-05-11",
+};
+
+const projectSite: ProjectSiteDto = {
+  id: "12121212-1212-4121-8121-121212121212",
+  siteCode: "SITE-WX-001",
+  siteName: "科技园一期项目点",
+  clientPartyId: party.id,
+  clientPartyName: "无锡科技园服务单位",
+  operatorPartyId: null,
+  operatorPartyName: null,
+  serviceMode: "direct",
+  subcontractorPartyId: null,
+  subcontractorPartyName: null,
+  region: "无锡",
+  siteAddress: "无锡市新吴区",
+  serviceType: "园区综合服务",
+  status: "active",
+  startDate: "2026-05-01",
+  endDate: null,
+  primaryManagerEmployeeId: employee.id,
+  primaryManagerEmployeeName: employee.name,
+  clientContactName: "李客户",
+  clientContactPhone: "13800000000",
+  subcontractorContactName: null,
+  subcontractorContactPhone: null,
+  remark: null,
+  createdAt: "2026-05-11T13:00:00.000Z",
+  updatedAt: "2026-05-11T13:00:00.000Z",
+};
+
+const projectUsageRequest: ProjectUsageRequestDto = {
+  id: "13131313-1313-4131-8131-131313131313",
+  requestNo: "USE20260511001",
+  requestDate: "2026-05-11",
+  projectSiteId: projectSite.id,
+  projectSiteName: projectSite.siteName,
+  warehouseId: warehouse.id,
+  warehouseCode: warehouse.warehouseCode,
+  warehouseName: warehouse.warehouseName,
+  materialId: material.id,
+  materialCode: material.materialCode,
+  materialName: material.materialName,
+  specification: material.specification,
+  requestedQuantity: 10,
+  approvedQuantity: null,
+  issuedQuantity: 0,
+  unit: material.baseUnit,
+  purpose: "项目点新员工补领",
+  requestedBy: "项目点负责人",
+  expectedDate: "2026-05-15",
+  status: "pending",
+  outboundNo: null,
+  remark: null,
+  createdAt: "2026-05-11T13:10:00.000Z",
+  updatedAt: "2026-05-11T13:10:00.000Z",
 };
 
 describe("Company ERP app shell", () => {
@@ -648,6 +706,141 @@ describe("Company ERP app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await screen.findByText("入库登记失败，请检查必填项或单号是否重复。")).toBeInTheDocument();
+  });
+
+  it("renders project site and usage request workspace data", async () => {
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "项目点" })).toBeInTheDocument();
+    expect(screen.getAllByText("项目点台账").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("领用申请").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("出库登记").length).toBeGreaterThan(0);
+    expect(screen.getByText("新增项目点")).toBeInTheDocument();
+    expect(screen.getByText("新增领用申请")).toBeInTheDocument();
+    expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
+    expect(screen.getAllByText("科技园一期项目点").length).toBeGreaterThan(0);
+    expect(screen.getByText("USE20260511001")).toBeInTheDocument();
+    expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
+  });
+
+  it("renders project site empty and error states", async () => {
+    const { rerender } = render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无项目点资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无领用申请")).toBeInTheDocument();
+
+    rerender(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.reject(new Error("offline"))}
+        loadUsageRequests={() => Promise.reject(new Error("offline"))}
+        loadParties={() => Promise.reject(new Error("offline"))}
+        loadMaterials={() => Promise.reject(new Error("offline"))}
+        loadWarehouses={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("项目点资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("领用申请加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("项目点、物料或仓库接口暂不可用，暂不能登记领用。")).toBeInTheDocument();
+  });
+
+  it("creates a project site and usage request", async () => {
+    const createdSite = { ...projectSite, siteCode: "SITE-WX-002", siteName: "滨江项目点" };
+    const createdRequest = { ...projectUsageRequest, requestNo: "USE20260511002", projectSiteName: "滨江项目点" };
+
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        createProjectSite={() => Promise.resolve(createdSite)}
+        createUsageRequest={() => Promise.resolve(createdRequest)}
+      />,
+    );
+
+    await screen.findByText("暂无项目点资料");
+    fireEvent.change(screen.getByLabelText("项目点编码"), { target: { value: "SITE-WX-002" } });
+    fireEvent.change(screen.getByLabelText("项目点名称"), { target: { value: "滨江项目点" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存项目点" }));
+
+    expect(await screen.findByText("SITE-WX-002")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("领用申请单号"), { target: { value: "USE20260511002" } });
+    fireEvent.change(screen.getByLabelText("申请日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getAllByLabelText("项目点").find((element) => element.tagName === "SELECT")!, {
+      target: { value: projectSite.id },
+    });
+    fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
+    fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });
+    fireEvent.change(screen.getByLabelText("申请数量"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存领用申请" }));
+
+    expect(await screen.findByText("USE20260511002")).toBeInTheDocument();
+  });
+
+  it("issues a project usage request and shows failures", async () => {
+    const issuedRequest = {
+      ...projectUsageRequest,
+      issuedQuantity: 10,
+      outboundNo: "OUT20260511001",
+      status: "issued" as const,
+    };
+    const { rerender } = render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        issueUsageRequest={() => Promise.resolve(issuedRequest)}
+      />,
+    );
+
+    await screen.findByText("USE20260511001");
+    fireEvent.change(screen.getByLabelText("领用申请"), { target: { value: projectUsageRequest.id } });
+    fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511001" } });
+    fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
+
+    expect((await screen.findAllByText("已出库")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("10 套")).length).toBeGreaterThan(0);
+
+    rerender(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        issueUsageRequest={() => Promise.reject(new Error("insufficient stock"))}
+      />,
+    );
+
+    await screen.findByText("USE20260511001");
+    fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511002" } });
+    fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
+
+    expect(await screen.findByText("出库失败，请检查库存余额、单号或申请状态。")).toBeInTheDocument();
   });
 
   it("renders purchase empty and error states", async () => {
