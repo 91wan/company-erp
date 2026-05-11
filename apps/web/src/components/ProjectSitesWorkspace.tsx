@@ -631,13 +631,28 @@ export function ProjectSitesWorkspace({
             <StateMessage icon={<ClipboardList size={16} />} text="暂无领用申请" />
           ) : (
             <ResponsiveTable
-              headers={["申请单号", "项目点", "物料", "申请数量", "已出库", "仓库", "状态", "期望日期"]}
+              headers={[
+                "申请单号",
+                "项目点",
+                "物料",
+                "申请数量",
+                "已出库",
+                "领用金额",
+                "领用人",
+                "领用时间",
+                "仓库",
+                "状态",
+                "期望日期",
+              ]}
               rows={filteredUsageRequests.map((request) => [
                 request.requestNo,
                 request.projectSiteName,
                 `${request.materialCode} ${request.materialName}`,
                 `${request.requestedQuantity} ${request.unit}`,
                 `${request.issuedQuantity} ${request.unit}`,
+                formatMoney(request.chargeAmount),
+                request.lastReceivedByName ?? "-",
+                request.lastIssuedAt ?? "-",
                 request.warehouseCode,
                 <StatusBadge key={`${request.id}-status`} tone={request.status === "issued" ? "green" : "orange"}>
                   {usageStatusLabel.get(request.status) ?? request.status}
@@ -799,6 +814,11 @@ export function ProjectSitesWorkspace({
             onChange={(event) => setIssueForm({ ...issueForm, receivedByName: event.target.value })}
           />
         </label>
+        {issueForm.requestId ? (
+          <p className="form-helper">
+            出库成功后会按物料当前项目点收费价生成金额快照；后续调价不会回写历史流水。
+          </p>
+        ) : null}
         {issueSubmitState === "error" ? <p className="form-error">出库失败，请检查库存余额、单号或申请状态。</p> : null}
       </form> : null}
     </section>
@@ -853,4 +873,9 @@ function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
 function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray"; children: ReactNode }) {
   const className = tone === "green" ? "status-badge green" : tone === "orange" ? "status-badge amber" : "status-badge gray";
   return <span className={className}>{children}</span>;
+}
+
+function formatMoney(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "-";
+  return `¥${value.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

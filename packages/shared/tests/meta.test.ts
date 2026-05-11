@@ -4,6 +4,7 @@ import {
   canManage,
   canRead,
   calculateCurrentInventory,
+  CHARGE_PRICE_SOURCES,
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
   CONTRACT_STATUSES,
@@ -137,6 +138,7 @@ describe("MVP inventory dictionaries", () => {
       "project_site",
       "subcontractor",
     ]);
+    expect(CHARGE_PRICE_SOURCES.map((source) => source.code)).toEqual(["project_site_price"]);
     expect(MVP_DICTIONARIES.warehouseType.values).toEqual(["总部仓", "项目点仓", "临时仓"]);
     expect(MVP_DICTIONARIES.inventoryMovementType.values).toEqual([
       "入库",
@@ -158,6 +160,7 @@ describe("MVP inventory dictionaries", () => {
       "project_site",
       "subcontractor",
     ]);
+    expect(MVP_DICTIONARIES.chargePriceSource.values).toEqual(["项目点收费价"]);
     expect(MVP_DICTIONARIES.projectUsageStatus.values).toEqual([
       "待处理",
       "已出库",

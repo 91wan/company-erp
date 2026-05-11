@@ -36,6 +36,10 @@ enum IssueTargetType {
   subcontractor
 }
 
+enum ChargePriceSource {
+  project_site_price
+}
+
 enum ProjectUsageStatus {
   pending
   issued
@@ -158,6 +162,12 @@ model Material {
   defaultWarehouseId String?                 @map("default_warehouse_id") @db.Uuid
   defaultSupplierPartyId String?             @map("default_supplier_party_id") @db.Uuid
   safeStock          Decimal?                @map("safe_stock") @db.Decimal(14, 3)
+  isProjectSiteSaleEnabled Boolean           @default(false) @map("is_project_site_sale_enabled")
+  purchaseReferencePrice Decimal?            @map("purchase_reference_price") @db.Decimal(14, 4)
+  projectSiteSalePrice Decimal?              @map("project_site_sale_price") @db.Decimal(14, 4)
+  projectSiteSaleUnit String?                @map("project_site_sale_unit")
+  projectSiteSaleRemark String?              @map("project_site_sale_remark")
+  isConsumable       Boolean                 @default(false) @map("is_consumable")
   status             BaseStatus              @default(enabled)
   remark             String?
   createdAt          DateTime                @default(now()) @map("created_at")
@@ -208,6 +218,10 @@ model InventoryMovement {
   quantity              Decimal                @db.Decimal(14, 3)
   unit                  String
   unitPrice             Decimal?               @map("unit_price") @db.Decimal(14, 4)
+  unitChargePrice       Decimal?               @map("unit_charge_price") @db.Decimal(14, 4)
+  chargeAmount          Decimal?               @map("charge_amount") @db.Decimal(14, 4)
+  chargePriceSource     ChargePriceSource?     @map("charge_price_source")
+  chargeRemark          String?                @map("charge_remark")
   purchaseRecordNo      String?                @map("purchase_record_no")
   purchaseRecordLineId  String?                @map("purchase_record_line_id") @db.Uuid
   projectSiteId         String?                @map("project_site_id") @db.Uuid
@@ -250,6 +264,12 @@ model ProjectUsageRequest {
   expectedDate      DateTime?            @map("expected_date") @db.Date
   status            ProjectUsageStatus   @default(pending)
   outboundNo        String?              @map("outbound_no")
+  unitChargePrice   Decimal?             @map("unit_charge_price") @db.Decimal(14, 4)
+  chargeAmount      Decimal              @default(0) @map("charge_amount") @db.Decimal(14, 4)
+  chargePriceSource ChargePriceSource?   @map("charge_price_source")
+  chargeRemark      String?              @map("charge_remark")
+  lastIssuedAt      DateTime?            @map("last_issued_at") @db.Date
+  lastReceivedByName String?             @map("last_received_by_name")
   remark            String?
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")

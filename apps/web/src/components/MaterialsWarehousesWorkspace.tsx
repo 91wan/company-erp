@@ -71,6 +71,8 @@ export function MaterialsWarehousesWorkspace({
     materialName: "",
     materialCategory: "定制物料",
     baseUnit: "",
+    isProjectSiteSaleEnabled: false,
+    isConsumable: false,
     status: "enabled",
   });
   const [warehouseForm, setWarehouseForm] = useState<CreateWarehouseInput>({
@@ -165,6 +167,8 @@ export function MaterialsWarehousesWorkspace({
         materialName: "",
         materialCategory: "定制物料",
         baseUnit: "",
+        isProjectSiteSaleEnabled: false,
+        isConsumable: false,
         status: "enabled",
       });
       setMaterialSubmitState("idle");
@@ -316,6 +320,72 @@ export function MaterialsWarehousesWorkspace({
               }
             />
           </label>
+          <label className="form-check-row">
+            <input
+              type="checkbox"
+              checked={materialForm.isProjectSiteSaleEnabled ?? false}
+              onChange={(event) =>
+                setMaterialForm((current) => ({ ...current, isProjectSiteSaleEnabled: event.target.checked }))
+              }
+            />
+            <span>项目点领用收费</span>
+          </label>
+          <label>
+            <span>采购参考价</span>
+            <input
+              min="0"
+              step="0.0001"
+              type="number"
+              value={materialForm.purchaseReferencePrice ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  purchaseReferencePrice: event.target.value ? Number(event.target.value) : null,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>项目点收费价</span>
+            <input
+              min="0"
+              step="0.0001"
+              type="number"
+              value={materialForm.projectSiteSalePrice ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  projectSiteSalePrice: event.target.value ? Number(event.target.value) : null,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>收费单位</span>
+            <input
+              value={materialForm.projectSiteSaleUnit ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({ ...current, projectSiteSaleUnit: event.target.value || null }))
+              }
+            />
+          </label>
+          <label>
+            <span>收费备注</span>
+            <input
+              value={materialForm.projectSiteSaleRemark ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({ ...current, projectSiteSaleRemark: event.target.value || null }))
+              }
+            />
+          </label>
+          <label className="form-check-row">
+            <input
+              type="checkbox"
+              checked={materialForm.isConsumable ?? false}
+              onChange={(event) => setMaterialForm((current) => ({ ...current, isConsumable: event.target.checked }))}
+            />
+            <span>耗材</span>
+          </label>
 
           {materialSubmitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
         </form> : null}
@@ -442,6 +512,8 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
             <th>默认仓库</th>
             <th>默认供应商</th>
             <th>安全库存</th>
+            <th>项目点收费</th>
+            <th>耗材</th>
             <th>状态</th>
             <th>更新时间</th>
           </tr>
@@ -459,6 +531,13 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
               <td>{material.defaultWarehouseName || "-"}</td>
               <td>{material.defaultSupplierPartyName || "-"}</td>
               <td>{material.safeStock ?? "-"}</td>
+              <td>
+                {material.isProjectSiteSaleEnabled && material.projectSiteSalePrice !== null && material.projectSiteSalePrice !== undefined
+                  ? `${material.projectSiteSalePrice} / ${material.projectSiteSaleUnit || material.baseUnit}`
+                  : "不收费"}
+                {material.isProjectSiteSaleEnabled && material.projectSiteSaleRemark ? <small>{material.projectSiteSaleRemark}</small> : null}
+              </td>
+              <td>{material.isConsumable ? "是" : "否"}</td>
               <td>
                 <span className={`status-badge ${material.status === "enabled" ? "green" : "orange"}`}>
                   {statusLabel.get(material.status)}

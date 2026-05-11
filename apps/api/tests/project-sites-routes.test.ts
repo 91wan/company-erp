@@ -75,6 +75,12 @@ function makeUsageRequest(overrides: Partial<ProjectUsageRequestDto> = {}): Proj
     expectedDate: "2026-05-15",
     status: "pending",
     outboundNo: null,
+    unitChargePrice: null,
+    chargeAmount: 0,
+    chargePriceSource: null,
+    chargeRemark: null,
+    lastIssuedAt: null,
+    lastReceivedByName: null,
     remark: null,
     createdAt: now,
     updatedAt: now,
@@ -130,7 +136,10 @@ function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSi
   };
 }
 
-function createFakeUsageRepository(seed: ProjectUsageRequestDto[] = []): ProjectUsageRequestRepository {
+function createFakeUsageRepository(
+  seed: ProjectUsageRequestDto[] = [],
+  options: { unitChargePrice?: number | null; chargeRemark?: string | null } = {},
+): ProjectUsageRequestRepository {
   const requests = [...seed];
   let stock = 20;
 
@@ -182,12 +191,20 @@ function createFakeUsageRepository(seed: ProjectUsageRequestDto[] = []): Project
       if (input.outboundNo === "OUT-DUP") throw new ProjectUsageRequestConflictError("outboundNo");
       if (input.quantity > stock) throw new ProjectUsageRequestValidationError(["insufficient stock for issue"]);
       stock -= input.quantity;
+      const unitChargePrice = options.unitChargePrice ?? null;
+      const chargeAmount = typeof unitChargePrice === "number" ? Number((unitChargePrice * input.quantity).toFixed(4)) : 0;
       const nextIssuedQuantity = requests[index].issuedQuantity + input.quantity;
       const target = requests[index].approvedQuantity ?? requests[index].requestedQuantity;
       requests[index] = {
         ...requests[index],
         issuedQuantity: nextIssuedQuantity,
         outboundNo: input.outboundNo,
+        unitChargePrice,
+        chargeAmount: Number(((requests[index].chargeAmount ?? 0) + chargeAmount).toFixed(4)),
+        chargePriceSource: typeof unitChargePrice === "number" ? "project_site_price" : null,
+        chargeRemark: options.chargeRemark ?? null,
+        lastIssuedAt: input.movementDate,
+        lastReceivedByName: input.receivedByName ?? null,
         status: nextIssuedQuantity >= target ? "issued" : "partially_issued",
         updatedAt: now,
       };
@@ -418,6 +435,84 @@ describe("project usage request API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_USAGE_CONFLICT", field: "outboundNo" });
     expect(insufficient.statusCode).toBe(400);
     expect(insufficient.json().issues).toContain("insufficient stock for issue");
+  });
+
+  it("records project usage charge snapshots when issuing requests", async () => {
+    const app = buildApp({
+      projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()], {
+        unitChargePrice: 35.5,
+        chargeRemark: "项目点领用收费价",
+      }),
+    });
+
+    const firstIssue = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests/55555555-5555-4555-8555-555555555555/issue",
+      payload: {
+        outboundNo: "OUT20260511003",
+        movementDate: "2026-05-11",
+        quantity: 4,
+        handledBy: "王仓管",
+        receivedByName: "项目点领用人",
+      },
+    });
+    const secondIssue = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests/55555555-5555-4555-8555-555555555555/issue",
+      payload: {
+        outboundNo: "OUT20260511004",
+        movementDate: "2026-05-12",
+        quantity: 6,
+        handledBy: "王仓管",
+        receivedByName: "项目点二次领用人",
+      },
+    });
+    await app.close();
+
+    expect(firstIssue.statusCode).toBe(201);
+    expect(firstIssue.json()).toMatchObject({
+      projectUsageRequest: {
+        issuedQuantity: 4,
+        chargeAmount: 142,
+        unitChargePrice: 35.5,
+        chargePriceSource: "project_site_price",
+        chargeRemark: "项目点领用收费价",
+        lastIssuedAt: "2026-05-11",
+        lastReceivedByName: "项目点领用人",
+        status: "partially_issued",
+      },
+    });
+    expect(secondIssue.statusCode).toBe(201);
+    expect(secondIssue.json()).toMatchObject({
+      projectUsageRequest: {
+        issuedQuantity: 10,
+        chargeAmount: 355,
+        lastIssuedAt: "2026-05-12",
+        lastReceivedByName: "项目点二次领用人",
+        status: "issued",
+      },
+    });
+  });
+
+  it("allows issuing non-charge usage requests without blocking outbound flow", async () => {
+    const app = buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests/55555555-5555-4555-8555-555555555555/issue",
+      payload: { outboundNo: "OUT20260511005", movementDate: "2026-05-11", quantity: 2 },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      projectUsageRequest: {
+        issuedQuantity: 2,
+        chargeAmount: 0,
+        unitChargePrice: null,
+        chargePriceSource: null,
+      },
+    });
   });
 
   it("scopes project-site-only users to assigned sites and blocks issue execution", async () => {

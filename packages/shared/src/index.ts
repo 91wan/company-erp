@@ -107,6 +107,8 @@ export type InventorySourceTypeCode =
 
 export type IssueTargetTypeCode = "internal_office" | "project_site" | "subcontractor";
 
+export type ChargePriceSourceCode = "project_site_price";
+
 export type ReplenishmentSuggestionStatusCode = "open" | "converted" | "dismissed";
 
 export type ProjectSiteServiceModeCode = "direct" | "subcontracted";
@@ -262,6 +264,12 @@ export type MaterialDto = {
   defaultSupplierPartyId?: string | null;
   defaultSupplierPartyName?: string | null;
   safeStock?: number | null;
+  isProjectSiteSaleEnabled: boolean;
+  purchaseReferencePrice?: number | null;
+  projectSiteSalePrice?: number | null;
+  projectSiteSaleUnit?: string | null;
+  projectSiteSaleRemark?: string | null;
+  isConsumable: boolean;
   status: BaseStatusCode;
   remark?: string | null;
   createdAt: string;
@@ -277,6 +285,12 @@ export type CreateMaterialInput = {
   defaultWarehouseId?: string | null;
   defaultSupplierPartyId?: string | null;
   safeStock?: number | null;
+  isProjectSiteSaleEnabled?: boolean;
+  purchaseReferencePrice?: number | null;
+  projectSiteSalePrice?: number | null;
+  projectSiteSaleUnit?: string | null;
+  projectSiteSaleRemark?: string | null;
+  isConsumable?: boolean;
   status?: BaseStatusCode;
   remark?: string | null;
 };
@@ -628,6 +642,10 @@ export type InventoryMovementDto = {
   quantity: number;
   unit: string;
   unitPrice?: number | null;
+  unitChargePrice?: number | null;
+  chargeAmount?: number | null;
+  chargePriceSource?: ChargePriceSourceCode | null;
+  chargeRemark?: string | null;
   purchaseRecordNo?: string | null;
   purchaseRecordLineId?: string | null;
   projectSiteId?: string | null;
@@ -744,6 +762,12 @@ export type ProjectUsageRequestDto = {
   expectedDate?: string | null;
   status: ProjectUsageStatusCode;
   outboundNo?: string | null;
+  unitChargePrice?: number | null;
+  chargeAmount?: number | null;
+  chargePriceSource?: ChargePriceSourceCode | null;
+  chargeRemark?: string | null;
+  lastIssuedAt?: string | null;
+  lastReceivedByName?: string | null;
   remark?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -961,6 +985,10 @@ export const ISSUE_TARGET_TYPES = [
   { code: "subcontractor", label: "外包方" },
 ] as const satisfies readonly StatusMeta<IssueTargetTypeCode>[];
 
+export const CHARGE_PRICE_SOURCES = [
+  { code: "project_site_price", label: "项目点收费价" },
+] as const satisfies readonly StatusMeta<ChargePriceSourceCode>[];
+
 export const PROJECT_SITE_SERVICE_MODES = [
   { code: "direct", label: "直营服务" },
   { code: "subcontracted", label: "外包服务" },
@@ -1173,6 +1201,10 @@ export const MVP_DICTIONARIES = {
   issueTargetType: {
     label: "出库领用对象类型",
     values: ["internal_office", "project_site", "subcontractor"],
+  },
+  chargePriceSource: {
+    label: "领用计费价格来源",
+    values: ["项目点收费价"],
   },
   projectUsageStatus: {
     label: "项目点领用状态",
