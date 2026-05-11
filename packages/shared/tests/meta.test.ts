@@ -11,6 +11,9 @@ import {
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
   ISSUE_TARGET_TYPES,
+  IMPORT_JOB_STATUSES,
+  IMPORT_ROW_STATUSES,
+  IMPORT_TEMPLATE_TYPES,
   MVP_DICTIONARIES,
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
@@ -358,5 +361,30 @@ describe("MVP dictionary constants", () => {
       "其他",
     ]);
     expect(MVP_DICTIONARIES.warehouseType.values).toEqual(["总部仓", "项目点仓", "临时仓"]);
+  });
+
+  it("defines Excel import dictionaries for the first data onboarding slice", () => {
+    expect(IMPORT_TEMPLATE_TYPES.map((template) => template.code)).toEqual([
+      "parties",
+      "materials",
+      "employees",
+      "project_sites",
+      "opening_inventory",
+    ]);
+    expect(IMPORT_JOB_STATUSES.map((status) => status.code)).toEqual(["previewed", "confirmed", "failed"]);
+    expect(IMPORT_ROW_STATUSES.map((status) => status.code)).toEqual([
+      "valid",
+      "warning",
+      "error",
+      "skipped",
+      "imported",
+    ]);
+    expect(MVP_DICTIONARIES.importTemplateType.values).toEqual([
+      "往来方/供应商",
+      "物料",
+      "部门与员工",
+      "项目点",
+      "期初库存",
+    ]);
   });
 });

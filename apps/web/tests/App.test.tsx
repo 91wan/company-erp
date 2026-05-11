@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
 import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
+import { ExcelImportWorkspace } from "../src/components/ExcelImportWorkspace";
 import { InventoryWorkspace } from "../src/components/InventoryWorkspace";
 import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
@@ -18,6 +19,8 @@ import type {
   ContractDto,
   InventoryBalanceDto,
   InventoryMovementDto,
+  ImportJobDto,
+  ImportJobSummaryDto,
   MaterialDto,
   PartyDto,
   ProjectSiteDto,
@@ -81,6 +84,8 @@ function mockShellFetch(user: typeof adminUser | typeof viewerUser | null = admi
     if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
     if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
     if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
+    if (url.includes("/api/import-jobs/")) return Promise.resolve(jsonResponse({ importJob }));
+    if (url.includes("/api/import-jobs")) return Promise.resolve(jsonResponse({ importJobs: [] }));
 
     return Promise.resolve(jsonResponse({}));
   });
@@ -184,6 +189,52 @@ const userAccount: UserAccountDto = {
   passwordChangedAt: "2026-05-11T10:00:00.000Z",
   createdAt: "2026-05-11T10:00:00.000Z",
   updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const importJobSummary: ImportJobSummaryDto = {
+  id: "12121212-1212-4121-8121-121212121212",
+  templateType: "parties",
+  originalFileName: "suppliers.xlsx",
+  fileHash: "hash",
+  status: "previewed",
+  totalRows: 2,
+  validRows: 1,
+  warningRows: 0,
+  errorRows: 0,
+  skippedRows: 1,
+  importedRows: 0,
+  createdAt: "2026-05-11T12:00:00.000Z",
+  confirmedAt: null,
+};
+
+const importJob: ImportJobDto = {
+  ...importJobSummary,
+  rows: [
+    {
+      id: "13131313-1313-4131-8131-131313131313",
+      rowNumber: 2,
+      rawData: { 供应商编码: "SUP0001", 供应商名称: "晨光贸易有限公司" },
+      normalizedData: { partyCode: "SUP0001", partyName: "晨光贸易有限公司", partyTypes: ["supplier"] },
+      issues: [],
+      status: "valid",
+      targetRecordType: null,
+      targetRecordId: null,
+      createdAt: "2026-05-11T12:00:00.000Z",
+      updatedAt: "2026-05-11T12:00:00.000Z",
+    },
+    {
+      id: "14141414-1414-4141-8141-141414141414",
+      rowNumber: 3,
+      rawData: { 供应商编码: "SUP0002", 供应商名称: "已存在供应商" },
+      normalizedData: { partyCode: "SUP0002", partyName: "已存在供应商", partyTypes: ["supplier"] },
+      issues: [{ level: "warning", field: "供应商编码", message: "编码已存在，确认导入时会跳过" }],
+      status: "skipped",
+      targetRecordType: "party",
+      targetRecordId: party.id,
+      createdAt: "2026-05-11T12:00:00.000Z",
+      updatedAt: "2026-05-11T12:00:00.000Z",
+    },
+  ],
 };
 
 const purchaseRequest: PurchaseRequestDto = {
@@ -540,6 +591,19 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: "保存物料" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存采购需求" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
+  });
+
+  it("renders the Excel import workspace in the app shell", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Excel 导入" })).toBeInTheDocument();
+    expect(screen.getByText("先预检基础资料和期初库存模板，确认无错误后再写入系统。")).toBeInTheDocument();
+    expect(screen.getByText("导入批次")).toBeInTheDocument();
+    expect(screen.getByText("行级预览")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入预检" })).toBeInTheDocument();
   });
 
   it("shows API health success state", async () => {
@@ -1124,6 +1188,74 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
     expect(await screen.findByText("附件路径保存失败，请检查合同和路径。")).toBeInTheDocument();
+  });
+
+  it("previews and confirms Excel import jobs", async () => {
+    const confirmedJob: ImportJobDto = {
+      ...importJob,
+      status: "confirmed",
+      importedRows: 1,
+      confirmedAt: "2026-05-11T12:30:00.000Z",
+      rows: importJob.rows.map((row) => (row.status === "valid" ? { ...row, status: "imported" as const } : row)),
+    };
+
+    render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([])}
+        previewImportJob={() => Promise.resolve(importJob)}
+        confirmImportJob={() => Promise.resolve(confirmedJob)}
+      />,
+    );
+
+    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Excel 文件"), {
+      target: {
+        files: [new File(["xlsx"], "suppliers.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "导入预检" }));
+
+    expect(await screen.findByText("suppliers.xlsx")).toBeInTheDocument();
+    expect(screen.getByText("编码已存在，确认导入时会跳过")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认导入" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
+
+    expect(await screen.findByText("已确认导入")).toBeInTheDocument();
+    expect(screen.getAllByText("已导入").length).toBeGreaterThan(0);
+  });
+
+  it("shows Excel import loading, error, empty, and read-only states", async () => {
+    const { rerender } = render(
+      <ExcelImportWorkspace
+        canManage={false}
+        loadImportJobs={() => Promise.resolve([importJobSummary])}
+        loadImportJobDetail={() => Promise.resolve(importJob)}
+      />,
+    );
+
+    expect(await screen.findByText("suppliers.xlsx")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("suppliers.xlsx"));
+    expect(await screen.findByText("编码已存在，确认导入时会跳过")).toBeInTheDocument();
+
+    rerender(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([])}
+        previewImportJob={() => Promise.reject(new Error("invalid template"))}
+      />,
+    );
+    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Excel 文件"), {
+      target: {
+        files: [new File(["bad"], "bad.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "导入预检" }));
+    expect(await screen.findByText("Excel 导入操作失败")).toBeInTheDocument();
+
+    rerender(<ExcelImportWorkspace loadImportJobs={() => Promise.reject(new Error("offline"))} />);
+    expect(await screen.findByText("导入批次加载失败")).toBeInTheDocument();
   });
 
   it("renders purchase empty and error states", async () => {
