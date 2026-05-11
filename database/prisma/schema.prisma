@@ -453,6 +453,7 @@ model PurchaseRecord {
   id                  String               @id @default(uuid()) @db.Uuid
   purchaseNo          String               @unique @map("purchase_no")
   purchaseRequestId   String?              @map("purchase_request_id") @db.Uuid
+  purchaseRequestNo   String?              @map("purchase_request_no")
   purchaserName       String               @map("purchaser_name")
   purchaserEmployeeId String?              @map("purchaser_employee_id") @db.Uuid
   sourceType          PurchaseSourceType   @map("source_type")

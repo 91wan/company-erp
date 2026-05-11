@@ -99,3 +99,9 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed purchase records can be platform, supplier, or offline purchases; supplier party linkage remains optional.
 - Confirmed purchase creation can move a linked purchase request into `purchasing`, but this slice does not create receiving records or update inventory balances.
 - Added migration `20260511190000_purchase_foundation`.
+
+## 2026-05-11 Purchase Foundation Hardening
+
+- Added `database/migrations/migration_lock.toml` so Prisma migration tools can detect the PostgreSQL provider from the migrations directory.
+- Added `purchase_records.purchase_request_no` as a text fallback for historical or manually entered purchase records that only know the purchase request number and do not have an internal request id link.
+- Added migration `20260511195500_purchase_record_request_no`.

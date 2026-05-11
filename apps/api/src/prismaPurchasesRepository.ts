@@ -79,7 +79,7 @@ function toPurchaseRecordDto(record: PrismaPurchaseRecord): PurchaseRecordDto {
     id: record.id,
     purchaseNo: record.purchaseNo,
     purchaseRequestId: record.purchaseRequestId,
-    purchaseRequestNo: record.purchaseRequest?.requestNo ?? null,
+    purchaseRequestNo: record.purchaseRequest?.requestNo ?? record.purchaseRequestNo,
     purchaserName: record.purchaserName,
     purchaserEmployeeId: record.purchaserEmployeeId,
     sourceType: record.sourceType,
@@ -163,6 +163,7 @@ function recordCreateData(input: CreatePurchaseRecordInput): Prisma.PurchaseReco
   return {
     purchaseNo: input.purchaseNo,
     purchaseRequest: input.purchaseRequestId ? { connect: { id: input.purchaseRequestId } } : undefined,
+    purchaseRequestNo: input.purchaseRequestNo,
     purchaserName: input.purchaserName,
     purchaser: input.purchaserEmployeeId ? { connect: { id: input.purchaserEmployeeId } } : undefined,
     sourceType: input.sourceType,
@@ -212,6 +213,7 @@ function recordUpdateData(input: UpdatePurchaseRecordInput): Prisma.PurchaseReco
   return {
     ...(input.purchaseNo !== undefined ? { purchaseNo: input.purchaseNo } : {}),
     ...relationUpdate(input.purchaseRequestId, "purchaseRequest"),
+    ...(input.purchaseRequestNo !== undefined ? { purchaseRequestNo: input.purchaseRequestNo } : {}),
     ...(input.purchaserName !== undefined ? { purchaserName: input.purchaserName } : {}),
     ...relationUpdate(input.purchaserEmployeeId, "purchaser"),
     ...(input.sourceType !== undefined ? { sourceType: input.sourceType } : {}),
