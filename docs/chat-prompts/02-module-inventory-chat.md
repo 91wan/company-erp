@@ -3,7 +3,7 @@
 你负责 Company ERP 的库存管理模块规划和实现方案。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 模块目标：
 仓库人员可以登记入库、出库、库存盘点，项目点可以查看库存并提交领用需求。

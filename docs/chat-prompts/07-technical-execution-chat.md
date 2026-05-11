@@ -3,7 +3,7 @@
 你负责 Company ERP 的实际技术实现。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 执行前必须先读取：
 1. `PROJECT_PLAN.md`

@@ -3,7 +3,7 @@
 你负责 Company ERP 的人员、部门、账号、权限模块规划。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 模块目标：
 支持公司内部用户登录，按角色访问采购、库存、合同、项目点、人员数据。

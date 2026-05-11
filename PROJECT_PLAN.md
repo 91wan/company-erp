@@ -242,7 +242,7 @@ This is not a full HR system in v1.
 Use this structure when development begins:
 
 ```text
-/Users/liuchangxi/Documents/Codex/Company-ERP/
+<project-root>/
   README.md
   PROJECT_PLAN.md
   docs/

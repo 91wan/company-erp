@@ -3,7 +3,7 @@
 你负责 Company ERP 的采购管理模块规划和实现方案。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 模块目标：
 采购人员可以管理供应商、采购需求、采购记录，并和库存入库流程衔接。

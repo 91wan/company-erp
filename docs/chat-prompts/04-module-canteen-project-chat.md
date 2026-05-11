@@ -3,7 +3,7 @@
 你负责 Company ERP 的食堂项目/项目点模块规划。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 模块目标：
 管理公司服务的食堂项目点，包括项目基础信息、负责人、人员、库存领用、合同引用。

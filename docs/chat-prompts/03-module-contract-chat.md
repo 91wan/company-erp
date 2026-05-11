@@ -3,7 +3,7 @@
 你负责 Company ERP 的合同管理模块规划。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 模块目标：
 第一版只做合同基础台账和业务引用，不做完整合同生命周期。

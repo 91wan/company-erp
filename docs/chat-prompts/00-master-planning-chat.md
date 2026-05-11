@@ -11,7 +11,7 @@
 3. 明确用户角色和权限。
 4. 明确现有数据来源：Excel、微信记录、纸质表。
 5. 明确项目目录结构。
-6. 最终产出 `/Users/liuchangxi/Documents/Codex/Company-ERP/PROJECT_PLAN.md`。
+6. 最终产出 `<project-root>/PROJECT_PLAN.md`。
 
 约束：
 - 默认中文沟通，必要技术词保留英文。
@@ -22,7 +22,7 @@
 
 建议目录：
 ```text
-/Users/liuchangxi/Documents/Codex/Company-ERP/
+<project-root>/
   README.md
   PROJECT_PLAN.md
   docs/

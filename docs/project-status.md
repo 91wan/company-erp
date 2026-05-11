@@ -9,8 +9,8 @@ Scope checked:
 
 Current state:
 
-- The active project root is `/Users/liuchangxi/Documents/Codex/Company-ERP`.
-- Planning files were previously split between `/Users/liuchangxi/Documents/Company-ERP` and `/Users/liuchangxi/Documents/Codex/Company-ERP`.
+- The active project root is the repository root.
+- Planning files were previously split between two local folders; the repository root is now the only canonical project location.
 - The project skeleton now exists under the active root:
   - `apps/web/`
   - `packages/shared/`

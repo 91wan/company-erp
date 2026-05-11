@@ -41,7 +41,7 @@ The MVP is not intended to be a full finance, payroll, HR, BI, mobile, OCR, or w
 When development begins, use this structure:
 
 ```text
-/Users/liuchangxi/Documents/Codex/Company-ERP/
+<project-root>/
   README.md
   PROJECT_PLAN.md
   docs/

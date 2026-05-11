@@ -3,7 +3,7 @@
 你负责 Company ERP 的数据整理、字段模板、导入规则规划。
 
 项目根目录：
-`/Users/liuchangxi/Documents/Codex/Company-ERP`
+`<project-root>`
 
 数据来源：
 - Excel
