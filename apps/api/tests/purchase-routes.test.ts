@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseRecordDto, PurchaseRequestDto } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { hashPassword } from "../src/password";
 import {
   PurchaseRecordConflictError,
   PurchaseRequestConflictError,
@@ -9,6 +11,8 @@ import {
 } from "../src/purchases";
 
 const now = "2026-05-11T11:00:00.000Z";
+const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const unassignedProjectSiteId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function makePurchaseRequest(overrides: Partial<PurchaseRequestDto> = {}): PurchaseRequestDto {
   return {
@@ -59,6 +63,8 @@ function makePurchaseRecord(overrides: Partial<PurchaseRecordDto> = {}): Purchas
     contractId: null,
     contractNo: null,
     contractName: null,
+    projectSiteId: null,
+    projectSiteName: null,
     supplierNameText: null,
     purchaseDescription: null,
     purchaseDate: "2026-05-11",
@@ -96,12 +102,13 @@ function createFakePurchaseRequestRepository(seed: PurchaseRequestDto[] = []): P
         const matchesStatus = filters.status ? request.status === filters.status : true;
         const matchesRequester = filters.requesterName ? request.requesterName.includes(filters.requesterName) : true;
         const matchesSite = filters.projectSiteId ? request.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(request.projectSiteId ?? "") : true;
         const matchesQuery = filters.q
           ? [request.requestNo, request.requesterName, request.lines[0]?.materialName]
               .filter(Boolean)
               .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesStatus && matchesRequester && matchesSite && matchesQuery;
+        return matchesStatus && matchesRequester && matchesSite && matchesScopedSites && matchesQuery;
       });
     },
     async getById(id) {
@@ -176,12 +183,13 @@ function createFakePurchaseRecordRepository(seed: PurchaseRecordDto[] = []): Pur
         const matchesSource = filters.sourceType ? record.sourceType === filters.sourceType : true;
         const matchesSupplier = filters.supplierPartyId ? record.supplierPartyId === filters.supplierPartyId : true;
         const matchesPurchaser = filters.purchaserName ? record.purchaserName.includes(filters.purchaserName) : true;
+        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(record.projectSiteId ?? "") : true;
         const matchesQuery = filters.q
           ? [record.purchaseNo, record.purchasePlatform, record.shopName, record.lines[0]?.materialName]
               .filter(Boolean)
               .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesStatus && matchesSource && matchesSupplier && matchesPurchaser && matchesQuery;
+        return matchesStatus && matchesSource && matchesSupplier && matchesPurchaser && matchesScopedSites && matchesQuery;
       });
     },
     async getById(id) {
@@ -255,6 +263,51 @@ function createFakePurchaseRecordRepository(seed: PurchaseRecordDto[] = []): Pur
       return records[index];
     },
   };
+}
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    username: "site-user",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: "44444444-4444-4444-8444-444444444444",
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["project_site"],
+    assignedProjectSiteIds: [assignedProjectSiteId],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "site-user", password: "ChangeMe123!" },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("purchase requests API", () => {
@@ -335,6 +388,57 @@ describe("purchase requests API", () => {
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_CONFLICT", field: "requestNo" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("scopes project-site users to assigned project purchase requests", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedRequest = makePurchaseRequest({
+      id: "10101010-1010-4010-8010-101010101010",
+      requestNo: "PR-ASSIGNED",
+      projectSiteId: assignedProjectSiteId,
+      projectSiteName: "已分配项目点",
+    });
+    const unassignedRequest = makePurchaseRequest({
+      id: "20202020-2020-4020-8020-202020202020",
+      requestNo: "PR-UNASSIGNED",
+      projectSiteId: unassignedProjectSiteId,
+      projectSiteName: "未分配项目点",
+    });
+    const globalRequest = makePurchaseRequest({
+      id: "60606060-6060-4060-8060-606060606060",
+      requestNo: "PR-GLOBAL",
+      projectSiteId: null,
+      projectSiteName: null,
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-purchases" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      purchaseRequestRepository: createFakePurchaseRequestRepository([assignedRequest, unassignedRequest, globalRequest]),
+    });
+    const cookie = await loginCookie(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/purchase-requests",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/purchase-requests/${unassignedRequest.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const globalDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/purchase-requests/${globalRequest.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({ purchaseRequests: [{ requestNo: "PR-ASSIGNED" }] });
+    expect(listResponse.json().purchaseRequests).toHaveLength(1);
+    expect(unassignedDetailResponse.statusCode).toBe(404);
+    expect(globalDetailResponse.statusCode).toBe(404);
   });
 });
 
@@ -436,5 +540,58 @@ describe("purchase records API", () => {
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "PURCHASE_RECORD_CONFLICT", field: "purchaseNo" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("scopes project-site users to purchase records linked to assigned project requests", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedRecord = makePurchaseRecord({
+      id: "30303030-3030-4030-8030-303030303030",
+      purchaseNo: "PO-ASSIGNED",
+      projectSiteId: assignedProjectSiteId,
+      projectSiteName: "已分配项目点",
+    });
+    const unassignedRecord = makePurchaseRecord({
+      id: "40404040-4040-4040-8040-404040404040",
+      purchaseNo: "PO-UNASSIGNED",
+      projectSiteId: unassignedProjectSiteId,
+      projectSiteName: "未分配项目点",
+    });
+    const globalRecord = makePurchaseRecord({
+      id: "50505050-5050-4050-8050-505050505050",
+      purchaseNo: "PO-GLOBAL",
+      purchaseRequestId: null,
+      purchaseRequestNo: null,
+      projectSiteId: null,
+      projectSiteName: null,
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-purchase-records" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      purchaseRecordRepository: createFakePurchaseRecordRepository([assignedRecord, unassignedRecord, globalRecord]),
+    });
+    const cookie = await loginCookie(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/purchase-records",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/purchase-records/${unassignedRecord.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const globalDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/purchase-records/${globalRecord.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({ purchaseRecords: [{ purchaseNo: "PO-ASSIGNED" }] });
+    expect(listResponse.json().purchaseRecords).toHaveLength(1);
+    expect(unassignedDetailResponse.statusCode).toBe(404);
+    expect(globalDetailResponse.statusCode).toBe(404);
   });
 });

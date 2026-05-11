@@ -9,6 +9,8 @@ import type {
   UpdateProjectUsageRequestInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { hashPassword } from "../src/password";
 import {
   ProjectSiteConflictError,
   ProjectUsageRequestConflictError,
@@ -89,12 +91,15 @@ function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSi
         const matchesStatus = filters.status ? site.status === filters.status : true;
         const matchesMode = filters.serviceMode ? site.serviceMode === filters.serviceMode : true;
         const matchesClient = filters.clientPartyId ? site.clientPartyId === filters.clientPartyId : true;
+        const matchesScopedSites = (filters as { projectSiteIds?: string[] }).projectSiteIds?.length
+          ? (filters as { projectSiteIds: string[] }).projectSiteIds.includes(site.id)
+          : true;
         const matchesQuery = filters.q
           ? [site.siteCode, site.siteName, site.clientPartyName, site.region]
               .filter(Boolean)
               .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesStatus && matchesMode && matchesClient && matchesQuery;
+        return matchesStatus && matchesMode && matchesClient && matchesScopedSites && matchesQuery;
       });
     },
     async getById(id) {
@@ -134,13 +139,16 @@ function createFakeUsageRepository(seed: ProjectUsageRequestDto[] = []): Project
       return requests.filter((request) => {
         const matchesStatus = filters.status ? request.status === filters.status : true;
         const matchesSite = filters.projectSiteId ? request.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = (filters as { projectSiteIds?: string[] }).projectSiteIds?.length
+          ? (filters as { projectSiteIds: string[] }).projectSiteIds.includes(request.projectSiteId)
+          : true;
         const matchesWarehouse = filters.warehouseId ? request.warehouseId === filters.warehouseId : true;
         const matchesMaterial = filters.materialId ? request.materialId === filters.materialId : true;
         const matchesQuery = filters.q
           ? [request.requestNo, request.projectSiteName, request.materialCode, request.materialName]
               .some((value) => value.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesStatus && matchesSite && matchesWarehouse && matchesMaterial && matchesQuery;
+        return matchesStatus && matchesSite && matchesScopedSites && matchesWarehouse && matchesMaterial && matchesQuery;
       });
     },
     async getById(id) {
@@ -186,6 +194,47 @@ function createFakeUsageRepository(seed: ProjectUsageRequestDto[] = []): Project
       return requests[index];
     },
   };
+}
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    username: "site-user",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: "44444444-4444-4444-8444-444444444444",
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["project_site"],
+    assignedProjectSiteIds: ["11111111-1111-4111-8111-111111111111"],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>, username = "site-user", password = "ChangeMe123!") {
+  const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("project site API", () => {
@@ -369,5 +418,147 @@ describe("project usage request API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_USAGE_CONFLICT", field: "outboundNo" });
     expect(insufficient.statusCode).toBe(400);
     expect(insufficient.json().issues).toContain("insufficient stock for issue");
+  });
+
+  it("scopes project-site-only users to assigned sites and blocks issue execution", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedSite = makeProjectSite();
+    const unassignedSite = makeProjectSite({
+      id: "22222222-2222-4222-8222-222222222222",
+      siteCode: "SITE-WX-002",
+      siteName: "滨江项目点",
+    });
+    const assignedUsage = makeUsageRequest();
+    const unassignedUsage = makeUsageRequest({
+      id: "88888888-8888-4888-8888-888888888888",
+      requestNo: "USE20260511002",
+      projectSiteId: unassignedSite.id,
+      projectSiteName: unassignedSite.siteName,
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
+      projectUsageRequestRepository: createFakeUsageRepository([assignedUsage, unassignedUsage]),
+    });
+    const cookie = await loginCookie(app);
+
+    const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    const unassignedSiteDetail = await app.inject({
+      method: "GET",
+      url: `/api/project-sites/${unassignedSite.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const usageList = await app.inject({ method: "GET", url: "/api/project-usage-requests", cookies: { company_erp_session: cookie } });
+    const createAssigned = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        requestNo: "USE20260511003",
+        requestDate: "2026-05-11",
+        projectSiteId: assignedSite.id,
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        requestedQuantity: 1,
+        unit: "套",
+      },
+    });
+    const createUnassigned = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        requestNo: "USE20260511004",
+        requestDate: "2026-05-11",
+        projectSiteId: unassignedSite.id,
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        requestedQuantity: 1,
+        unit: "套",
+      },
+    });
+    const createIssued = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        requestNo: "USE20260511005",
+        requestDate: "2026-05-11",
+        projectSiteId: assignedSite.id,
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        requestedQuantity: 1,
+        unit: "套",
+        status: "issued",
+      },
+    });
+    const issue = await app.inject({
+      method: "POST",
+      url: `/api/project-usage-requests/${assignedUsage.id}/issue`,
+      cookies: { company_erp_session: cookie },
+      payload: { outboundNo: "OUT20260511001", movementDate: "2026-05-11", quantity: 1 },
+    });
+    await app.close();
+
+    expect(siteList.json()).toMatchObject({ projectSites: [{ id: assignedSite.id }] });
+    expect(JSON.stringify(siteList.json())).not.toContain(unassignedSite.siteCode);
+    expect(unassignedSiteDetail.statusCode).toBe(404);
+    expect(usageList.json()).toMatchObject({ projectUsageRequests: [{ id: assignedUsage.id }] });
+    expect(JSON.stringify(usageList.json())).not.toContain(unassignedUsage.requestNo);
+    expect(createAssigned.statusCode).toBe(201);
+    expect(createUnassigned.statusCode).toBe(404);
+    expect(createIssued.statusCode).toBe(400);
+    expect(issue.statusCode).toBe(403);
+  });
+
+  it("returns no project data for project-site users with no active assignments", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedSite = makeProjectSite();
+    const assignedUsage = makeUsageRequest();
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-empty-scope" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash, assignedProjectSiteIds: [] })]),
+      projectSiteRepository: createFakeProjectSiteRepository([assignedSite]),
+      projectUsageRequestRepository: createFakeUsageRepository([assignedUsage]),
+    });
+    const cookie = await loginCookie(app);
+
+    const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    const siteDetail = await app.inject({
+      method: "GET",
+      url: `/api/project-sites/${assignedSite.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const usageList = await app.inject({ method: "GET", url: "/api/project-usage-requests", cookies: { company_erp_session: cookie } });
+    await app.close();
+
+    expect(siteList.json()).toEqual({ projectSites: [] });
+    expect(siteDetail.statusCode).toBe(404);
+    expect(usageList.json()).toEqual({ projectUsageRequests: [] });
+  });
+
+  it("does not apply project-site scope to broader multi-role users", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const firstSite = makeProjectSite();
+    const secondSite = makeProjectSite({
+      id: "22222222-2222-4222-8222-222222222222",
+      siteCode: "SITE-WX-002",
+      siteName: "滨江项目点",
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-mixed-role-scope" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ passwordHash, roles: ["project_site", "hr"], assignedProjectSiteIds: [] }),
+      ]),
+      projectSiteRepository: createFakeProjectSiteRepository([firstSite, secondSite]),
+    });
+    const cookie = await loginCookie(app);
+
+    const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    await app.close();
+
+    expect(siteList.statusCode).toBe(200);
+    expect(siteList.json().projectSites).toHaveLength(2);
   });
 });

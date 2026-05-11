@@ -10,6 +10,7 @@ import {
   createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
+  createPrismaProjectSiteAssignmentRepository,
   createPrismaUserAccountRepository,
 } from "./prismaPeoplePermissionsRepository.js";
 import {
@@ -44,6 +45,7 @@ const app = buildApp({
   departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
   employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
   userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
+  projectSiteAssignmentRepository: prisma ? createPrismaProjectSiteAssignmentRepository(prisma) : undefined,
   purchaseRequestRepository: prisma ? createPrismaPurchaseRequestRepository(prisma) : undefined,
   purchaseRecordRepository: prisma ? createPrismaPurchaseRecordRepository(prisma) : undefined,
   inventoryRepository: prisma ? createPrismaInventoryRepository(prisma) : undefined,

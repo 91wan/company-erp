@@ -8,7 +8,7 @@ import {
   Server,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { canManage, type AuthenticatedUserDto } from "@company-erp/shared";
+import { canManage, canRead, type AuthenticatedUserDto } from "@company-erp/shared";
 import {
   SettingsIcon,
   approvals,
@@ -40,11 +40,13 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
+  const isProjectSiteOnly = currentUser.roles.length === 1 && currentUser.roles[0] === "project_site";
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
     canManage(currentUser.roles, "procurement") ||
     canManage(currentUser.roles, "inventory") ||
     canManage(currentUser.roles, "projectSites") ||
+    canManage(currentUser.roles, "projectUsage") ||
     canManage(currentUser.roles, "contracts") ||
     canManage(currentUser.roles, "employees")
   );
@@ -72,8 +74,15 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
           <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
           <PurchaseWorkspace canManage={canManage(currentUser.roles, "procurement")} />
           <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} />
-          <InventoryWorkspace canManage={canManage(currentUser.roles, "inventory")} />
-          <ProjectSitesWorkspace canManage={canManage(currentUser.roles, "projectSites")} />
+          <InventoryWorkspace
+            canManage={canManage(currentUser.roles, "inventory")}
+            showBalances={!isProjectSiteOnly && canRead(currentUser.roles, "inventory")}
+          />
+          <ProjectSitesWorkspace
+            canManageSites={canManage(currentUser.roles, "projectSites")}
+            canManageUsage={canManage(currentUser.roles, "projectUsage")}
+            canIssue={canManage(currentUser.roles, "inventory")}
+          />
           <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} />
           <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
         </div>
@@ -144,6 +153,9 @@ function TopBar({ currentUser, onLogout }: DashboardShellProps) {
           <div>
             <strong>{currentUser.username}</strong>
             <small>{currentUser.roles.join(" / ")}</small>
+            {currentUser.assignedProjectSiteIds?.length ? (
+              <small>{currentUser.assignedProjectSiteIds.length} 个项目点</small>
+            ) : null}
           </div>
           <button className="logout-button" type="button" onClick={onLogout}>
             <LogOut aria-hidden="true" size={15} />

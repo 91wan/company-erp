@@ -13,6 +13,7 @@ export type InventoryMovementListFilters = {
   materialId?: string;
   movementType?: InventoryMovementTypeCode;
   sourceType?: InventorySourceTypeCode;
+  projectSiteIds?: readonly string[];
   q?: string;
   dateFrom?: string;
   dateTo?: string;

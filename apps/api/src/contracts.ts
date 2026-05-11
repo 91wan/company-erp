@@ -18,6 +18,7 @@ export type ContractListFilters = {
   direction?: ContractDirectionCode;
   counterpartyPartyId?: string;
   projectSiteId?: string;
+  projectSiteIds?: readonly string[];
   expiry?: ContractExpiryStateCode;
   q?: string;
 };

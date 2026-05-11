@@ -14,6 +14,7 @@ import {
   IMPORT_JOB_STATUSES,
   IMPORT_ROW_STATUSES,
   IMPORT_TEMPLATE_TYPES,
+  EMPLOYEE_PROJECT_SITE_RELATION_TYPES,
   MVP_DICTIONARIES,
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
@@ -76,6 +77,7 @@ describe("MVP inventory helpers", () => {
     expect(canIssueStock(20, 19.5)).toBe(false);
     expect(canIssueStock(20, 20)).toBe(true);
   });
+
 });
 
 describe("MVP replenishment helpers", () => {
@@ -180,6 +182,12 @@ describe("MVP inventory dictionaries", () => {
     ]);
     expect(MVP_DICTIONARIES.projectSiteServiceMode.values).toEqual(["直营服务", "外包服务"]);
     expect(MVP_DICTIONARIES.projectSiteStatus.values).toEqual(["筹备中", "服务中", "暂停", "已结束"]);
+    expect(EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => relation.code)).toEqual([
+      "assigned",
+      "manager",
+      "support",
+    ]);
+    expect(MVP_DICTIONARIES.employeeProjectSiteRelationType.values).toEqual(["分配", "负责人", "协助"]);
   });
 });
 
@@ -217,6 +225,16 @@ describe("MVP permission constants", () => {
     expect(canManage(["viewer", "procurement"], "procurement")).toBe(true);
     expect(canManage(["hr"], "roleAssignment")).toBe(false);
     expect(canManage(["admin"], "systemSettings")).toBe(true);
+  });
+
+  it("separates project-site master data from project usage permissions", () => {
+    expect(canRead(["project_site"], "projectSites")).toBe(true);
+    expect(canManage(["project_site"], "projectSites")).toBe(false);
+    expect(canRead(["project_site"], "projectUsage")).toBe(true);
+    expect(canManage(["project_site"], "projectUsage")).toBe(true);
+    expect(canManage(["project_site"], "inventory")).toBe(false);
+    expect(canManage(["warehouse"], "projectUsage")).toBe(false);
+    expect(canManage(["admin"], "projectUsage")).toBe(true);
   });
 });
 

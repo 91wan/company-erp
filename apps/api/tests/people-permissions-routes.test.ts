@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { hashPassword } from "../src/password";
 import {
   DepartmentConflictError,
+  EmployeeProjectSiteAssignmentConflictError,
   EmployeeConflictError,
   UserAccountConflictError,
   type DepartmentRepository,
+  type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
   type UserAccountRepository,
 } from "../src/peoplePermissions";
-import type { DepartmentDto, EmployeeDto, MvpRoleCode, UserAccountDto } from "@company-erp/shared";
+import type { DepartmentDto, EmployeeDto, EmployeeProjectSiteAssignmentDto, MvpRoleCode, UserAccountDto } from "@company-erp/shared";
 
 const now = "2026-05-11T10:00:00.000Z";
 const departmentId = "11111111-1111-4111-8111-111111111111";
 const employeeId = "22222222-2222-4222-8222-222222222222";
 const accountId = "33333333-3333-4333-8333-333333333333";
+const projectSiteId = "77777777-7777-4777-8777-777777777777";
 
 function makeDepartment(overrides: Partial<DepartmentDto> = {}): DepartmentDto {
   return {
@@ -72,6 +77,67 @@ function makeUserAccount(overrides: Partial<UserAccountDto> = {}): UserAccountDt
     updatedAt: now,
     ...overrides,
   };
+}
+
+function makeProjectSiteAssignment(overrides: Partial<EmployeeProjectSiteAssignmentDto> = {}): EmployeeProjectSiteAssignmentDto {
+  return {
+    id: "77777777-7777-4777-8777-777777777778",
+    employeeId,
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    projectSiteId,
+    siteCode: "SITE-WX-001",
+    siteName: "科技园一期项目点",
+    relationType: "assigned",
+    isPrimary: true,
+    startDate: "2026-05-01",
+    endDate: null,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: accountId,
+    username: "admin",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId,
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["admin"],
+    assignedProjectSiteIds: [projectSiteId],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin", password = "ChangeMe123!") {
+  const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 function createFakeDepartmentRepository(seed: DepartmentDto[] = []): DepartmentRepository {
@@ -208,6 +274,69 @@ function createFakeUserAccountRepository(seed: UserAccountDto[] = []): UserAccou
   };
 }
 
+function createFakeProjectSiteAssignmentRepository(seed: EmployeeProjectSiteAssignmentDto[] = []): EmployeeProjectSiteAssignmentRepository {
+  const assignments = [...seed];
+
+  return {
+    async list(filters) {
+      return assignments.filter((assignment) => {
+        const matchesEmployee = filters.employeeId ? assignment.employeeId === filters.employeeId : true;
+        const matchesSite = filters.projectSiteId ? assignment.projectSiteId === filters.projectSiteId : true;
+        const matchesRelation = filters.relationType ? assignment.relationType === filters.relationType : true;
+        const matchesActive = filters.activeOnly ? assignment.isActive : true;
+        const matchesQuery = filters.q
+          ? [assignment.employeeNo, assignment.employeeName, assignment.siteCode, assignment.siteName]
+              .some((value) => value.toLowerCase().includes(filters.q!.toLowerCase()))
+          : true;
+        return matchesEmployee && matchesSite && matchesRelation && matchesActive && matchesQuery;
+      });
+    },
+    async getById(id) {
+      return assignments.find((assignment) => assignment.id === id) ?? null;
+    },
+    async create(input) {
+      if (
+        assignments.some(
+          (assignment) =>
+            assignment.employeeId === input.employeeId &&
+            assignment.projectSiteId === input.projectSiteId &&
+            assignment.relationType === (input.relationType ?? "assigned") &&
+            assignment.isActive,
+        )
+      ) {
+        throw new EmployeeProjectSiteAssignmentConflictError("employeeId_projectSiteId_relationType");
+      }
+      if (input.isPrimary) {
+        for (const assignment of assignments) {
+          if (assignment.employeeId === input.employeeId && assignment.isActive) assignment.isPrimary = false;
+        }
+      }
+      const assignment = makeProjectSiteAssignment({
+        id: "88888888-8888-4888-8888-888888888888",
+        ...input,
+        relationType: input.relationType ?? "assigned",
+        isPrimary: input.isPrimary ?? false,
+        isActive: true,
+      });
+      assignments.unshift(assignment);
+      return assignment;
+    },
+    async update(id, input) {
+      const index = assignments.findIndex((assignment) => assignment.id === id);
+      if (index === -1) return null;
+      if (input.isPrimary) {
+        for (const assignment of assignments) {
+          if (assignment.employeeId === assignments[index].employeeId && assignment.id !== id && assignment.isActive) {
+            assignment.isPrimary = false;
+          }
+        }
+      }
+      assignments[index] = { ...assignments[index], ...input, updatedAt: now };
+      return assignments[index];
+    },
+  };
+}
+
 describe("departments API", () => {
   it("reports departments API as unavailable when no repository is configured", async () => {
     const app = buildApp();
@@ -249,6 +378,98 @@ describe("departments API", () => {
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "DEPARTMENT_CONFLICT", field: "departmentCode" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+});
+
+describe("project-site assignments API", () => {
+  it("reports assignment API as unavailable when no repository is configured", async () => {
+    const app = buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/api/project-site-assignments" });
+    await app.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "PROJECT_SITE_ASSIGNMENT_REPOSITORY_NOT_CONFIGURED" });
+  });
+
+  it("lists, reads, creates, and updates project-site assignments", async () => {
+    const existing = makeProjectSiteAssignment();
+    const app = buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
+
+    const list = await app.inject({ method: "GET", url: "/api/project-site-assignments?activeOnly=true&q=科技园" });
+    const detail = await app.inject({ method: "GET", url: `/api/project-site-assignments/${existing.id}` });
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/project-site-assignments",
+      payload: {
+        employeeId,
+        projectSiteId: "99999999-9999-4999-8999-999999999999",
+        relationType: "manager",
+        isPrimary: true,
+        startDate: "2026-05-11",
+      },
+    });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/project-site-assignments/${existing.id}`,
+      payload: { relationType: "support", endDate: "2026-06-01" },
+    });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({ projectSiteAssignments: [{ siteCode: "SITE-WX-001", isActive: true }] });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({ projectSiteAssignment: { employeeNo: "EMP0001" } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ projectSiteAssignment: { relationType: "manager", isPrimary: true } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ projectSiteAssignment: { relationType: "support", endDate: "2026-06-01" } });
+  });
+
+  it("rejects invalid and duplicate project-site assignments", async () => {
+    const existing = makeProjectSiteAssignment();
+    const app = buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
+
+    const invalid = await app.inject({
+      method: "POST",
+      url: "/api/project-site-assignments",
+      payload: { employeeId, projectSiteId, relationType: "owner" },
+    });
+    const duplicate = await app.inject({
+      method: "POST",
+      url: "/api/project-site-assignments",
+      payload: { employeeId, projectSiteId, relationType: "assigned" },
+    });
+    const missing = await app.inject({ method: "GET", url: "/api/project-site-assignments/missing" });
+    await app.close();
+
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toMatchObject({ error: "PROJECT_SITE_ASSIGNMENT_VALIDATION_FAILED" });
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.json()).toMatchObject({ error: "PROJECT_SITE_ASSIGNMENT_CONFLICT" });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it("blocks project-site-only users from reading assignment records", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-assignment-guard" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "site-user", passwordHash, roles: ["project_site"] }),
+      ]),
+      projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([makeProjectSiteAssignment()]),
+    });
+    const cookie = await loginCookie(app, "site-user");
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/project-site-assignments",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "FORBIDDEN", permissionArea: "employees", requiredLevel: "read" });
   });
 });
 

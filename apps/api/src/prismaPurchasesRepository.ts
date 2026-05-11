@@ -25,7 +25,7 @@ type PrismaPurchaseRequest = Prisma.PurchaseRequestGetPayload<{
 
 type PrismaPurchaseRecord = Prisma.PurchaseRecordGetPayload<{
   include: {
-    purchaseRequest: true;
+    purchaseRequest: { include: { projectSite: true } };
     supplierParty: true;
     contract: true;
     lines: true;
@@ -81,6 +81,8 @@ function toPurchaseRecordDto(record: PrismaPurchaseRecord): PurchaseRecordDto {
     purchaseNo: record.purchaseNo,
     purchaseRequestId: record.purchaseRequestId,
     purchaseRequestNo: record.purchaseRequest?.requestNo ?? record.purchaseRequestNo,
+    projectSiteId: record.purchaseRequest?.projectSiteId ?? null,
+    projectSiteName: record.purchaseRequest?.projectSite?.siteName ?? null,
     purchaserName: record.purchaserName,
     purchaserEmployeeId: record.purchaserEmployeeId,
     sourceType: record.sourceType,
@@ -273,6 +275,7 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
           ...(filters.status ? { status: filters.status } : {}),
           ...(filters.requesterName ? { requesterName: { contains: filters.requesterName, mode: "insensitive" } } : {}),
           ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+          ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
           ...(filters.q
             ? {
                 OR: [
@@ -324,7 +327,7 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
 
 export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): PurchaseRecordRepository {
   const include = {
-    purchaseRequest: true,
+    purchaseRequest: { include: { projectSite: true } },
     supplierParty: true,
     contract: true,
     lines: { orderBy: { createdAt: "asc" } },
@@ -338,6 +341,7 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
           ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
           ...(filters.supplierPartyId ? { supplierPartyId: filters.supplierPartyId } : {}),
           ...(filters.purchaserName ? { purchaserName: { contains: filters.purchaserName, mode: "insensitive" } } : {}),
+          ...(filters.projectSiteIds ? { purchaseRequest: { projectSiteId: { in: [...filters.projectSiteIds] } } } : {}),
           ...(filters.q
             ? {
                 OR: [

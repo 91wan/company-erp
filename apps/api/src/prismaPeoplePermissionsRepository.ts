@@ -2,21 +2,28 @@ import { Prisma, PrismaClient, type RoleCode as PrismaRoleCode } from "@prisma/c
 import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
+  CreateEmployeeProjectSiteAssignmentInput,
   CreateUserAccountInput,
   DepartmentDto,
   EmployeeDto,
+  EmployeeProjectSiteAssignmentDto,
   MvpRoleCode,
   UpdateDepartmentInput,
   UpdateEmployeeInput,
+  UpdateEmployeeProjectSiteAssignmentInput,
   UpdateUserAccountInput,
   UserAccountDto,
 } from "@company-erp/shared";
 import {
   DepartmentConflictError,
+  EmployeeProjectSiteAssignmentConflictError,
+  EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
   UserAccountConflictError,
   type DepartmentListFilters,
   type DepartmentRepository,
+  type EmployeeProjectSiteAssignmentListFilters,
+  type EmployeeProjectSiteAssignmentRepository,
   type EmployeeListFilters,
   type EmployeeRepository,
   type UserAccountListFilters,
@@ -48,8 +55,19 @@ type PrismaUserAccount = Prisma.UserAccountGetPayload<{
 
 type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
   include: {
-    employee: true;
+    employee: {
+      include: {
+        projectSiteAssignments: true;
+      };
+    };
     roles: true;
+  };
+}>;
+
+type PrismaProjectSiteAssignment = Prisma.EmployeeProjectSiteAssignmentGetPayload<{
+  include: {
+    employee: true;
+    projectSite: true;
   };
 }>;
 
@@ -129,11 +147,42 @@ function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
     employeeName: account.employee?.name ?? null,
     employeeStatus: account.employee?.employmentStatus ?? null,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
+    assignedProjectSiteIds: (account.employee?.projectSiteAssignments ?? [])
+      .filter(isActiveAssignment)
+      .map((assignment) => assignment.projectSiteId)
+      .sort(),
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
     createdAt: account.createdAt.toISOString(),
     updatedAt: account.updatedAt.toISOString(),
   };
+}
+
+function toProjectSiteAssignmentDto(assignment: PrismaProjectSiteAssignment): EmployeeProjectSiteAssignmentDto {
+  return {
+    id: assignment.id,
+    employeeId: assignment.employeeId,
+    employeeNo: assignment.employee.employeeNo,
+    employeeName: assignment.employee.name,
+    projectSiteId: assignment.projectSiteId,
+    siteCode: assignment.projectSite.siteCode,
+    siteName: assignment.projectSite.siteName,
+    relationType: assignment.relationType,
+    isPrimary: assignment.isPrimary,
+    startDate: dateOnly(assignment.startDate),
+    endDate: dateOnly(assignment.endDate),
+    isActive: isActiveAssignment(assignment),
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  };
+}
+
+function isActiveAssignment(assignment: { startDate?: Date | null; endDate?: Date | null }): boolean {
+  const today = new Date();
+  const todayDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const starts = !assignment.startDate || assignment.startDate <= todayDate;
+  const notEnded = !assignment.endDate || assignment.endDate >= todayDate;
+  return starts && notEnded;
 }
 
 function relationUpdate<TConnect extends object>(
@@ -425,8 +474,151 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
   };
 }
 
+export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient): EmployeeProjectSiteAssignmentRepository {
+  const include = { employee: true, projectSite: true } satisfies Prisma.EmployeeProjectSiteAssignmentInclude;
+
+  function where(filters: EmployeeProjectSiteAssignmentListFilters): Prisma.EmployeeProjectSiteAssignmentWhereInput {
+    const today = new Date();
+    const todayDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    return {
+      ...(filters.employeeId ? { employeeId: filters.employeeId } : {}),
+      ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+      ...(filters.relationType ? { relationType: filters.relationType } : {}),
+      ...(filters.activeOnly
+        ? {
+            AND: [
+              { OR: [{ startDate: null }, { startDate: { lte: todayDate } }] },
+              { OR: [{ endDate: null }, { endDate: { gte: todayDate } }] },
+            ],
+          }
+        : {}),
+      ...(filters.q
+        ? {
+            OR: [
+              { employee: { employeeNo: { contains: filters.q, mode: "insensitive" } } },
+              { employee: { name: { contains: filters.q, mode: "insensitive" } } },
+              { projectSite: { siteCode: { contains: filters.q, mode: "insensitive" } } },
+              { projectSite: { siteName: { contains: filters.q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  async function assertNoDuplicateActive(
+    input: { employeeId?: string; projectSiteId?: string; relationType?: string; startDate?: string | null; endDate?: string | null },
+    excludeId?: string,
+  ) {
+    if (!input.employeeId || !input.projectSiteId) return;
+    const relationType = input.relationType ?? "assigned";
+    const existing = await prisma.employeeProjectSiteAssignment.findMany({
+      where: {
+        employeeId: input.employeeId,
+        projectSiteId: input.projectSiteId,
+        relationType: relationType as any,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+    const candidate = {
+      startDate: parseDate(input.startDate),
+      endDate: parseDate(input.endDate),
+    };
+    if (isActiveAssignment(candidate) && existing.some(isActiveAssignment)) {
+      throw new EmployeeProjectSiteAssignmentConflictError("employeeId_projectSiteId_relationType");
+    }
+  }
+
+  async function clearOtherPrimary(employeeId: string, exceptId?: string) {
+    await prisma.employeeProjectSiteAssignment.updateMany({
+      where: {
+        employeeId,
+        isPrimary: true,
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      data: { isPrimary: false },
+    });
+  }
+
+  return {
+    async list(filters) {
+      const assignments = await prisma.employeeProjectSiteAssignment.findMany({
+        where: where(filters),
+        include,
+        orderBy: [{ updatedAt: "desc" }],
+      });
+      return assignments.map(toProjectSiteAssignmentDto);
+    },
+    async getById(id) {
+      const assignment = await prisma.employeeProjectSiteAssignment.findUnique({ where: { id }, include });
+      return assignment ? toProjectSiteAssignmentDto(assignment) : null;
+    },
+    async create(input: CreateEmployeeProjectSiteAssignmentInput) {
+      try {
+        await assertNoDuplicateActive(input);
+        if (input.isPrimary) await clearOtherPrimary(input.employeeId);
+        const assignment = await prisma.employeeProjectSiteAssignment.create({
+          data: {
+            employee: { connect: { id: input.employeeId } },
+            projectSite: { connect: { id: input.projectSiteId } },
+            relationType: input.relationType ?? "assigned",
+            isPrimary: input.isPrimary ?? false,
+            startDate: parseDate(input.startDate),
+            endDate: parseDate(input.endDate),
+          },
+          include,
+        });
+        return toProjectSiteAssignmentDto(assignment);
+      } catch (error) {
+        if (error instanceof EmployeeProjectSiteAssignmentConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2003" || error.code === "P2025")) {
+          throw new EmployeeProjectSiteAssignmentValidationError(["Referenced employee or project site was not found"]);
+        }
+        throw error;
+      }
+    },
+    async update(id: string, input: UpdateEmployeeProjectSiteAssignmentInput) {
+      try {
+        const current = await prisma.employeeProjectSiteAssignment.findUnique({ where: { id } });
+        if (!current) return null;
+        const next = {
+          employeeId: input.employeeId ?? current.employeeId,
+          projectSiteId: input.projectSiteId ?? current.projectSiteId,
+          relationType: input.relationType ?? current.relationType,
+          startDate: input.startDate ?? dateOnly(current.startDate),
+          endDate: input.endDate ?? dateOnly(current.endDate),
+        };
+        await assertNoDuplicateActive(next, id);
+        if (input.isPrimary) await clearOtherPrimary(next.employeeId, id);
+        const assignment = await prisma.employeeProjectSiteAssignment.update({
+          where: { id },
+          data: {
+            ...(input.employeeId !== undefined ? { employee: { connect: { id: input.employeeId } } } : {}),
+            ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
+            ...(input.relationType !== undefined ? { relationType: input.relationType } : {}),
+            ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
+            ...(input.startDate !== undefined ? { startDate: parseDate(input.startDate) } : {}),
+            ...(input.endDate !== undefined ? { endDate: parseDate(input.endDate) } : {}),
+          },
+          include,
+        });
+        return toProjectSiteAssignmentDto(assignment);
+      } catch (error) {
+        if (error instanceof EmployeeProjectSiteAssignmentConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+          throw new EmployeeProjectSiteAssignmentValidationError(["Referenced employee or project site was not found"]);
+        }
+        throw error;
+      }
+    },
+  };
+}
+
 export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository {
-  const include = { employee: true, roles: true } satisfies Prisma.UserAccountInclude;
+  const include = {
+    employee: { include: { projectSiteAssignments: true } },
+    roles: true,
+  } satisfies Prisma.UserAccountInclude;
 
   return {
     async findByUsername(username: string) {

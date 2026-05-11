@@ -5,12 +5,16 @@ import type {
   InventoryMovementDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import {
   InventoryMovementConflictError,
   type InventoryRepository,
 } from "../src/inventory";
+import { hashPassword } from "../src/password";
 
 const now = "2026-05-11T12:00:00.000Z";
+const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const unassignedProjectSiteId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function makeMovement(overrides: Partial<InventoryMovementDto> = {}): InventoryMovementDto {
   return {
@@ -31,6 +35,8 @@ function makeMovement(overrides: Partial<InventoryMovementDto> = {}): InventoryM
     unitPrice: 98,
     purchaseRecordNo: "PO20260511001",
     purchaseRecordLineId: "44444444-4444-4444-8444-444444444444",
+    projectSiteId: null,
+    projectSiteName: null,
     handledBy: "王仓管",
     purpose: "采购入库",
     remark: null,
@@ -68,12 +74,20 @@ function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): Inven
         const matchesMaterial = filters.materialId ? movement.materialId === filters.materialId : true;
         const matchesMovementType = filters.movementType ? movement.movementType === filters.movementType : true;
         const matchesSourceType = filters.sourceType ? movement.sourceType === filters.sourceType : true;
+        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(movement.projectSiteId ?? "") : true;
         const matchesQuery = filters.q
           ? [movement.movementNo, movement.materialName, movement.materialCode, movement.warehouseCode]
               .filter(Boolean)
               .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesWarehouse && matchesMaterial && matchesMovementType && matchesSourceType && matchesQuery;
+        return (
+          matchesWarehouse &&
+          matchesMaterial &&
+          matchesMovementType &&
+          matchesSourceType &&
+          matchesScopedSites &&
+          matchesQuery
+        );
       });
     },
     async getMovementById(id) {
@@ -125,6 +139,51 @@ function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): Inven
   };
 }
 
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    username: "site-user",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: "44444444-4444-4444-8444-444444444444",
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["project_site"],
+    assignedProjectSiteIds: [assignedProjectSiteId],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "site-user", password: "ChangeMe123!" },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+}
+
 describe("inventory movements API", () => {
   it("reports inventory API as unavailable when no repository is configured", async () => {
     const app = buildApp();
@@ -165,6 +224,64 @@ describe("inventory movements API", () => {
     expect(found.json()).toMatchObject({ inventoryMovement: { movementNo: "RK20260511001" } });
     expect(missing.statusCode).toBe(404);
     expect(missing.json()).toEqual({ error: "INVENTORY_MOVEMENT_NOT_FOUND" });
+  });
+
+  it("scopes project-site users to assigned project usage outbound movements", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedMovement = makeMovement({
+      id: "10101010-1010-4010-8010-101010101010",
+      movementNo: "CK-ASSIGNED",
+      movementType: "outbound",
+      sourceType: "project_usage",
+      quantity: -2,
+      projectSiteId: assignedProjectSiteId,
+      projectSiteName: "已分配项目点",
+    });
+    const unassignedMovement = makeMovement({
+      id: "20202020-2020-4020-8020-202020202020",
+      movementNo: "CK-UNASSIGNED",
+      movementType: "outbound",
+      sourceType: "project_usage",
+      quantity: -2,
+      projectSiteId: unassignedProjectSiteId,
+      projectSiteName: "未分配项目点",
+    });
+    const purchaseMovement = makeMovement({
+      id: "30303030-3030-4030-8030-303030303030",
+      movementNo: "RK-PURCHASE",
+      sourceType: "purchase",
+      projectSiteId: assignedProjectSiteId,
+      projectSiteName: "已分配项目点",
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-inventory" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      inventoryRepository: createFakeInventoryRepository([assignedMovement, unassignedMovement, purchaseMovement]),
+    });
+    const cookie = await loginCookie(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/inventory-movements",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/inventory-movements/${unassignedMovement.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const purchaseDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/inventory-movements/${purchaseMovement.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({ inventoryMovements: [{ movementNo: "CK-ASSIGNED" }] });
+    expect(listResponse.json().inventoryMovements).toHaveLength(1);
+    expect(unassignedDetailResponse.statusCode).toBe(404);
+    expect(purchaseDetailResponse.statusCode).toBe(404);
   });
 
   it("creates a positive inbound movement", async () => {
@@ -267,5 +384,25 @@ describe("inventory balances API", () => {
       error: "INVENTORY_VALIDATION_FAILED",
       issues: ["lowStockOnly must be true or false"],
     });
+  });
+
+  it("blocks project-site users from global inventory balances", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-balances" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      inventoryRepository: createFakeInventoryRepository(),
+    });
+    const cookie = await loginCookie(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/inventory-balances",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "read" });
   });
 });

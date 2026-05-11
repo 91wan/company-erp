@@ -30,6 +30,8 @@ import {
 import {
   DepartmentConflictError,
   DepartmentValidationError,
+  EmployeeProjectSiteAssignmentConflictError,
+  EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
   EmployeeValidationError,
   UserAccountConflictError,
@@ -38,9 +40,12 @@ import {
   normalizeDepartmentInput,
   normalizeEmployeeFilters,
   normalizeEmployeeInput,
+  normalizeProjectSiteAssignmentFilters,
+  normalizeProjectSiteAssignmentInput,
   normalizeUserAccountFilters,
   normalizeUserAccountInput,
   type DepartmentRepository,
+  type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
   type UserAccountRepository,
 } from "./peoplePermissions.js";
@@ -99,7 +104,7 @@ import {
   normalizeImportTemplateType,
   type ImportJobRepository,
 } from "./importJobs.js";
-import { registerAuth, type AuthOptions, type AuthRepository } from "./auth.js";
+import { registerAuth, type AuthenticatedRequest, type AuthOptions, type AuthRepository } from "./auth.js";
 
 type BuildAppOptions = {
   auth?: AuthOptions;
@@ -110,6 +115,7 @@ type BuildAppOptions = {
   departmentRepository?: DepartmentRepository;
   employeeRepository?: EmployeeRepository;
   userAccountRepository?: UserAccountRepository;
+  projectSiteAssignmentRepository?: EmployeeProjectSiteAssignmentRepository;
   purchaseRequestRepository?: PurchaseRequestRepository;
   purchaseRecordRepository?: PurchaseRecordRepository;
   inventoryRepository?: InventoryRepository;
@@ -119,6 +125,18 @@ type BuildAppOptions = {
   contractRepository?: ContractRepository;
   importJobRepository?: ImportJobRepository;
 };
+
+function scopedProjectSiteIds(request: unknown): readonly string[] | null {
+  const user = (request as AuthenticatedRequest).currentUser;
+  if (!user) return null;
+  return user.roles.length === 1 && user.roles[0] === "project_site"
+    ? [...(user.assignedProjectSiteIds ?? [])]
+    : null;
+}
+
+function isOutsideProjectSiteScope(scope: readonly string[] | null, projectSiteId?: string | null): boolean {
+  return scope !== null && (!projectSiteId || !scope.includes(projectSiteId));
+}
 
 export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
@@ -678,6 +696,76 @@ export function buildApp(options: BuildAppOptions = {}) {
     return { userAccount };
   });
 
+  app.get("/api/project-site-assignments", async (request, reply) => {
+    if (!options.projectSiteAssignmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_ASSIGNMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeProjectSiteAssignmentFilters(request.query as Record<string, unknown>);
+      const projectSiteAssignments = await options.projectSiteAssignmentRepository.list(filters);
+      return { projectSiteAssignments };
+    } catch (error) {
+      if (error instanceof EmployeeProjectSiteAssignmentValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_ASSIGNMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-site-assignments/:id", async (request, reply) => {
+    if (!options.projectSiteAssignmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_ASSIGNMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const projectSiteAssignment = await options.projectSiteAssignmentRepository.getById(id);
+    if (!projectSiteAssignment) return reply.status(404).send({ error: "PROJECT_SITE_ASSIGNMENT_NOT_FOUND" });
+    return { projectSiteAssignment };
+  });
+
+  app.post("/api/project-site-assignments", async (request, reply) => {
+    if (!options.projectSiteAssignmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_ASSIGNMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeProjectSiteAssignmentInput(request.body, "create");
+      const projectSiteAssignment = await options.projectSiteAssignmentRepository.create(input);
+      return reply.status(201).send({ projectSiteAssignment });
+    } catch (error) {
+      if (error instanceof EmployeeProjectSiteAssignmentValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_ASSIGNMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof EmployeeProjectSiteAssignmentConflictError) {
+        return reply.status(409).send({ error: "PROJECT_SITE_ASSIGNMENT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/project-site-assignments/:id", async (request, reply) => {
+    if (!options.projectSiteAssignmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_ASSIGNMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeProjectSiteAssignmentInput(request.body, "update");
+      const projectSiteAssignment = await options.projectSiteAssignmentRepository.update(id, input);
+      if (!projectSiteAssignment) return reply.status(404).send({ error: "PROJECT_SITE_ASSIGNMENT_NOT_FOUND" });
+      return { projectSiteAssignment };
+    } catch (error) {
+      if (error instanceof EmployeeProjectSiteAssignmentValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_ASSIGNMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof EmployeeProjectSiteAssignmentConflictError) {
+        return reply.status(409).send({ error: "PROJECT_SITE_ASSIGNMENT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
   app.post("/api/user-accounts", async (request, reply) => {
     if (!options.userAccountRepository) {
       return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
@@ -726,7 +814,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizePurchaseRequestFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { purchaseRequests: [] };
+      const filters = {
+        ...normalizePurchaseRequestFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
       const purchaseRequests = await options.purchaseRequestRepository.list(filters);
       return { purchaseRequests };
     } catch (error) {
@@ -744,6 +837,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const purchaseRequest = await options.purchaseRequestRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), purchaseRequest?.projectSiteId)) {
+      return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+    }
     if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
     return { purchaseRequest };
   });
@@ -797,7 +893,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizePurchaseRecordFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { purchaseRecords: [] };
+      const filters = {
+        ...normalizePurchaseRecordFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
       const purchaseRecords = await options.purchaseRecordRepository.list(filters);
       return { purchaseRecords };
     } catch (error) {
@@ -815,6 +916,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const purchaseRecord = await options.purchaseRecordRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), purchaseRecord?.projectSiteId)) {
+      return reply.status(404).send({ error: "PURCHASE_RECORD_NOT_FOUND" });
+    }
     if (!purchaseRecord) return reply.status(404).send({ error: "PURCHASE_RECORD_NOT_FOUND" });
     return { purchaseRecord };
   });
@@ -871,7 +975,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizeInventoryMovementFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { inventoryMovements: [] };
+      const filters = {
+        ...normalizeInventoryMovementFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope, sourceType: "project_usage" as const } : {}),
+      };
       const inventoryMovements = await options.inventoryRepository.listMovements(filters);
       return { inventoryMovements };
     } catch (error) {
@@ -889,6 +998,15 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const inventoryMovement = await options.inventoryRepository.getMovementById(id);
+    const scope = scopedProjectSiteIds(request);
+    if (
+      scope !== null &&
+      (!inventoryMovement ||
+        inventoryMovement.sourceType !== "project_usage" ||
+        isOutsideProjectSiteScope(scope, inventoryMovement.projectSiteId))
+    ) {
+      return reply.status(404).send({ error: "INVENTORY_MOVEMENT_NOT_FOUND" });
+    }
     if (!inventoryMovement) return reply.status(404).send({ error: "INVENTORY_MOVEMENT_NOT_FOUND" });
     return { inventoryMovement };
   });
@@ -919,6 +1037,9 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
+      if (scopedProjectSiteIds(request) !== null) {
+        return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "read" });
+      }
       const filters = normalizeInventoryBalanceFilters(request.query as Record<string, unknown>);
       const inventoryBalances = await options.inventoryRepository.listBalances(filters);
       return { inventoryBalances };
@@ -936,6 +1057,9 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
+      if (scopedProjectSiteIds(request) !== null) {
+        return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "read" });
+      }
       const filters = normalizeReplenishmentSuggestionFilters(request.query as Record<string, unknown>);
       const replenishmentSuggestions = await options.replenishmentSuggestionRepository.list(filters);
       return { replenishmentSuggestions };
@@ -1006,7 +1130,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizeProjectSiteFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { projectSites: [] };
+      const filters = {
+        ...normalizeProjectSiteFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
       const projectSites = await options.projectSiteRepository.list(filters);
       return { projectSites };
     } catch (error) {
@@ -1024,6 +1153,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const projectSite = await options.projectSiteRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), projectSite?.id)) {
+      return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    }
     if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
     return { projectSite };
   });
@@ -1034,6 +1166,9 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
+      if (scopedProjectSiteIds(request) !== null) {
+        return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSites", requiredLevel: "manage" });
+      }
       const input = normalizeProjectSiteInput(request.body, "create");
       const projectSite = await options.projectSiteRepository.create(input);
       return reply.status(201).send({ projectSite });
@@ -1055,6 +1190,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     try {
+      if (scopedProjectSiteIds(request) !== null) {
+        return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSites", requiredLevel: "manage" });
+      }
       const input = normalizeProjectSiteInput(request.body, "update");
       const projectSite = await options.projectSiteRepository.update(id, input);
       if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
@@ -1076,7 +1214,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizeProjectUsageRequestFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { projectUsageRequests: [] };
+      const filters = {
+        ...normalizeProjectUsageRequestFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
       const projectUsageRequests = await options.projectUsageRequestRepository.list(filters);
       return { projectUsageRequests };
     } catch (error) {
@@ -1094,6 +1237,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const projectUsageRequest = await options.projectUsageRequestRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), projectUsageRequest?.projectSiteId)) {
+      return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+    }
     if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
     return { projectUsageRequest };
   });
@@ -1105,6 +1251,13 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     try {
       const input = normalizeProjectUsageRequestInput(request.body, "create");
+      const scope = scopedProjectSiteIds(request);
+      if (isOutsideProjectSiteScope(scope, input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      }
+      if (scope !== null && input.status && input.status !== "pending") {
+        return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: ["project-site users can only create pending usage requests"] });
+      }
       const projectUsageRequest = await options.projectUsageRequestRepository.create(input);
       return reply.status(201).send({ projectUsageRequest });
     } catch (error) {
@@ -1126,6 +1279,19 @@ export function buildApp(options: BuildAppOptions = {}) {
     const { id } = request.params as { id: string };
     try {
       const input = normalizeProjectUsageRequestInput(request.body, "update");
+      const scope = scopedProjectSiteIds(request);
+      if (scope !== null) {
+        const current = await options.projectUsageRequestRepository.getById(id);
+        if (isOutsideProjectSiteScope(scope, current?.projectSiteId)) {
+          return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+        }
+        if (input.projectSiteId !== undefined && isOutsideProjectSiteScope(scope, input.projectSiteId)) {
+          return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+        }
+        if (input.status && input.status !== "pending") {
+          return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: ["project-site users can only keep usage requests pending"] });
+        }
+      }
       const projectUsageRequest = await options.projectUsageRequestRepository.update(id, input);
       if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
       return { projectUsageRequest };
@@ -1168,7 +1334,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const filters = normalizeContractFilters(request.query as Record<string, unknown>);
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { contracts: [] };
+      const filters = {
+        ...normalizeContractFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
       const contracts = await options.contractRepository.list(filters);
       return { contracts };
     } catch (error) {
@@ -1186,6 +1357,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     const contract = await options.contractRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), contract?.projectSiteId)) {
+      return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+    }
     if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
     return { contract };
   });
@@ -1238,6 +1412,11 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     const { id } = request.params as { id: string };
+    const contract = await options.contractRepository.getById(id);
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), contract?.projectSiteId)) {
+      return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+    }
+    if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
     const contractAttachments = await options.contractRepository.listAttachments(id);
     if (!contractAttachments) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
     return { contractAttachments };

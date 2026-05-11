@@ -211,6 +211,7 @@ export function createPrismaContractRepository(prisma: PrismaClient): ContractRe
           ...(filters.direction ? { direction: filters.direction } : {}),
           ...(filters.counterpartyPartyId ? { counterpartyPartyId: filters.counterpartyPartyId } : {}),
           ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+          ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
           ...(filters.q
             ? {
                 OR: [

@@ -23,6 +23,7 @@ import type {
   ImportJobSummaryDto,
   MaterialDto,
   PartyDto,
+  EmployeeProjectSiteAssignmentDto,
   ProjectSiteDto,
   ProjectUsageRequestDto,
   PurchaseRecordDto,
@@ -49,6 +50,14 @@ const viewerUser = {
   roles: ["viewer"] as const,
 };
 
+const projectSiteUser = {
+  ...adminUser,
+  id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+  username: "siteuser",
+  roles: ["project_site"] as const,
+  assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -61,7 +70,7 @@ function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Res
   } as Response;
 }
 
-function mockShellFetch(user: typeof adminUser | typeof viewerUser | null = adminUser) {
+function mockShellFetch(user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | null = adminUser) {
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -76,6 +85,7 @@ function mockShellFetch(user: typeof adminUser | typeof viewerUser | null = admi
     if (url.includes("/api/departments")) return Promise.resolve(jsonResponse({ departments: [] }));
     if (url.includes("/api/employees")) return Promise.resolve(jsonResponse({ employees: [] }));
     if (url.includes("/api/user-accounts")) return Promise.resolve(jsonResponse({ userAccounts: [] }));
+    if (url.includes("/api/project-site-assignments")) return Promise.resolve(jsonResponse({ projectSiteAssignments: [] }));
     if (url.includes("/api/purchase-requests")) return Promise.resolve(jsonResponse({ purchaseRequests: [] }));
     if (url.includes("/api/purchase-records")) return Promise.resolve(jsonResponse({ purchaseRecords: [] }));
     if (url.includes("/api/inventory-movements")) return Promise.resolve(jsonResponse({ inventoryMovements: [] }));
@@ -399,6 +409,23 @@ const projectSite: ProjectSiteDto = {
   updatedAt: "2026-05-11T13:00:00.000Z",
 };
 
+const projectSiteAssignment: EmployeeProjectSiteAssignmentDto = {
+  id: "14141414-1414-4141-8141-141414141414",
+  employeeId: employee.id,
+  employeeNo: employee.employeeNo,
+  employeeName: employee.name,
+  projectSiteId: projectSite.id,
+  siteCode: projectSite.siteCode,
+  siteName: projectSite.siteName,
+  relationType: "manager",
+  isPrimary: true,
+  startDate: "2026-05-01",
+  endDate: null,
+  isActive: true,
+  createdAt: "2026-05-11T13:10:00.000Z",
+  updatedAt: "2026-05-11T13:10:00.000Z",
+};
+
 const contract: ContractDto = {
   id: "15151515-1515-4151-8151-151515151515",
   contractNo: "HT20260511001",
@@ -594,6 +621,20 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
   });
 
+  it("shows project-site users only usage actions and hides global stock balance", async () => {
+    mockShellFetch(projectSiteUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(screen.getAllByText("siteuser").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 个项目点")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存项目点" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "执行出库" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "当前库存查询" })).not.toBeInTheDocument();
+  });
+
   it("renders the Excel import workspace in the app shell", async () => {
     mockShellFetch(adminUser);
 
@@ -758,6 +799,8 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([userAccount])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadProjectSiteAssignments={() => Promise.resolve([projectSiteAssignment])}
       />,
     );
 
@@ -765,10 +808,12 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("部门管理")).toBeInTheDocument();
     expect(screen.getByText("员工台账")).toBeInTheDocument();
     expect(screen.getByText("账号角色")).toBeInTheDocument();
+    expect(screen.getByText("项目点分配")).toBeInTheDocument();
     expect(screen.getByText("权限矩阵")).toBeInTheDocument();
     expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
     expect(screen.getByText("EMP0001")).toBeInTheDocument();
     expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("SITE-WX-001 科技园一期项目点").length).toBeGreaterThan(0);
     expect(screen.getAllByText("HR").length).toBeGreaterThan(0);
   });
 
@@ -1057,8 +1102,9 @@ describe("Company ERP app shell", () => {
     await screen.findByText("USE20260511001");
     fireEvent.change(screen.getByLabelText("领用申请"), { target: { value: projectUsageRequest.id } });
     fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511001" } });
-    fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("领用时间"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("领用人"), { target: { value: "项目点领用人" } });
     fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
 
     expect((await screen.findAllByText("已出库")).length).toBeGreaterThan(0);
@@ -1077,7 +1123,7 @@ describe("Company ERP app shell", () => {
 
     await screen.findByText("USE20260511001");
     fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511002" } });
-    fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("领用时间"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
 
@@ -1359,39 +1405,49 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([])}
         loadEmployees={() => Promise.resolve([])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadProjectSites={() => Promise.resolve([])}
+        loadProjectSiteAssignments={() => Promise.resolve([])}
       />,
     );
 
     expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无员工资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无账号资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无项目点分配")).toBeInTheDocument();
 
     rerender(
       <PeoplePermissionsWorkspace
         loadDepartments={() => Promise.reject(new Error("offline"))}
         loadEmployees={() => Promise.reject(new Error("offline"))}
         loadUserAccounts={() => Promise.reject(new Error("offline"))}
+        loadProjectSites={() => Promise.reject(new Error("offline"))}
+        loadProjectSiteAssignments={() => Promise.reject(new Error("offline"))}
       />,
     );
 
     expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("员工资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("账号资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("项目点分配加载失败")).toBeInTheDocument();
   });
 
   it("creates department, employee, and user account records from the forms", async () => {
     const createdDepartment = { ...department, departmentCode: "DEP-WH", name: "仓储部" };
     const createdEmployee = { ...employee, employeeNo: "EMP0002", name: "李四", username: null, accountStatus: null };
     const createdAccount = { ...userAccount, username: "lisi", employeeNo: "EMP0002", employeeName: "李四", roles: ["viewer"] as const };
+    const createdAssignment = { ...projectSiteAssignment, id: "24242424-2424-4242-8242-242424242424" };
 
     render(
       <PeoplePermissionsWorkspace
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.resolve(createdDepartment)}
         createEmployee={() => Promise.resolve(createdEmployee)}
         createUserAccount={() => Promise.resolve(createdAccount)}
+        createProjectSiteAssignment={() => Promise.resolve(createdAssignment)}
       />,
     );
 
@@ -1407,10 +1463,14 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+    fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
+    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
     expect(await screen.findAllByText("仓储部")).not.toHaveLength(0);
     expect(await screen.findByText("EMP0002")).toBeInTheDocument();
     expect(await screen.findByText("lisi")).toBeInTheDocument();
+    expect(await screen.findAllByText("SITE-WX-001 科技园一期项目点")).not.toHaveLength(0);
   });
 
   it("shows people permissions creation failures", async () => {
@@ -1419,9 +1479,12 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.reject(new Error("duplicate department"))}
         createEmployee={() => Promise.reject(new Error("duplicate employee"))}
         createUserAccount={() => Promise.reject(new Error("duplicate account"))}
+        createProjectSiteAssignment={() => Promise.reject(new Error("duplicate assignment"))}
       />,
     );
 
@@ -1437,7 +1500,11 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+    fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
+    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
     expect(await screen.findAllByText("保存失败，请检查唯一编码或稍后重试。")).toHaveLength(3);
+    expect(await screen.findByText("保存失败，请检查是否重复分配或项目点是否有效。")).toBeInTheDocument();
   });
 });
