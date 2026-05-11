@@ -30,6 +30,11 @@ function decimalToNumber(value: unknown): number {
   return Number(value);
 }
 
+function decimalToNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return decimalToNumber(value);
+}
+
 function dateToString(value: Date | string | null | undefined): string | null {
   if (!value) return null;
   if (typeof value === "string") return value.slice(0, 10);
@@ -112,6 +117,12 @@ function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
     expectedDate: dateToString(request.expectedDate),
     status: request.status,
     outboundNo: request.outboundNo,
+    unitChargePrice: decimalToNullableNumber(request.unitChargePrice),
+    chargeAmount: decimalToNullableNumber(request.chargeAmount),
+    chargePriceSource: request.chargePriceSource,
+    chargeRemark: request.chargeRemark,
+    lastIssuedAt: dateToString(request.lastIssuedAt),
+    lastReceivedByName: request.lastReceivedByName,
     remark: request.remark,
     createdAt: timestampToString(request.createdAt),
     updatedAt: timestampToString(request.updatedAt),
@@ -308,6 +319,25 @@ async function currentStock(client: AnyPrisma, warehouseId: string, materialId: 
   return decimalToNumber(grouped._sum.quantity);
 }
 
+function calculateChargeSnapshot(material: any, quantity: number) {
+  if (!material?.isProjectSiteSaleEnabled || material.projectSiteSalePrice === null || material.projectSiteSalePrice === undefined) {
+    return {
+      unitChargePrice: null,
+      chargeAmount: 0,
+      chargePriceSource: null,
+      chargeRemark: null,
+    };
+  }
+
+  const unitChargePrice = decimalToNumber(material.projectSiteSalePrice);
+  return {
+    unitChargePrice,
+    chargeAmount: Number((unitChargePrice * quantity).toFixed(4)),
+    chargePriceSource: "project_site_price" as const,
+    chargeRemark: material.projectSiteSaleRemark ?? null,
+  };
+}
+
 export function createPrismaProjectSiteRepository(prisma: PrismaClient): ProjectSiteRepository {
   const client = prisma as AnyPrisma;
 
@@ -430,6 +460,9 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
             throw new ProjectUsageRequestValidationError(["insufficient stock for issue"]);
           }
 
+          const chargeSnapshot = calculateChargeSnapshot(request.material, input.quantity);
+          const currentChargeAmount = decimalToNumber(request.chargeAmount);
+
           await tx.inventoryMovement.create({
             data: {
               movementNo: input.outboundNo,
@@ -441,6 +474,10 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
               material: { connect: { id: request.materialId } },
               quantity: -input.quantity,
               unit: request.unit,
+              unitChargePrice: chargeSnapshot.unitChargePrice,
+              chargeAmount: chargeSnapshot.chargeAmount,
+              chargePriceSource: chargeSnapshot.chargePriceSource,
+              chargeRemark: chargeSnapshot.chargeRemark,
               projectSite: { connect: { id: request.projectSiteId } },
               subcontractorName: request.projectSite.subcontractorParty?.partyName,
               requestedBy: request.requestedBy,
@@ -454,12 +491,19 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
 
           const nextIssuedQuantity = issuedQuantity + input.quantity;
           const nextStatus = nextIssuedQuantity >= targetQuantity ? "issued" : "partially_issued";
+          const nextChargeAmount = Number((currentChargeAmount + chargeSnapshot.chargeAmount).toFixed(4));
           return tx.projectUsageRequest.update({
             where: { id },
             data: {
               issuedQuantity: nextIssuedQuantity,
               outboundNo: input.outboundNo,
               status: nextStatus,
+              unitChargePrice: chargeSnapshot.unitChargePrice,
+              chargeAmount: nextChargeAmount,
+              chargePriceSource: chargeSnapshot.chargePriceSource,
+              chargeRemark: chargeSnapshot.chargeRemark,
+              lastIssuedAt: new Date(`${input.movementDate}T00:00:00.000Z`),
+              lastReceivedByName: input.receivedByName,
             },
             include: usageInclude,
           });

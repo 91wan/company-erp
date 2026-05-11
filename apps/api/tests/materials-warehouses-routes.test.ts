@@ -40,6 +40,12 @@ function makeMaterial(overrides: Partial<MaterialDto> = {}): MaterialDto {
     defaultSupplierPartyId: "11111111-1111-4111-8111-111111111111",
     defaultSupplierPartyName: "晨光贸易有限公司",
     safeStock: 20,
+    isProjectSiteSaleEnabled: false,
+    purchaseReferencePrice: null,
+    projectSiteSalePrice: null,
+    projectSiteSaleUnit: null,
+    projectSiteSaleRemark: null,
+    isConsumable: false,
     status: "enabled",
     remark: "按季度补货",
     createdAt: now,
@@ -214,6 +220,12 @@ describe("materials API", () => {
         materialName: "定制纸杯",
         materialCategory: "定制物料",
         baseUnit: "箱",
+        isProjectSiteSaleEnabled: true,
+        purchaseReferencePrice: 12.5,
+        projectSiteSalePrice: 15,
+        projectSiteSaleUnit: "箱",
+        projectSiteSaleRemark: "按项目点领用核算",
+        isConsumable: true,
       },
     });
 
@@ -234,6 +246,12 @@ describe("materials API", () => {
         materialCode: "MAT0003",
         materialName: "定制纸杯",
         defaultSupplierPartyId: null,
+        isProjectSiteSaleEnabled: true,
+        purchaseReferencePrice: 12.5,
+        projectSiteSalePrice: 15,
+        projectSiteSaleUnit: "箱",
+        projectSiteSaleRemark: "按项目点领用核算",
+        isConsumable: true,
         status: "enabled",
       },
     });
@@ -270,6 +288,57 @@ describe("materials API", () => {
     expect(invalidResponse.json()).toMatchObject({ error: "MATERIAL_VALIDATION_FAILED" });
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "MATERIAL_CONFLICT", field: "materialCode" });
+  });
+
+  it("rejects invalid project-site charge prices for materials", async () => {
+    const app = buildApp({
+      materialRepository: createFakeMaterialRepository([
+        makeMaterial({ purchaseReferencePrice: 20, projectSiteSalePrice: 25 }),
+      ]),
+    });
+
+    const negativePrice = await app.inject({
+      method: "POST",
+      url: "/api/materials",
+      payload: {
+        materialCode: "MAT0098",
+        materialName: "负价物料",
+        materialCategory: "定制物料",
+        baseUnit: "套",
+        projectSiteSalePrice: -1,
+      },
+    });
+    const belowReference = await app.inject({
+      method: "POST",
+      url: "/api/materials",
+      payload: {
+        materialCode: "MAT0099",
+        materialName: "售价低于采购参考价",
+        materialCategory: "定制物料",
+        baseUnit: "套",
+        purchaseReferencePrice: 20,
+        projectSiteSalePrice: 19.99,
+      },
+    });
+    const updateBelowExistingReference = await app.inject({
+      method: "PATCH",
+      url: "/api/materials/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      payload: {
+        projectSiteSalePrice: 19,
+      },
+    });
+    await app.close();
+
+    expect(negativePrice.statusCode).toBe(400);
+    expect(negativePrice.json().issues).toContain("projectSiteSalePrice must be a non-negative number");
+    expect(belowReference.statusCode).toBe(400);
+    expect(belowReference.json().issues).toContain(
+      "projectSiteSalePrice must be greater than or equal to purchaseReferencePrice",
+    );
+    expect(updateBelowExistingReference.statusCode).toBe(400);
+    expect(updateBelowExistingReference.json().issues).toContain(
+      "projectSiteSalePrice must be greater than or equal to purchaseReferencePrice",
+    );
   });
 });
 

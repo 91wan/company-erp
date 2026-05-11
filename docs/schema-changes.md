@@ -165,3 +165,12 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed project-site-only users are scoped to assigned project sites for project sites, usage requests, purchase requests, purchase records, contracts, and project usage inventory movements.
 - Confirmed global inventory balances remain blocked for project-site-only users because current balances have no project-site dimension.
 - Added shared `projectUsage` permission area so project-site accounts can submit usage requests without gaining project-site master-data maintenance or warehouse issue permissions.
+
+## 2026-05-11 Project Usage Charges And Consumables
+
+- Added `ChargePriceSource` enum with initial value `project_site_price`.
+- Added material fields for project-site usage charging, purchase reference price, project-site sale price/unit/remark, and consumable marking.
+- Added project-usage outbound charge snapshot fields to `inventory_movements`.
+- Added cumulative charge and latest issue snapshot fields to `project_usage_requests`.
+- Confirmed charge data is an operational snapshot only; it does not create finance receivables, payment records, or settlement reports in this slice.
+- Added migration `20260511234500_project_usage_charges_consumables`.

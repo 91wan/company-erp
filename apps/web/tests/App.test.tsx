@@ -145,6 +145,12 @@ const material: MaterialDto = {
   defaultSupplierPartyId: party.id,
   defaultSupplierPartyName: party.partyName,
   safeStock: 20,
+  isProjectSiteSaleEnabled: true,
+  purchaseReferencePrice: 80,
+  projectSiteSalePrice: 98,
+  projectSiteSaleUnit: "套",
+  projectSiteSaleRemark: "项目点领用核算价",
+  isConsumable: true,
   status: "enabled",
   remark: "按季度补货",
   createdAt: "2026-05-11T09:00:00.000Z",
@@ -716,6 +722,8 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("物料基础")).toBeInTheDocument();
     expect(screen.getByText("仓库基础")).toBeInTheDocument();
     expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
+    expect(screen.getByText("98 / 套")).toBeInTheDocument();
+    expect(screen.getByText("项目点领用核算价")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("无锡总部仓库").length).toBeGreaterThan(0);
     expect(screen.getByText("MVP 只管理无锡总部真实库存，不管理项目点现场库存。")).toBeInTheDocument();
@@ -746,12 +754,13 @@ describe("Company ERP app shell", () => {
   it("creates material and warehouse records from the forms", async () => {
     const createdMaterial = { ...material, materialCode: "MAT0002", materialName: "定制纸杯" };
     const createdWarehouse = { ...warehouse, warehouseCode: "WH-TEMP-01", warehouseName: "临时周转仓" };
+    const createMaterial = vi.fn(() => Promise.resolve(createdMaterial));
 
     render(
       <MaterialsWarehousesWorkspace
         loadMaterials={() => Promise.resolve([])}
         loadWarehouses={() => Promise.resolve([])}
-        createMaterial={() => Promise.resolve(createdMaterial)}
+        createMaterial={createMaterial}
         createWarehouse={() => Promise.resolve(createdWarehouse)}
       />,
     );
@@ -760,6 +769,12 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("物料编码"), { target: { value: "MAT0002" } });
     fireEvent.change(screen.getByLabelText("物料名称"), { target: { value: "定制纸杯" } });
     fireEvent.change(screen.getByLabelText("基本单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByLabelText("项目点领用收费"));
+    fireEvent.change(screen.getByLabelText("采购参考价"), { target: { value: "12.5" } });
+    fireEvent.change(screen.getByLabelText("项目点收费价"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText("收费单位"), { target: { value: "箱" } });
+    fireEvent.change(screen.getByLabelText("收费备注"), { target: { value: "项目点耗材核算" } });
+    fireEvent.click(screen.getByLabelText("耗材"));
     fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
 
     fireEvent.change(screen.getByLabelText("仓库编码"), { target: { value: "WH-TEMP-01" } });
@@ -768,6 +783,16 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("定制纸杯")).toBeInTheDocument();
     expect(await screen.findByText("临时周转仓")).toBeInTheDocument();
+    expect(createMaterial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isProjectSiteSaleEnabled: true,
+        purchaseReferencePrice: 12.5,
+        projectSiteSalePrice: 15,
+        projectSiteSaleUnit: "箱",
+        projectSiteSaleRemark: "项目点耗材核算",
+        isConsumable: true,
+      }),
+    );
   });
 
   it("shows material and warehouse creation failures", async () => {
@@ -1086,6 +1111,12 @@ describe("Company ERP app shell", () => {
       ...projectUsageRequest,
       issuedQuantity: 10,
       outboundNo: "OUT20260511001",
+      chargeAmount: 980,
+      unitChargePrice: 98,
+      chargePriceSource: "project_site_price" as const,
+      chargeRemark: "项目点领用核算价",
+      lastIssuedAt: "2026-05-11",
+      lastReceivedByName: "项目点领用人",
       status: "issued" as const,
     };
     const { rerender } = render(
@@ -1109,6 +1140,9 @@ describe("Company ERP app shell", () => {
 
     expect((await screen.findAllByText("已出库")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("10 套")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("¥980.00")).toBeInTheDocument();
+    expect(await screen.findByText("项目点领用人")).toBeInTheDocument();
+    expect((await screen.findAllByText("2026-05-11")).length).toBeGreaterThan(0);
 
     rerender(
       <ProjectSitesWorkspace

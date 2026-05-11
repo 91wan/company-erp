@@ -82,6 +82,16 @@ function normalizeSafeStock(value: unknown, issues: string[]): number | null | u
   return value;
 }
 
+function normalizeNonNegativeNumber(value: unknown, field: string, issues: string[]): number | null | undefined {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    issues.push(`${field} must be a non-negative number`);
+    return undefined;
+  }
+  return value;
+}
+
 export function normalizeMaterialInput(input: unknown, mode: "create"): CreateMaterialInput;
 export function normalizeMaterialInput(input: unknown, mode: "update"): UpdateMaterialInput;
 export function normalizeMaterialInput(
@@ -101,13 +111,48 @@ export function normalizeMaterialInput(
   if (typeof payload.materialCategory === "string") normalized.materialCategory = payload.materialCategory.trim();
   if (typeof payload.baseUnit === "string") normalized.baseUnit = payload.baseUnit.trim();
 
-  for (const field of ["specification", "defaultWarehouseId", "defaultSupplierPartyId", "remark"] as const) {
+  for (const field of [
+    "specification",
+    "defaultWarehouseId",
+    "defaultSupplierPartyId",
+    "projectSiteSaleUnit",
+    "projectSiteSaleRemark",
+    "remark",
+  ] as const) {
     const value = normalizeNullableString(payload[field]);
     if (value !== undefined) normalized[field] = value;
   }
 
   const safeStock = normalizeSafeStock(payload.safeStock, issues);
   if (safeStock !== undefined) normalized.safeStock = safeStock;
+  const purchaseReferencePrice = normalizeNonNegativeNumber(payload.purchaseReferencePrice, "purchaseReferencePrice", issues);
+  const projectSiteSalePrice = normalizeNonNegativeNumber(payload.projectSiteSalePrice, "projectSiteSalePrice", issues);
+  if (purchaseReferencePrice !== undefined) normalized.purchaseReferencePrice = purchaseReferencePrice;
+  if (projectSiteSalePrice !== undefined) normalized.projectSiteSalePrice = projectSiteSalePrice;
+
+  if (typeof payload.isProjectSiteSaleEnabled === "boolean") {
+    normalized.isProjectSiteSaleEnabled = payload.isProjectSiteSaleEnabled;
+  } else if (payload.isProjectSiteSaleEnabled !== undefined) {
+    issues.push("isProjectSiteSaleEnabled must be a boolean");
+  }
+
+  if (typeof payload.isConsumable === "boolean") {
+    normalized.isConsumable = payload.isConsumable;
+  } else if (payload.isConsumable !== undefined) {
+    issues.push("isConsumable must be a boolean");
+  }
+
+  const effectivePurchaseReferencePrice =
+    purchaseReferencePrice === undefined ? undefined : purchaseReferencePrice;
+  const effectiveProjectSiteSalePrice =
+    projectSiteSalePrice === undefined ? undefined : projectSiteSalePrice;
+  if (
+    typeof effectivePurchaseReferencePrice === "number" &&
+    typeof effectiveProjectSiteSalePrice === "number" &&
+    effectiveProjectSiteSalePrice < effectivePurchaseReferencePrice
+  ) {
+    issues.push("projectSiteSalePrice must be greater than or equal to purchaseReferencePrice");
+  }
 
   if (payload.status !== undefined) {
     if (payload.status === "enabled" || payload.status === "disabled") {

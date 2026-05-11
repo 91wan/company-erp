@@ -431,6 +431,23 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     try {
       const input = normalizeMaterialInput(request.body, "update");
+      if (input.purchaseReferencePrice !== undefined || input.projectSiteSalePrice !== undefined) {
+        const current = await options.materialRepository.getById(id);
+        if (!current) return reply.status(404).send({ error: "MATERIAL_NOT_FOUND" });
+        const purchaseReferencePrice =
+          input.purchaseReferencePrice !== undefined ? input.purchaseReferencePrice : current.purchaseReferencePrice;
+        const projectSiteSalePrice =
+          input.projectSiteSalePrice !== undefined ? input.projectSiteSalePrice : current.projectSiteSalePrice;
+        if (
+          typeof purchaseReferencePrice === "number" &&
+          typeof projectSiteSalePrice === "number" &&
+          projectSiteSalePrice < purchaseReferencePrice
+        ) {
+          throw new MaterialValidationError([
+            "projectSiteSalePrice must be greater than or equal to purchaseReferencePrice",
+          ]);
+        }
+      }
       const material = await options.materialRepository.update(id, input);
 
       if (!material) {
