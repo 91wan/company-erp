@@ -21,9 +21,9 @@ import {
   type EmployeeRepository,
   type UserAccountListFilters,
   type UserAccountRepository,
-} from "./peoplePermissions";
-import { hashPassword } from "./password";
-import type { AuthRepository, AuthAccountRecord } from "./auth";
+} from "./peoplePermissions.js";
+import { hashPassword } from "./password.js";
+import type { AuthRepository, AuthAccountRecord } from "./auth.js";
 
 type PrismaDepartment = Prisma.DepartmentGetPayload<{
   include: {

@@ -7,7 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "bootstrap:admin": "tsx src/bootstrapAdmin.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"import('./dist/app.js').then(() => console.log('api dist import ok'))\"",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

@@ -9,10 +9,14 @@ import {
   type PermissionAreaCode,
   type UserAccountStatusCode,
 } from "@company-erp/shared";
-import { verifyPassword } from "./password";
+import { verifyPassword } from "./password.js";
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const INSECURE_SESSION_SECRET_PLACEHOLDERS = new Set([
+  "company-erp-local-dev-session-secret-change-me",
+  "change-me-long-random-local-secret",
+]);
 
 export type AuthAccountRecord = AuthenticatedUserDto & {
   passwordHash: string;
@@ -111,6 +115,14 @@ function serializeCookie(
   return parts.join("; ");
 }
 
+function normalizeSessionSecret(secret: string | undefined): string {
+  const normalized = secret?.trim();
+  if (!normalized || INSECURE_SESSION_SECRET_PLACEHOLDERS.has(normalized)) {
+    throw new Error("AUTH_SESSION_SECRET must be set to a non-placeholder value when auth is enabled");
+  }
+  return normalized;
+}
+
 function toAuthenticatedUser(account: AuthAccountRecord): AuthenticatedUserDto {
   return {
     id: account.id,
@@ -192,7 +204,7 @@ export function registerAuth(
   const enabled = authOptions?.enabled ?? false;
   if (!enabled) return;
 
-  const secret = authOptions?.sessionSecret ?? "company-erp-local-dev-session-secret-change-me";
+  const secret = normalizeSessionSecret(authOptions?.sessionSecret);
   const ttlSeconds = authOptions?.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
   const secure = authOptions?.cookieSecure ?? false;
 

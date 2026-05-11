@@ -11,7 +11,7 @@ import {
   type InventoryBalanceListFilters,
   type InventoryMovementListFilters,
   type InventoryRepository,
-} from "./inventory";
+} from "./inventory.js";
 
 type AnyPrisma = PrismaClient & Record<string, any>;
 

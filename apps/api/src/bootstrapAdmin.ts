@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { hashPassword } from "./password";
+import { hashPassword } from "./password.js";
 
 const username = process.env.BOOTSTRAP_ADMIN_USERNAME?.trim();
 const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "";
