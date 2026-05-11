@@ -226,6 +226,7 @@ function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
     ...(filters.serviceMode ? { serviceMode: filters.serviceMode } : {}),
     ...(filters.clientPartyId ? { clientPartyId: filters.clientPartyId } : {}),
     ...(filters.subcontractorPartyId ? { subcontractorPartyId: filters.subcontractorPartyId } : {}),
+    ...(filters.projectSiteIds ? { id: { in: [...filters.projectSiteIds] } } : {}),
     ...(filters.q
       ? {
           OR: [
@@ -246,6 +247,7 @@ function usageWhere(filters: ProjectUsageRequestListFilters): Record<string, unk
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
     ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
     ...(filters.materialId ? { materialId: filters.materialId } : {}),
     ...(filters.dateFrom || filters.dateTo

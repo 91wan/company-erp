@@ -26,6 +26,9 @@ type ProjectSitesWorkspaceProps = {
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
   canManage?: boolean;
+  canManageSites?: boolean;
+  canManageUsage?: boolean;
+  canIssue?: boolean;
 };
 
 type SiteFormState = {
@@ -140,7 +143,13 @@ export function ProjectSitesWorkspace({
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
   canManage = true,
+  canManageSites,
+  canManageUsage,
+  canIssue,
 }: ProjectSitesWorkspaceProps) {
+  const canEditSites = canManageSites ?? canManage;
+  const canCreateUsage = canManageUsage ?? canManage;
+  const canIssueUsage = canIssue ?? canManage;
   const [sites, setSites] = useState<ProjectSiteDto[]>([]);
   const [usageRequests, setUsageRequests] = useState<ProjectUsageRequestDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
@@ -431,7 +440,7 @@ export function ProjectSitesWorkspace({
       <div className="inventory-tabs" aria-label="项目点模块功能">
         <button type="button" aria-current="page">项目点台账</button>
         <button type="button">领用申请</button>
-        <button type="button">出库登记</button>
+        <button type="button" disabled={!canIssueUsage}>出库登记</button>
         <button type="button" disabled>现场库存 后续开放</button>
       </div>
 
@@ -510,7 +519,7 @@ export function ProjectSitesWorkspace({
           )}
         </section>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
+        {canEditSites ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
           <div className="panel-header people-panel-title">
             <h3>
               <MapPin aria-hidden="true" size={16} />
@@ -639,7 +648,7 @@ export function ProjectSitesWorkspace({
           )}
         </section>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
+        {canCreateUsage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
           <div className="panel-header people-panel-title">
             <h3>
               <ClipboardList aria-hidden="true" size={16} />
@@ -733,7 +742,7 @@ export function ProjectSitesWorkspace({
         </form> : null}
       </div>
 
-      {canManage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单">
+      {canIssueUsage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单">
         <div className="panel-header people-panel-title">
           <h3>
             <PackageMinus aria-hidden="true" size={16} />
@@ -762,7 +771,7 @@ export function ProjectSitesWorkspace({
           <input value={issueForm.outboundNo} onChange={(event) => setIssueForm({ ...issueForm, outboundNo: event.target.value })} />
         </label>
         <label>
-          <span>出库日期</span>
+          <span>领用时间</span>
           <input
             type="date"
             value={issueForm.movementDate}
@@ -784,7 +793,7 @@ export function ProjectSitesWorkspace({
           <input value={issueForm.handledBy} onChange={(event) => setIssueForm({ ...issueForm, handledBy: event.target.value })} />
         </label>
         <label>
-          <span>接收人</span>
+          <span>领用人</span>
           <input
             value={issueForm.receivedByName}
             onChange={(event) => setIssueForm({ ...issueForm, receivedByName: event.target.value })}

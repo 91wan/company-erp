@@ -19,6 +19,7 @@ export type ProjectSiteListFilters = {
   serviceMode?: ProjectSiteServiceModeCode;
   clientPartyId?: string;
   subcontractorPartyId?: string;
+  projectSiteIds?: readonly string[];
   q?: string;
 };
 
@@ -27,6 +28,7 @@ export type ProjectUsageRequestListFilters = {
   projectSiteId?: string;
   warehouseId?: string;
   materialId?: string;
+  projectSiteIds?: readonly string[];
   q?: string;
   dateFrom?: string;
   dateTo?: string;

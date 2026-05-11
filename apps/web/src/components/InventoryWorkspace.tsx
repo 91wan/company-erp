@@ -19,6 +19,7 @@ type InventoryWorkspaceProps = {
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
   canManage?: boolean;
+  showBalances?: boolean;
 };
 
 type MovementFormState = {
@@ -85,6 +86,7 @@ export function InventoryWorkspace({
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
   canManage = true,
+  showBalances = true,
 }: InventoryWorkspaceProps) {
   const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
   const [balances, setBalances] = useState<InventoryBalanceDto[]>([]);
@@ -132,6 +134,13 @@ export function InventoryWorkspace({
 
   useEffect(() => {
     let mounted = true;
+    if (!showBalances) {
+      setBalances([]);
+      setBalanceStatus("ready");
+      return () => {
+        mounted = false;
+      };
+    }
     setBalanceStatus("loading");
     loadInventoryBalances()
       .then((nextBalances) => {
@@ -146,7 +155,7 @@ export function InventoryWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadInventoryBalances]);
+  }, [loadInventoryBalances, showBalances]);
 
   useEffect(() => {
     let mounted = true;
@@ -229,7 +238,9 @@ export function InventoryWorkspace({
         remark: form.remark || null,
       });
       setMovements((current) => [created, ...current.filter((movement) => movement.id !== created.id)]);
-      setBalances(await loadInventoryBalances());
+      if (showBalances) {
+        setBalances(await loadInventoryBalances());
+      }
       setForm((current) => ({
         movementNo: "",
         movementDate: "",
@@ -273,7 +284,7 @@ export function InventoryWorkspace({
       <div className="inventory-tabs" aria-label="库存模块功能">
         <button type="button" aria-current="page">入库登记</button>
         <button type="button">库存流水</button>
-        <button type="button">当前库存查询</button>
+        {showBalances ? <button type="button">当前库存查询</button> : null}
         <button type="button" disabled>出库登记 后续开放</button>
         <button type="button" disabled>项目点领用记录 后续开放</button>
       </div>
@@ -476,7 +487,7 @@ export function InventoryWorkspace({
         </form> : null}
       </div>
 
-      <section className="dashboard-panel table-panel">
+      {showBalances ? <section className="dashboard-panel table-panel">
         <div className="panel-header people-panel-title">
           <h3>
             <Warehouse aria-hidden="true" size={16} />
@@ -503,7 +514,7 @@ export function InventoryWorkspace({
             ])}
           />
         )}
-      </section>
+      </section> : null}
     </section>
   );
 }

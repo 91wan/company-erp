@@ -22,6 +22,7 @@ export type AuthAccountRecord = AuthenticatedUserDto & {
   passwordHash: string;
   status: UserAccountStatusCode;
   employeeStatus?: EmployeeStatusCode | null;
+  assignedProjectSiteIds?: readonly string[];
   passwordChangedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +132,7 @@ function toAuthenticatedUser(account: AuthAccountRecord): AuthenticatedUserDto {
     employeeNo: account.employeeNo ?? null,
     employeeName: account.employeeName ?? null,
     roles: [...account.roles].sort(),
+    assignedProjectSiteIds: [...(account.assignedProjectSiteIds ?? [])].sort(),
     lastLoginAt: account.lastLoginAt ?? null,
   };
 }
@@ -177,14 +179,19 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/departments")) return { area: "departments", requiredLevel };
   if (pathname.startsWith("/api/employees")) return { area: "employees", requiredLevel };
   if (pathname.startsWith("/api/user-accounts")) return { area: "userAccounts", requiredLevel };
+  if (pathname.startsWith("/api/project-site-assignments")) return { area: "employees", requiredLevel };
   if (pathname.startsWith("/api/purchase-requests") || pathname.startsWith("/api/purchase-records") || pathname.startsWith("/api/replenishment-suggestions")) {
     return { area: "procurement", requiredLevel };
   }
   if (pathname.startsWith("/api/inventory-movements") || pathname.startsWith("/api/inventory-balances")) {
     return { area: "inventory", requiredLevel };
   }
-  if (pathname.startsWith("/api/project-sites") || pathname.startsWith("/api/project-usage-requests")) {
+  if (pathname.startsWith("/api/project-sites")) {
     return { area: "projectSites", requiredLevel };
+  }
+  if (pathname.startsWith("/api/project-usage-requests")) {
+    if (pathname.endsWith("/issue")) return { area: "inventory", requiredLevel: "manage" };
+    return { area: "projectUsage", requiredLevel };
   }
   if (pathname.startsWith("/api/contracts") || pathname.startsWith("/api/contract-attachments")) {
     return { area: "contracts", requiredLevel };

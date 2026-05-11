@@ -29,6 +29,7 @@ export type MvpPermissionMatrix = {
   inventory: MvpPermissionRule;
   contracts: MvpPermissionRule;
   projectSites: MvpPermissionRule;
+  projectUsage: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
 };
 
@@ -41,6 +42,7 @@ export type AuthenticatedUserDto = {
   employeeNo?: string | null;
   employeeName?: string | null;
   roles: readonly MvpRoleCode[];
+  assignedProjectSiteIds?: readonly string[];
   lastLoginAt?: string | null;
 };
 
@@ -112,6 +114,8 @@ export type ProjectSiteServiceModeCode = "direct" | "subcontracted";
 export type ProjectSiteStatusCode = "preparing" | "active" | "paused" | "ended";
 
 export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
+
+export type EmployeeProjectSiteRelationTypeCode = "assigned" | "manager" | "support";
 
 export type ImportTemplateTypeCode =
   | "parties"
@@ -357,6 +361,34 @@ export type UserAccountDto = {
   updatedAt: string;
 };
 
+export type EmployeeProjectSiteAssignmentDto = {
+  id: string;
+  employeeId: string;
+  employeeNo: string;
+  employeeName: string;
+  projectSiteId: string;
+  siteCode: string;
+  siteName: string;
+  relationType: EmployeeProjectSiteRelationTypeCode;
+  isPrimary: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateEmployeeProjectSiteAssignmentInput = {
+  employeeId: string;
+  projectSiteId: string;
+  relationType?: EmployeeProjectSiteRelationTypeCode;
+  isPrimary?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+export type UpdateEmployeeProjectSiteAssignmentInput = Partial<CreateEmployeeProjectSiteAssignmentInput>;
+
 export type CreateUserAccountInput = {
   employeeId?: string | null;
   username: string;
@@ -449,6 +481,8 @@ export type PurchaseRecordDto = {
   purchaseNo: string;
   purchaseRequestId?: string | null;
   purchaseRequestNo?: string | null;
+  projectSiteId?: string | null;
+  projectSiteName?: string | null;
   purchaserName: string;
   purchaserEmployeeId?: string | null;
   sourceType: PurchaseSourceTypeCode;
@@ -596,6 +630,8 @@ export type InventoryMovementDto = {
   unitPrice?: number | null;
   purchaseRecordNo?: string | null;
   purchaseRecordLineId?: string | null;
+  projectSiteId?: string | null;
+  projectSiteName?: string | null;
   handledBy?: string | null;
   purpose?: string | null;
   remark?: string | null;
@@ -944,6 +980,12 @@ export const PROJECT_USAGE_STATUSES = [
   { code: "rejected", label: "已驳回" },
 ] as const satisfies readonly StatusMeta<ProjectUsageStatusCode>[];
 
+export const EMPLOYEE_PROJECT_SITE_RELATION_TYPES = [
+  { code: "assigned", label: "分配" },
+  { code: "manager", label: "负责人" },
+  { code: "support", label: "协助" },
+] as const satisfies readonly StatusMeta<EmployeeProjectSiteRelationTypeCode>[];
+
 export const IMPORT_TEMPLATE_TYPES = [
   { code: "parties", label: "往来方/供应商" },
   { code: "materials", label: "物料" },
@@ -1025,6 +1067,10 @@ export const MVP_PERMISSION_MATRIX = {
   },
   projectSites: {
     read: ALL_ROLES,
+    manage: ["admin", "hr"],
+  },
+  projectUsage: {
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "viewer"],
     manage: ["admin", "project_site"],
   },
   systemSettings: {
@@ -1139,6 +1185,10 @@ export const MVP_DICTIONARIES = {
   projectSiteStatus: {
     label: "项目点状态",
     values: ["筹备中", "服务中", "暂停", "已结束"],
+  },
+  employeeProjectSiteRelationType: {
+    label: "项目点人员关系",
+    values: ["分配", "负责人", "协助"],
   },
   importTemplateType: {
     label: "Excel 导入模板类型",
@@ -1257,6 +1307,7 @@ export function calculateCurrentInventory(
 export function canIssueStock(requestedQuantity: number, currentQuantity: number): boolean {
   return requestedQuantity > 0 && requestedQuantity <= currentQuantity;
 }
+
 
 export function calculateReplenishmentSuggestionQuantity(input: ReplenishmentQuantityInput): number {
   const gap = input.safeStock + input.reservedUsageQty - input.currentStock - input.openPurchaseQty;

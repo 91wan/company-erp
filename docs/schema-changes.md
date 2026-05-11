@@ -157,3 +157,11 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed duplicate existing business codes are skipped by default and recorded as warning/skipped rows; production data is not overwritten.
 - Confirmed opening inventory import writes `inventory_movements` records with `movement_type=opening`; no inventory balance table is added.
 - Added migration `20260511233000_excel_import_foundation`.
+
+## 2026-05-11 Project Site Data Permissions Foundation
+
+- Reused existing `employee_project_site_assignments` for employee-to-project-site data scope; no new Prisma migration was required.
+- Confirmed active assignment scope is derived from `start_date <= today` and empty/future `end_date`.
+- Confirmed project-site-only users are scoped to assigned project sites for project sites, usage requests, purchase requests, purchase records, contracts, and project usage inventory movements.
+- Confirmed global inventory balances remain blocked for project-site-only users because current balances have no project-site dimension.
+- Added shared `projectUsage` permission area so project-site accounts can submit usage requests without gaining project-site master-data maintenance or warehouse issue permissions.

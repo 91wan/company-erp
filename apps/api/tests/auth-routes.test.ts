@@ -144,7 +144,10 @@ describe("auth API", () => {
 
   it("returns current user for valid sessions and null for missing, expired, or tampered sessions", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const account = makeAuthAccount({ passwordHash });
+    const account = makeAuthAccount({
+      passwordHash,
+      assignedProjectSiteIds: ["77777777-7777-4777-8777-777777777777"],
+    });
     const app = buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([account]),
@@ -159,7 +162,13 @@ describe("auth API", () => {
     const logout = await app.inject({ method: "POST", url: "/api/auth/logout", cookies: { company_erp_session: validCookie } });
     await app.close();
 
-    expect(valid.json()).toMatchObject({ user: { username: "admin", roles: ["admin"] } });
+    expect(valid.json()).toMatchObject({
+      user: {
+        username: "admin",
+        roles: ["admin"],
+        assignedProjectSiteIds: ["77777777-7777-4777-8777-777777777777"],
+      },
+    });
     expect(missing.json()).toEqual({ user: null });
     expect(expired.json()).toEqual({ user: null });
     expect(tampered.json()).toEqual({ user: null });

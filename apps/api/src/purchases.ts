@@ -17,6 +17,7 @@ export type PurchaseRequestListFilters = {
   status?: PurchaseRequestStatusCode;
   requesterName?: string;
   projectSiteId?: string;
+  projectSiteIds?: readonly string[];
   q?: string;
 };
 
@@ -25,6 +26,7 @@ export type PurchaseRecordListFilters = {
   sourceType?: PurchaseSourceTypeCode;
   supplierPartyId?: string;
   purchaserName?: string;
+  projectSiteIds?: readonly string[];
   q?: string;
 };
 

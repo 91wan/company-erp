@@ -8,16 +8,20 @@ import type {
   UpdateContractInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import {
   ContractConflictError,
   getContractExpiryState,
   type ContractListFilters,
   type ContractRepository,
 } from "../src/contracts";
+import { hashPassword } from "../src/password";
 
 const now = "2026-05-11T11:00:00.000Z";
 const contractId = "11111111-1111-4111-8111-111111111111";
 const attachmentId = "22222222-2222-4222-8222-222222222222";
+const assignedProjectSiteId = "44444444-4444-4444-8444-444444444444";
+const unassignedProjectSiteId = "55555555-5555-4555-8555-555555555555";
 
 function makeContract(overrides: Partial<ContractDto> = {}): ContractDto {
   return {
@@ -77,6 +81,7 @@ function createFakeContractRepository(
           ? contract.counterpartyPartyId === filters.counterpartyPartyId
           : true;
         const matchesSite = filters.projectSiteId ? contract.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(contract.projectSiteId ?? "") : true;
         const matchesExpiry = filters.expiry ? contract.expiryState === filters.expiry : true;
         const matchesQuery = filters.q
           ? [
@@ -89,7 +94,15 @@ function createFakeContractRepository(
               .filter(Boolean)
               .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
           : true;
-        return matchesStatus && matchesDirection && matchesCounterparty && matchesSite && matchesExpiry && matchesQuery;
+        return (
+          matchesStatus &&
+          matchesDirection &&
+          matchesCounterparty &&
+          matchesSite &&
+          matchesScopedSites &&
+          matchesExpiry &&
+          matchesQuery
+        );
       });
     },
     async getById(id: string) {
@@ -160,6 +173,51 @@ function createFakeContractRepository(
       return attachments[index];
     },
   };
+}
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    username: "site-user",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: "44444444-4444-4444-8444-444444444444",
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["project_site"],
+    assignedProjectSiteIds: [assignedProjectSiteId],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "site-user", password: "ChangeMe123!" },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("contract expiry helper", () => {
@@ -262,6 +320,72 @@ describe("contracts API", () => {
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "CONTRACT_CONFLICT", field: "contractNo" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("scopes project-site users to assigned project contracts and attachments", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedContract = makeContract({
+      id: "10101010-1010-4010-8010-101010101010",
+      contractNo: "HT-ASSIGNED",
+      projectSiteId: assignedProjectSiteId,
+      projectSiteName: "已分配项目点",
+    });
+    const unassignedContract = makeContract({
+      id: "20202020-2020-4020-8020-202020202020",
+      contractNo: "HT-UNASSIGNED",
+      projectSiteId: unassignedProjectSiteId,
+      projectSiteName: "未分配项目点",
+    });
+    const globalContract = makeContract({
+      id: "30303030-3030-4030-8030-303030303030",
+      contractNo: "HT-GLOBAL",
+      projectSiteId: null,
+      projectSiteName: null,
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-contracts" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      contractRepository: createFakeContractRepository(
+        [assignedContract, unassignedContract, globalContract],
+        [makeAttachment({ contractId: assignedContract.id })],
+      ),
+    });
+    const cookie = await loginCookie(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/contracts",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/contracts/${unassignedContract.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const globalDetailResponse = await app.inject({
+      method: "GET",
+      url: `/api/contracts/${globalContract.id}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const assignedAttachmentsResponse = await app.inject({
+      method: "GET",
+      url: `/api/contracts/${assignedContract.id}/attachments`,
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedAttachmentsResponse = await app.inject({
+      method: "GET",
+      url: `/api/contracts/${unassignedContract.id}/attachments`,
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({ contracts: [{ contractNo: "HT-ASSIGNED" }] });
+    expect(listResponse.json().contracts).toHaveLength(1);
+    expect(unassignedDetailResponse.statusCode).toBe(404);
+    expect(globalDetailResponse.statusCode).toBe(404);
+    expect(assignedAttachmentsResponse.statusCode).toBe(200);
+    expect(unassignedAttachmentsResponse.statusCode).toBe(404);
   });
 
   it("manages contract attachment path metadata", async () => {

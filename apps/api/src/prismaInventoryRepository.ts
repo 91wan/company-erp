@@ -38,6 +38,7 @@ function movementInclude() {
   return {
     warehouse: true,
     material: true,
+    projectSite: true,
   };
 }
 
@@ -60,6 +61,8 @@ function toInventoryMovementDto(movement: any): InventoryMovementDto {
     unitPrice: decimalToNumber(movement.unitPrice),
     purchaseRecordNo: movement.purchaseRecordNo,
     purchaseRecordLineId: movement.purchaseRecordLineId ?? null,
+    projectSiteId: movement.projectSiteId ?? null,
+    projectSiteName: movement.projectSite?.siteName ?? null,
     handledBy: movement.handledBy,
     purpose: movement.purpose,
     remark: movement.remark,
@@ -114,6 +117,7 @@ function movementWhere(filters: InventoryMovementListFilters): Record<string, un
     ...(filters.materialId ? { materialId: filters.materialId } : {}),
     ...(filters.movementType ? { movementType: filters.movementType } : {}),
     ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] }, sourceType: "project_usage" } : {}),
     ...(filters.dateFrom || filters.dateTo
       ? {
           movementDate: {

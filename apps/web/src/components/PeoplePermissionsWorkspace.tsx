@@ -1,16 +1,20 @@
-import { IdCard, KeyRound, RefreshCw, Save, Search, ShieldCheck, Users } from "lucide-react";
+import { IdCard, KeyRound, MapPin, RefreshCw, Save, Search, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   DEPARTMENT_STATUSES,
   EMPLOYEE_STATUSES,
+  EMPLOYEE_PROJECT_SITE_RELATION_TYPES,
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
   USER_ACCOUNT_STATUSES,
   type CreateDepartmentInput,
   type CreateEmployeeInput,
+  type CreateEmployeeProjectSiteAssignmentInput,
   type CreateUserAccountInput,
   type DepartmentDto,
   type EmployeeDto,
+  type EmployeeProjectSiteAssignmentDto,
+  type ProjectSiteDto,
   type MvpRoleCode,
   type UserAccountDto,
 } from "@company-erp/shared";
@@ -20,9 +24,14 @@ type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
   loadEmployees?: () => Promise<EmployeeDto[]>;
   loadUserAccounts?: () => Promise<UserAccountDto[]>;
+  loadProjectSites?: () => Promise<ProjectSiteDto[]>;
+  loadProjectSiteAssignments?: () => Promise<EmployeeProjectSiteAssignmentDto[]>;
   createDepartment?: (input: CreateDepartmentInput) => Promise<DepartmentDto>;
   createEmployee?: (input: CreateEmployeeInput) => Promise<EmployeeDto>;
   createUserAccount?: (input: CreateUserAccountInput) => Promise<UserAccountDto>;
+  createProjectSiteAssignment?: (
+    input: CreateEmployeeProjectSiteAssignmentInput,
+  ) => Promise<EmployeeProjectSiteAssignmentDto>;
   canManage?: boolean;
 };
 
@@ -30,6 +39,7 @@ const departmentStatusLabel = new Map(DEPARTMENT_STATUSES.map((status) => [statu
 const employeeStatusLabel = new Map(EMPLOYEE_STATUSES.map((status) => [status.code, status.label]));
 const accountStatusLabel = new Map(USER_ACCOUNT_STATUSES.map((status) => [status.code, status.label]));
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
+const relationTypeLabel = new Map(EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => [relation.code, relation.label]));
 
 async function defaultLoadDepartments(): Promise<DepartmentDto[]> {
   const payload = await requestJson<{ departments: DepartmentDto[] }>(`${apiBaseUrl}/api/departments`);
@@ -44,6 +54,18 @@ async function defaultLoadEmployees(): Promise<EmployeeDto[]> {
 async function defaultLoadUserAccounts(): Promise<UserAccountDto[]> {
   const payload = await requestJson<{ userAccounts: UserAccountDto[] }>(`${apiBaseUrl}/api/user-accounts`);
   return payload.userAccounts;
+}
+
+async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
+  const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
+  return payload.projectSites;
+}
+
+async function defaultLoadProjectSiteAssignments(): Promise<EmployeeProjectSiteAssignmentDto[]> {
+  const payload = await requestJson<{ projectSiteAssignments: EmployeeProjectSiteAssignmentDto[] }>(
+    `${apiBaseUrl}/api/project-site-assignments`,
+  );
+  return payload.projectSiteAssignments;
 }
 
 async function defaultCreateDepartment(input: CreateDepartmentInput): Promise<DepartmentDto> {
@@ -70,25 +92,45 @@ async function defaultCreateUserAccount(input: CreateUserAccountInput): Promise<
   return payload.userAccount;
 }
 
+async function defaultCreateProjectSiteAssignment(
+  input: CreateEmployeeProjectSiteAssignmentInput,
+): Promise<EmployeeProjectSiteAssignmentDto> {
+  const payload = await requestJson<{ projectSiteAssignment: EmployeeProjectSiteAssignmentDto }>(
+    `${apiBaseUrl}/api/project-site-assignments`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.projectSiteAssignment;
+}
+
 export function PeoplePermissionsWorkspace({
   loadDepartments = defaultLoadDepartments,
   loadEmployees = defaultLoadEmployees,
   loadUserAccounts = defaultLoadUserAccounts,
+  loadProjectSites = defaultLoadProjectSites,
+  loadProjectSiteAssignments = defaultLoadProjectSiteAssignments,
   createDepartment = defaultCreateDepartment,
   createEmployee = defaultCreateEmployee,
   createUserAccount = defaultCreateUserAccount,
+  createProjectSiteAssignment = defaultCreateProjectSiteAssignment,
   canManage = true,
 }: PeoplePermissionsWorkspaceProps) {
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [userAccounts, setUserAccounts] = useState<UserAccountDto[]>([]);
+  const [projectSites, setProjectSites] = useState<ProjectSiteDto[]>([]);
+  const [projectSiteAssignments, setProjectSiteAssignments] = useState<EmployeeProjectSiteAssignmentDto[]>([]);
   const [departmentStatus, setDepartmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [employeeStatus, setEmployeeStatus] = useState<"loading" | "ready" | "error">("loading");
   const [accountStatus, setAccountStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [assignmentStatus, setAssignmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
+  const [assignmentSubmit, setAssignmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [departmentForm, setDepartmentForm] = useState<CreateDepartmentInput>({
     departmentCode: "",
     name: "",
@@ -105,6 +147,12 @@ export function PeoplePermissionsWorkspace({
     initialPassword: "",
     status: "active",
     roles: ["viewer"],
+  });
+  const [assignmentForm, setAssignmentForm] = useState<CreateEmployeeProjectSiteAssignmentInput>({
+    employeeId: "",
+    projectSiteId: "",
+    relationType: "assigned",
+    isPrimary: false,
   });
 
   useEffect(() => {
@@ -140,6 +188,10 @@ export function PeoplePermissionsWorkspace({
           ...current,
           employeeId: current.employeeId ?? nextEmployees[0]?.id ?? null,
         }));
+        setAssignmentForm((current) => ({
+          ...current,
+          employeeId: current.employeeId || nextEmployees[0]?.id || "",
+        }));
         setEmployeeStatus("ready");
       })
       .catch(() => {
@@ -150,6 +202,29 @@ export function PeoplePermissionsWorkspace({
       mounted = false;
     };
   }, [loadEmployees]);
+
+  useEffect(() => {
+    let mounted = true;
+    setAssignmentStatus("loading");
+    Promise.all([loadProjectSites(), loadProjectSiteAssignments()])
+      .then(([nextSites, nextAssignments]) => {
+        if (!mounted) return;
+        setProjectSites(nextSites);
+        setProjectSiteAssignments(nextAssignments);
+        setAssignmentForm((current) => ({
+          ...current,
+          projectSiteId: current.projectSiteId || nextSites[0]?.id || "",
+        }));
+        setAssignmentStatus("ready");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setAssignmentStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadProjectSiteAssignments, loadProjectSites]);
 
   useEffect(() => {
     let mounted = true;
@@ -194,6 +269,14 @@ export function PeoplePermissionsWorkspace({
         .some((value) => value!.toLowerCase().includes(normalizedQuery)),
     );
   }, [normalizedQuery, userAccounts]);
+  const filteredProjectSiteAssignments = useMemo(() => {
+    if (!normalizedQuery) return projectSiteAssignments;
+    return projectSiteAssignments.filter((assignment) =>
+      [assignment.employeeNo, assignment.employeeName, assignment.siteCode, assignment.siteName]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [normalizedQuery, projectSiteAssignments]);
 
   async function handleDepartmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -242,6 +325,27 @@ export function PeoplePermissionsWorkspace({
       setAccountSubmit("idle");
     } catch {
       setAccountSubmit("error");
+    }
+  }
+
+  async function handleAssignmentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAssignmentSubmit("saving");
+    try {
+      const created = await createProjectSiteAssignment(assignmentForm);
+      setProjectSiteAssignments((current) => [
+        created,
+        ...current.filter((assignment) => assignment.id !== created.id),
+      ]);
+      setAssignmentForm((current) => ({
+        employeeId: current.employeeId,
+        projectSiteId: current.projectSiteId,
+        relationType: "assigned",
+        isPrimary: false,
+      }));
+      setAssignmentSubmit("idle");
+    } catch {
+      setAssignmentSubmit("error");
     }
   }
 
@@ -368,6 +472,86 @@ export function PeoplePermissionsWorkspace({
             ))}
           </fieldset>
           {accountSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
+        </form> : null}
+      </section>
+
+      <section className="people-section-grid">
+        <section className="dashboard-panel table-panel">
+          <PanelTitle icon={<MapPin size={18} />} title="项目点分配" />
+          {assignmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点分配..." /> : null}
+          {assignmentStatus === "error" ? <StateMessage text="项目点分配加载失败" /> : null}
+          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length === 0 ? (
+            <StateMessage text="暂无项目点分配" />
+          ) : null}
+          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length > 0 ? (
+            <ProjectSiteAssignmentsTable assignments={filteredProjectSiteAssignments} />
+          ) : null}
+        </section>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAssignmentSubmit}>
+          <FormHeader title="新增项目点分配" buttonText="保存分配" saving={assignmentSubmit === "saving"} />
+          <label>
+            <span>员工</span>
+            <select
+              required
+              value={assignmentForm.employeeId}
+              onChange={(event) =>
+                setAssignmentForm((current) => ({ ...current, employeeId: event.target.value }))
+              }
+            >
+              <option value="">请选择员工</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.employeeNo} {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>项目点</span>
+            <select
+              required
+              value={assignmentForm.projectSiteId}
+              onChange={(event) =>
+                setAssignmentForm((current) => ({ ...current, projectSiteId: event.target.value }))
+              }
+            >
+              <option value="">请选择项目点</option>
+              {projectSites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.siteCode} {site.siteName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>关系类型</span>
+            <select
+              value={assignmentForm.relationType}
+              onChange={(event) =>
+                setAssignmentForm((current) => ({
+                  ...current,
+                  relationType: event.target.value as CreateEmployeeProjectSiteAssignmentInput["relationType"],
+                }))
+              }
+            >
+              {EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => (
+                <option key={relation.code} value={relation.code}>
+                  {relation.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="party-type-check">
+            <input
+              type="checkbox"
+              checked={Boolean(assignmentForm.isPrimary)}
+              onChange={(event) =>
+                setAssignmentForm((current) => ({ ...current, isPrimary: event.target.checked }))
+              }
+            />
+            <span>设为主项目点</span>
+          </label>
+          {assignmentSubmit === "error" ? <p className="form-error">保存失败，请检查是否重复分配或项目点是否有效。</p> : null}
         </form> : null}
       </section>
 
@@ -512,6 +696,47 @@ function UserAccountsTable({ userAccounts }: { userAccounts: UserAccountDto[] })
                 </span>
               </td>
               <td>{account.passwordChangedAt ? formatDateTime(account.passwordChangedAt) : "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProjectSiteAssignmentsTable({ assignments }: { assignments: EmployeeProjectSiteAssignmentDto[] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>员工</th>
+            <th>项目点</th>
+            <th>关系</th>
+            <th>主项目点</th>
+            <th>有效期</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {assignments.map((assignment) => (
+            <tr key={assignment.id}>
+              <td>
+                {assignment.employeeNo} {assignment.employeeName}
+              </td>
+              <td>
+                {assignment.siteCode} {assignment.siteName}
+              </td>
+              <td>{relationTypeLabel.get(assignment.relationType) ?? assignment.relationType}</td>
+              <td>{assignment.isPrimary ? "是" : "否"}</td>
+              <td>
+                {assignment.startDate ?? "-"} / {assignment.endDate ?? "长期"}
+              </td>
+              <td>
+                <span className={`status-badge ${assignment.isActive ? "green" : "orange"}`}>
+                  {assignment.isActive ? "有效" : "失效"}
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>

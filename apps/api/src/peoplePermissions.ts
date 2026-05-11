@@ -3,13 +3,17 @@ import {
   type BaseStatusCode,
   type CreateDepartmentInput,
   type CreateEmployeeInput,
+  type CreateEmployeeProjectSiteAssignmentInput,
   type CreateUserAccountInput,
   type DepartmentDto,
   type EmployeeDto,
+  type EmployeeProjectSiteAssignmentDto,
+  type EmployeeProjectSiteRelationTypeCode,
   type EmployeeStatusCode,
   type MvpRoleCode,
   type UpdateDepartmentInput,
   type UpdateEmployeeInput,
+  type UpdateEmployeeProjectSiteAssignmentInput,
   type UpdateUserAccountInput,
   type UserAccountDto,
   type UserAccountStatusCode,
@@ -29,6 +33,14 @@ export type EmployeeListFilters = {
 export type UserAccountListFilters = {
   status?: UserAccountStatusCode;
   role?: MvpRoleCode;
+  q?: string;
+};
+
+export type EmployeeProjectSiteAssignmentListFilters = {
+  employeeId?: string;
+  projectSiteId?: string;
+  relationType?: EmployeeProjectSiteRelationTypeCode;
+  activeOnly?: boolean;
   q?: string;
 };
 
@@ -53,6 +65,13 @@ export type UserAccountRepository = {
   update(id: string, input: UpdateUserAccountInput): Promise<UserAccountDto | null>;
 };
 
+export type EmployeeProjectSiteAssignmentRepository = {
+  list(filters: EmployeeProjectSiteAssignmentListFilters): Promise<EmployeeProjectSiteAssignmentDto[]>;
+  getById(id: string): Promise<EmployeeProjectSiteAssignmentDto | null>;
+  create(input: CreateEmployeeProjectSiteAssignmentInput): Promise<EmployeeProjectSiteAssignmentDto>;
+  update(id: string, input: UpdateEmployeeProjectSiteAssignmentInput): Promise<EmployeeProjectSiteAssignmentDto | null>;
+};
+
 export class DepartmentConflictError extends Error {
   constructor(public readonly field: "departmentCode") {
     super(`Department conflict on ${field}`);
@@ -71,6 +90,13 @@ export class UserAccountConflictError extends Error {
   constructor(public readonly field: "username" | "employeeId") {
     super(`User account conflict on ${field}`);
     this.name = "UserAccountConflictError";
+  }
+}
+
+export class EmployeeProjectSiteAssignmentConflictError extends Error {
+  constructor(public readonly field: "employeeId_projectSiteId_relationType") {
+    super(`Project-site assignment conflict on ${field}`);
+    this.name = "EmployeeProjectSiteAssignmentConflictError";
   }
 }
 
@@ -95,9 +121,17 @@ export class UserAccountValidationError extends Error {
   }
 }
 
+export class EmployeeProjectSiteAssignmentValidationError extends Error {
+  constructor(public readonly issues: string[]) {
+    super("Project-site assignment validation failed");
+    this.name = "EmployeeProjectSiteAssignmentValidationError";
+  }
+}
+
 const employeeStatusCodes = new Set<EmployeeStatusCode>(["active", "resigned", "disabled"]);
 const userAccountStatusCodes = new Set<UserAccountStatusCode>(["active", "disabled", "locked"]);
 const roleCodes = new Set<MvpRoleCode>(MVP_ROLES.map((role) => role.code));
+const projectSiteRelationTypes = new Set<EmployeeProjectSiteRelationTypeCode>(["assigned", "manager", "support"]);
 
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -113,6 +147,14 @@ function normalizeDateString(value: unknown): string | null | undefined {
   const normalized = normalizeNullableString(value);
   if (normalized === undefined || normalized === null) return normalized;
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : undefined;
+}
+
+function normalizeBoolean(value: unknown, field: string, issues: string[]): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  issues.push(`${field} must be boolean`);
+  return undefined;
 }
 
 function normalizeSortOrder(value: unknown, issues: string[]): number | undefined {
@@ -277,6 +319,84 @@ export function normalizeUserAccountInput(
     } as CreateUserAccountInput;
   }
   return normalized;
+}
+
+export function normalizeProjectSiteAssignmentFilters(
+  query: Record<string, unknown>,
+): EmployeeProjectSiteAssignmentListFilters {
+  const issues: string[] = [];
+  const filters: EmployeeProjectSiteAssignmentListFilters = {};
+
+  for (const field of ["employeeId", "projectSiteId", "q"] as const) {
+    const value = normalizeNullableString(query[field]);
+    if (typeof value === "string") filters[field] = value;
+  }
+
+  if (query.relationType !== undefined) {
+    if (typeof query.relationType === "string" && projectSiteRelationTypes.has(query.relationType as EmployeeProjectSiteRelationTypeCode)) {
+      filters.relationType = query.relationType as EmployeeProjectSiteRelationTypeCode;
+    } else {
+      issues.push("relationType is unsupported");
+    }
+  }
+
+  const activeOnly = normalizeBoolean(query.activeOnly, "activeOnly", issues);
+  if (activeOnly !== undefined) filters.activeOnly = activeOnly;
+
+  if (issues.length > 0) throw new EmployeeProjectSiteAssignmentValidationError(issues);
+  return filters;
+}
+
+export function normalizeProjectSiteAssignmentInput(
+  input: unknown,
+  mode: "create",
+): CreateEmployeeProjectSiteAssignmentInput;
+export function normalizeProjectSiteAssignmentInput(
+  input: unknown,
+  mode: "update",
+): UpdateEmployeeProjectSiteAssignmentInput;
+export function normalizeProjectSiteAssignmentInput(
+  input: unknown,
+  mode: "create" | "update",
+): CreateEmployeeProjectSiteAssignmentInput | UpdateEmployeeProjectSiteAssignmentInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new EmployeeProjectSiteAssignmentValidationError(["Payload must be an object"]);
+  }
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const normalized: UpdateEmployeeProjectSiteAssignmentInput = {};
+
+  for (const field of ["employeeId", "projectSiteId"] as const) {
+    const value = normalizeRequiredString(payload[field]);
+    if (value !== undefined) normalized[field] = value;
+  }
+
+  if (payload.relationType !== undefined) {
+    if (typeof payload.relationType === "string" && projectSiteRelationTypes.has(payload.relationType as EmployeeProjectSiteRelationTypeCode)) {
+      normalized.relationType = payload.relationType as EmployeeProjectSiteRelationTypeCode;
+    } else {
+      issues.push("relationType is unsupported");
+    }
+  }
+
+  for (const field of ["startDate", "endDate"] as const) {
+    const value = normalizeDateString(payload[field]);
+    if (value !== undefined) normalized[field] = value;
+    if (payload[field] !== undefined && value === undefined) issues.push(`${field} must be YYYY-MM-DD`);
+  }
+
+  const isPrimary = normalizeBoolean(payload.isPrimary, "isPrimary", issues);
+  if (isPrimary !== undefined) normalized.isPrimary = isPrimary;
+
+  if (mode === "create") {
+    if (!normalized.employeeId) issues.push("employeeId is required");
+    if (!normalized.projectSiteId) issues.push("projectSiteId is required");
+  }
+
+  if (issues.length > 0) throw new EmployeeProjectSiteAssignmentValidationError(issues);
+  return mode === "create"
+    ? ({ ...normalized, relationType: normalized.relationType ?? "assigned", isPrimary: normalized.isPrimary ?? false } as CreateEmployeeProjectSiteAssignmentInput)
+    : normalized;
 }
 
 export function normalizeDepartmentFilters(query: Record<string, unknown>): DepartmentListFilters {

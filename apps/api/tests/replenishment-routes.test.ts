@@ -12,8 +12,55 @@ import {
   ReplenishmentSuggestionConflictError,
   type ReplenishmentSuggestionRepository,
 } from "../src/replenishment";
+import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { hashPassword } from "../src/password";
 
 const now = "2026-05-11T12:00:00.000Z";
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    username: "site-user",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: "22222222-2222-4222-8222-222222222222",
+    employeeNo: "EMP0001",
+    employeeName: "张三",
+    employeeStatus: "active",
+    roles: ["project_site"],
+    assignedProjectSiteIds: ["33333333-3333-4333-8333-333333333333"],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+async function loginCookie(app: ReturnType<typeof buildApp>) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "site-user", password: "ChangeMe123!" },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+}
 
 function makeSuggestion(overrides: Partial<ReplenishmentSuggestionDto> = {}): ReplenishmentSuggestionDto {
   return {
@@ -157,6 +204,26 @@ describe("replenishment suggestions API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ replenishmentSuggestions: [makeSuggestion()] });
+  });
+
+  it("blocks project-site users from global replenishment suggestions", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-project-site-replenishment" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]),
+    });
+    const cookie = await loginCookie(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/replenishment-suggestions",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "read" });
   });
 
   it("generates suggestions idempotently", async () => {
