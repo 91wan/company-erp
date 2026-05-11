@@ -32,6 +32,7 @@ import { ApiStatus } from "./ApiStatus";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
 import { PeoplePermissionsWorkspace } from "./PeoplePermissionsWorkspace";
+import { PurchaseWorkspace } from "./PurchaseWorkspace";
 
 export function DashboardShell() {
   return (
@@ -54,6 +55,7 @@ export function DashboardShell() {
           </section>
           <PartiesWorkspace />
           <MaterialsWarehousesWorkspace />
+          <PurchaseWorkspace />
           <PeoplePermissionsWorkspace />
           <InventoryWorkspace />
         </div>
