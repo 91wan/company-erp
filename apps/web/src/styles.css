@@ -786,6 +786,12 @@ tbody tr:last-child td {
   margin-top: 2px;
 }
 
+.people-permissions-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
 .parties-heading {
   display: flex;
   align-items: end;
@@ -840,6 +846,10 @@ tbody tr:last-child td {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.people-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .party-summary article {
   min-height: 70px;
   padding: 13px 14px;
@@ -882,6 +892,22 @@ tbody tr:last-child td {
 
 .warehouse-heading {
   margin-top: 10px;
+}
+
+.people-search {
+  min-width: 300px;
+}
+
+.people-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+
+.people-panel-title h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .party-search,

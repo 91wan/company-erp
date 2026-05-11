@@ -82,3 +82,11 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed `materials.default_supplier_party_id` remains optional; missing a preferred supplier must not block material creation.
 - Confirmed `WH-WX-HQ` is the MVP headquarters warehouse focus, while project-site warehouse types remain reserved and do not imply site-level stock management in this slice.
 - No new Prisma migration was added in this slice.
+
+## 2026-05-11 People and Permissions API/UI Foundation
+
+- Reused the existing `departments`, `employees`, `user_accounts`, and `user_role_assignments` tables from migration `20260511162000_people_permissions_foundation`.
+- Confirmed no additional database tables, columns, indexes, or enum values were required for the people-permissions ledger API/UI slice.
+- Confirmed account DTOs must never expose `password_hash`; account creation and reset use hashed password storage only.
+- Confirmed employee resignation or disablement should disable the linked user account.
+- No new Prisma migration was added in this slice.
