@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   canIssueStock,
+  canManage,
+  canRead,
   calculateCurrentInventory,
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
   CONTRACT_STATUSES,
+  getPermissionLevel,
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
   ISSUE_TARGET_TYPES,
@@ -187,6 +190,30 @@ describe("MVP permission constants", () => {
     expect(USER_ROLE_ASSIGNMENT_POLICY.allowMultipleRoles).toBe(true);
     expect(USER_ROLE_ASSIGNMENT_POLICY.effectivePermissionRule).toBe("union");
     expect(USER_ROLE_ASSIGNMENT_POLICY.adminRoleAssignableBy).toEqual(["admin"]);
+  });
+
+  it("exposes a master data permission area for parties, materials, and warehouses", () => {
+    expect(MVP_PERMISSION_MATRIX.masterData.read).toEqual([
+      "admin",
+      "hr",
+      "procurement",
+      "warehouse",
+      "project_site",
+      "viewer",
+    ]);
+    expect(MVP_PERMISSION_MATRIX.masterData.manage).toEqual(["admin", "procurement", "warehouse"]);
+  });
+
+  it("calculates fixed-role union permission levels", () => {
+    expect(getPermissionLevel(["viewer"], "procurement")).toBe("read");
+    expect(getPermissionLevel(["viewer"], "inventory")).toBe("read");
+    expect(getPermissionLevel(["viewer"], "masterData")).toBe("read");
+    expect(canRead(["viewer"], "contracts")).toBe(true);
+    expect(canManage(["viewer"], "contracts")).toBe(false);
+    expect(canManage(["warehouse"], "inventory")).toBe(true);
+    expect(canManage(["viewer", "procurement"], "procurement")).toBe(true);
+    expect(canManage(["hr"], "roleAssignment")).toBe(false);
+    expect(canManage(["admin"], "systemSettings")).toBe(true);
   });
 });
 

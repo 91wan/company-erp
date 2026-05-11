@@ -20,6 +20,7 @@ export type MvpPermissionRule = {
 };
 
 export type MvpPermissionMatrix = {
+  masterData: MvpPermissionRule;
   employees: MvpPermissionRule;
   departments: MvpPermissionRule;
   userAccounts: MvpPermissionRule;
@@ -29,6 +30,23 @@ export type MvpPermissionMatrix = {
   contracts: MvpPermissionRule;
   projectSites: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
+};
+
+export type PermissionAreaCode = keyof MvpPermissionMatrix;
+
+export type AuthenticatedUserDto = {
+  id: string;
+  username: string;
+  employeeId?: string | null;
+  employeeNo?: string | null;
+  employeeName?: string | null;
+  roles: readonly MvpRoleCode[];
+  lastLoginAt?: string | null;
+};
+
+export type LoginInput = {
+  username: string;
+  password: string;
 };
 
 export type MvpDictionary = {
@@ -901,6 +919,10 @@ const ALL_ROLES: readonly MvpRoleCode[] = [
 ];
 
 export const MVP_PERMISSION_MATRIX = {
+  masterData: {
+    read: ALL_ROLES,
+    manage: ["admin", "procurement", "warehouse"],
+  },
   employees: {
     read: ["admin", "hr", "viewer"],
     manage: ["admin", "hr"],
@@ -938,6 +960,24 @@ export const MVP_PERMISSION_MATRIX = {
     manage: ["admin"],
   },
 } as const satisfies MvpPermissionMatrix;
+
+export function getPermissionLevel(
+  roles: readonly MvpRoleCode[],
+  area: PermissionAreaCode,
+): MvpPermissionLevel {
+  const rule = MVP_PERMISSION_MATRIX[area];
+  if (roles.some((role) => (rule.manage as readonly MvpRoleCode[]).includes(role))) return "manage";
+  if (roles.some((role) => (rule.read as readonly MvpRoleCode[]).includes(role))) return "read";
+  return "none";
+}
+
+export function canRead(roles: readonly MvpRoleCode[], area: PermissionAreaCode): boolean {
+  return getPermissionLevel(roles, area) !== "none";
+}
+
+export function canManage(roles: readonly MvpRoleCode[], area: PermissionAreaCode): boolean {
+  return getPermissionLevel(roles, area) === "manage";
+}
 
 export const MVP_DICTIONARIES = {
   baseStatus: {

@@ -10,6 +10,7 @@ import {
   type MaterialDto,
   type WarehouseDto,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
@@ -17,6 +18,7 @@ type InventoryWorkspaceProps = {
   createInventoryMovement?: (input: CreateInventoryMovementInput) => Promise<InventoryMovementDto>;
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
+  canManage?: boolean;
 };
 
 type MovementFormState = {
@@ -35,18 +37,11 @@ type MovementFormState = {
   remark: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const movementTypeLabel = new Map(INVENTORY_MOVEMENT_TYPES.map((movementType) => [movementType.code, movementType.label]));
 const sourceTypeLabel = new Map(INVENTORY_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
 const creatableMovementTypes = INVENTORY_MOVEMENT_TYPES.filter((movementType) =>
   ["opening", "inbound", "adjustment_in"].includes(movementType.code),
 );
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (!response.ok) throw new Error(`Request failed with ${response.status}`);
-  return (await response.json()) as T;
-}
 
 async function defaultLoadInventoryMovements(): Promise<InventoryMovementDto[]> {
   const payload = await requestJson<{ inventoryMovements: InventoryMovementDto[] }>(
@@ -77,7 +72,6 @@ async function defaultCreateInventoryMovement(input: CreateInventoryMovementInpu
     `${apiBaseUrl}/api/inventory-movements`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   );
@@ -90,6 +84,7 @@ export function InventoryWorkspace({
   createInventoryMovement = defaultCreateInventoryMovement,
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
+  canManage = true,
 }: InventoryWorkspaceProps) {
   const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
   const [balances, setBalances] = useState<InventoryBalanceDto[]>([]);
@@ -358,7 +353,7 @@ export function InventoryWorkspace({
           )}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="入库登记表单">
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="入库登记表单">
           <div className="panel-header people-panel-title">
             <h3>
               <PackageCheck aria-hidden="true" size={16} />
@@ -478,7 +473,7 @@ export function InventoryWorkspace({
           </label>
           {masterStatus === "error" ? <p className="form-error">物料或仓库接口暂不可用，暂不能登记入库。</p> : null}
           {submitState === "error" ? <p className="form-error">入库登记失败，请检查必填项或单号是否重复。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
       <section className="dashboard-panel table-panel">

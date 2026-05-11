@@ -92,8 +92,11 @@ import {
   normalizeContractInput,
   type ContractRepository,
 } from "./contracts";
+import { registerAuth, type AuthOptions, type AuthRepository } from "./auth";
 
 type BuildAppOptions = {
+  auth?: AuthOptions;
+  authRepository?: AuthRepository;
   partyRepository?: PartyRepository;
   materialRepository?: MaterialRepository;
   warehouseRepository?: WarehouseRepository;
@@ -116,7 +119,10 @@ export function buildApp(options: BuildAppOptions = {}) {
 
   void app.register(cors, {
     origin: true,
+    credentials: true,
   });
+
+  registerAuth(app, options.authRepository, options.auth);
 
   app.get("/health", async () => ({
     status: "ok",

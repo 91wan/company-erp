@@ -8,15 +8,16 @@ import {
   type MaterialDto,
   type WarehouseDto,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type MaterialsWarehousesWorkspaceProps = {
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
   createMaterial?: (input: CreateMaterialInput) => Promise<MaterialDto>;
   createWarehouse?: (input: CreateWarehouseInput) => Promise<WarehouseDto>;
+  canManage?: boolean;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const statusLabel = new Map([
   ["enabled", "启用"],
   ["disabled", "停用"],
@@ -24,54 +25,28 @@ const statusLabel = new Map([
 const warehouseTypeLabel = new Map(WAREHOUSE_TYPES.map((warehouseType) => [warehouseType.code, warehouseType.label]));
 
 async function defaultLoadMaterials(): Promise<MaterialDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/materials`);
-
-  if (!response.ok) {
-    throw new Error(`Materials request failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { materials: MaterialDto[] };
+  const payload = await requestJson<{ materials: MaterialDto[] }>(`${apiBaseUrl}/api/materials`);
   return payload.materials;
 }
 
 async function defaultLoadWarehouses(): Promise<WarehouseDto[]> {
-  const response = await fetch(`${apiBaseUrl}/api/warehouses`);
-
-  if (!response.ok) {
-    throw new Error(`Warehouses request failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { warehouses: WarehouseDto[] };
+  const payload = await requestJson<{ warehouses: WarehouseDto[] }>(`${apiBaseUrl}/api/warehouses`);
   return payload.warehouses;
 }
 
 async function defaultCreateMaterial(input: CreateMaterialInput): Promise<MaterialDto> {
-  const response = await fetch(`${apiBaseUrl}/api/materials`, {
+  const payload = await requestJson<{ material: MaterialDto }>(`${apiBaseUrl}/api/materials`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-
-  if (!response.ok) {
-    throw new Error(`Material create failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { material: MaterialDto };
   return payload.material;
 }
 
 async function defaultCreateWarehouse(input: CreateWarehouseInput): Promise<WarehouseDto> {
-  const response = await fetch(`${apiBaseUrl}/api/warehouses`, {
+  const payload = await requestJson<{ warehouse: WarehouseDto }>(`${apiBaseUrl}/api/warehouses`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-
-  if (!response.ok) {
-    throw new Error(`Warehouse create failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { warehouse: WarehouseDto };
   return payload.warehouse;
 }
 
@@ -80,6 +55,7 @@ export function MaterialsWarehousesWorkspace({
   loadWarehouses = defaultLoadWarehouses,
   createMaterial = defaultCreateMaterial,
   createWarehouse = defaultCreateWarehouse,
+  canManage = true,
 }: MaterialsWarehousesWorkspaceProps) {
   const [materials, setMaterials] = useState<MaterialDto[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -278,7 +254,7 @@ export function MaterialsWarehousesWorkspace({
           ) : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleMaterialSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleMaterialSubmit}>
           <div className="panel-header">
             <h3>新增物料</h3>
             <button type="submit" disabled={materialSubmitState === "saving"}>
@@ -342,7 +318,7 @@ export function MaterialsWarehousesWorkspace({
           </label>
 
           {materialSubmitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </div>
 
       <div className="parties-heading warehouse-heading">
@@ -378,7 +354,7 @@ export function MaterialsWarehousesWorkspace({
           ) : null}
         </section>
 
-        <form className="dashboard-panel party-form" onSubmit={handleWarehouseSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleWarehouseSubmit}>
           <div className="panel-header">
             <h3>新增仓库</h3>
             <button type="submit" disabled={warehouseSubmitState === "saving"}>
@@ -447,7 +423,7 @@ export function MaterialsWarehousesWorkspace({
           {warehouseSubmitState === "error" ? (
             <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p>
           ) : null}
-        </form>
+        </form> : null}
       </div>
     </section>
   );

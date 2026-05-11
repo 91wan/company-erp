@@ -14,6 +14,7 @@ import {
   type MvpRoleCode,
   type UserAccountDto,
 } from "@company-erp/shared";
+import { apiBaseUrl, requestJson } from "../apiClient";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -22,19 +23,13 @@ type PeoplePermissionsWorkspaceProps = {
   createDepartment?: (input: CreateDepartmentInput) => Promise<DepartmentDto>;
   createEmployee?: (input: CreateEmployeeInput) => Promise<EmployeeDto>;
   createUserAccount?: (input: CreateUserAccountInput) => Promise<UserAccountDto>;
+  canManage?: boolean;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 const departmentStatusLabel = new Map(DEPARTMENT_STATUSES.map((status) => [status.code, status.label]));
 const employeeStatusLabel = new Map(EMPLOYEE_STATUSES.map((status) => [status.code, status.label]));
 const accountStatusLabel = new Map(USER_ACCOUNT_STATUSES.map((status) => [status.code, status.label]));
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
-
-async function requestJson<TPayload>(url: string, init?: RequestInit): Promise<TPayload> {
-  const response = await fetch(url, init);
-  if (!response.ok) throw new Error(`Request failed with ${response.status}`);
-  return (await response.json()) as TPayload;
-}
 
 async function defaultLoadDepartments(): Promise<DepartmentDto[]> {
   const payload = await requestJson<{ departments: DepartmentDto[] }>(`${apiBaseUrl}/api/departments`);
@@ -54,7 +49,6 @@ async function defaultLoadUserAccounts(): Promise<UserAccountDto[]> {
 async function defaultCreateDepartment(input: CreateDepartmentInput): Promise<DepartmentDto> {
   const payload = await requestJson<{ department: DepartmentDto }>(`${apiBaseUrl}/api/departments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   return payload.department;
@@ -63,7 +57,6 @@ async function defaultCreateDepartment(input: CreateDepartmentInput): Promise<De
 async function defaultCreateEmployee(input: CreateEmployeeInput): Promise<EmployeeDto> {
   const payload = await requestJson<{ employee: EmployeeDto }>(`${apiBaseUrl}/api/employees`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   return payload.employee;
@@ -72,7 +65,6 @@ async function defaultCreateEmployee(input: CreateEmployeeInput): Promise<Employ
 async function defaultCreateUserAccount(input: CreateUserAccountInput): Promise<UserAccountDto> {
   const payload = await requestJson<{ userAccount: UserAccountDto }>(`${apiBaseUrl}/api/user-accounts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   return payload.userAccount;
@@ -85,6 +77,7 @@ export function PeoplePermissionsWorkspace({
   createDepartment = defaultCreateDepartment,
   createEmployee = defaultCreateEmployee,
   createUserAccount = defaultCreateUserAccount,
+  canManage = true,
 }: PeoplePermissionsWorkspaceProps) {
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
@@ -289,7 +282,7 @@ export function PeoplePermissionsWorkspace({
           {departmentStatus === "ready" && filteredDepartments.length === 0 ? <StateMessage text="暂无部门资料" /> : null}
           {departmentStatus === "ready" && filteredDepartments.length > 0 ? <DepartmentsTable departments={filteredDepartments} /> : null}
         </section>
-        <form className="dashboard-panel party-form" onSubmit={handleDepartmentSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleDepartmentSubmit}>
           <FormHeader title="新增部门" buttonText="保存部门" saving={departmentSubmit === "saving"} />
           <label>
             <span>部门编码</span>
@@ -300,7 +293,7 @@ export function PeoplePermissionsWorkspace({
             <input required value={departmentForm.name} onChange={(event) => setDepartmentForm((current) => ({ ...current, name: event.target.value }))} />
           </label>
           {departmentSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </section>
 
       <section className="people-section-grid">
@@ -311,7 +304,7 @@ export function PeoplePermissionsWorkspace({
           {employeeStatus === "ready" && filteredEmployees.length === 0 ? <StateMessage text="暂无员工资料" /> : null}
           {employeeStatus === "ready" && filteredEmployees.length > 0 ? <EmployeesTable employees={filteredEmployees} /> : null}
         </section>
-        <form className="dashboard-panel party-form" onSubmit={handleEmployeeSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleEmployeeSubmit}>
           <FormHeader title="新增员工" buttonText="保存员工" saving={employeeSubmit === "saving"} />
           <label>
             <span>员工编号</span>
@@ -333,7 +326,7 @@ export function PeoplePermissionsWorkspace({
             </select>
           </label>
           {employeeSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </section>
 
       <section className="people-section-grid">
@@ -344,7 +337,7 @@ export function PeoplePermissionsWorkspace({
           {accountStatus === "ready" && filteredUserAccounts.length === 0 ? <StateMessage text="暂无账号资料" /> : null}
           {accountStatus === "ready" && filteredUserAccounts.length > 0 ? <UserAccountsTable userAccounts={filteredUserAccounts} /> : null}
         </section>
-        <form className="dashboard-panel party-form" onSubmit={handleAccountSubmit}>
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAccountSubmit}>
           <FormHeader title="新增账号" buttonText="保存账号" saving={accountSubmit === "saving"} />
           <label>
             <span>绑定员工</span>
@@ -375,7 +368,7 @@ export function PeoplePermissionsWorkspace({
             ))}
           </fieldset>
           {accountSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
-        </form>
+        </form> : null}
       </section>
 
       <section className="dashboard-panel table-panel">

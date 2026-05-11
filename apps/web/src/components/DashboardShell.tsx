@@ -1,6 +1,6 @@
 import {
+  LogOut,
   Bell,
-  ChevronDown,
   ChevronLeft,
   ChevronsRight,
   Database,
@@ -8,6 +8,7 @@ import {
   Server,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { canManage, type AuthenticatedUserDto } from "@company-erp/shared";
 import {
   SettingsIcon,
   approvals,
@@ -32,12 +33,26 @@ import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWor
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
 import { ContractsWorkspace } from "./ContractsWorkspace";
 
-export function DashboardShell() {
+type DashboardShellProps = {
+  currentUser: AuthenticatedUserDto;
+  onLogout: () => Promise<void> | void;
+};
+
+export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
+  const isReadOnly = !(
+    canManage(currentUser.roles, "masterData") ||
+    canManage(currentUser.roles, "procurement") ||
+    canManage(currentUser.roles, "inventory") ||
+    canManage(currentUser.roles, "projectSites") ||
+    canManage(currentUser.roles, "contracts") ||
+    canManage(currentUser.roles, "employees")
+  );
+
   return (
-    <main className="erp-shell">
+    <main className={isReadOnly ? "erp-shell read-only-shell" : "erp-shell"}>
       <Sidebar />
       <section className="erp-main" aria-label="Dashboard workspace">
-        <TopBar />
+        <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
           <DashboardHeader />
           <MetricStrip />
@@ -51,14 +66,14 @@ export function DashboardShell() {
             <SiteUsagePanel />
             <SystemStatusPanel />
           </section>
-          <PartiesWorkspace />
-          <MaterialsWarehousesWorkspace />
-          <ReplenishmentSuggestionsWorkspace />
-          <PurchaseWorkspace />
-          <PeoplePermissionsWorkspace />
-          <InventoryWorkspace />
-          <ProjectSitesWorkspace />
-          <ContractsWorkspace />
+          <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+          <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+          <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
+          <PurchaseWorkspace canManage={canManage(currentUser.roles, "procurement")} />
+          <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} />
+          <InventoryWorkspace canManage={canManage(currentUser.roles, "inventory")} />
+          <ProjectSitesWorkspace canManage={canManage(currentUser.roles, "projectSites")} />
+          <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} />
         </div>
       </section>
     </main>
@@ -99,7 +114,7 @@ function Sidebar() {
   );
 }
 
-function TopBar() {
+function TopBar({ currentUser, onLogout }: DashboardShellProps) {
   return (
     <header className="topbar">
       <label className="global-search">
@@ -123,12 +138,15 @@ function TopBar() {
         </button>
 
         <div className="user-chip">
-          <div className="avatar">A</div>
+          <div className="avatar">{currentUser.username.slice(0, 1).toUpperCase()}</div>
           <div>
-            <strong>Admin</strong>
-            <small>系统管理员</small>
+            <strong>{currentUser.username}</strong>
+            <small>{currentUser.roles.join(" / ")}</small>
           </div>
-          <ChevronDown aria-hidden="true" size={16} />
+          <button className="logout-button" type="button" onClick={onLogout}>
+            <LogOut aria-hidden="true" size={15} />
+            退出登录
+          </button>
         </div>
       </div>
     </header>
