@@ -74,3 +74,11 @@ Before creating migrations, confirm the MVP data model for:
 - Extended `project_sites` with optional client party, operator party, subcontractor party, service mode, service/contact fields, and party foreign keys.
 - Added `ProjectSiteServiceMode` enum with `direct` and `subcontracted`.
 - Added migration `20260511172000_parties_foundation`.
+
+## 2026-05-11 Material and Warehouse Foundation API/UI
+
+- Reused the existing `materials` and `warehouses` tables from migration `20260511164500_inventory_mvp`.
+- Confirmed no additional database tables, columns, indexes, or enum values were required for the material and warehouse master-data API/UI slice.
+- Confirmed `materials.default_supplier_party_id` remains optional; missing a preferred supplier must not block material creation.
+- Confirmed `WH-WX-HQ` is the MVP headquarters warehouse focus, while project-site warehouse types remain reserved and do not imply site-level stock management in this slice.
+- No new Prisma migration was added in this slice.

@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
+import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
-import type { PartyDto } from "@company-erp/shared";
+import type { MaterialDto, PartyDto, WarehouseDto } from "@company-erp/shared";
 
 const party: PartyDto = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -21,6 +22,38 @@ const party: PartyDto = {
   remark: "常用供应商",
   createdAt: "2026-05-11T08:00:00.000Z",
   updatedAt: "2026-05-11T08:00:00.000Z",
+};
+
+const warehouse: WarehouseDto = {
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  warehouseCode: "WH-WX-HQ",
+  warehouseName: "无锡总部仓库",
+  warehouseType: "headquarters",
+  projectSiteId: null,
+  managerName: "王仓管",
+  managerPhone: "13900000000",
+  status: "enabled",
+  remark: "MVP 唯一真实库存仓库",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
+const material: MaterialDto = {
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  materialCode: "MAT0001",
+  materialName: "定制员工工服",
+  specification: "夏装 L 码",
+  materialCategory: "定制物料",
+  baseUnit: "套",
+  defaultWarehouseId: warehouse.id,
+  defaultWarehouseName: warehouse.warehouseName,
+  defaultSupplierPartyId: party.id,
+  defaultSupplierPartyName: party.partyName,
+  safeStock: 20,
+  status: "enabled",
+  remark: "按季度补货",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
 };
 
 describe("Company ERP app shell", () => {
@@ -135,5 +168,93 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("无锡科技园服务单位")).toBeInTheDocument();
     expect(screen.getByText("CLI0001")).toBeInTheDocument();
+  });
+
+  it("renders material and warehouse master data", async () => {
+    render(
+      <MaterialsWarehousesWorkspace
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+      />,
+    );
+
+    expect(screen.getByText("物料基础")).toBeInTheDocument();
+    expect(screen.getByText("仓库基础")).toBeInTheDocument();
+    expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
+    expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("无锡总部仓库").length).toBeGreaterThan(0);
+    expect(screen.getByText("MVP 只管理无锡总部真实库存，不管理项目点现场库存。")).toBeInTheDocument();
+  });
+
+  it("renders empty and error states for material and warehouse loading", async () => {
+    const { rerender } = render(
+      <MaterialsWarehousesWorkspace
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无物料资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无仓库资料")).toBeInTheDocument();
+
+    rerender(
+      <MaterialsWarehousesWorkspace
+        loadMaterials={() => Promise.reject(new Error("offline"))}
+        loadWarehouses={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("物料资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("仓库资料加载失败")).toBeInTheDocument();
+  });
+
+  it("creates material and warehouse records from the forms", async () => {
+    const createdMaterial = { ...material, materialCode: "MAT0002", materialName: "定制纸杯" };
+    const createdWarehouse = { ...warehouse, warehouseCode: "WH-TEMP-01", warehouseName: "临时周转仓" };
+
+    render(
+      <MaterialsWarehousesWorkspace
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        createMaterial={() => Promise.resolve(createdMaterial)}
+        createWarehouse={() => Promise.resolve(createdWarehouse)}
+      />,
+    );
+
+    await screen.findByText("暂无物料资料");
+    fireEvent.change(screen.getByLabelText("物料编码"), { target: { value: "MAT0002" } });
+    fireEvent.change(screen.getByLabelText("物料名称"), { target: { value: "定制纸杯" } });
+    fireEvent.change(screen.getByLabelText("基本单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
+
+    fireEvent.change(screen.getByLabelText("仓库编码"), { target: { value: "WH-TEMP-01" } });
+    fireEvent.change(screen.getByLabelText("仓库名称"), { target: { value: "临时周转仓" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存仓库" }));
+
+    expect(await screen.findByText("定制纸杯")).toBeInTheDocument();
+    expect(await screen.findByText("临时周转仓")).toBeInTheDocument();
+  });
+
+  it("shows material and warehouse creation failures", async () => {
+    render(
+      <MaterialsWarehousesWorkspace
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        createMaterial={() => Promise.reject(new Error("duplicate material"))}
+        createWarehouse={() => Promise.reject(new Error("duplicate warehouse"))}
+      />,
+    );
+
+    await screen.findByText("暂无物料资料");
+    fireEvent.change(screen.getByLabelText("物料编码"), { target: { value: "MAT0002" } });
+    fireEvent.change(screen.getByLabelText("物料名称"), { target: { value: "定制纸杯" } });
+    fireEvent.change(screen.getByLabelText("基本单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
+
+    fireEvent.change(screen.getByLabelText("仓库编码"), { target: { value: "WH-TEMP-01" } });
+    fireEvent.change(screen.getByLabelText("仓库名称"), { target: { value: "临时周转仓" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存仓库" }));
+
+    expect(await screen.findAllByText("保存失败，请检查编码是否重复或稍后重试。")).toHaveLength(2);
   });
 });

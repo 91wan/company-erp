@@ -780,6 +780,12 @@ tbody tr:last-child td {
   margin-top: 2px;
 }
 
+.materials-warehouses-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
 .parties-heading {
   display: flex;
   align-items: end;
@@ -830,6 +836,10 @@ tbody tr:last-child td {
   gap: 10px;
 }
 
+.material-summary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .party-summary article {
   min-height: 70px;
   padding: 13px 14px;
@@ -864,6 +874,14 @@ tbody tr:last-child td {
   grid-template-columns: minmax(220px, 1fr) 180px;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.warehouse-toolbar {
+  grid-template-columns: minmax(220px, 1fr);
+}
+
+.warehouse-heading {
+  margin-top: 10px;
 }
 
 .party-search,
