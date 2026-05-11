@@ -1,7 +1,27 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
+import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
+import type { PartyDto } from "@company-erp/shared";
+
+const party: PartyDto = {
+  id: "11111111-1111-4111-8111-111111111111",
+  partyCode: "SUP0001",
+  partyName: "晨光贸易有限公司",
+  partyTypes: ["supplier"],
+  unifiedSocialCreditCode: "91320200MA00000001",
+  primaryContactName: "张三",
+  primaryContactPhone: "13800000000",
+  supplyCategory: "办公物料",
+  commonMaterials: "复印纸、工服",
+  address: "无锡市",
+  settlementNotes: "月结",
+  status: "enabled",
+  remark: "常用供应商",
+  createdAt: "2026-05-11T08:00:00.000Z",
+  updatedAt: "2026-05-11T08:00:00.000Z",
+};
 
 describe("Company ERP app shell", () => {
   it("renders the Apple-style dashboard navigation and top bar", () => {
@@ -13,7 +33,7 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("数据库已连接")).toBeInTheDocument();
     expect(screen.getByText("系统管理员")).toBeInTheDocument();
 
-    for (const label of ["采购", "库存", "合同", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
+    for (const label of ["基础资料", "采购", "库存", "合同", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
   });
@@ -73,5 +93,47 @@ describe("Company ERP app shell", () => {
     await waitFor(() => {
       expect(screen.getByText("API offline")).toBeInTheDocument();
     });
+  });
+
+  it("renders populated counterparty master data", async () => {
+    render(<PartiesWorkspace loadParties={() => Promise.resolve([party])} />);
+
+    expect(screen.getByText("往来方基础")).toBeInTheDocument();
+    expect(screen.getByText("加载往来方资料...")).toBeInTheDocument();
+
+    expect(await screen.findByText("晨光贸易有限公司")).toBeInTheDocument();
+    expect(screen.getByText("SUP0001")).toBeInTheDocument();
+    expect(screen.getAllByText("供应商").length).toBeGreaterThan(0);
+    expect(screen.getByText("启用")).toBeInTheDocument();
+  });
+
+  it("renders empty and error states for counterparty loading", async () => {
+    const { rerender } = render(<PartiesWorkspace loadParties={() => Promise.resolve([])} />);
+
+    expect(await screen.findByText("暂无往来方资料")).toBeInTheDocument();
+
+    rerender(<PartiesWorkspace loadParties={() => Promise.reject(new Error("offline"))} />);
+
+    expect(await screen.findByText("往来方资料加载失败")).toBeInTheDocument();
+  });
+
+  it("creates a counterparty from the form", async () => {
+    const created = { ...party, partyCode: "CLI0001", partyName: "无锡科技园服务单位", partyTypes: ["client"] as const };
+
+    render(
+      <PartiesWorkspace
+        loadParties={() => Promise.resolve([])}
+        createParty={() => Promise.resolve(created)}
+      />,
+    );
+
+    await screen.findByText("暂无往来方资料");
+    fireEvent.change(screen.getByLabelText("往来方编码"), { target: { value: "CLI0001" } });
+    fireEvent.change(screen.getByLabelText("往来方名称"), { target: { value: "无锡科技园服务单位" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "甲方客户/服务单位" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存往来方" }));
+
+    expect(await screen.findByText("无锡科技园服务单位")).toBeInTheDocument();
+    expect(screen.getByText("CLI0001")).toBeInTheDocument();
   });
 });

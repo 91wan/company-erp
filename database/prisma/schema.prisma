@@ -42,6 +42,45 @@ enum ProjectUsageStatus {
   rejected
 }
 
+enum PartyType {
+  supplier
+  client
+  subcontractor
+  operator
+}
+
+enum ProjectSiteServiceMode {
+  direct
+  subcontracted
+}
+
+model Party {
+  id                      String        @id @default(uuid()) @db.Uuid
+  partyCode               String        @unique @map("party_code")
+  partyName               String        @map("party_name")
+  partyTypes              PartyType[]   @map("party_types")
+  unifiedSocialCreditCode String?       @unique @map("unified_social_credit_code")
+  primaryContactName      String?       @map("primary_contact_name")
+  primaryContactPhone     String?       @map("primary_contact_phone")
+  supplyCategory          String?       @map("supply_category")
+  commonMaterials         String?       @map("common_materials")
+  address                 String?
+  settlementNotes         String?       @map("settlement_notes")
+  status                  BaseStatus    @default(enabled)
+  remark                  String?
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  defaultedMaterials        Material[]    @relation("DefaultSupplierMaterials")
+  clientProjectSites        ProjectSite[] @relation("ProjectSiteClientParty")
+  operatorProjectSites      ProjectSite[] @relation("ProjectSiteOperatorParty")
+  subcontractorProjectSites ProjectSite[] @relation("ProjectSiteSubcontractorParty")
+
+  @@index([status])
+  @@index([partyName])
+  @@map("parties")
+}
+
 model Material {
   id                 String                  @id @default(uuid()) @db.Uuid
   materialCode       String                  @unique @map("material_code")
@@ -50,15 +89,18 @@ model Material {
   materialCategory   String                  @map("material_category")
   baseUnit           String                  @map("base_unit")
   defaultWarehouseId String?                 @map("default_warehouse_id") @db.Uuid
+  defaultSupplierPartyId String?             @map("default_supplier_party_id") @db.Uuid
   safeStock          Decimal?                @map("safe_stock") @db.Decimal(14, 3)
   status             BaseStatus              @default(enabled)
   remark             String?
   createdAt          DateTime                @default(now()) @map("created_at")
   updatedAt          DateTime                @updatedAt @map("updated_at")
   defaultWarehouse   Warehouse?              @relation("DefaultWarehouseMaterials", fields: [defaultWarehouseId], references: [id])
+  defaultSupplierParty Party?                 @relation("DefaultSupplierMaterials", fields: [defaultSupplierPartyId], references: [id], onDelete: SetNull)
   movements          InventoryMovement[]
   usageRequests      ProjectUsageRequest[]
 
+  @@index([defaultSupplierPartyId])
   @@map("materials")
 }
 
@@ -274,13 +316,26 @@ model ProjectSite {
   id                       String            @id @default(uuid()) @db.Uuid
   siteCode                 String            @unique @map("site_code")
   siteName                 String            @map("site_name")
+  clientPartyId            String?           @map("client_party_id") @db.Uuid
+  operatorPartyId          String?           @map("operator_party_id") @db.Uuid
+  serviceMode              ProjectSiteServiceMode @default(direct) @map("service_mode")
+  subcontractorPartyId     String?           @map("subcontractor_party_id") @db.Uuid
+  siteAddress              String?           @map("site_address")
+  serviceType              String?           @map("service_type")
   status                   ProjectSiteStatus @default(active)
   primaryManagerEmployeeId String?           @map("primary_manager_employee_id") @db.Uuid
+  clientContactName        String?           @map("client_contact_name")
+  clientContactPhone       String?           @map("client_contact_phone")
+  subcontractorContactName String?           @map("subcontractor_contact_name")
+  subcontractorContactPhone String?          @map("subcontractor_contact_phone")
   remark                   String?
   createdAt                DateTime          @default(now()) @map("created_at")
   updatedAt                DateTime          @updatedAt @map("updated_at")
 
   primaryManager Employee?                       @relation("ProjectSitePrimaryManager", fields: [primaryManagerEmployeeId], references: [id], onDelete: SetNull)
+  clientParty    Party?                          @relation("ProjectSiteClientParty", fields: [clientPartyId], references: [id], onDelete: Restrict)
+  operatorParty  Party?                          @relation("ProjectSiteOperatorParty", fields: [operatorPartyId], references: [id], onDelete: Restrict)
+  subcontractorParty Party?                       @relation("ProjectSiteSubcontractorParty", fields: [subcontractorPartyId], references: [id], onDelete: Restrict)
   assignments    EmployeeProjectSiteAssignment[]
   warehouses      Warehouse[]
   inventoryMoves  InventoryMovement[]
@@ -288,6 +343,9 @@ model ProjectSite {
 
   @@index([status])
   @@index([primaryManagerEmployeeId])
+  @@index([clientPartyId])
+  @@index([operatorPartyId])
+  @@index([subcontractorPartyId])
   @@map("project_sites")
 }
 

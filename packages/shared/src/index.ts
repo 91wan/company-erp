@@ -36,6 +36,51 @@ export type MvpDictionary = {
   values: readonly string[];
 };
 
+export type BaseStatusCode = "enabled" | "disabled";
+
+export type PartyTypeCode = "supplier" | "client" | "subcontractor" | "operator";
+
+export type PartyType = {
+  code: PartyTypeCode;
+  label: string;
+  description: string;
+};
+
+export type PartyDto = {
+  id: string;
+  partyCode: string;
+  partyName: string;
+  partyTypes: readonly PartyTypeCode[];
+  unifiedSocialCreditCode?: string | null;
+  primaryContactName?: string | null;
+  primaryContactPhone?: string | null;
+  supplyCategory?: string | null;
+  commonMaterials?: string | null;
+  address?: string | null;
+  settlementNotes?: string | null;
+  status: BaseStatusCode;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePartyInput = {
+  partyCode: string;
+  partyName: string;
+  partyTypes: readonly PartyTypeCode[];
+  unifiedSocialCreditCode?: string | null;
+  primaryContactName?: string | null;
+  primaryContactPhone?: string | null;
+  supplyCategory?: string | null;
+  commonMaterials?: string | null;
+  address?: string | null;
+  settlementNotes?: string | null;
+  status?: BaseStatusCode;
+  remark?: string | null;
+};
+
+export type UpdatePartyInput = Partial<CreatePartyInput>;
+
 export type InventoryMovementInput = {
   warehouseCode: string;
   materialCode: string;
@@ -68,6 +113,24 @@ export const USER_ROLE_ASSIGNMENT_POLICY = {
   defaultRole: MvpRoleCode;
   adminRoleAssignableBy: readonly MvpRoleCode[];
 };
+
+export const PARTY_TYPES = [
+  { code: "supplier", label: "供应商", description: "Provides goods or services for purchasing" },
+  { code: "client", label: "甲方客户/服务单位", description: "Client or service unit for project sites" },
+  { code: "subcontractor", label: "外包方", description: "Subcontracted operator for a project site" },
+  { code: "operator", label: "我方公司主体", description: "Internal company entity in service relationships" },
+] as const satisfies readonly PartyType[];
+
+export const PARTY_SUPPLY_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
+
+export const PARTY_METADATA = {
+  partyTypes: PARTY_TYPES,
+  supplyCategories: PARTY_SUPPLY_CATEGORIES,
+  statuses: [
+    { code: "enabled", label: "启用" },
+    { code: "disabled", label: "停用" },
+  ],
+} as const;
 
 const ALL_ROLES: readonly MvpRoleCode[] = [
   "admin",
@@ -153,6 +216,14 @@ export const MVP_DICTIONARIES = {
   purchaseSupplierPolicy: {
     label: "采购记录供应商规则",
     values: ["供应商可选"],
+  },
+  partyType: {
+    label: "往来方类型",
+    values: ["supplier", "client", "subcontractor", "operator"],
+  },
+  supplierSupplyCategory: {
+    label: "供应类别",
+    values: PARTY_SUPPLY_CATEGORIES,
   },
   warehouseType: {
     label: "仓库类型",

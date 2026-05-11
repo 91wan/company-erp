@@ -4,7 +4,7 @@ This file records every database schema decision and migration.
 
 ## Pending
 
-- Confirm supplier, purchase, contract attachment, and import tables.
+- Confirm purchase, contract attachment, and import tables.
 - Confirm whether project-site data-level filtering ships with the first project-site CRUD milestone or after the ledger exists.
 
 ## 2026-05-11 Phase 1 Foundation
@@ -64,3 +64,13 @@ Before creating migrations, confirm the MVP data model for:
 - Added `project_usage_requests` for project-site material usage requests and outbound fulfillment status.
 - Added migration `20260511164500_inventory_mvp`.
 - Confirmed current stock is derived from signed movement quantity grouped by warehouse and material.
+
+## 2026-05-11 Counterparty Foundation
+
+- Added unified `parties` model for suppliers, client/service units, subcontractors, and the internal operator company.
+- Added `PartyType` enum with `supplier`, `client`, `subcontractor`, and `operator`.
+- Confirmed one party can hold multiple party types so the same business entity can be reused across purchase, contract, and project-site records.
+- Added optional `materials.default_supplier_party_id` so material master data can reference a preferred supplier without making suppliers mandatory on purchase records.
+- Extended `project_sites` with optional client party, operator party, subcontractor party, service mode, service/contact fields, and party foreign keys.
+- Added `ProjectSiteServiceMode` enum with `direct` and `subcontracted`.
+- Added migration `20260511172000_parties_foundation`.

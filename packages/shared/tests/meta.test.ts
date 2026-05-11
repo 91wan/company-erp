@@ -5,6 +5,8 @@ import {
   MVP_DICTIONARIES,
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
+  PARTY_METADATA,
+  PARTY_TYPES,
   USER_ROLE_ASSIGNMENT_POLICY,
 } from "../src/index";
 
@@ -121,5 +123,40 @@ describe("MVP dictionary constants", () => {
       "已取消",
     ]);
     expect(MVP_DICTIONARIES.purchaseSupplierPolicy.values).toEqual(["供应商可选"]);
+  });
+
+  it("defines the approved counterparty metadata for suppliers, clients, subcontractors, and operator", () => {
+    expect(PARTY_TYPES.map((partyType) => partyType.code)).toEqual([
+      "supplier",
+      "client",
+      "subcontractor",
+      "operator",
+    ]);
+    expect(PARTY_METADATA.partyTypes.map((partyType) => partyType.label)).toEqual([
+      "供应商",
+      "甲方客户/服务单位",
+      "外包方",
+      "我方公司主体",
+    ]);
+    expect(PARTY_METADATA.supplyCategories).toEqual([
+      "定制物料",
+      "办公物料",
+      "设备",
+      "服务",
+      "其他",
+    ]);
+    expect(MVP_DICTIONARIES.partyType.values).toEqual([
+      "supplier",
+      "client",
+      "subcontractor",
+      "operator",
+    ]);
+    expect(MVP_DICTIONARIES.supplierSupplyCategory.values).toEqual([
+      "定制物料",
+      "办公物料",
+      "设备",
+      "服务",
+      "其他",
+    ]);
   });
 });
