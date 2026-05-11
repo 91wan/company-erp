@@ -4,6 +4,7 @@ import {
   PURCHASE_RECORD_STATUSES,
   PURCHASE_REQUEST_STATUSES,
   PURCHASE_SOURCE_TYPES,
+  type ContractDto,
   type CreatePurchaseRecordInput,
   type CreatePurchaseRequestInput,
   type PurchaseRecordDto,
@@ -16,6 +17,7 @@ import {
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
   loadPurchaseRecords?: () => Promise<PurchaseRecordDto[]>;
+  loadContracts?: () => Promise<ContractDto[]>;
   createPurchaseRequest?: (input: CreatePurchaseRequestInput) => Promise<PurchaseRequestDto>;
   createPurchaseRecord?: (input: CreatePurchaseRecordInput) => Promise<PurchaseRecordDto>;
 };
@@ -37,6 +39,7 @@ type RecordFormState = {
   purchasePlatform: string;
   supplierNameText: string;
   purchaseDescription: string;
+  contractId: string;
   purchaseDate: string;
   materialName: string;
   purchaseQuantity: string;
@@ -60,6 +63,13 @@ async function defaultLoadPurchaseRecords(): Promise<PurchaseRecordDto[]> {
   if (!response.ok) throw new Error(`Purchase records failed with ${response.status}`);
   const payload = (await response.json()) as { purchaseRecords: PurchaseRecordDto[] };
   return payload.purchaseRecords;
+}
+
+async function defaultLoadContracts(): Promise<ContractDto[]> {
+  const response = await fetch(`${apiBaseUrl}/api/contracts`);
+  if (!response.ok) throw new Error(`Contracts failed with ${response.status}`);
+  const payload = (await response.json()) as { contracts: ContractDto[] };
+  return payload.contracts;
 }
 
 async function defaultCreatePurchaseRequest(input: CreatePurchaseRequestInput): Promise<PurchaseRequestDto> {
@@ -87,11 +97,13 @@ async function defaultCreatePurchaseRecord(input: CreatePurchaseRecordInput): Pr
 export function PurchaseWorkspace({
   loadPurchaseRequests = defaultLoadPurchaseRequests,
   loadPurchaseRecords = defaultLoadPurchaseRecords,
+  loadContracts = defaultLoadContracts,
   createPurchaseRequest = defaultCreatePurchaseRequest,
   createPurchaseRecord = defaultCreatePurchaseRecord,
 }: PurchaseWorkspaceProps) {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDto[]>([]);
   const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordDto[]>([]);
+  const [contracts, setContracts] = useState<ContractDto[]>([]);
   const [requestStatus, setRequestStatus] = useState<"loading" | "ready" | "error">("loading");
   const [recordStatus, setRecordStatus] = useState<"loading" | "ready" | "error">("loading");
   const [requestQuery, setRequestQuery] = useState("");
@@ -116,6 +128,7 @@ export function PurchaseWorkspace({
     purchasePlatform: "",
     supplierNameText: "",
     purchaseDescription: "",
+    contractId: "",
     purchaseDate: "",
     materialName: "",
     purchaseQuantity: "",
@@ -158,6 +171,22 @@ export function PurchaseWorkspace({
     };
   }, [loadPurchaseRecords]);
 
+  useEffect(() => {
+    let mounted = true;
+    loadContracts()
+      .then((nextContracts) => {
+        if (!mounted) return;
+        setContracts(nextContracts);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setContracts([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadContracts]);
+
   const filteredRequests = useMemo(() => {
     const query = requestQuery.trim().toLowerCase();
     return purchaseRequests.filter((request) => {
@@ -184,6 +213,8 @@ export function PurchaseWorkspace({
           record.shopName,
           record.supplierPartyName,
           record.supplierNameText,
+          record.contractNo,
+          record.contractName,
           record.lines[0]?.materialName,
         ]
           .filter(Boolean)
@@ -238,6 +269,7 @@ export function PurchaseWorkspace({
         purchasePlatform: recordForm.purchasePlatform || null,
         supplierNameText: recordForm.supplierNameText || null,
         purchaseDescription: recordForm.purchaseDescription || null,
+        contractId: recordForm.contractId || null,
         purchaseDate: recordForm.purchaseDate,
         lines: [
           {
@@ -255,6 +287,7 @@ export function PurchaseWorkspace({
         purchasePlatform: "",
         supplierNameText: "",
         purchaseDescription: "",
+        contractId: "",
         purchaseDate: "",
         materialName: "",
         purchaseQuantity: "",
@@ -411,6 +444,17 @@ export function PurchaseWorkspace({
             <input value={recordForm.purchaseDescription} onChange={(event) => setRecordForm((current) => ({ ...current, purchaseDescription: event.target.value }))} />
           </label>
           <label>
+            <span>关联合同</span>
+            <select value={recordForm.contractId} onChange={(event) => setRecordForm((current) => ({ ...current, contractId: event.target.value }))}>
+              <option value="">不关联合同</option>
+              {contracts.map((contract) => (
+                <option key={contract.id} value={contract.id}>
+                  {contract.contractNo} {contract.contractName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             <span>采购日期</span>
             <input required type="date" value={recordForm.purchaseDate} onChange={(event) => setRecordForm((current) => ({ ...current, purchaseDate: event.target.value }))} />
           </label>
@@ -532,6 +576,7 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
             <th>采购人</th>
             <th>来源</th>
             <th>供应商/平台/店铺</th>
+            <th>合同</th>
             <th>物料</th>
             <th>采购数量</th>
             <th>采购日期</th>
@@ -548,6 +593,7 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
                 <td>{record.purchaserName}</td>
                 <td>{sourceTypeLabel.get(record.sourceType)}</td>
                 <td>{sourceText}</td>
+                <td>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "-"}</td>
                 <td>{firstLine?.materialName ?? "-"}</td>
                 <td>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</td>
                 <td>{record.purchaseDate}</td>

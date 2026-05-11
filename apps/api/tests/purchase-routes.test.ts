@@ -56,6 +56,9 @@ function makePurchaseRecord(overrides: Partial<PurchaseRecordDto> = {}): Purchas
     shopName: "京东自营",
     supplierPartyId: null,
     supplierPartyName: null,
+    contractId: null,
+    contractNo: null,
+    contractName: null,
     supplierNameText: null,
     purchaseDescription: null,
     purchaseDate: "2026-05-11",
@@ -199,6 +202,9 @@ function createFakePurchaseRecordRepository(seed: PurchaseRecordDto[] = []): Pur
         shopName: input.shopName ?? null,
         supplierPartyId: input.supplierPartyId ?? null,
         supplierPartyName: null,
+        contractId: input.contractId ?? null,
+        contractNo: input.contractId ? "HT20260511001" : null,
+        contractName: input.contractId ? "采购框架合同" : null,
         supplierNameText: input.supplierNameText ?? null,
         purchaseDescription: input.purchaseDescription ?? null,
         expectedArrivalDate: input.expectedArrivalDate ?? null,
@@ -365,6 +371,7 @@ describe("purchase records API", () => {
         purchaseRequestNo: "PR20260511001",
         purchaserName: "赵六",
         sourceType: "offline",
+        contractId: "55555555-5555-4555-8555-555555555555",
         purchaseDescription: "线下门店临时采购",
         purchaseDate: "2026-05-11",
         lines: [{ materialName: "办公复印纸", purchaseQuantity: 5, unit: "箱" }],
@@ -381,7 +388,13 @@ describe("purchase records API", () => {
     expect(listResponse.json()).toEqual({ purchaseRecords: [makePurchaseRecord()] });
     expect(detailResponse.json()).toEqual({ purchaseRecord: makePurchaseRecord() });
     expect(createResponse.statusCode).toBe(201);
-    expect(createResponse.json()).toMatchObject({ purchaseRecord: { purchaseNo: "PO20260511002" } });
+    expect(createResponse.json()).toMatchObject({
+      purchaseRecord: {
+        purchaseNo: "PO20260511002",
+        contractId: "55555555-5555-4555-8555-555555555555",
+        contractNo: "HT20260511001",
+      },
+    });
     expect(requestAfterCreate?.status).toBe("purchasing");
     expect(updateResponse.json()).toMatchObject({ purchaseRecord: { status: "ordered" } });
   });

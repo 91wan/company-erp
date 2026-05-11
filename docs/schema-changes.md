@@ -4,7 +4,7 @@ This file records every database schema decision and migration.
 
 ## Pending
 
-- Confirm purchase, contract attachment, and import tables.
+- Confirm import tables.
 - Confirm whether project-site data-level filtering ships with the first project-site CRUD milestone or after the ledger exists.
 
 ## 2026-05-11 Phase 1 Foundation
@@ -130,3 +130,12 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed outbound stock remains a signed `inventory_movements.quantity` record and no separate outbound table or inventory balance table is added.
 - Confirmed usage issue creates an outbound movement, checks available current stock, and updates `project_usage_requests.issued_quantity`, `outbound_no`, and status.
 - Added migration `20260511213000_project_site_usage_foundation`.
+
+## 2026-05-11 Contract Ledger Foundation
+
+- Added `ContractDirection` and `ContractStatus` enums for stable contract direction and manual lifecycle status codes.
+- Added `contracts` for searchable contract metadata, counterparty linkage, optional project-site linkage, dates, amount fields, primary attachment reference, and remarks.
+- Added `contract_attachments` for attachment metadata and NAS/local file paths only; no binary file storage or upload workflow is added.
+- Added optional `purchase_records.contract_id` so purchase execution can reference a contract without making contracts mandatory.
+- Confirmed expiry display state remains derived from `contracts.end_date` and manual `terminated` status; no reminder or renewal workflow is added.
+- Added migration `20260511223000_contracts_foundation`.

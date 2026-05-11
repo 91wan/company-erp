@@ -84,6 +84,19 @@ enum PurchaseSourceType {
   offline
 }
 
+enum ContractDirection {
+  purchase_contract
+  client_service_contract
+  subcontract_contract
+  framework_contract
+  other
+}
+
+enum ContractStatus {
+  active
+  terminated
+}
+
 model Party {
   id                      String        @id @default(uuid()) @db.Uuid
   partyCode               String        @unique @map("party_code")
@@ -106,6 +119,7 @@ model Party {
   operatorProjectSites      ProjectSite[] @relation("ProjectSiteOperatorParty")
   subcontractorProjectSites ProjectSite[] @relation("ProjectSiteSubcontractorParty")
   purchaseRecords           PurchaseRecord[]
+  contracts                 Contract[]
 
   @@index([status])
   @@index([partyName])
@@ -411,6 +425,7 @@ model ProjectSite {
   inventoryMoves  InventoryMovement[]
   usageRequests   ProjectUsageRequest[]
   purchaseRequests PurchaseRequest[]
+  contracts        Contract[]
 
   @@index([status])
   @@index([primaryManagerEmployeeId])
@@ -503,6 +518,7 @@ model PurchaseRecord {
   platformOrderNo     String?              @map("platform_order_no")
   shopName            String?              @map("shop_name")
   supplierPartyId     String?              @map("supplier_party_id") @db.Uuid
+  contractId          String?              @map("contract_id") @db.Uuid
   supplierNameText    String?              @map("supplier_name_text")
   purchaseDescription String?              @map("purchase_description")
   purchaseDate        DateTime             @map("purchase_date") @db.Date
@@ -516,6 +532,7 @@ model PurchaseRecord {
   purchaseRequest PurchaseRequest?     @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
   purchaser       Employee?            @relation("PurchaseRecordPurchaser", fields: [purchaserEmployeeId], references: [id], onDelete: SetNull)
   supplierParty   Party?               @relation(fields: [supplierPartyId], references: [id], onDelete: SetNull)
+  contract        Contract?            @relation(fields: [contractId], references: [id], onDelete: SetNull)
   lines           PurchaseRecordLine[]
 
   @@index([status])
@@ -523,6 +540,7 @@ model PurchaseRecord {
   @@index([purchaseRequestId])
   @@index([purchaserEmployeeId])
   @@index([supplierPartyId])
+  @@index([contractId])
   @@map("purchase_records")
 }
 
@@ -551,4 +569,54 @@ model PurchaseRecordLine {
   @@index([purchaseRequestLineId])
   @@index([materialId])
   @@map("purchase_record_lines")
+}
+
+model Contract {
+  id                       String             @id @default(uuid()) @db.Uuid
+  contractNo               String             @unique @map("contract_no")
+  contractName             String             @map("contract_name")
+  counterpartyPartyId      String             @map("counterparty_party_id") @db.Uuid
+  counterpartyNameSnapshot String             @map("counterparty_name_snapshot")
+  direction                ContractDirection
+  projectSiteId            String?            @map("project_site_id") @db.Uuid
+  signedDate               DateTime?          @map("signed_date") @db.Date
+  startDate                DateTime           @map("start_date") @db.Date
+  endDate                  DateTime           @map("end_date") @db.Date
+  amount                   Decimal?           @db.Decimal(14, 2)
+  budgetAmount             Decimal?           @map("budget_amount") @db.Decimal(14, 2)
+  currency                 String             @default("CNY")
+  attachmentRef            String?            @map("attachment_ref")
+  status                   ContractStatus     @default(active)
+  remark                   String?
+  createdAt                DateTime           @default(now()) @map("created_at")
+  updatedAt                DateTime           @updatedAt @map("updated_at")
+
+  counterpartyParty Party                @relation(fields: [counterpartyPartyId], references: [id], onDelete: Restrict)
+  projectSite       ProjectSite?         @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
+  attachments       ContractAttachment[]
+  purchaseRecords   PurchaseRecord[]
+
+  @@index([counterpartyPartyId])
+  @@index([projectSiteId])
+  @@index([direction])
+  @@index([status])
+  @@index([endDate])
+  @@map("contracts")
+}
+
+model ContractAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  contractId String   @map("contract_id") @db.Uuid
+  fileName   String   @map("file_name")
+  filePath   String   @map("file_path")
+  fileType   String?  @map("file_type")
+  fileSize   Int?     @map("file_size")
+  uploadedBy String?  @map("uploaded_by")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  remark     String?
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_attachments")
 }

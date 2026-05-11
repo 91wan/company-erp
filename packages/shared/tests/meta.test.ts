@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   canIssueStock,
   calculateCurrentInventory,
+  CONTRACT_DIRECTIONS,
+  CONTRACT_EXPIRY_STATES,
+  CONTRACT_STATUSES,
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
   ISSUE_TARGET_TYPES,
@@ -192,8 +195,33 @@ describe("MVP dictionary constants", () => {
     expect(MVP_DICTIONARIES.baseStatus.values).toEqual(["启用", "停用"]);
     expect(MVP_DICTIONARIES.employeeStatus.values).toEqual(["在职", "离职", "停用"]);
     expect(MVP_DICTIONARIES.contractStatus.values).toEqual([
-      "草稿",
       "履行中",
+      "已终止",
+    ]);
+    expect(CONTRACT_DIRECTIONS.map((direction) => direction.code)).toEqual([
+      "purchase_contract",
+      "client_service_contract",
+      "subcontract_contract",
+      "framework_contract",
+      "other",
+    ]);
+    expect(CONTRACT_STATUSES.map((status) => status.code)).toEqual(["active", "terminated"]);
+    expect(CONTRACT_EXPIRY_STATES.map((state) => state.code)).toEqual([
+      "normal",
+      "expiring_soon",
+      "expired",
+      "terminated",
+    ]);
+    expect(MVP_DICTIONARIES.contractDirection.values).toEqual([
+      "采购合同",
+      "客户服务合同",
+      "外包合同",
+      "框架合同",
+      "其他",
+    ]);
+    expect(MVP_DICTIONARIES.contractExpiryState.values).toEqual([
+      "正常",
+      "即将到期",
       "已到期",
       "已终止",
     ]);

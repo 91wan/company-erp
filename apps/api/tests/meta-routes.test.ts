@@ -69,7 +69,9 @@ describe("metadata API", () => {
       dictionaries: {
         baseStatus: { values: ["启用", "停用"] },
         employeeStatus: { values: ["在职", "离职", "停用"] },
-        contractStatus: { values: ["草稿", "履行中", "已到期", "已终止"] },
+        contractStatus: { values: ["履行中", "已终止"] },
+        contractDirection: { values: ["采购合同", "客户服务合同", "外包合同", "框架合同", "其他"] },
+        contractExpiryState: { values: ["正常", "即将到期", "已到期", "已终止"] },
         wechatProcessingStatus: {
           values: ["待整理", "已转采购申请", "已转入库", "已转出库", "已归档", "无效"],
         },

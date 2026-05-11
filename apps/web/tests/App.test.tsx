@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
+import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
 import { InventoryWorkspace } from "../src/components/InventoryWorkspace";
 import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
@@ -13,6 +14,8 @@ import type {
   DepartmentDto,
   EmployeeDto,
   GenerateReplenishmentSuggestionsResult,
+  ContractAttachmentDto,
+  ContractDto,
   InventoryBalanceDto,
   InventoryMovementDto,
   MaterialDto,
@@ -191,6 +194,9 @@ const purchaseRecord: PurchaseRecordDto = {
   shopName: "京东自营",
   supplierPartyId: null,
   supplierPartyName: null,
+  contractId: "15151515-1515-4151-8151-151515151515",
+  contractNo: "HT20260511001",
+  contractName: "无锡项目点服务合同",
   supplierNameText: null,
   purchaseDescription: null,
   purchaseDate: "2026-05-11",
@@ -283,6 +289,52 @@ const projectSite: ProjectSiteDto = {
   remark: null,
   createdAt: "2026-05-11T13:00:00.000Z",
   updatedAt: "2026-05-11T13:00:00.000Z",
+};
+
+const contract: ContractDto = {
+  id: "15151515-1515-4151-8151-151515151515",
+  contractNo: "HT20260511001",
+  contractName: "无锡项目点服务合同",
+  counterpartyPartyId: party.id,
+  counterpartyPartyName: party.partyName,
+  counterpartyNameSnapshot: party.partyName,
+  direction: "client_service_contract",
+  projectSiteId: projectSite.id,
+  projectSiteName: projectSite.siteName,
+  signedDate: "2026-05-01",
+  startDate: "2026-05-01",
+  endDate: "2026-06-05",
+  amount: 120000,
+  budgetAmount: 100000,
+  currency: "CNY",
+  attachmentRef: "/volume1/company-erp/attachments/contracts/HT20260511001.pdf",
+  status: "active",
+  expiryState: "expiring_soon",
+  remark: "MVP 合同样例",
+  createdAt: "2026-05-11T13:20:00.000Z",
+  updatedAt: "2026-05-11T13:20:00.000Z",
+};
+
+const expiredContract: ContractDto = {
+  ...contract,
+  id: "16161616-1616-4161-8161-161616161616",
+  contractNo: "HT20250511001",
+  contractName: "旧年度采购合同",
+  direction: "purchase_contract",
+  endDate: "2026-04-30",
+  expiryState: "expired",
+};
+
+const contractAttachment: ContractAttachmentDto = {
+  id: "17171717-1717-4171-8171-171717171717",
+  contractId: contract.id,
+  fileName: "HT20260511001.pdf",
+  filePath: "/volume1/company-erp/attachments/contracts/HT20260511001.pdf",
+  fileType: "pdf",
+  fileSize: 1024,
+  uploadedBy: "Admin",
+  uploadedAt: "2026-05-11T13:30:00.000Z",
+  remark: "扫描件路径",
 };
 
 const projectUsageRequest: ProjectUsageRequestDto = {
@@ -538,6 +590,7 @@ describe("Company ERP app shell", () => {
       <PurchaseWorkspace
         loadPurchaseRequests={() => Promise.resolve([{ ...purchaseRequest, purpose: "库存补货建议" }])}
         loadPurchaseRecords={() => Promise.resolve([purchaseRecord])}
+        loadContracts={() => Promise.resolve([contract])}
       />,
     );
 
@@ -549,6 +602,7 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("PR20260511001")).toBeInTheDocument();
     expect(screen.getByText("库存补货建议")).toBeInTheDocument();
     expect(screen.getByText("PO20260511001")).toBeInTheDocument();
+    expect(screen.getAllByText("HT20260511001 无锡项目点服务合同").length).toBeGreaterThan(0);
     expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
     expect(screen.getByText("京东企业购")).toBeInTheDocument();
   });
@@ -843,11 +897,118 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("出库失败，请检查库存余额、单号或申请状态。")).toBeInTheDocument();
   });
 
+  it("renders contract ledger and attachment path data", async () => {
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract, expiredContract])}
+        loadContractAttachments={() => Promise.resolve([contractAttachment])}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { name: "合同台账" }).length).toBeGreaterThan(0);
+    expect(screen.getByText("新增合同")).toBeInTheDocument();
+    expect(screen.getAllByText("附件路径").length).toBeGreaterThan(0);
+    expect(await screen.findByText("HT20260511001")).toBeInTheDocument();
+    expect(screen.getByText("无锡项目点服务合同")).toBeInTheDocument();
+    expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("已到期").length).toBeGreaterThan(0);
+    expect(await screen.findByText("HT20260511001.pdf")).toBeInTheDocument();
+  });
+
+  it("renders contract empty and error states", async () => {
+    const { rerender } = render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([])}
+        loadContractAttachments={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([])}
+        loadProjectSites={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无合同资料")).toBeInTheDocument();
+    expect(await screen.findByText("缺少往来方资料，暂不能新增合同。")).toBeInTheDocument();
+
+    rerender(
+      <ContractsWorkspace
+        loadContracts={() => Promise.reject(new Error("offline"))}
+        loadContractAttachments={() => Promise.reject(new Error("offline"))}
+        loadParties={() => Promise.reject(new Error("offline"))}
+        loadProjectSites={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("合同台账加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("往来方或项目点接口暂不可用，暂不能新增合同。")).toBeInTheDocument();
+  });
+
+  it("creates contract and attachment metadata", async () => {
+    const createdContract = { ...contract, id: "18181818-1818-4181-8181-181818181818", contractNo: "HT20260511002", contractName: "采购框架合同" };
+    const createdAttachment = { ...contractAttachment, id: "19191919-1919-4191-8191-191919191919", contractId: createdContract.id, fileName: "supplement.pdf" };
+
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([])}
+        loadContractAttachments={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        createContract={() => Promise.resolve(createdContract)}
+        createContractAttachment={() => Promise.resolve(createdAttachment)}
+      />,
+    );
+
+    await screen.findByText("暂无合同资料");
+    fireEvent.change(screen.getByLabelText("合同编号"), { target: { value: "HT20260511002" } });
+    fireEvent.change(screen.getByLabelText("合同名称"), { target: { value: "采购框架合同" } });
+    fireEvent.change(screen.getByLabelText("相对方"), { target: { value: party.id } });
+    fireEvent.change(screen.getByLabelText("合同方向"), { target: { value: "purchase_contract" } });
+    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    fireEvent.change(screen.getByLabelText("开始日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("结束日期"), { target: { value: "2027-05-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
+
+    expect(await screen.findByText("HT20260511002")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
+    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "/volume1/company-erp/attachments/contracts/supplement.pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
+
+    expect(await screen.findByText("supplement.pdf")).toBeInTheDocument();
+  });
+
+  it("shows contract and attachment creation failures", async () => {
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract])}
+        loadContractAttachments={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        createContract={() => Promise.reject(new Error("duplicate contract"))}
+        createContractAttachment={() => Promise.reject(new Error("bad path"))}
+      />,
+    );
+
+    await screen.findByText("HT20260511001");
+    fireEvent.change(screen.getByLabelText("合同编号"), { target: { value: "HT20260511002" } });
+    fireEvent.change(screen.getByLabelText("合同名称"), { target: { value: "采购框架合同" } });
+    fireEvent.change(screen.getByLabelText("开始日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("结束日期"), { target: { value: "2027-05-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
+
+    fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
+    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "/volume1/company-erp/attachments/contracts/supplement.pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
+
+    expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
+    expect(await screen.findByText("附件路径保存失败，请检查合同和路径。")).toBeInTheDocument();
+  });
+
   it("renders purchase empty and error states", async () => {
     const { rerender } = render(
       <PurchaseWorkspace
         loadPurchaseRequests={() => Promise.resolve([])}
         loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([])}
       />,
     );
 
@@ -858,6 +1019,7 @@ describe("Company ERP app shell", () => {
       <PurchaseWorkspace
         loadPurchaseRequests={() => Promise.reject(new Error("offline"))}
         loadPurchaseRecords={() => Promise.reject(new Error("offline"))}
+        loadContracts={() => Promise.resolve([])}
       />,
     );
 
@@ -873,6 +1035,7 @@ describe("Company ERP app shell", () => {
       <PurchaseWorkspace
         loadPurchaseRequests={() => Promise.resolve([])}
         loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([contract])}
         createPurchaseRequest={() => Promise.resolve(createdRequest)}
         createPurchaseRecord={() => Promise.resolve(createdRecord)}
       />,
@@ -891,6 +1054,7 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("采购人"), { target: { value: "赵六" } });
     fireEvent.change(screen.getByLabelText("采购来源"), { target: { value: "offline" } });
     fireEvent.change(screen.getByLabelText("采购说明"), { target: { value: "线下门店临时采购" } });
+    fireEvent.change(screen.getByLabelText("关联合同"), { target: { value: contract.id } });
     fireEvent.change(screen.getByLabelText("采购日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("采购物料名称"), { target: { value: "办公复印纸" } });
     fireEvent.change(screen.getByLabelText("采购数量"), { target: { value: "5" } });
@@ -906,6 +1070,7 @@ describe("Company ERP app shell", () => {
       <PurchaseWorkspace
         loadPurchaseRequests={() => Promise.resolve([])}
         loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([])}
         createPurchaseRequest={() => Promise.reject(new Error("duplicate request"))}
         createPurchaseRecord={() => Promise.reject(new Error("duplicate record"))}
       />,
