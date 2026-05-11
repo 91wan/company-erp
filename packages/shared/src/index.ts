@@ -38,6 +38,15 @@ export type MvpDictionary = {
 
 export type BaseStatusCode = "enabled" | "disabled";
 
+export type EmployeeStatusCode = "active" | "resigned" | "disabled";
+
+export type UserAccountStatusCode = "active" | "disabled" | "locked";
+
+export type StatusMeta<TCode extends string = string> = {
+  code: TCode;
+  label: string;
+};
+
 export type PartyTypeCode = "supplier" | "client" | "subcontractor" | "operator";
 
 export type PartyType = {
@@ -149,6 +158,100 @@ export type CreateMaterialInput = {
 
 export type UpdateMaterialInput = Partial<CreateMaterialInput>;
 
+export type DepartmentDto = {
+  id: string;
+  departmentCode: string;
+  name: string;
+  parentId?: string | null;
+  parentName?: string | null;
+  managerEmployeeId?: string | null;
+  managerEmployeeName?: string | null;
+  status: BaseStatusCode;
+  sortOrder: number;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateDepartmentInput = {
+  departmentCode: string;
+  name: string;
+  parentId?: string | null;
+  managerEmployeeId?: string | null;
+  status?: BaseStatusCode;
+  sortOrder?: number;
+  remark?: string | null;
+};
+
+export type UpdateDepartmentInput = Partial<CreateDepartmentInput>;
+
+export type EmployeeDto = {
+  id: string;
+  employeeNo: string;
+  name: string;
+  gender?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  departmentId: string;
+  departmentName: string;
+  position?: string | null;
+  employmentStatus: EmployeeStatusCode;
+  hireDate?: string | null;
+  leaveDate?: string | null;
+  remark?: string | null;
+  userAccountId?: string | null;
+  username?: string | null;
+  accountStatus?: UserAccountStatusCode | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateEmployeeInput = {
+  employeeNo: string;
+  name: string;
+  gender?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  departmentId: string;
+  position?: string | null;
+  employmentStatus?: EmployeeStatusCode;
+  hireDate?: string | null;
+  leaveDate?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateEmployeeInput = Partial<CreateEmployeeInput>;
+
+export type UserAccountDto = {
+  id: string;
+  employeeId?: string | null;
+  employeeNo?: string | null;
+  employeeName?: string | null;
+  username: string;
+  status: UserAccountStatusCode;
+  roles: readonly MvpRoleCode[];
+  lastLoginAt?: string | null;
+  passwordChangedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateUserAccountInput = {
+  employeeId?: string | null;
+  username: string;
+  initialPassword: string;
+  status?: UserAccountStatusCode;
+  roles?: readonly MvpRoleCode[];
+};
+
+export type UpdateUserAccountInput = {
+  employeeId?: string | null;
+  username?: string;
+  resetPassword?: string;
+  status?: UserAccountStatusCode;
+  roles?: readonly MvpRoleCode[];
+};
+
 export type InventoryMovementInput = {
   warehouseCode: string;
   materialCode: string;
@@ -192,6 +295,23 @@ export const PARTY_TYPES = [
 export const PARTY_SUPPLY_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
 
 export const MATERIAL_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
+
+export const DEPARTMENT_STATUSES = [
+  { code: "enabled", label: "启用" },
+  { code: "disabled", label: "停用" },
+] as const satisfies readonly StatusMeta<BaseStatusCode>[];
+
+export const EMPLOYEE_STATUSES = [
+  { code: "active", label: "在职" },
+  { code: "resigned", label: "离职" },
+  { code: "disabled", label: "停用" },
+] as const satisfies readonly StatusMeta<EmployeeStatusCode>[];
+
+export const USER_ACCOUNT_STATUSES = [
+  { code: "active", label: "启用" },
+  { code: "disabled", label: "停用" },
+  { code: "locked", label: "锁定" },
+] as const satisfies readonly StatusMeta<UserAccountStatusCode>[];
 
 export const WAREHOUSE_TYPES = [
   { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
@@ -264,6 +384,10 @@ export const MVP_DICTIONARIES = {
   employeeStatus: {
     label: "员工状态",
     values: ["在职", "离职", "停用"],
+  },
+  userAccountStatus: {
+    label: "账号状态",
+    values: ["启用", "停用", "锁定"],
   },
   contractStatus: {
     label: "合同状态",

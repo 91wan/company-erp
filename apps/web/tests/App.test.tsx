@@ -4,7 +4,8 @@ import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
 import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
-import type { MaterialDto, PartyDto, WarehouseDto } from "@company-erp/shared";
+import { PeoplePermissionsWorkspace } from "../src/components/PeoplePermissionsWorkspace";
+import type { DepartmentDto, EmployeeDto, MaterialDto, PartyDto, UserAccountDto, WarehouseDto } from "@company-erp/shared";
 
 const party: PartyDto = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -54,6 +55,56 @@ const material: MaterialDto = {
   remark: "按季度补货",
   createdAt: "2026-05-11T09:00:00.000Z",
   updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
+const department: DepartmentDto = {
+  id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  departmentCode: "DEP-HR",
+  name: "人事行政部",
+  parentId: null,
+  parentName: null,
+  managerEmployeeId: null,
+  managerEmployeeName: null,
+  status: "enabled",
+  sortOrder: 10,
+  remark: "人员台账维护",
+  createdAt: "2026-05-11T10:00:00.000Z",
+  updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const employee: EmployeeDto = {
+  id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+  employeeNo: "EMP0001",
+  name: "张三",
+  gender: "男",
+  phone: "13800000000",
+  email: "zhangsan@example.com",
+  departmentId: department.id,
+  departmentName: department.name,
+  position: "人事专员",
+  employmentStatus: "active",
+  hireDate: "2026-05-01",
+  leaveDate: null,
+  remark: "MVP 员工样例",
+  userAccountId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  username: "zhangsan",
+  accountStatus: "active",
+  createdAt: "2026-05-11T10:00:00.000Z",
+  updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const userAccount: UserAccountDto = {
+  id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  employeeId: employee.id,
+  employeeNo: employee.employeeNo,
+  employeeName: employee.name,
+  username: "zhangsan",
+  status: "active",
+  roles: ["hr", "viewer"],
+  lastLoginAt: null,
+  passwordChangedAt: "2026-05-11T10:00:00.000Z",
+  createdAt: "2026-05-11T10:00:00.000Z",
+  updatedAt: "2026-05-11T10:00:00.000Z",
 };
 
 describe("Company ERP app shell", () => {
@@ -256,5 +307,113 @@ describe("Company ERP app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存仓库" }));
 
     expect(await screen.findAllByText("保存失败，请检查编码是否重复或稍后重试。")).toHaveLength(2);
+  });
+
+  it("renders populated people and permissions master data", async () => {
+    render(
+      <PeoplePermissionsWorkspace
+        loadDepartments={() => Promise.resolve([department])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadUserAccounts={() => Promise.resolve([userAccount])}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "人员权限" })).toBeInTheDocument();
+    expect(screen.getByText("部门管理")).toBeInTheDocument();
+    expect(screen.getByText("员工台账")).toBeInTheDocument();
+    expect(screen.getByText("账号角色")).toBeInTheDocument();
+    expect(screen.getByText("权限矩阵")).toBeInTheDocument();
+    expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
+    expect(screen.getByText("EMP0001")).toBeInTheDocument();
+    expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("HR").length).toBeGreaterThan(0);
+  });
+
+  it("renders people permissions empty and error states", async () => {
+    const { rerender } = render(
+      <PeoplePermissionsWorkspace
+        loadDepartments={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+        loadUserAccounts={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无员工资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无账号资料")).toBeInTheDocument();
+
+    rerender(
+      <PeoplePermissionsWorkspace
+        loadDepartments={() => Promise.reject(new Error("offline"))}
+        loadEmployees={() => Promise.reject(new Error("offline"))}
+        loadUserAccounts={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("员工资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("账号资料加载失败")).toBeInTheDocument();
+  });
+
+  it("creates department, employee, and user account records from the forms", async () => {
+    const createdDepartment = { ...department, departmentCode: "DEP-WH", name: "仓储部" };
+    const createdEmployee = { ...employee, employeeNo: "EMP0002", name: "李四", username: null, accountStatus: null };
+    const createdAccount = { ...userAccount, username: "lisi", employeeNo: "EMP0002", employeeName: "李四", roles: ["viewer"] as const };
+
+    render(
+      <PeoplePermissionsWorkspace
+        loadDepartments={() => Promise.resolve([department])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadUserAccounts={() => Promise.resolve([])}
+        createDepartment={() => Promise.resolve(createdDepartment)}
+        createEmployee={() => Promise.resolve(createdEmployee)}
+        createUserAccount={() => Promise.resolve(createdAccount)}
+      />,
+    );
+
+    await screen.findByText("EMP0001");
+    fireEvent.change(screen.getByLabelText("部门编码"), { target: { value: "DEP-WH" } });
+    fireEvent.change(screen.getByLabelText("部门名称"), { target: { value: "仓储部" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
+
+    fireEvent.change(screen.getByLabelText("员工编号"), { target: { value: "EMP0002" } });
+    fireEvent.change(screen.getByLabelText("员工姓名"), { target: { value: "李四" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
+
+    fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
+    fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+
+    expect(await screen.findAllByText("仓储部")).not.toHaveLength(0);
+    expect(await screen.findByText("EMP0002")).toBeInTheDocument();
+    expect(await screen.findByText("lisi")).toBeInTheDocument();
+  });
+
+  it("shows people permissions creation failures", async () => {
+    render(
+      <PeoplePermissionsWorkspace
+        loadDepartments={() => Promise.resolve([department])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadUserAccounts={() => Promise.resolve([])}
+        createDepartment={() => Promise.reject(new Error("duplicate department"))}
+        createEmployee={() => Promise.reject(new Error("duplicate employee"))}
+        createUserAccount={() => Promise.reject(new Error("duplicate account"))}
+      />,
+    );
+
+    await screen.findByText("EMP0001");
+    fireEvent.change(screen.getByLabelText("部门编码"), { target: { value: "DEP-WH" } });
+    fireEvent.change(screen.getByLabelText("部门名称"), { target: { value: "仓储部" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
+
+    fireEvent.change(screen.getByLabelText("员工编号"), { target: { value: "EMP0002" } });
+    fireEvent.change(screen.getByLabelText("员工姓名"), { target: { value: "李四" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
+
+    fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
+    fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+
+    expect(await screen.findAllByText("保存失败，请检查唯一编码或稍后重试。")).toHaveLength(3);
   });
 });

@@ -26,11 +26,31 @@ import {
   type MaterialRepository,
   type WarehouseRepository,
 } from "./materialsWarehouses";
+import {
+  DepartmentConflictError,
+  DepartmentValidationError,
+  EmployeeConflictError,
+  EmployeeValidationError,
+  UserAccountConflictError,
+  UserAccountValidationError,
+  normalizeDepartmentFilters,
+  normalizeDepartmentInput,
+  normalizeEmployeeFilters,
+  normalizeEmployeeInput,
+  normalizeUserAccountFilters,
+  normalizeUserAccountInput,
+  type DepartmentRepository,
+  type EmployeeRepository,
+  type UserAccountRepository,
+} from "./peoplePermissions";
 
 type BuildAppOptions = {
   partyRepository?: PartyRepository;
   materialRepository?: MaterialRepository;
   warehouseRepository?: WarehouseRepository;
+  departmentRepository?: DepartmentRepository;
+  employeeRepository?: EmployeeRepository;
+  userAccountRepository?: UserAccountRepository;
 };
 
 export function buildApp(options: BuildAppOptions = {}) {
@@ -317,6 +337,216 @@ export function buildApp(options: BuildAppOptions = {}) {
       }
       if (error instanceof WarehouseConflictError) {
         return reply.status(409).send({ error: "WAREHOUSE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/departments", async (request, reply) => {
+    if (!options.departmentRepository) {
+      return reply.status(503).send({ error: "DEPARTMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeDepartmentFilters(request.query as Record<string, unknown>);
+      const departments = await options.departmentRepository.list(filters);
+      return { departments };
+    } catch (error) {
+      if (error instanceof DepartmentValidationError) {
+        return reply.status(400).send({ error: "DEPARTMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/departments/:id", async (request, reply) => {
+    if (!options.departmentRepository) {
+      return reply.status(503).send({ error: "DEPARTMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const department = await options.departmentRepository.getById(id);
+    if (!department) return reply.status(404).send({ error: "DEPARTMENT_NOT_FOUND" });
+    return { department };
+  });
+
+  app.post("/api/departments", async (request, reply) => {
+    if (!options.departmentRepository) {
+      return reply.status(503).send({ error: "DEPARTMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeDepartmentInput(request.body, "create");
+      const department = await options.departmentRepository.create(input);
+      return reply.status(201).send({ department });
+    } catch (error) {
+      if (error instanceof DepartmentValidationError) {
+        return reply.status(400).send({ error: "DEPARTMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof DepartmentConflictError) {
+        return reply.status(409).send({ error: "DEPARTMENT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/departments/:id", async (request, reply) => {
+    if (!options.departmentRepository) {
+      return reply.status(503).send({ error: "DEPARTMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeDepartmentInput(request.body, "update");
+      const department = await options.departmentRepository.update(id, input);
+      if (!department) return reply.status(404).send({ error: "DEPARTMENT_NOT_FOUND" });
+      return { department };
+    } catch (error) {
+      if (error instanceof DepartmentValidationError) {
+        return reply.status(400).send({ error: "DEPARTMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof DepartmentConflictError) {
+        return reply.status(409).send({ error: "DEPARTMENT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/employees", async (request, reply) => {
+    if (!options.employeeRepository) {
+      return reply.status(503).send({ error: "EMPLOYEE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeEmployeeFilters(request.query as Record<string, unknown>);
+      const employees = await options.employeeRepository.list(filters);
+      return { employees };
+    } catch (error) {
+      if (error instanceof EmployeeValidationError) {
+        return reply.status(400).send({ error: "EMPLOYEE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/employees/:id", async (request, reply) => {
+    if (!options.employeeRepository) {
+      return reply.status(503).send({ error: "EMPLOYEE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const employee = await options.employeeRepository.getById(id);
+    if (!employee) return reply.status(404).send({ error: "EMPLOYEE_NOT_FOUND" });
+    return { employee };
+  });
+
+  app.post("/api/employees", async (request, reply) => {
+    if (!options.employeeRepository) {
+      return reply.status(503).send({ error: "EMPLOYEE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeEmployeeInput(request.body, "create");
+      const employee = await options.employeeRepository.create(input);
+      return reply.status(201).send({ employee });
+    } catch (error) {
+      if (error instanceof EmployeeValidationError) {
+        return reply.status(400).send({ error: "EMPLOYEE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof EmployeeConflictError) {
+        return reply.status(409).send({ error: "EMPLOYEE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/employees/:id", async (request, reply) => {
+    if (!options.employeeRepository) {
+      return reply.status(503).send({ error: "EMPLOYEE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeEmployeeInput(request.body, "update");
+      const employee = await options.employeeRepository.update(id, input);
+      if (!employee) return reply.status(404).send({ error: "EMPLOYEE_NOT_FOUND" });
+      return { employee };
+    } catch (error) {
+      if (error instanceof EmployeeValidationError) {
+        return reply.status(400).send({ error: "EMPLOYEE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof EmployeeConflictError) {
+        return reply.status(409).send({ error: "EMPLOYEE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/user-accounts", async (request, reply) => {
+    if (!options.userAccountRepository) {
+      return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeUserAccountFilters(request.query as Record<string, unknown>);
+      const userAccounts = await options.userAccountRepository.list(filters);
+      return { userAccounts };
+    } catch (error) {
+      if (error instanceof UserAccountValidationError) {
+        return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/user-accounts/:id", async (request, reply) => {
+    if (!options.userAccountRepository) {
+      return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const userAccount = await options.userAccountRepository.getById(id);
+    if (!userAccount) return reply.status(404).send({ error: "USER_ACCOUNT_NOT_FOUND" });
+    return { userAccount };
+  });
+
+  app.post("/api/user-accounts", async (request, reply) => {
+    if (!options.userAccountRepository) {
+      return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeUserAccountInput(request.body, "create");
+      const userAccount = await options.userAccountRepository.create(input);
+      return reply.status(201).send({ userAccount });
+    } catch (error) {
+      if (error instanceof UserAccountValidationError) {
+        return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof UserAccountConflictError) {
+        return reply.status(409).send({ error: "USER_ACCOUNT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/user-accounts/:id", async (request, reply) => {
+    if (!options.userAccountRepository) {
+      return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeUserAccountInput(request.body, "update");
+      const userAccount = await options.userAccountRepository.update(id, input);
+      if (!userAccount) return reply.status(404).send({ error: "USER_ACCOUNT_NOT_FOUND" });
+      return { userAccount };
+    } catch (error) {
+      if (error instanceof UserAccountValidationError) {
+        return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof UserAccountConflictError) {
+        return reply.status(409).send({ error: "USER_ACCOUNT_CONFLICT", field: error.field });
       }
       throw error;
     }

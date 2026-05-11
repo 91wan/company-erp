@@ -6,6 +6,11 @@ import {
   createPrismaWarehouseRepository,
 } from "./prismaMaterialsWarehousesRepository";
 import { createPrismaPartyRepository } from "./prismaPartyRepository";
+import {
+  createPrismaDepartmentRepository,
+  createPrismaEmployeeRepository,
+  createPrismaUserAccountRepository,
+} from "./prismaPeoplePermissionsRepository";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -15,6 +20,9 @@ const app = buildApp({
   partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
   materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,
   warehouseRepository: prisma ? createPrismaWarehouseRepository(prisma) : undefined,
+  departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
+  employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
+  userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
 });
 
 if (prisma) {

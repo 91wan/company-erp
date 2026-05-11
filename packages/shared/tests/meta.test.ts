@@ -7,7 +7,10 @@ import {
   MVP_ROLES,
   PARTY_METADATA,
   PARTY_TYPES,
+  DEPARTMENT_STATUSES,
+  EMPLOYEE_STATUSES,
   MATERIAL_CATEGORIES,
+  USER_ACCOUNT_STATUSES,
   WAREHOUSE_TYPES,
   USER_ROLE_ASSIGNMENT_POLICY,
 } from "../src/index";
@@ -22,6 +25,14 @@ describe("MVP role constants", () => {
       "project_site",
       "viewer",
     ]);
+  });
+
+  it("defines personnel and account dictionaries for the people-permissions foundation", () => {
+    expect(DEPARTMENT_STATUSES.map((status) => status.code)).toEqual(["enabled", "disabled"]);
+    expect(EMPLOYEE_STATUSES.map((status) => status.code)).toEqual(["active", "resigned", "disabled"]);
+    expect(USER_ACCOUNT_STATUSES.map((status) => status.code)).toEqual(["active", "disabled", "locked"]);
+    expect(MVP_DICTIONARIES.employeeStatus.values).toEqual(["在职", "离职", "停用"]);
+    expect(MVP_DICTIONARIES.userAccountStatus.values).toEqual(["启用", "停用", "锁定"]);
   });
 });
 
