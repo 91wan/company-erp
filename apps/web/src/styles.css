@@ -1213,6 +1213,13 @@ tbody tr:last-child td {
   font-weight: 620;
 }
 
+.form-success {
+  margin: 0;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 620;
+}
+
 @media (max-width: 1180px) {
   body {
     overflow: auto;

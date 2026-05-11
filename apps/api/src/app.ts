@@ -84,6 +84,14 @@ import {
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
 } from "./projectSites";
+import {
+  ContractConflictError,
+  ContractValidationError,
+  normalizeContractAttachmentInput,
+  normalizeContractFilters,
+  normalizeContractInput,
+  type ContractRepository,
+} from "./contracts";
 
 type BuildAppOptions = {
   partyRepository?: PartyRepository;
@@ -98,6 +106,7 @@ type BuildAppOptions = {
   replenishmentSuggestionRepository?: ReplenishmentSuggestionRepository;
   projectSiteRepository?: ProjectSiteRepository;
   projectUsageRequestRepository?: ProjectUsageRequestRepository;
+  contractRepository?: ContractRepository;
 };
 
 export function buildApp(options: BuildAppOptions = {}) {
@@ -1036,6 +1045,124 @@ export function buildApp(options: BuildAppOptions = {}) {
       }
       if (error instanceof ProjectUsageRequestConflictError) {
         return reply.status(409).send({ error: "PROJECT_USAGE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/contracts", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeContractFilters(request.query as Record<string, unknown>);
+      const contracts = await options.contractRepository.list(filters);
+      return { contracts };
+    } catch (error) {
+      if (error instanceof ContractValidationError) {
+        return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/contracts/:id", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const contract = await options.contractRepository.getById(id);
+    if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+    return { contract };
+  });
+
+  app.post("/api/contracts", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeContractInput(request.body, "create");
+      const contract = await options.contractRepository.create(input);
+      return reply.status(201).send({ contract });
+    } catch (error) {
+      if (error instanceof ContractValidationError) {
+        return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ContractConflictError) {
+        return reply.status(409).send({ error: "CONTRACT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/contracts/:id", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeContractInput(request.body, "update");
+      const contract = await options.contractRepository.update(id, input);
+      if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+      return { contract };
+    } catch (error) {
+      if (error instanceof ContractValidationError) {
+        return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ContractConflictError) {
+        return reply.status(409).send({ error: "CONTRACT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/contracts/:id/attachments", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const contractAttachments = await options.contractRepository.listAttachments(id);
+    if (!contractAttachments) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+    return { contractAttachments };
+  });
+
+  app.post("/api/contracts/:id/attachments", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeContractAttachmentInput(request.body, "create");
+      const contractAttachment = await options.contractRepository.createAttachment(id, input);
+      return reply.status(201).send({ contractAttachment });
+    } catch (error) {
+      if (error instanceof ContractValidationError) {
+        return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/contract-attachments/:id", async (request, reply) => {
+    if (!options.contractRepository) {
+      return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeContractAttachmentInput(request.body, "update");
+      const contractAttachment = await options.contractRepository.updateAttachment(id, input);
+      if (!contractAttachment) return reply.status(404).send({ error: "CONTRACT_ATTACHMENT_NOT_FOUND" });
+      return { contractAttachment };
+    } catch (error) {
+      if (error instanceof ContractValidationError) {
+        return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
       }
       throw error;
     }

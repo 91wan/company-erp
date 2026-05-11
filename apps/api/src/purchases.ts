@@ -256,6 +256,7 @@ export function normalizePurchaseRecordInput(
   for (const field of [
     "purchaseRequestId",
     "purchaserEmployeeId",
+    "contractId",
     "purchasePlatform",
     "platformOrderNo",
     "shopName",

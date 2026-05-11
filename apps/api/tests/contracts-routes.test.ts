@@ -1,0 +1,306 @@
+import { describe, expect, it } from "vitest";
+import type {
+  ContractAttachmentDto,
+  ContractDto,
+  CreateContractAttachmentInput,
+  CreateContractInput,
+  UpdateContractAttachmentInput,
+  UpdateContractInput,
+} from "@company-erp/shared";
+import { buildApp } from "../src/app";
+import {
+  ContractConflictError,
+  getContractExpiryState,
+  type ContractListFilters,
+  type ContractRepository,
+} from "../src/contracts";
+
+const now = "2026-05-11T11:00:00.000Z";
+const contractId = "11111111-1111-4111-8111-111111111111";
+const attachmentId = "22222222-2222-4222-8222-222222222222";
+
+function makeContract(overrides: Partial<ContractDto> = {}): ContractDto {
+  return {
+    id: contractId,
+    contractNo: "HT20260511001",
+    contractName: "无锡项目点服务合同",
+    counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+    counterpartyPartyName: "无锡客户单位",
+    counterpartyNameSnapshot: "无锡客户单位",
+    direction: "client_service_contract",
+    projectSiteId: "44444444-4444-4444-8444-444444444444",
+    projectSiteName: "科技园一期项目点",
+    signedDate: "2026-05-01",
+    startDate: "2026-05-01",
+    endDate: "2026-06-05",
+    amount: 120000,
+    budgetAmount: 100000,
+    currency: "CNY",
+    attachmentRef: "/volume1/company-erp/attachments/contracts/HT20260511001.pdf",
+    status: "active",
+    expiryState: "expiring_soon",
+    remark: "MVP 合同样例",
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeAttachment(overrides: Partial<ContractAttachmentDto> = {}): ContractAttachmentDto {
+  return {
+    id: attachmentId,
+    contractId,
+    fileName: "HT20260511001.pdf",
+    filePath: "/volume1/company-erp/attachments/contracts/HT20260511001.pdf",
+    fileType: "pdf",
+    fileSize: 1024,
+    uploadedBy: "Admin",
+    uploadedAt: now,
+    remark: "扫描件路径",
+    ...overrides,
+  };
+}
+
+function createFakeContractRepository(
+  seed: ContractDto[] = [],
+  attachmentSeed: ContractAttachmentDto[] = [],
+): ContractRepository {
+  const contracts = [...seed];
+  const attachments = [...attachmentSeed];
+
+  return {
+    async list(filters: ContractListFilters) {
+      return contracts.filter((contract) => {
+        const matchesStatus = filters.status ? contract.status === filters.status : true;
+        const matchesDirection = filters.direction ? contract.direction === filters.direction : true;
+        const matchesCounterparty = filters.counterpartyPartyId
+          ? contract.counterpartyPartyId === filters.counterpartyPartyId
+          : true;
+        const matchesSite = filters.projectSiteId ? contract.projectSiteId === filters.projectSiteId : true;
+        const matchesExpiry = filters.expiry ? contract.expiryState === filters.expiry : true;
+        const matchesQuery = filters.q
+          ? [
+              contract.contractNo,
+              contract.contractName,
+              contract.counterpartyPartyName,
+              contract.projectSiteName,
+              contract.attachmentRef,
+            ]
+              .filter(Boolean)
+              .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
+          : true;
+        return matchesStatus && matchesDirection && matchesCounterparty && matchesSite && matchesExpiry && matchesQuery;
+      });
+    },
+    async getById(id: string) {
+      return contracts.find((contract) => contract.id === id) ?? null;
+    },
+    async create(input: CreateContractInput) {
+      if (contracts.some((contract) => contract.contractNo === input.contractNo)) {
+        throw new ContractConflictError("contractNo");
+      }
+      const contract = makeContract({
+        id: "55555555-5555-4555-8555-555555555555",
+        ...input,
+        counterpartyPartyName: "无锡客户单位",
+        counterpartyNameSnapshot: input.counterpartyNameSnapshot ?? "无锡客户单位",
+        projectSiteName: input.projectSiteId ? "科技园一期项目点" : null,
+        signedDate: input.signedDate ?? null,
+        amount: input.amount ?? null,
+        budgetAmount: input.budgetAmount ?? null,
+        currency: input.currency ?? "CNY",
+        attachmentRef: input.attachmentRef ?? null,
+        status: input.status ?? "active",
+        expiryState: "normal",
+        remark: input.remark ?? null,
+      });
+      contracts.push(contract);
+      return contract;
+    },
+    async update(id: string, input: UpdateContractInput) {
+      const index = contracts.findIndex((contract) => contract.id === id);
+      if (index === -1) return null;
+      contracts[index] = {
+        ...contracts[index],
+        ...input,
+        counterpartyNameSnapshot: input.counterpartyNameSnapshot ?? contracts[index].counterpartyNameSnapshot,
+        updatedAt: now,
+      };
+      return contracts[index];
+    },
+    async listAttachments(id: string) {
+      if (!contracts.some((contract) => contract.id === id)) return null;
+      return attachments.filter((attachment) => attachment.contractId === id);
+    },
+    async createAttachment(id: string, input: CreateContractAttachmentInput) {
+      if (!contracts.some((contract) => contract.id === id)) {
+        throw new Error("missing contract");
+      }
+      const attachment = makeAttachment({
+        id: "66666666-6666-4666-8666-666666666666",
+        contractId: id,
+        fileName: input.fileName,
+        filePath: input.filePath,
+        fileType: input.fileType ?? null,
+        fileSize: input.fileSize ?? null,
+        uploadedBy: input.uploadedBy ?? null,
+        remark: input.remark ?? null,
+      });
+      attachments.push(attachment);
+      return attachment;
+    },
+    async updateAttachment(id: string, input: UpdateContractAttachmentInput) {
+      const index = attachments.findIndex((attachment) => attachment.id === id);
+      if (index === -1) return null;
+      attachments[index] = {
+        ...attachments[index],
+        ...input,
+        uploadedAt: input.uploadedAt ?? attachments[index].uploadedAt,
+      };
+      return attachments[index];
+    },
+  };
+}
+
+describe("contract expiry helper", () => {
+  it("calculates normal, expiring, expired, and terminated display states", () => {
+    const reference = new Date("2026-05-11T08:00:00.000Z");
+
+    expect(getContractExpiryState({ status: "active", endDate: "2026-07-01" }, reference)).toBe("normal");
+    expect(getContractExpiryState({ status: "active", endDate: "2026-06-05" }, reference)).toBe("expiring_soon");
+    expect(getContractExpiryState({ status: "active", endDate: "2026-05-01" }, reference)).toBe("expired");
+    expect(getContractExpiryState({ status: "terminated", endDate: "2026-07-01" }, reference)).toBe("terminated");
+  });
+});
+
+describe("contracts API", () => {
+  it("reports contracts API as unavailable when no repository is configured", async () => {
+    const app = buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/api/contracts" });
+    await app.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
+  });
+
+  it("lists, reads, creates, and updates contracts", async () => {
+    const repository = createFakeContractRepository([makeContract()]);
+    const app = buildApp({ contractRepository: repository });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/contracts?status=active&direction=client_service_contract&expiry=expiring_soon&q=无锡",
+    });
+    const detailResponse = await app.inject({ method: "GET", url: `/api/contracts/${contractId}` });
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT20260511002",
+        contractName: "采购框架合同",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "purchase_contract",
+        signedDate: "2026-05-11",
+        startDate: "2026-05-11",
+        endDate: "2027-05-10",
+        amount: 50000,
+      },
+    });
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/contracts/${createResponse.json().contract.id}`,
+      payload: { status: "terminated" },
+    });
+    await app.close();
+
+    expect(listResponse.json()).toEqual({ contracts: [makeContract()] });
+    expect(detailResponse.json()).toEqual({ contract: makeContract() });
+    expect(createResponse.statusCode).toBe(201);
+    expect(createResponse.json()).toMatchObject({
+      contract: { contractNo: "HT20260511002", contractName: "采购框架合同", status: "active" },
+    });
+    expect(updateResponse.json()).toMatchObject({ contract: { status: "terminated" } });
+  });
+
+  it("rejects invalid contracts and duplicate contract numbers", async () => {
+    const app = buildApp({ contractRepository: createFakeContractRepository([makeContract()]) });
+
+    const invalidResponse = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT20260511002",
+        contractName: "日期错误合同",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "purchase_contract",
+        startDate: "2026-06-01",
+        endDate: "2026-05-01",
+        amount: -1,
+      },
+    });
+    const duplicateResponse = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT20260511001",
+        contractName: "重复合同",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "purchase_contract",
+        startDate: "2026-05-11",
+        endDate: "2027-05-10",
+      },
+    });
+    const missingResponse = await app.inject({
+      method: "GET",
+      url: "/api/contracts/99999999-9999-4999-8999-999999999999",
+    });
+    await app.close();
+
+    expect(invalidResponse.statusCode).toBe(400);
+    expect(invalidResponse.json()).toMatchObject({ error: "CONTRACT_VALIDATION_FAILED" });
+    expect(duplicateResponse.statusCode).toBe(409);
+    expect(duplicateResponse.json()).toMatchObject({ error: "CONTRACT_CONFLICT", field: "contractNo" });
+    expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("manages contract attachment path metadata", async () => {
+    const repository = createFakeContractRepository([makeContract()], [makeAttachment()]);
+    const app = buildApp({ contractRepository: repository });
+
+    const listResponse = await app.inject({ method: "GET", url: `/api/contracts/${contractId}/attachments` });
+    const createResponse = await app.inject({
+      method: "POST",
+      url: `/api/contracts/${contractId}/attachments`,
+      payload: {
+        fileName: "补充协议.pdf",
+        filePath: "/volume1/company-erp/attachments/contracts/supplement.pdf",
+        fileType: "pdf",
+        fileSize: 2048,
+      },
+    });
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/contract-attachments/${createResponse.json().contractAttachment.id}`,
+      payload: { remark: "已归档" },
+    });
+    const invalidResponse = await app.inject({
+      method: "POST",
+      url: `/api/contracts/${contractId}/attachments`,
+      payload: { fileName: "", filePath: "", fileSize: -1 },
+    });
+    const missingResponse = await app.inject({
+      method: "PATCH",
+      url: "/api/contract-attachments/99999999-9999-4999-8999-999999999999",
+      payload: { remark: "missing" },
+    });
+    await app.close();
+
+    expect(listResponse.json()).toEqual({ contractAttachments: [makeAttachment()] });
+    expect(createResponse.statusCode).toBe(201);
+    expect(createResponse.json()).toMatchObject({ contractAttachment: { fileName: "补充协议.pdf" } });
+    expect(updateResponse.json()).toMatchObject({ contractAttachment: { remark: "已归档" } });
+    expect(invalidResponse.statusCode).toBe(400);
+    expect(missingResponse.statusCode).toBe(404);
+  });
+});

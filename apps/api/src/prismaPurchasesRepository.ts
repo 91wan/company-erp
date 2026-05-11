@@ -27,6 +27,7 @@ type PrismaPurchaseRecord = Prisma.PurchaseRecordGetPayload<{
   include: {
     purchaseRequest: true;
     supplierParty: true;
+    contract: true;
     lines: true;
   };
 }>;
@@ -88,6 +89,9 @@ function toPurchaseRecordDto(record: PrismaPurchaseRecord): PurchaseRecordDto {
     shopName: record.shopName,
     supplierPartyId: record.supplierPartyId,
     supplierPartyName: record.supplierParty?.partyName ?? null,
+    contractId: record.contractId,
+    contractNo: record.contract?.contractNo ?? null,
+    contractName: record.contract?.contractName ?? null,
     supplierNameText: record.supplierNameText,
     purchaseDescription: record.purchaseDescription,
     purchaseDate: dateToString(record.purchaseDate) ?? "",
@@ -171,6 +175,7 @@ function recordCreateData(input: CreatePurchaseRecordInput): Prisma.PurchaseReco
     platformOrderNo: input.platformOrderNo,
     shopName: input.shopName,
     supplierParty: input.supplierPartyId ? { connect: { id: input.supplierPartyId } } : undefined,
+    contract: input.contractId ? { connect: { id: input.contractId } } : undefined,
     supplierNameText: input.supplierNameText,
     purchaseDescription: input.purchaseDescription,
     purchaseDate: new Date(`${input.purchaseDate}T00:00:00.000Z`),
@@ -221,6 +226,7 @@ function recordUpdateData(input: UpdatePurchaseRecordInput): Prisma.PurchaseReco
     ...(input.platformOrderNo !== undefined ? { platformOrderNo: input.platformOrderNo } : {}),
     ...(input.shopName !== undefined ? { shopName: input.shopName } : {}),
     ...relationUpdate(input.supplierPartyId, "supplierParty"),
+    ...relationUpdate(input.contractId, "contract"),
     ...(input.supplierNameText !== undefined ? { supplierNameText: input.supplierNameText } : {}),
     ...(input.purchaseDescription !== undefined ? { purchaseDescription: input.purchaseDescription } : {}),
     ...(input.purchaseDate !== undefined ? { purchaseDate: new Date(`${input.purchaseDate}T00:00:00.000Z`) } : {}),
@@ -320,6 +326,7 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
   const include = {
     purchaseRequest: true,
     supplierParty: true,
+    contract: true,
     lines: { orderBy: { createdAt: "asc" } },
   } satisfies Prisma.PurchaseRecordInclude;
 
@@ -339,6 +346,8 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
                   { purchasePlatform: { contains: filters.q, mode: "insensitive" } },
                   { shopName: { contains: filters.q, mode: "insensitive" } },
                   { supplierNameText: { contains: filters.q, mode: "insensitive" } },
+                  { contract: { contractNo: { contains: filters.q, mode: "insensitive" } } },
+                  { contract: { contractName: { contains: filters.q, mode: "insensitive" } } },
                   { lines: { some: { materialName: { contains: filters.q, mode: "insensitive" } } } },
                 ],
               }

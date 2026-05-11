@@ -59,6 +59,17 @@ export type PurchaseRecordStatusCode =
 
 export type PurchaseSourceTypeCode = "platform" | "supplier" | "offline";
 
+export type ContractDirectionCode =
+  | "purchase_contract"
+  | "client_service_contract"
+  | "subcontract_contract"
+  | "framework_contract"
+  | "other";
+
+export type ContractStatusCode = "active" | "terminated";
+
+export type ContractExpiryStateCode = "normal" | "expiring_soon" | "expired" | "terminated";
+
 export type InventoryMovementTypeCode =
   | "opening"
   | "inbound"
@@ -378,6 +389,9 @@ export type PurchaseRecordDto = {
   shopName?: string | null;
   supplierPartyId?: string | null;
   supplierPartyName?: string | null;
+  contractId?: string | null;
+  contractNo?: string | null;
+  contractName?: string | null;
   supplierNameText?: string | null;
   purchaseDescription?: string | null;
   purchaseDate: string;
@@ -413,6 +427,7 @@ export type CreatePurchaseRecordInput = {
   platformOrderNo?: string | null;
   shopName?: string | null;
   supplierPartyId?: string | null;
+  contractId?: string | null;
   supplierNameText?: string | null;
   purchaseDescription?: string | null;
   purchaseDate: string;
@@ -425,6 +440,75 @@ export type CreatePurchaseRecordInput = {
 export type UpdatePurchaseRecordInput = Partial<Omit<CreatePurchaseRecordInput, "lines">> & {
   lines?: readonly CreatePurchaseRecordLineInput[];
 };
+
+export type ContractDto = {
+  id: string;
+  contractNo: string;
+  contractName: string;
+  counterpartyPartyId: string;
+  counterpartyPartyName?: string | null;
+  counterpartyNameSnapshot: string;
+  direction: ContractDirectionCode;
+  projectSiteId?: string | null;
+  projectSiteName?: string | null;
+  signedDate?: string | null;
+  startDate: string;
+  endDate: string;
+  amount?: number | null;
+  budgetAmount?: number | null;
+  currency: string;
+  attachmentRef?: string | null;
+  status: ContractStatusCode;
+  expiryState: ContractExpiryStateCode;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateContractInput = {
+  contractNo: string;
+  contractName: string;
+  counterpartyPartyId: string;
+  counterpartyNameSnapshot?: string | null;
+  direction: ContractDirectionCode;
+  projectSiteId?: string | null;
+  signedDate?: string | null;
+  startDate: string;
+  endDate: string;
+  amount?: number | null;
+  budgetAmount?: number | null;
+  currency?: string;
+  attachmentRef?: string | null;
+  status?: ContractStatusCode;
+  remark?: string | null;
+};
+
+export type UpdateContractInput = Partial<CreateContractInput>;
+
+export type ContractAttachmentDto = {
+  id: string;
+  contractId: string;
+  fileName: string;
+  filePath: string;
+  fileType?: string | null;
+  fileSize?: number | null;
+  uploadedBy?: string | null;
+  uploadedAt: string;
+  remark?: string | null;
+};
+
+export type CreateContractAttachmentInput = {
+  contractId?: string;
+  fileName: string;
+  filePath: string;
+  fileType?: string | null;
+  fileSize?: number | null;
+  uploadedBy?: string | null;
+  uploadedAt?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateContractAttachmentInput = Partial<Omit<CreateContractAttachmentInput, "contractId">>;
 
 export type InventoryMovementDto = {
   id: string;
@@ -724,6 +808,26 @@ export const PURCHASE_RECORD_STATUSES = [
   { code: "cancelled", label: "已取消" },
 ] as const satisfies readonly StatusMeta<PurchaseRecordStatusCode>[];
 
+export const CONTRACT_DIRECTIONS = [
+  { code: "purchase_contract", label: "采购合同" },
+  { code: "client_service_contract", label: "客户服务合同" },
+  { code: "subcontract_contract", label: "外包合同" },
+  { code: "framework_contract", label: "框架合同" },
+  { code: "other", label: "其他" },
+] as const satisfies readonly StatusMeta<ContractDirectionCode>[];
+
+export const CONTRACT_STATUSES = [
+  { code: "active", label: "履行中" },
+  { code: "terminated", label: "已终止" },
+] as const satisfies readonly StatusMeta<ContractStatusCode>[];
+
+export const CONTRACT_EXPIRY_STATES = [
+  { code: "normal", label: "正常" },
+  { code: "expiring_soon", label: "即将到期" },
+  { code: "expired", label: "已到期" },
+  { code: "terminated", label: "已终止" },
+] as const satisfies readonly StatusMeta<ContractExpiryStateCode>[];
+
 export const INVENTORY_MOVEMENT_TYPES = [
   { code: "opening", label: "期初" },
   { code: "inbound", label: "入库" },
@@ -850,7 +954,15 @@ export const MVP_DICTIONARIES = {
   },
   contractStatus: {
     label: "合同状态",
-    values: ["草稿", "履行中", "已到期", "已终止"],
+    values: ["履行中", "已终止"],
+  },
+  contractDirection: {
+    label: "合同方向",
+    values: ["采购合同", "客户服务合同", "外包合同", "框架合同", "其他"],
+  },
+  contractExpiryState: {
+    label: "合同到期显示状态",
+    values: ["正常", "即将到期", "已到期", "已终止"],
   },
   wechatProcessingStatus: {
     label: "微信处理状态",

@@ -30,6 +30,7 @@ import { PurchaseWorkspace } from "./PurchaseWorkspace";
 import { InventoryWorkspace } from "./InventoryWorkspace";
 import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWorkspace";
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
+import { ContractsWorkspace } from "./ContractsWorkspace";
 
 export function DashboardShell() {
   return (
@@ -57,6 +58,7 @@ export function DashboardShell() {
           <PeoplePermissionsWorkspace />
           <InventoryWorkspace />
           <ProjectSitesWorkspace />
+          <ContractsWorkspace />
         </div>
       </section>
     </main>
