@@ -105,3 +105,19 @@ Before creating migrations, confirm the MVP data model for:
 - Added `database/migrations/migration_lock.toml` so Prisma migration tools can detect the PostgreSQL provider from the migrations directory.
 - Added `purchase_records.purchase_request_no` as a text fallback for historical or manually entered purchase records that only know the purchase request number and do not have an internal request id link.
 - Added migration `20260511195500_purchase_record_request_no`.
+
+## 2026-05-11 Replenishment Suggestion Foundation
+
+- Added `ReplenishmentSuggestionStatus` enum with `open`, `converted`, and `dismissed`.
+- Added `replenishment_suggestions` for low-stock replenishment recommendations derived from current stock, reserved usage, open purchase quantity, and material safe stock.
+- Linked replenishment suggestions to `warehouses`, `materials`, and optional converted `purchase_requests`.
+- Added a partial unique index so a warehouse/material pair can only have one open replenishment suggestion at a time.
+- Added migration `20260511200500_replenishment_suggestions`.
+
+## 2026-05-11 Inventory Receiving and Balance Foundation
+
+- Reused `inventory_movements` as the source of truth for headquarters warehouse receiving.
+- Added optional `inventory_movements.purchase_record_line_id` so inbound movements can precisely roll received quantity back to `purchase_record_lines`.
+- Added relation from `purchase_record_lines` to inventory movements.
+- Confirmed no inventory balance table is added; current stock remains derived by summing `inventory_movements.quantity` grouped by warehouse, material, and unit.
+- Added migration `20260511203000_inventory_receiving_balances`.

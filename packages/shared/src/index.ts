@@ -59,6 +59,24 @@ export type PurchaseRecordStatusCode =
 
 export type PurchaseSourceTypeCode = "platform" | "supplier" | "offline";
 
+export type InventoryMovementTypeCode =
+  | "opening"
+  | "inbound"
+  | "outbound"
+  | "adjustment_in"
+  | "adjustment_out";
+
+export type InventorySourceTypeCode =
+  | "purchase"
+  | "return_material"
+  | "inventory_gain"
+  | "opening"
+  | "other";
+
+export type IssueTargetTypeCode = "internal_office" | "project_site" | "subcontractor";
+
+export type ReplenishmentSuggestionStatusCode = "open" | "converted" | "dismissed";
+
 export type StatusMeta<TCode extends string = string> = {
   code: TCode;
   label: string;
@@ -401,6 +419,115 @@ export type UpdatePurchaseRecordInput = Partial<Omit<CreatePurchaseRecordInput, 
   lines?: readonly CreatePurchaseRecordLineInput[];
 };
 
+export type InventoryMovementDto = {
+  id: string;
+  movementNo: string;
+  movementDate: string;
+  movementType: InventoryMovementTypeCode;
+  sourceType?: InventorySourceTypeCode | null;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  quantity: number;
+  unit: string;
+  unitPrice?: number | null;
+  purchaseRecordNo?: string | null;
+  purchaseRecordLineId?: string | null;
+  handledBy?: string | null;
+  purpose?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InventoryBalanceDto = {
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  currentQuantity: number;
+  unit: string;
+  safeStock?: number | null;
+  isLowStock: boolean;
+  lastMovementAt?: string | null;
+};
+
+export type CreateInventoryMovementInput = {
+  movementNo: string;
+  movementDate: string;
+  movementType: InventoryMovementTypeCode;
+  sourceType?: InventorySourceTypeCode | null;
+  warehouseId: string;
+  materialId: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number | null;
+  purchaseRecordNo?: string | null;
+  purchaseRecordLineId?: string | null;
+  handledBy?: string | null;
+  purpose?: string | null;
+  remark?: string | null;
+};
+
+export type ReplenishmentSuggestionDto = {
+  id: string;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  unit: string;
+  safeStock: number;
+  currentStock: number;
+  reservedUsageQty: number;
+  openPurchaseQty: number;
+  suggestedQuantity: number;
+  status: ReplenishmentSuggestionStatusCode;
+  convertedPurchaseRequestId?: string | null;
+  convertedPurchaseRequestNo?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GenerateReplenishmentSuggestionsResult = {
+  created: readonly ReplenishmentSuggestionDto[];
+  existingOpen: readonly ReplenishmentSuggestionDto[];
+  skipped: number;
+};
+
+export type UpdateReplenishmentSuggestionInput = {
+  status?: Extract<ReplenishmentSuggestionStatusCode, "open" | "dismissed">;
+  remark?: string | null;
+};
+
+export type ConvertReplenishmentSuggestionInput = {
+  requestNo: string;
+  requesterName: string;
+  requesterEmployeeId?: string | null;
+  departmentName: string;
+  departmentId?: string | null;
+  expectedArrivalDate?: string | null;
+  purpose?: string | null;
+  remark?: string | null;
+};
+
+export type ReplenishmentQuantityInput = {
+  safeStock: number;
+  currentStock: number;
+  reservedUsageQty: number;
+  openPurchaseQty: number;
+};
+
 export type InventoryMovementInput = {
   warehouseCode: string;
   materialCode: string;
@@ -484,6 +611,34 @@ export const PURCHASE_RECORD_STATUSES = [
   { code: "received", label: "已到货" },
   { code: "cancelled", label: "已取消" },
 ] as const satisfies readonly StatusMeta<PurchaseRecordStatusCode>[];
+
+export const INVENTORY_MOVEMENT_TYPES = [
+  { code: "opening", label: "期初" },
+  { code: "inbound", label: "入库" },
+  { code: "outbound", label: "出库" },
+  { code: "adjustment_in", label: "盘盈" },
+  { code: "adjustment_out", label: "盘亏" },
+] as const satisfies readonly StatusMeta<InventoryMovementTypeCode>[];
+
+export const REPLENISHMENT_SUGGESTION_STATUSES = [
+  { code: "open", label: "待确认" },
+  { code: "converted", label: "已转采购需求" },
+  { code: "dismissed", label: "已忽略" },
+] as const satisfies readonly StatusMeta<ReplenishmentSuggestionStatusCode>[];
+
+export const INVENTORY_SOURCE_TYPES = [
+  { code: "purchase", label: "采购" },
+  { code: "return_material", label: "退料" },
+  { code: "inventory_gain", label: "盘盈" },
+  { code: "opening", label: "期初" },
+  { code: "other", label: "其他" },
+] as const satisfies readonly StatusMeta<InventorySourceTypeCode>[];
+
+export const ISSUE_TARGET_TYPES = [
+  { code: "internal_office", label: "内部办公" },
+  { code: "project_site", label: "项目点" },
+  { code: "subcontractor", label: "外包方" },
+] as const satisfies readonly StatusMeta<IssueTargetTypeCode>[];
 
 export const WAREHOUSE_TYPES = [
   { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
@@ -725,4 +880,9 @@ export function calculateCurrentInventory(
 
 export function canIssueStock(requestedQuantity: number, currentQuantity: number): boolean {
   return requestedQuantity > 0 && requestedQuantity <= currentQuantity;
+}
+
+export function calculateReplenishmentSuggestionQuantity(input: ReplenishmentQuantityInput): number {
+  const gap = input.safeStock + input.reservedUsageQty - input.currentStock - input.openPurchaseQty;
+  return Math.max(0, gap);
 }

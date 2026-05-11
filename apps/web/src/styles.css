@@ -798,6 +798,129 @@ tbody tr:last-child td {
   margin-top: 2px;
 }
 
+.primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.primary-action:disabled {
+  opacity: 0.6;
+}
+
+.replenishment-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) auto repeat(4, minmax(120px, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.replenishment-card h3 {
+  margin: 4px 0 3px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.replenishment-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.replenishment-card > div:first-child > strong {
+  color: #2563eb;
+  font-size: 12px;
+}
+
+.replenishment-card label {
+  display: grid;
+  gap: 6px;
+}
+
+.replenishment-card label > span {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.replenishment-card input {
+  width: 100%;
+  min-height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.suggestion-quantity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #047857;
+  background: #ecfdf3;
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.replenishment-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.replenishment-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.replenishment-actions button[type="submit"] {
+  border-color: #2563eb;
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.replenishment-actions button:disabled {
+  opacity: 0.6;
+}
+
+.conversion-result {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #047857;
+  background: #f0fdf4;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .parties-heading {
   display: flex;
   align-items: end;
@@ -1087,6 +1210,7 @@ tbody tr:last-child td {
   .dashboard-grid-primary,
   .dashboard-grid-secondary,
   .parties-layout,
+  .replenishment-card,
   .inventory-grid {
     grid-template-columns: 1fr;
   }

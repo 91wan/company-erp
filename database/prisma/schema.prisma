@@ -42,6 +42,12 @@ enum ProjectUsageStatus {
   rejected
 }
 
+enum ReplenishmentSuggestionStatus {
+  open
+  converted
+  dismissed
+}
+
 enum PartyType {
   supplier
   client
@@ -123,6 +129,7 @@ model Material {
   defaultSupplierParty Party?                 @relation("DefaultSupplierMaterials", fields: [defaultSupplierPartyId], references: [id], onDelete: SetNull)
   movements          InventoryMovement[]
   usageRequests      ProjectUsageRequest[]
+  replenishmentSuggestions ReplenishmentSuggestion[]
   purchaseRequestLines PurchaseRequestLine[]
   purchaseRecordLines  PurchaseRecordLine[]
 
@@ -146,6 +153,7 @@ model Warehouse {
   defaultedMaterials Material[]          @relation("DefaultWarehouseMaterials")
   movements          InventoryMovement[]
   usageRequests      ProjectUsageRequest[]
+  replenishmentSuggestions ReplenishmentSuggestion[]
 
   @@index([projectSiteId])
   @@map("warehouses")
@@ -164,6 +172,7 @@ model InventoryMovement {
   unit                  String
   unitPrice             Decimal?               @map("unit_price") @db.Decimal(14, 4)
   purchaseRecordNo      String?                @map("purchase_record_no")
+  purchaseRecordLineId  String?                @map("purchase_record_line_id") @db.Uuid
   projectSiteId         String?                @map("project_site_id") @db.Uuid
   subcontractorName     String?                @map("subcontractor_name")
   departmentName        String?                @map("department_name")
@@ -177,11 +186,13 @@ model InventoryMovement {
   updatedAt             DateTime               @updatedAt @map("updated_at")
   warehouse             Warehouse              @relation(fields: [warehouseId], references: [id])
   material              Material               @relation(fields: [materialId], references: [id])
+  purchaseRecordLine    PurchaseRecordLine?    @relation(fields: [purchaseRecordLineId], references: [id], onDelete: SetNull)
   projectSite           ProjectSite?           @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
   usageRequest          ProjectUsageRequest?   @relation(fields: [usageRequestId], references: [id])
 
   @@index([warehouseId, materialId, movementDate])
   @@index([movementType, movementDate])
+  @@index([purchaseRecordLineId])
   @@index([projectSiteId])
   @@map("inventory_movements")
 }
@@ -213,6 +224,32 @@ model ProjectUsageRequest {
   @@index([projectSiteId, requestDate])
   @@index([status])
   @@map("project_usage_requests")
+}
+
+model ReplenishmentSuggestion {
+  id                         String                         @id @default(uuid()) @db.Uuid
+  warehouseId                String                         @map("warehouse_id") @db.Uuid
+  materialId                 String                         @map("material_id") @db.Uuid
+  safeStock                  Decimal                        @map("safe_stock") @db.Decimal(14, 3)
+  currentStock               Decimal                        @map("current_stock") @db.Decimal(14, 3)
+  reservedUsageQty           Decimal                        @map("reserved_usage_qty") @db.Decimal(14, 3)
+  openPurchaseQty            Decimal                        @map("open_purchase_qty") @db.Decimal(14, 3)
+  suggestedQuantity          Decimal                        @map("suggested_quantity") @db.Decimal(14, 3)
+  status                     ReplenishmentSuggestionStatus  @default(open)
+  convertedPurchaseRequestId String?                        @map("converted_purchase_request_id") @db.Uuid
+  remark                     String?
+  createdAt                  DateTime                       @default(now()) @map("created_at")
+  updatedAt                  DateTime                       @updatedAt @map("updated_at")
+
+  warehouse                Warehouse        @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  material                 Material         @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  convertedPurchaseRequest PurchaseRequest? @relation("ReplenishmentConvertedRequest", fields: [convertedPurchaseRequestId], references: [id], onDelete: SetNull)
+
+  @@index([warehouseId])
+  @@index([materialId])
+  @@index([status])
+  @@index([convertedPurchaseRequestId])
+  @@map("replenishment_suggestions")
 }
 
 enum BaseStatus {
@@ -419,6 +456,7 @@ model PurchaseRequest {
   projectSite ProjectSite?           @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
   lines       PurchaseRequestLine[]
   records     PurchaseRecord[]
+  replenishmentSuggestions ReplenishmentSuggestion[] @relation("ReplenishmentConvertedRequest")
 
   @@index([status])
   @@index([requesterEmployeeId])
@@ -503,6 +541,7 @@ model PurchaseRecordLine {
   purchaseRecord      PurchaseRecord       @relation(fields: [purchaseRecordId], references: [id], onDelete: Cascade)
   purchaseRequestLine PurchaseRequestLine?  @relation(fields: [purchaseRequestLineId], references: [id], onDelete: SetNull)
   material            Material?             @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  inventoryMovements  InventoryMovement[]
 
   @@index([purchaseRecordId])
   @@index([purchaseRequestLineId])

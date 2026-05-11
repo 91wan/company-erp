@@ -489,6 +489,7 @@ function PurchaseRequestsTable({ requests }: { requests: PurchaseRequestDto[] })
             <th>部门/项目点</th>
             <th>物料</th>
             <th>数量</th>
+            <th>来源</th>
             <th>状态</th>
             <th>期望到货</th>
             <th>更新时间</th>
@@ -504,6 +505,7 @@ function PurchaseRequestsTable({ requests }: { requests: PurchaseRequestDto[] })
                 <td>{request.projectSiteName || request.departmentName}</td>
                 <td>{firstLine?.materialName ?? "-"}</td>
                 <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
+                <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
                 <td>
                   <span className={`status-badge ${request.status === "cancelled" ? "orange" : "blue"}`}>
                     {requestStatusLabel.get(request.status)}

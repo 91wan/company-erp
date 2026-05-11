@@ -11,16 +11,10 @@ import type { ReactNode } from "react";
 import {
   SettingsIcon,
   approvals,
-  inventoryInboundRecords,
-  inventoryMaterials,
-  inventoryOutboundRecords,
-  inventorySnapshot,
-  inventoryTabs,
   lowStockMaterials,
   metrics,
   navigationItems,
   purchaseRecords,
-  projectUsageRequests,
   receivingRecords,
   siteUsage,
   systemStatus,
@@ -33,6 +27,8 @@ import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
 import { PeoplePermissionsWorkspace } from "./PeoplePermissionsWorkspace";
 import { PurchaseWorkspace } from "./PurchaseWorkspace";
+import { InventoryWorkspace } from "./InventoryWorkspace";
+import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWorkspace";
 
 export function DashboardShell() {
   return (
@@ -55,6 +51,7 @@ export function DashboardShell() {
           </section>
           <PartiesWorkspace />
           <MaterialsWarehousesWorkspace />
+          <ReplenishmentSuggestionsWorkspace />
           <PurchaseWorkspace />
           <PeoplePermissionsWorkspace />
           <InventoryWorkspace />
@@ -302,89 +299,6 @@ function SystemStatusPanel() {
             <span>{item.side}</span>
           </article>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function InventoryWorkspace() {
-  return (
-    <section className="inventory-workspace">
-      <div className="inventory-heading">
-        <div>
-          <h2>库存管理</h2>
-          <p>采购到库存闭环</p>
-        </div>
-        <span>当前库存 = 入库 - 出库 + 盘盈 - 盘亏</span>
-      </div>
-
-      <div className="inventory-tabs" aria-label="库存模块功能">
-        {inventoryTabs.map((tab) => (
-          <button key={tab} type="button">
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="inventory-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelHeader title="物料管理" />
-          <ResponsiveTable
-            headers={["物料编码", "物料名称", "规格型号", "单位", "类别", "状态"]}
-            rows={inventoryMaterials.map((row) => [
-              row.code,
-              row.name,
-              row.specification,
-              row.unit,
-              row.category,
-              <StatusBadge key={`${row.code}-status`} status={row.status} />,
-            ])}
-          />
-        </section>
-
-        <section className="dashboard-panel table-panel">
-          <PanelHeader title="入库登记" />
-          <ResponsiveTable
-            headers={["入库单号", "日期", "物料", "数量", "来源"]}
-            rows={inventoryInboundRecords.map((row) => [row.id, row.date, row.material, row.quantity, row.source])}
-          />
-        </section>
-
-        <section className="dashboard-panel table-panel">
-          <PanelHeader title="出库登记" />
-          <ResponsiveTable
-            headers={["出库单号", "日期", "领用对象", "物料", "数量"]}
-            rows={inventoryOutboundRecords.map((row) => [row.id, row.date, row.target, row.material, row.quantity])}
-          />
-        </section>
-
-        <section className="dashboard-panel table-panel">
-          <PanelHeader title="当前库存查询" />
-          <ResponsiveTable
-            headers={["仓库", "物料编码", "当前库存", "单位", "状态"]}
-            rows={inventorySnapshot.map((row) => [
-              row.warehouse,
-              row.material,
-              row.current,
-              row.unit,
-              <StatusBadge key={`${row.warehouse}-${row.material}`} status={row.status} />,
-            ])}
-          />
-        </section>
-
-        <section className="dashboard-panel table-panel">
-          <PanelHeader title="项目点领用记录" />
-          <ResponsiveTable
-            headers={["领用单号", "项目点", "物料编码", "申请数量", "状态"]}
-            rows={projectUsageRequests.map((row) => [
-              row.requestNo,
-              row.site,
-              row.material,
-              row.quantity,
-              <StatusBadge key={`${row.requestNo}-status`} status={row.status} />,
-            ])}
-          />
-        </section>
       </div>
     </section>
   );
