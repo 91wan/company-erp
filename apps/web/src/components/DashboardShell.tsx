@@ -29,6 +29,7 @@ import {
   type MetricTone,
 } from "../dashboardData";
 import { ApiStatus } from "./ApiStatus";
+import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
 
 export function DashboardShell() {
@@ -51,6 +52,7 @@ export function DashboardShell() {
             <SystemStatusPanel />
           </section>
           <PartiesWorkspace />
+          <MaterialsWarehousesWorkspace />
           <InventoryWorkspace />
         </div>
       </section>

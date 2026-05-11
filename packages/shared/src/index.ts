@@ -81,6 +81,74 @@ export type CreatePartyInput = {
 
 export type UpdatePartyInput = Partial<CreatePartyInput>;
 
+export type WarehouseTypeCode = "headquarters" | "project_site" | "temporary";
+
+export type WarehouseTypeMeta = {
+  code: WarehouseTypeCode;
+  label: string;
+  description: string;
+};
+
+export type WarehouseDto = {
+  id: string;
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseType: WarehouseTypeCode;
+  projectSiteId?: string | null;
+  managerName?: string | null;
+  managerPhone?: string | null;
+  status: BaseStatusCode;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateWarehouseInput = {
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseType?: WarehouseTypeCode;
+  projectSiteId?: string | null;
+  managerName?: string | null;
+  managerPhone?: string | null;
+  status?: BaseStatusCode;
+  remark?: string | null;
+};
+
+export type UpdateWarehouseInput = Partial<CreateWarehouseInput>;
+
+export type MaterialDto = {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  materialCategory: string;
+  baseUnit: string;
+  defaultWarehouseId?: string | null;
+  defaultWarehouseName?: string | null;
+  defaultSupplierPartyId?: string | null;
+  defaultSupplierPartyName?: string | null;
+  safeStock?: number | null;
+  status: BaseStatusCode;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateMaterialInput = {
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  materialCategory: string;
+  baseUnit: string;
+  defaultWarehouseId?: string | null;
+  defaultSupplierPartyId?: string | null;
+  safeStock?: number | null;
+  status?: BaseStatusCode;
+  remark?: string | null;
+};
+
+export type UpdateMaterialInput = Partial<CreateMaterialInput>;
+
 export type InventoryMovementInput = {
   warehouseCode: string;
   materialCode: string;
@@ -122,6 +190,14 @@ export const PARTY_TYPES = [
 ] as const satisfies readonly PartyType[];
 
 export const PARTY_SUPPLY_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
+
+export const MATERIAL_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
+
+export const WAREHOUSE_TYPES = [
+  { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
+  { code: "project_site", label: "项目点仓", description: "Reserved lightweight project-site warehouse type" },
+  { code: "temporary", label: "临时仓", description: "Temporary staging warehouse" },
+] as const satisfies readonly WarehouseTypeMeta[];
 
 export const PARTY_METADATA = {
   partyTypes: PARTY_TYPES,
@@ -224,6 +300,10 @@ export const MVP_DICTIONARIES = {
   supplierSupplyCategory: {
     label: "供应类别",
     values: PARTY_SUPPLY_CATEGORIES,
+  },
+  materialCategory: {
+    label: "物料类别",
+    values: MATERIAL_CATEGORIES,
   },
   warehouseType: {
     label: "仓库类型",

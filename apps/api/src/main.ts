@@ -1,6 +1,10 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app";
+import {
+  createPrismaMaterialRepository,
+  createPrismaWarehouseRepository,
+} from "./prismaMaterialsWarehousesRepository";
 import { createPrismaPartyRepository } from "./prismaPartyRepository";
 
 const port = Number(process.env.API_PORT ?? 3001);
@@ -9,6 +13,8 @@ const prisma = process.env.DATABASE_URL ? new PrismaClient() : null;
 
 const app = buildApp({
   partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
+  materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,
+  warehouseRepository: prisma ? createPrismaWarehouseRepository(prisma) : undefined,
 });
 
 if (prisma) {

@@ -7,6 +7,8 @@ import {
   MVP_ROLES,
   PARTY_METADATA,
   PARTY_TYPES,
+  MATERIAL_CATEGORIES,
+  WAREHOUSE_TYPES,
   USER_ROLE_ASSIGNMENT_POLICY,
 } from "../src/index";
 
@@ -158,5 +160,27 @@ describe("MVP dictionary constants", () => {
       "服务",
       "其他",
     ]);
+  });
+
+  it("defines material and warehouse master-data dictionaries for the headquarters inventory MVP", () => {
+    expect(MATERIAL_CATEGORIES).toEqual(["定制物料", "办公物料", "设备", "服务", "其他"]);
+    expect(WAREHOUSE_TYPES.map((warehouseType) => warehouseType.code)).toEqual([
+      "headquarters",
+      "project_site",
+      "temporary",
+    ]);
+    expect(WAREHOUSE_TYPES.map((warehouseType) => warehouseType.label)).toEqual([
+      "总部仓",
+      "项目点仓",
+      "临时仓",
+    ]);
+    expect(MVP_DICTIONARIES.materialCategory.values).toEqual([
+      "定制物料",
+      "办公物料",
+      "设备",
+      "服务",
+      "其他",
+    ]);
+    expect(MVP_DICTIONARIES.warehouseType.values).toEqual(["总部仓", "项目点仓", "临时仓"]);
   });
 });
