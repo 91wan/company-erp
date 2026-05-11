@@ -182,13 +182,14 @@ Project-site display should show:
 - Service mode
 - Internal project manager
 - Subcontractor, only for subcontracted sites
-- Client contract reference
-- Subcontract contract reference, only for subcontracted sites
+- Client contract references
+- Subcontract contract references, only for subcontracted sites
 
 MVP contract rules:
 
-- A direct site may reference one active client service contract.
-- A subcontracted site may reference one active client service contract and one subcontract contract.
+- A direct site may reference one or more active client service contracts.
+- A subcontracted site may reference one or more active client service contracts and one or more subcontract contracts.
+- If several active contracts exist for the same project site and direction, the project-site summary may show the latest active contract plus a count of other active contracts. A manually selected primary contract requires a future contract-schema field and must be implemented separately.
 - Contract references may be empty while old contracts are still being collected or scanned.
 - Contract amount visibility can be hidden from project-site users if permission scope requires it.
 
