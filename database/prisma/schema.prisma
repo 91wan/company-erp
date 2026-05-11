@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WarehouseType {
+  headquarters
+  project_site
+  temporary
+}
+
+enum InventoryMovementType {
+  opening
+  inbound
+  outbound
+  adjustment_in
+  adjustment_out
+}
+
+enum InventorySourceType {
+  purchase
+  return_material
+  inventory_gain
+  opening
+  other
+}
+
+enum IssueTargetType {
+  internal_office
+  project_site
+  subcontractor
+}
+
+enum ProjectUsageStatus {
+  pending
+  issued
+  partially_issued
+  rejected
+}
+
+model Material {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  materialCode       String                  @unique @map("material_code")
+  materialName       String                  @map("material_name")
+  specification      String?
+  materialCategory   String                  @map("material_category")
+  baseUnit           String                  @map("base_unit")
+  defaultWarehouseId String?                 @map("default_warehouse_id") @db.Uuid
+  safeStock          Decimal?                @map("safe_stock") @db.Decimal(14, 3)
+  status             BaseStatus              @default(enabled)
+  remark             String?
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+  defaultWarehouse   Warehouse?              @relation("DefaultWarehouseMaterials", fields: [defaultWarehouseId], references: [id])
+  movements          InventoryMovement[]
+  usageRequests      ProjectUsageRequest[]
+
+  @@map("materials")
+}
+
+model Warehouse {
+  id                 String              @id @default(uuid()) @db.Uuid
+  warehouseCode      String              @unique @map("warehouse_code")
+  warehouseName      String              @map("warehouse_name")
+  warehouseType      WarehouseType       @default(headquarters) @map("warehouse_type")
+  projectSiteId      String?             @map("project_site_id") @db.Uuid
+  managerName        String?             @map("manager_name")
+  managerPhone       String?             @map("manager_phone")
+  status             BaseStatus          @default(enabled)
+  remark             String?
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  projectSite        ProjectSite?        @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
+  defaultedMaterials Material[]          @relation("DefaultWarehouseMaterials")
+  movements          InventoryMovement[]
+  usageRequests      ProjectUsageRequest[]
+
+  @@index([projectSiteId])
+  @@map("warehouses")
+}
+
+model InventoryMovement {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  movementNo            String                 @unique @map("movement_no")
+  movementDate          DateTime               @map("movement_date") @db.Date
+  movementType          InventoryMovementType  @map("movement_type")
+  sourceType            InventorySourceType?   @map("source_type")
+  issueTargetType       IssueTargetType?       @map("issue_target_type")
+  warehouseId           String                 @map("warehouse_id") @db.Uuid
+  materialId            String                 @map("material_id") @db.Uuid
+  quantity              Decimal                @db.Decimal(14, 3)
+  unit                  String
+  unitPrice             Decimal?               @map("unit_price") @db.Decimal(14, 4)
+  purchaseRecordNo      String?                @map("purchase_record_no")
+  projectSiteId         String?                @map("project_site_id") @db.Uuid
+  subcontractorName     String?                @map("subcontractor_name")
+  departmentName        String?                @map("department_name")
+  requestedBy           String?                @map("requested_by")
+  handledBy             String?                @map("handled_by")
+  receivedByName        String?                @map("received_by_name")
+  purpose               String?
+  remark                String?
+  usageRequestId        String?                @map("usage_request_id") @db.Uuid
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  warehouse             Warehouse              @relation(fields: [warehouseId], references: [id])
+  material              Material               @relation(fields: [materialId], references: [id])
+  projectSite           ProjectSite?           @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
+  usageRequest          ProjectUsageRequest?   @relation(fields: [usageRequestId], references: [id])
+
+  @@index([warehouseId, materialId, movementDate])
+  @@index([movementType, movementDate])
+  @@index([projectSiteId])
+  @@map("inventory_movements")
+}
+
+model ProjectUsageRequest {
+  id                String               @id @default(uuid()) @db.Uuid
+  requestNo         String               @unique @map("request_no")
+  requestDate       DateTime             @map("request_date") @db.Date
+  projectSiteId     String               @map("project_site_id") @db.Uuid
+  warehouseId       String               @map("warehouse_id") @db.Uuid
+  materialId        String               @map("material_id") @db.Uuid
+  requestedQuantity Decimal              @map("requested_quantity") @db.Decimal(14, 3)
+  approvedQuantity  Decimal?             @map("approved_quantity") @db.Decimal(14, 3)
+  issuedQuantity    Decimal              @default(0) @map("issued_quantity") @db.Decimal(14, 3)
+  unit              String
+  purpose           String?
+  requestedBy       String?              @map("requested_by")
+  expectedDate      DateTime?            @map("expected_date") @db.Date
+  status            ProjectUsageStatus   @default(pending)
+  outboundNo        String?              @map("outbound_no")
+  remark            String?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  projectSite       ProjectSite          @relation(fields: [projectSiteId], references: [id], onDelete: Restrict)
+  warehouse         Warehouse            @relation(fields: [warehouseId], references: [id])
+  material          Material             @relation(fields: [materialId], references: [id])
+  movements         InventoryMovement[]
+
+  @@index([projectSiteId, requestDate])
+  @@index([status])
+  @@map("project_usage_requests")
+}
+
+enum BaseStatus {
+  enabled
+  disabled
+}
+
+enum EmployeeStatus {
+  active
+  resigned
+  disabled
+}
+
+enum UserAccountStatus {
+  active
+  disabled
+  locked
+}
+
+enum RoleCode {
+  admin
+  hr
+  procurement
+  warehouse
+  project_site
+  viewer
+}
+
+enum ProjectSiteStatus {
+  preparing
+  active
+  paused
+  ended
+}
+
+enum EmployeeProjectSiteRelationType {
+  assigned
+  manager
+  support
+}
+
+model Department {
+  id                String       @id @default(uuid()) @db.Uuid
+  departmentCode    String       @unique @map("department_code")
+  name              String
+  parentId          String?      @map("parent_id") @db.Uuid
+  managerEmployeeId String?      @map("manager_employee_id") @db.Uuid
+  status            BaseStatus   @default(enabled)
+  sortOrder         Int          @default(0) @map("sort_order")
+  remark            String?
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  parent          Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children        Department[] @relation("DepartmentHierarchy")
+  managerEmployee Employee?    @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  employees       Employee[]   @relation("EmployeeDepartment")
+
+  @@index([parentId])
+  @@index([status])
+  @@map("departments")
+}
+
+model Employee {
+  id               String         @id @default(uuid()) @db.Uuid
+  employeeNo       String         @unique @map("employee_no")
+  name             String
+  gender           String?
+  phone            String?        @unique
+  email            String?        @unique
+  departmentId     String         @map("department_id") @db.Uuid
+  position         String?
+  employmentStatus EmployeeStatus @default(active) @map("employment_status")
+  hireDate         DateTime?      @map("hire_date") @db.Date
+  leaveDate        DateTime?      @map("leave_date") @db.Date
+  remark           String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  department             Department                      @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  userAccount            UserAccount?
+  managedDepartments     Department[]                    @relation("DepartmentManager")
+  managedProjectSites    ProjectSite[]                   @relation("ProjectSitePrimaryManager")
+  projectSiteAssignments EmployeeProjectSiteAssignment[]
+
+  @@index([departmentId])
+  @@index([employmentStatus])
+  @@map("employees")
+}
+
+model UserAccount {
+  id                String            @id @default(uuid()) @db.Uuid
+  employeeId        String?           @unique @map("employee_id") @db.Uuid
+  username          String            @unique
+  passwordHash      String            @map("password_hash")
+  status            UserAccountStatus @default(active)
+  lastLoginAt       DateTime?         @map("last_login_at")
+  passwordChangedAt DateTime?         @map("password_changed_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  employee            Employee?             @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  roles               UserRoleAssignment[]  @relation("UserAccountRoles")
+  assignedRoleChanges UserRoleAssignment[]  @relation("AssignedUserRoles")
+
+  @@index([status])
+  @@map("user_accounts")
+}
+
+model UserRoleAssignment {
+  id               String    @id @default(uuid()) @db.Uuid
+  userAccountId    String    @map("user_account_id") @db.Uuid
+  role             RoleCode
+  assignedByUserId String?   @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime  @default(now()) @map("assigned_at")
+
+  userAccount UserAccount  @relation("UserAccountRoles", fields: [userAccountId], references: [id], onDelete: Cascade)
+  assignedBy  UserAccount? @relation("AssignedUserRoles", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userAccountId, role])
+  @@index([role])
+  @@index([assignedByUserId])
+  @@map("user_role_assignments")
+}
+
+model ProjectSite {
+  id                       String            @id @default(uuid()) @db.Uuid
+  siteCode                 String            @unique @map("site_code")
+  siteName                 String            @map("site_name")
+  status                   ProjectSiteStatus @default(active)
+  primaryManagerEmployeeId String?           @map("primary_manager_employee_id") @db.Uuid
+  remark                   String?
+  createdAt                DateTime          @default(now()) @map("created_at")
+  updatedAt                DateTime          @updatedAt @map("updated_at")
+
+  primaryManager Employee?                       @relation("ProjectSitePrimaryManager", fields: [primaryManagerEmployeeId], references: [id], onDelete: SetNull)
+  assignments    EmployeeProjectSiteAssignment[]
+  warehouses      Warehouse[]
+  inventoryMoves  InventoryMovement[]
+  usageRequests   ProjectUsageRequest[]
+
+  @@index([status])
+  @@index([primaryManagerEmployeeId])
+  @@map("project_sites")
+}
+
+model EmployeeProjectSiteAssignment {
+  id             String                          @id @default(uuid()) @db.Uuid
+  employeeId     String                          @map("employee_id") @db.Uuid
+  projectSiteId  String                          @map("project_site_id") @db.Uuid
+  relationType   EmployeeProjectSiteRelationType @default(assigned) @map("relation_type")
+  isPrimary      Boolean                         @default(false) @map("is_primary")
+  startDate      DateTime?                       @map("start_date") @db.Date
+  endDate        DateTime?                       @map("end_date") @db.Date
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  projectSite ProjectSite @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([projectSiteId])
+  @@index([relationType])
+  @@map("employee_project_site_assignments")
+}

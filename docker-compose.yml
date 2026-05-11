@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: company-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-company_erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-nas}
+      POSTGRES_DB: ${POSTGRES_DB:-company_erp}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ${NAS_DATA_ROOT:-./data}/postgres:/var/lib/postgresql/data
+      - ${NAS_ATTACHMENTS_ROOT:-./attachments}:/attachments
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
