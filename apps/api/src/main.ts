@@ -11,6 +11,10 @@ import {
   createPrismaEmployeeRepository,
   createPrismaUserAccountRepository,
 } from "./prismaPeoplePermissionsRepository";
+import {
+  createPrismaPurchaseRecordRepository,
+  createPrismaPurchaseRequestRepository,
+} from "./prismaPurchasesRepository";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -23,6 +27,8 @@ const app = buildApp({
   departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
   employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
   userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
+  purchaseRequestRepository: prisma ? createPrismaPurchaseRequestRepository(prisma) : undefined,
+  purchaseRecordRepository: prisma ? createPrismaPurchaseRecordRepository(prisma) : undefined,
 });
 
 if (prisma) {

@@ -7,6 +7,9 @@ import {
   MVP_ROLES,
   PARTY_METADATA,
   PARTY_TYPES,
+  PURCHASE_RECORD_STATUSES,
+  PURCHASE_REQUEST_STATUSES,
+  PURCHASE_SOURCE_TYPES,
   DEPARTMENT_STATUSES,
   EMPLOYEE_STATUSES,
   MATERIAL_CATEGORIES,
@@ -119,6 +122,26 @@ describe("MVP dictionary constants", () => {
   });
 
   it("defines procurement dictionaries without making suppliers mandatory", () => {
+    expect(PURCHASE_SOURCE_TYPES.map((sourceType) => sourceType.code)).toEqual([
+      "platform",
+      "supplier",
+      "offline",
+    ]);
+    expect(PURCHASE_REQUEST_STATUSES.map((status) => status.code)).toEqual([
+      "draft",
+      "pending_purchase",
+      "purchasing",
+      "partially_received",
+      "completed",
+      "cancelled",
+    ]);
+    expect(PURCHASE_RECORD_STATUSES.map((status) => status.code)).toEqual([
+      "pending_purchase",
+      "ordered",
+      "partially_received",
+      "received",
+      "cancelled",
+    ]);
     expect(MVP_DICTIONARIES.purchaseSourceType.values).toEqual(["平台采购", "供应商采购", "线下采购"]);
     expect(MVP_DICTIONARIES.purchaseRequestStatus.values).toEqual([
       "草稿",

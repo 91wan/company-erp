@@ -792,6 +792,12 @@ tbody tr:last-child td {
   margin-top: 2px;
 }
 
+.purchase-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
 .parties-heading {
   display: flex;
   align-items: end;

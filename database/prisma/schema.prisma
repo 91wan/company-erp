@@ -54,6 +54,29 @@ enum ProjectSiteServiceMode {
   subcontracted
 }
 
+enum PurchaseRequestStatus {
+  draft
+  pending_purchase
+  purchasing
+  partially_received
+  completed
+  cancelled
+}
+
+enum PurchaseRecordStatus {
+  pending_purchase
+  ordered
+  partially_received
+  received
+  cancelled
+}
+
+enum PurchaseSourceType {
+  platform
+  supplier
+  offline
+}
+
 model Party {
   id                      String        @id @default(uuid()) @db.Uuid
   partyCode               String        @unique @map("party_code")
@@ -75,6 +98,7 @@ model Party {
   clientProjectSites        ProjectSite[] @relation("ProjectSiteClientParty")
   operatorProjectSites      ProjectSite[] @relation("ProjectSiteOperatorParty")
   subcontractorProjectSites ProjectSite[] @relation("ProjectSiteSubcontractorParty")
+  purchaseRecords           PurchaseRecord[]
 
   @@index([status])
   @@index([partyName])
@@ -99,6 +123,8 @@ model Material {
   defaultSupplierParty Party?                 @relation("DefaultSupplierMaterials", fields: [defaultSupplierPartyId], references: [id], onDelete: SetNull)
   movements          InventoryMovement[]
   usageRequests      ProjectUsageRequest[]
+  purchaseRequestLines PurchaseRequestLine[]
+  purchaseRecordLines  PurchaseRecordLine[]
 
   @@index([defaultSupplierPartyId])
   @@map("materials")
@@ -244,6 +270,7 @@ model Department {
   children        Department[] @relation("DepartmentHierarchy")
   managerEmployee Employee?    @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
   employees       Employee[]   @relation("EmployeeDepartment")
+  purchaseRequests PurchaseRequest[]
 
   @@index([parentId])
   @@index([status])
@@ -271,6 +298,8 @@ model Employee {
   managedDepartments     Department[]                    @relation("DepartmentManager")
   managedProjectSites    ProjectSite[]                   @relation("ProjectSitePrimaryManager")
   projectSiteAssignments EmployeeProjectSiteAssignment[]
+  requestedPurchases     PurchaseRequest[]               @relation("PurchaseRequestRequester")
+  handledPurchases       PurchaseRecord[]                @relation("PurchaseRecordPurchaser")
 
   @@index([departmentId])
   @@index([employmentStatus])
@@ -340,6 +369,7 @@ model ProjectSite {
   warehouses      Warehouse[]
   inventoryMoves  InventoryMovement[]
   usageRequests   ProjectUsageRequest[]
+  purchaseRequests PurchaseRequest[]
 
   @@index([status])
   @@index([primaryManagerEmployeeId])
@@ -367,4 +397,114 @@ model EmployeeProjectSiteAssignment {
   @@index([projectSiteId])
   @@index([relationType])
   @@map("employee_project_site_assignments")
+}
+
+model PurchaseRequest {
+  id                  String                @id @default(uuid()) @db.Uuid
+  requestNo           String                @unique @map("request_no")
+  requesterName       String                @map("requester_name")
+  requesterEmployeeId String?               @map("requester_employee_id") @db.Uuid
+  departmentName      String                @map("department_name")
+  departmentId        String?               @map("department_id") @db.Uuid
+  projectSiteId       String?               @map("project_site_id") @db.Uuid
+  expectedArrivalDate DateTime?             @map("expected_arrival_date") @db.Date
+  purpose             String?
+  status              PurchaseRequestStatus @default(draft)
+  remark              String?
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  requester   Employee?              @relation("PurchaseRequestRequester", fields: [requesterEmployeeId], references: [id], onDelete: SetNull)
+  department  Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  projectSite ProjectSite?           @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
+  lines       PurchaseRequestLine[]
+  records     PurchaseRecord[]
+
+  @@index([status])
+  @@index([requesterEmployeeId])
+  @@index([departmentId])
+  @@index([projectSiteId])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestLine {
+  id                 String   @id @default(uuid()) @db.Uuid
+  purchaseRequestId  String   @map("purchase_request_id") @db.Uuid
+  materialId         String?  @map("material_id") @db.Uuid
+  materialCode       String?  @map("material_code")
+  materialName       String   @map("material_name")
+  specification      String?
+  requestedQuantity  Decimal  @map("requested_quantity") @db.Decimal(14, 3)
+  unit               String
+  remark             String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  purchaseRequest PurchaseRequest      @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  material        Material?            @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  purchaseLines   PurchaseRecordLine[]
+
+  @@index([purchaseRequestId])
+  @@index([materialId])
+  @@map("purchase_request_lines")
+}
+
+model PurchaseRecord {
+  id                  String               @id @default(uuid()) @db.Uuid
+  purchaseNo          String               @unique @map("purchase_no")
+  purchaseRequestId   String?              @map("purchase_request_id") @db.Uuid
+  purchaserName       String               @map("purchaser_name")
+  purchaserEmployeeId String?              @map("purchaser_employee_id") @db.Uuid
+  sourceType          PurchaseSourceType   @map("source_type")
+  purchasePlatform    String?              @map("purchase_platform")
+  platformOrderNo     String?              @map("platform_order_no")
+  shopName            String?              @map("shop_name")
+  supplierPartyId     String?              @map("supplier_party_id") @db.Uuid
+  supplierNameText    String?              @map("supplier_name_text")
+  purchaseDescription String?              @map("purchase_description")
+  purchaseDate        DateTime             @map("purchase_date") @db.Date
+  expectedArrivalDate DateTime?            @map("expected_arrival_date") @db.Date
+  receivedQuantity    Decimal              @default(0) @map("received_quantity") @db.Decimal(14, 3)
+  status              PurchaseRecordStatus @default(pending_purchase)
+  remark              String?
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  purchaseRequest PurchaseRequest?     @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+  purchaser       Employee?            @relation("PurchaseRecordPurchaser", fields: [purchaserEmployeeId], references: [id], onDelete: SetNull)
+  supplierParty   Party?               @relation(fields: [supplierPartyId], references: [id], onDelete: SetNull)
+  lines           PurchaseRecordLine[]
+
+  @@index([status])
+  @@index([sourceType])
+  @@index([purchaseRequestId])
+  @@index([purchaserEmployeeId])
+  @@index([supplierPartyId])
+  @@map("purchase_records")
+}
+
+model PurchaseRecordLine {
+  id                    String   @id @default(uuid()) @db.Uuid
+  purchaseRecordId      String   @map("purchase_record_id") @db.Uuid
+  purchaseRequestLineId String?  @map("purchase_request_line_id") @db.Uuid
+  materialId            String?  @map("material_id") @db.Uuid
+  materialCode          String?  @map("material_code")
+  materialName          String   @map("material_name")
+  specification         String?
+  purchaseQuantity      Decimal  @map("purchase_quantity") @db.Decimal(14, 3)
+  unit                  String
+  purchasePrice         Decimal? @map("purchase_price") @db.Decimal(14, 4)
+  receivedQuantity      Decimal  @default(0) @map("received_quantity") @db.Decimal(14, 3)
+  remark                String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  purchaseRecord      PurchaseRecord       @relation(fields: [purchaseRecordId], references: [id], onDelete: Cascade)
+  purchaseRequestLine PurchaseRequestLine?  @relation(fields: [purchaseRequestLineId], references: [id], onDelete: SetNull)
+  material            Material?             @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseRecordId])
+  @@index([purchaseRequestLineId])
+  @@index([materialId])
+  @@map("purchase_record_lines")
 }

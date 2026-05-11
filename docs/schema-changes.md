@@ -90,3 +90,12 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed account DTOs must never expose `password_hash`; account creation and reset use hashed password storage only.
 - Confirmed employee resignation or disablement should disable the linked user account.
 - No new Prisma migration was added in this slice.
+
+## 2026-05-11 Purchase Request and Execution Foundation
+
+- Added `PurchaseRequestStatus`, `PurchaseRecordStatus`, and `PurchaseSourceType` enums using stable English codes.
+- Added `purchase_requests` and `purchase_request_lines` for demand registration with optional material, employee, department, and project-site links.
+- Added `purchase_records` and `purchase_record_lines` for purchase execution tracking with optional supplier party linkage.
+- Confirmed purchase records can be platform, supplier, or offline purchases; supplier party linkage remains optional.
+- Confirmed purchase creation can move a linked purchase request into `purchasing`, but this slice does not create receiving records or update inventory balances.
+- Added migration `20260511190000_purchase_foundation`.

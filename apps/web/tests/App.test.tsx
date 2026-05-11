@@ -5,7 +5,17 @@ import { ApiStatus } from "../src/components/ApiStatus";
 import { MaterialsWarehousesWorkspace } from "../src/components/MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
 import { PeoplePermissionsWorkspace } from "../src/components/PeoplePermissionsWorkspace";
-import type { DepartmentDto, EmployeeDto, MaterialDto, PartyDto, UserAccountDto, WarehouseDto } from "@company-erp/shared";
+import { PurchaseWorkspace } from "../src/components/PurchaseWorkspace";
+import type {
+  DepartmentDto,
+  EmployeeDto,
+  MaterialDto,
+  PartyDto,
+  PurchaseRecordDto,
+  PurchaseRequestDto,
+  UserAccountDto,
+  WarehouseDto,
+} from "@company-erp/shared";
 
 const party: PartyDto = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -105,6 +115,74 @@ const userAccount: UserAccountDto = {
   passwordChangedAt: "2026-05-11T10:00:00.000Z",
   createdAt: "2026-05-11T10:00:00.000Z",
   updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const purchaseRequest: PurchaseRequestDto = {
+  id: "11111111-1111-4111-8111-111111111111",
+  requestNo: "PR20260511001",
+  requesterName: "张三",
+  requesterEmployeeId: null,
+  departmentName: "项目运营部",
+  departmentId: null,
+  projectSiteId: null,
+  projectSiteName: null,
+  expectedArrivalDate: "2026-05-20",
+  purpose: "项目点补充工服",
+  status: "draft",
+  remark: null,
+  lines: [
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      materialId: null,
+      materialCode: "MAT0001",
+      materialName: "定制员工工服",
+      specification: "夏装 L 码",
+      requestedQuantity: 20,
+      unit: "套",
+      remark: null,
+    },
+  ],
+  createdAt: "2026-05-11T11:00:00.000Z",
+  updatedAt: "2026-05-11T11:00:00.000Z",
+};
+
+const purchaseRecord: PurchaseRecordDto = {
+  id: "33333333-3333-4333-8333-333333333333",
+  purchaseNo: "PO20260511001",
+  purchaseRequestId: purchaseRequest.id,
+  purchaseRequestNo: purchaseRequest.requestNo,
+  purchaserName: "李四",
+  purchaserEmployeeId: null,
+  sourceType: "platform",
+  purchasePlatform: "京东企业购",
+  platformOrderNo: "JD20260511001",
+  shopName: "京东自营",
+  supplierPartyId: null,
+  supplierPartyName: null,
+  supplierNameText: null,
+  purchaseDescription: null,
+  purchaseDate: "2026-05-11",
+  expectedArrivalDate: "2026-05-18",
+  receivedQuantity: 0,
+  status: "ordered",
+  remark: null,
+  lines: [
+    {
+      id: "44444444-4444-4444-8444-444444444444",
+      purchaseRequestLineId: purchaseRequest.lines[0].id,
+      materialId: null,
+      materialCode: "MAT0001",
+      materialName: "定制员工工服",
+      specification: "夏装 L 码",
+      purchaseQuantity: 20,
+      unit: "套",
+      purchasePrice: 98,
+      receivedQuantity: 0,
+      remark: null,
+    },
+  ],
+  createdAt: "2026-05-11T11:00:00.000Z",
+  updatedAt: "2026-05-11T11:00:00.000Z",
 };
 
 describe("Company ERP app shell", () => {
@@ -327,6 +405,115 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("EMP0001")).toBeInTheDocument();
     expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
     expect(screen.getAllByText("HR").length).toBeGreaterThan(0);
+  });
+
+  it("renders purchase request and purchase record workspace data", async () => {
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([purchaseRequest])}
+        loadPurchaseRecords={() => Promise.resolve([purchaseRecord])}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "采购管理" })).toBeInTheDocument();
+    expect(screen.getAllByText("采购需求").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("采购记录").length).toBeGreaterThan(0);
+    expect(screen.getByText("新增采购需求")).toBeInTheDocument();
+    expect(screen.getByText("新增采购记录")).toBeInTheDocument();
+    expect(await screen.findByText("PR20260511001")).toBeInTheDocument();
+    expect(screen.getByText("PO20260511001")).toBeInTheDocument();
+    expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
+    expect(screen.getByText("京东企业购")).toBeInTheDocument();
+  });
+
+  it("renders purchase empty and error states", async () => {
+    const { rerender } = render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无采购需求")).toBeInTheDocument();
+    expect(await screen.findByText("暂无采购记录")).toBeInTheDocument();
+
+    rerender(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.reject(new Error("offline"))}
+        loadPurchaseRecords={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("采购需求加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("采购记录加载失败")).toBeInTheDocument();
+  });
+
+  it("creates purchase request and purchase record records from the forms", async () => {
+    const createdRequest = { ...purchaseRequest, requestNo: "PR20260511002", lines: [{ ...purchaseRequest.lines[0], materialName: "定制纸杯" }] };
+    const createdRecord = { ...purchaseRecord, purchaseNo: "PO20260511002", sourceType: "offline" as const, purchasePlatform: null, shopName: null, purchaseDescription: "线下门店临时采购" };
+
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+        createPurchaseRequest={() => Promise.resolve(createdRequest)}
+        createPurchaseRecord={() => Promise.resolve(createdRecord)}
+      />,
+    );
+
+    await screen.findByText("暂无采购需求");
+    fireEvent.change(screen.getByLabelText("采购需求编号"), { target: { value: "PR20260511002" } });
+    fireEvent.change(screen.getByLabelText("申请人"), { target: { value: "王五" } });
+    fireEvent.change(screen.getByLabelText("申请部门"), { target: { value: "项目运营部" } });
+    fireEvent.change(screen.getByLabelText("需求物料名称"), { target: { value: "定制纸杯" } });
+    fireEvent.change(screen.getByLabelText("需求数量"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("需求单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存采购需求" }));
+
+    fireEvent.change(screen.getByLabelText("采购单号"), { target: { value: "PO20260511002" } });
+    fireEvent.change(screen.getByLabelText("采购人"), { target: { value: "赵六" } });
+    fireEvent.change(screen.getByLabelText("采购来源"), { target: { value: "offline" } });
+    fireEvent.change(screen.getByLabelText("采购说明"), { target: { value: "线下门店临时采购" } });
+    fireEvent.change(screen.getByLabelText("采购日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("采购物料名称"), { target: { value: "办公复印纸" } });
+    fireEvent.change(screen.getByLabelText("采购数量"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("采购单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存采购记录" }));
+
+    expect(await screen.findByText("PR20260511002")).toBeInTheDocument();
+    expect(await screen.findByText("PO20260511002")).toBeInTheDocument();
+  });
+
+  it("shows purchase creation failures", async () => {
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+        createPurchaseRequest={() => Promise.reject(new Error("duplicate request"))}
+        createPurchaseRecord={() => Promise.reject(new Error("duplicate record"))}
+      />,
+    );
+
+    await screen.findByText("暂无采购需求");
+    fireEvent.change(screen.getByLabelText("采购需求编号"), { target: { value: "PR20260511002" } });
+    fireEvent.change(screen.getByLabelText("申请人"), { target: { value: "王五" } });
+    fireEvent.change(screen.getByLabelText("申请部门"), { target: { value: "项目运营部" } });
+    fireEvent.change(screen.getByLabelText("需求物料名称"), { target: { value: "定制纸杯" } });
+    fireEvent.change(screen.getByLabelText("需求数量"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("需求单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存采购需求" }));
+
+    fireEvent.change(screen.getByLabelText("采购单号"), { target: { value: "PO20260511002" } });
+    fireEvent.change(screen.getByLabelText("采购人"), { target: { value: "赵六" } });
+    fireEvent.change(screen.getByLabelText("采购来源"), { target: { value: "offline" } });
+    fireEvent.change(screen.getByLabelText("采购说明"), { target: { value: "线下门店临时采购" } });
+    fireEvent.change(screen.getByLabelText("采购日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("采购物料名称"), { target: { value: "办公复印纸" } });
+    fireEvent.change(screen.getByLabelText("采购数量"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("采购单位"), { target: { value: "箱" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存采购记录" }));
+
+    expect(await screen.findAllByText("保存失败，请检查单号是否重复或稍后重试。")).toHaveLength(2);
   });
 
   it("renders people permissions empty and error states", async () => {

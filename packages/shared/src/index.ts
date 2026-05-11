@@ -42,6 +42,23 @@ export type EmployeeStatusCode = "active" | "resigned" | "disabled";
 
 export type UserAccountStatusCode = "active" | "disabled" | "locked";
 
+export type PurchaseRequestStatusCode =
+  | "draft"
+  | "pending_purchase"
+  | "purchasing"
+  | "partially_received"
+  | "completed"
+  | "cancelled";
+
+export type PurchaseRecordStatusCode =
+  | "pending_purchase"
+  | "ordered"
+  | "partially_received"
+  | "received"
+  | "cancelled";
+
+export type PurchaseSourceTypeCode = "platform" | "supplier" | "offline";
+
 export type StatusMeta<TCode extends string = string> = {
   code: TCode;
   label: string;
@@ -252,6 +269,138 @@ export type UpdateUserAccountInput = {
   roles?: readonly MvpRoleCode[];
 };
 
+export type PurchaseRequestLineDto = {
+  id: string;
+  materialId?: string | null;
+  materialCode?: string | null;
+  materialName: string;
+  specification?: string | null;
+  requestedQuantity: number;
+  unit: string;
+  remark?: string | null;
+};
+
+export type PurchaseRequestDto = {
+  id: string;
+  requestNo: string;
+  requesterName: string;
+  requesterEmployeeId?: string | null;
+  departmentName: string;
+  departmentId?: string | null;
+  projectSiteId?: string | null;
+  projectSiteName?: string | null;
+  expectedArrivalDate?: string | null;
+  purpose?: string | null;
+  status: PurchaseRequestStatusCode;
+  remark?: string | null;
+  lines: readonly PurchaseRequestLineDto[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePurchaseRequestLineInput = {
+  materialId?: string | null;
+  materialCode?: string | null;
+  materialName: string;
+  specification?: string | null;
+  requestedQuantity: number;
+  unit: string;
+  remark?: string | null;
+};
+
+export type CreatePurchaseRequestInput = {
+  requestNo: string;
+  requesterName: string;
+  requesterEmployeeId?: string | null;
+  departmentName: string;
+  departmentId?: string | null;
+  projectSiteId?: string | null;
+  expectedArrivalDate?: string | null;
+  purpose?: string | null;
+  status?: PurchaseRequestStatusCode;
+  remark?: string | null;
+  lines: readonly CreatePurchaseRequestLineInput[];
+};
+
+export type UpdatePurchaseRequestInput = Partial<Omit<CreatePurchaseRequestInput, "lines">> & {
+  lines?: readonly CreatePurchaseRequestLineInput[];
+};
+
+export type PurchaseRecordLineDto = {
+  id: string;
+  purchaseRequestLineId?: string | null;
+  materialId?: string | null;
+  materialCode?: string | null;
+  materialName: string;
+  specification?: string | null;
+  purchaseQuantity: number;
+  unit: string;
+  purchasePrice?: number | null;
+  receivedQuantity: number;
+  remark?: string | null;
+};
+
+export type PurchaseRecordDto = {
+  id: string;
+  purchaseNo: string;
+  purchaseRequestId?: string | null;
+  purchaseRequestNo?: string | null;
+  purchaserName: string;
+  purchaserEmployeeId?: string | null;
+  sourceType: PurchaseSourceTypeCode;
+  purchasePlatform?: string | null;
+  platformOrderNo?: string | null;
+  shopName?: string | null;
+  supplierPartyId?: string | null;
+  supplierPartyName?: string | null;
+  supplierNameText?: string | null;
+  purchaseDescription?: string | null;
+  purchaseDate: string;
+  expectedArrivalDate?: string | null;
+  receivedQuantity: number;
+  status: PurchaseRecordStatusCode;
+  remark?: string | null;
+  lines: readonly PurchaseRecordLineDto[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePurchaseRecordLineInput = {
+  purchaseRequestLineId?: string | null;
+  materialId?: string | null;
+  materialCode?: string | null;
+  materialName: string;
+  specification?: string | null;
+  purchaseQuantity: number;
+  unit: string;
+  purchasePrice?: number | null;
+  remark?: string | null;
+};
+
+export type CreatePurchaseRecordInput = {
+  purchaseNo: string;
+  purchaseRequestId?: string | null;
+  purchaseRequestNo?: string | null;
+  purchaserName: string;
+  purchaserEmployeeId?: string | null;
+  sourceType: PurchaseSourceTypeCode;
+  purchasePlatform?: string | null;
+  platformOrderNo?: string | null;
+  shopName?: string | null;
+  supplierPartyId?: string | null;
+  supplierNameText?: string | null;
+  purchaseDescription?: string | null;
+  purchaseDate: string;
+  expectedArrivalDate?: string | null;
+  status?: PurchaseRecordStatusCode;
+  remark?: string | null;
+  lines: readonly CreatePurchaseRecordLineInput[];
+};
+
+export type UpdatePurchaseRecordInput = Partial<Omit<CreatePurchaseRecordInput, "lines">> & {
+  lines?: readonly CreatePurchaseRecordLineInput[];
+};
+
 export type InventoryMovementInput = {
   warehouseCode: string;
   materialCode: string;
@@ -312,6 +461,29 @@ export const USER_ACCOUNT_STATUSES = [
   { code: "disabled", label: "停用" },
   { code: "locked", label: "锁定" },
 ] as const satisfies readonly StatusMeta<UserAccountStatusCode>[];
+
+export const PURCHASE_SOURCE_TYPES = [
+  { code: "platform", label: "平台采购" },
+  { code: "supplier", label: "供应商采购" },
+  { code: "offline", label: "线下采购" },
+] as const satisfies readonly StatusMeta<PurchaseSourceTypeCode>[];
+
+export const PURCHASE_REQUEST_STATUSES = [
+  { code: "draft", label: "草稿" },
+  { code: "pending_purchase", label: "待采购" },
+  { code: "purchasing", label: "采购中" },
+  { code: "partially_received", label: "部分到货" },
+  { code: "completed", label: "已完成" },
+  { code: "cancelled", label: "已取消" },
+] as const satisfies readonly StatusMeta<PurchaseRequestStatusCode>[];
+
+export const PURCHASE_RECORD_STATUSES = [
+  { code: "pending_purchase", label: "待采购" },
+  { code: "ordered", label: "已下单" },
+  { code: "partially_received", label: "部分到货" },
+  { code: "received", label: "已到货" },
+  { code: "cancelled", label: "已取消" },
+] as const satisfies readonly StatusMeta<PurchaseRecordStatusCode>[];
 
 export const WAREHOUSE_TYPES = [
   { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
