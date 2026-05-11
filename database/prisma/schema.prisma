@@ -26,6 +26,7 @@ enum InventorySourceType {
   return_material
   inventory_gain
   opening
+  project_usage
   other
 }
 
@@ -386,9 +387,12 @@ model ProjectSite {
   operatorPartyId          String?           @map("operator_party_id") @db.Uuid
   serviceMode              ProjectSiteServiceMode @default(direct) @map("service_mode")
   subcontractorPartyId     String?           @map("subcontractor_party_id") @db.Uuid
+  region                   String?
   siteAddress              String?           @map("site_address")
   serviceType              String?           @map("service_type")
   status                   ProjectSiteStatus @default(active)
+  startDate                DateTime?         @map("start_date") @db.Date
+  endDate                  DateTime?         @map("end_date") @db.Date
   primaryManagerEmployeeId String?           @map("primary_manager_employee_id") @db.Uuid
   clientContactName        String?           @map("client_contact_name")
   clientContactPhone       String?           @map("client_contact_phone")

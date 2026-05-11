@@ -71,11 +71,18 @@ export type InventorySourceTypeCode =
   | "return_material"
   | "inventory_gain"
   | "opening"
+  | "project_usage"
   | "other";
 
 export type IssueTargetTypeCode = "internal_office" | "project_site" | "subcontractor";
 
 export type ReplenishmentSuggestionStatusCode = "open" | "converted" | "dismissed";
+
+export type ProjectSiteServiceModeCode = "direct" | "subcontracted";
+
+export type ProjectSiteStatusCode = "preparing" | "active" | "paused" | "ended";
+
+export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
 
 export type StatusMeta<TCode extends string = string> = {
   code: TCode;
@@ -476,6 +483,111 @@ export type CreateInventoryMovementInput = {
   remark?: string | null;
 };
 
+export type ProjectSiteDto = {
+  id: string;
+  siteCode: string;
+  siteName: string;
+  clientPartyId?: string | null;
+  clientPartyName?: string | null;
+  operatorPartyId?: string | null;
+  operatorPartyName?: string | null;
+  serviceMode: ProjectSiteServiceModeCode;
+  subcontractorPartyId?: string | null;
+  subcontractorPartyName?: string | null;
+  region?: string | null;
+  siteAddress?: string | null;
+  serviceType?: string | null;
+  status: ProjectSiteStatusCode;
+  startDate?: string | null;
+  endDate?: string | null;
+  primaryManagerEmployeeId?: string | null;
+  primaryManagerEmployeeName?: string | null;
+  clientContactName?: string | null;
+  clientContactPhone?: string | null;
+  subcontractorContactName?: string | null;
+  subcontractorContactPhone?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectSiteInput = {
+  siteCode: string;
+  siteName: string;
+  clientPartyId?: string | null;
+  operatorPartyId?: string | null;
+  serviceMode?: ProjectSiteServiceModeCode;
+  subcontractorPartyId?: string | null;
+  region?: string | null;
+  siteAddress?: string | null;
+  serviceType?: string | null;
+  status?: ProjectSiteStatusCode;
+  startDate?: string | null;
+  endDate?: string | null;
+  primaryManagerEmployeeId?: string | null;
+  clientContactName?: string | null;
+  clientContactPhone?: string | null;
+  subcontractorContactName?: string | null;
+  subcontractorContactPhone?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateProjectSiteInput = Partial<CreateProjectSiteInput>;
+
+export type ProjectUsageRequestDto = {
+  id: string;
+  requestNo: string;
+  requestDate: string;
+  projectSiteId: string;
+  projectSiteName: string;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  requestedQuantity: number;
+  approvedQuantity?: number | null;
+  issuedQuantity: number;
+  unit: string;
+  purpose?: string | null;
+  requestedBy?: string | null;
+  expectedDate?: string | null;
+  status: ProjectUsageStatusCode;
+  outboundNo?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectUsageRequestInput = {
+  requestNo: string;
+  requestDate: string;
+  projectSiteId: string;
+  warehouseId: string;
+  materialId: string;
+  requestedQuantity: number;
+  approvedQuantity?: number | null;
+  unit: string;
+  purpose?: string | null;
+  requestedBy?: string | null;
+  expectedDate?: string | null;
+  status?: ProjectUsageStatusCode;
+  remark?: string | null;
+};
+
+export type UpdateProjectUsageRequestInput = Partial<CreateProjectUsageRequestInput>;
+
+export type IssueProjectUsageRequestInput = {
+  outboundNo: string;
+  movementDate: string;
+  quantity: number;
+  handledBy?: string | null;
+  receivedByName?: string | null;
+  remark?: string | null;
+};
+
 export type ReplenishmentSuggestionDto = {
   id: string;
   warehouseId: string;
@@ -631,6 +743,7 @@ export const INVENTORY_SOURCE_TYPES = [
   { code: "return_material", label: "退料" },
   { code: "inventory_gain", label: "盘盈" },
   { code: "opening", label: "期初" },
+  { code: "project_usage", label: "项目点领用" },
   { code: "other", label: "其他" },
 ] as const satisfies readonly StatusMeta<InventorySourceTypeCode>[];
 
@@ -639,6 +752,25 @@ export const ISSUE_TARGET_TYPES = [
   { code: "project_site", label: "项目点" },
   { code: "subcontractor", label: "外包方" },
 ] as const satisfies readonly StatusMeta<IssueTargetTypeCode>[];
+
+export const PROJECT_SITE_SERVICE_MODES = [
+  { code: "direct", label: "直营服务" },
+  { code: "subcontracted", label: "外包服务" },
+] as const satisfies readonly StatusMeta<ProjectSiteServiceModeCode>[];
+
+export const PROJECT_SITE_STATUSES = [
+  { code: "preparing", label: "筹备中" },
+  { code: "active", label: "服务中" },
+  { code: "paused", label: "暂停" },
+  { code: "ended", label: "已结束" },
+] as const satisfies readonly StatusMeta<ProjectSiteStatusCode>[];
+
+export const PROJECT_USAGE_STATUSES = [
+  { code: "pending", label: "待处理" },
+  { code: "issued", label: "已出库" },
+  { code: "partially_issued", label: "部分出库" },
+  { code: "rejected", label: "已驳回" },
+] as const satisfies readonly StatusMeta<ProjectUsageStatusCode>[];
 
 export const WAREHOUSE_TYPES = [
   { code: "headquarters", label: "总部仓", description: "Wuxi headquarters material warehouse" },
@@ -765,8 +897,8 @@ export const MVP_DICTIONARIES = {
     values: ["入库", "出库", "盘盈", "盘亏", "期初"],
   },
   inventorySourceType: {
-    label: "入库来源类型",
-    values: ["采购", "退料", "盘盈", "期初", "其他"],
+    label: "库存来源类型",
+    values: ["采购", "退料", "盘盈", "期初", "项目点领用", "其他"],
   },
   issueTargetType: {
     label: "出库领用对象类型",
@@ -775,6 +907,14 @@ export const MVP_DICTIONARIES = {
   projectUsageStatus: {
     label: "项目点领用状态",
     values: ["待处理", "已出库", "部分出库", "已驳回"],
+  },
+  projectSiteServiceMode: {
+    label: "项目点服务模式",
+    values: ["直营服务", "外包服务"],
+  },
+  projectSiteStatus: {
+    label: "项目点状态",
+    values: ["筹备中", "服务中", "暂停", "已结束"],
   },
   commonUnit: {
     label: "常用单位",

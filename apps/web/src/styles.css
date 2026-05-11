@@ -655,6 +655,27 @@ tbody tr:last-child td {
   background: var(--red-soft);
 }
 
+.status-badge.green {
+  color: #15803d;
+  background: var(--green-soft);
+}
+
+.status-badge.orange,
+.status-badge.amber {
+  color: #b45309;
+  background: var(--orange-soft);
+}
+
+.status-badge.blue {
+  color: #0f5bdb;
+  background: var(--blue-soft);
+}
+
+.status-badge.gray {
+  color: #475467;
+  background: #eef2f7;
+}
+
 .system-list {
   display: grid;
 }
@@ -718,6 +739,10 @@ tbody tr:last-child td {
 }
 
 .inventory-workspace {
+  margin-top: 2px;
+}
+
+.project-sites-workspace {
   margin-top: 2px;
 }
 
@@ -1031,6 +1056,7 @@ tbody tr:last-child td {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
+  margin-bottom: 16px;
 }
 
 .people-panel-title h3 {

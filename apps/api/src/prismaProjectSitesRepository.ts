@@ -1,0 +1,472 @@
+import { Prisma, PrismaClient } from "@prisma/client";
+import type {
+  CreateProjectSiteInput,
+  CreateProjectUsageRequestInput,
+  IssueProjectUsageRequestInput,
+  ProjectSiteDto,
+  ProjectUsageRequestDto,
+  UpdateProjectSiteInput,
+  UpdateProjectUsageRequestInput,
+} from "@company-erp/shared";
+import {
+  ProjectSiteConflictError,
+  ProjectSiteValidationError,
+  ProjectUsageRequestConflictError,
+  ProjectUsageRequestValidationError,
+  type ProjectSiteListFilters,
+  type ProjectSiteRepository,
+  type ProjectUsageRequestListFilters,
+  type ProjectUsageRequestRepository,
+} from "./projectSites";
+
+type AnyPrisma = PrismaClient & Record<string, any>;
+
+function decimalToNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  return Number(value);
+}
+
+function dateToString(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+function timestampToString(value: Date | string): string {
+  return typeof value === "string" ? value : value.toISOString();
+}
+
+function nullableDate(value: string | null | undefined): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+const siteInclude = {
+  clientParty: true,
+  operatorParty: true,
+  subcontractorParty: true,
+  primaryManager: true,
+};
+
+const usageInclude = {
+  projectSite: { include: { subcontractorParty: true } },
+  warehouse: true,
+  material: true,
+};
+
+function toProjectSiteDto(site: any): ProjectSiteDto {
+  return {
+    id: site.id,
+    siteCode: site.siteCode,
+    siteName: site.siteName,
+    clientPartyId: site.clientPartyId,
+    clientPartyName: site.clientParty?.partyName ?? null,
+    operatorPartyId: site.operatorPartyId,
+    operatorPartyName: site.operatorParty?.partyName ?? null,
+    serviceMode: site.serviceMode,
+    subcontractorPartyId: site.subcontractorPartyId,
+    subcontractorPartyName: site.subcontractorParty?.partyName ?? null,
+    region: site.region,
+    siteAddress: site.siteAddress,
+    serviceType: site.serviceType,
+    status: site.status,
+    startDate: dateToString(site.startDate),
+    endDate: dateToString(site.endDate),
+    primaryManagerEmployeeId: site.primaryManagerEmployeeId,
+    primaryManagerEmployeeName: site.primaryManager?.name ?? null,
+    clientContactName: site.clientContactName,
+    clientContactPhone: site.clientContactPhone,
+    subcontractorContactName: site.subcontractorContactName,
+    subcontractorContactPhone: site.subcontractorContactPhone,
+    remark: site.remark,
+    createdAt: timestampToString(site.createdAt),
+    updatedAt: timestampToString(site.updatedAt),
+  };
+}
+
+function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
+  return {
+    id: request.id,
+    requestNo: request.requestNo,
+    requestDate: dateToString(request.requestDate) ?? "",
+    projectSiteId: request.projectSiteId,
+    projectSiteName: request.projectSite?.siteName ?? "",
+    warehouseId: request.warehouseId,
+    warehouseCode: request.warehouse?.warehouseCode ?? "",
+    warehouseName: request.warehouse?.warehouseName ?? "",
+    materialId: request.materialId,
+    materialCode: request.material?.materialCode ?? "",
+    materialName: request.material?.materialName ?? "",
+    specification: request.material?.specification ?? null,
+    requestedQuantity: decimalToNumber(request.requestedQuantity),
+    approvedQuantity: request.approvedQuantity === null ? null : decimalToNumber(request.approvedQuantity),
+    issuedQuantity: decimalToNumber(request.issuedQuantity),
+    unit: request.unit,
+    purpose: request.purpose,
+    requestedBy: request.requestedBy,
+    expectedDate: dateToString(request.expectedDate),
+    status: request.status,
+    outboundNo: request.outboundNo,
+    remark: request.remark,
+    createdAt: timestampToString(request.createdAt),
+    updatedAt: timestampToString(request.updatedAt),
+  };
+}
+
+function optionalRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+  if (id === undefined) return undefined;
+  return id ? { connect: { id } } : { disconnect: true };
+}
+
+function optionalCreateRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+  return id ? { connect: { id } } : undefined;
+}
+
+function toSiteCreateData(input: CreateProjectSiteInput): Record<string, unknown> {
+  return {
+    siteCode: input.siteCode,
+    siteName: input.siteName,
+    clientParty: optionalCreateRelation(input.clientPartyId),
+    operatorParty: optionalCreateRelation(input.operatorPartyId),
+    serviceMode: input.serviceMode ?? "direct",
+    subcontractorParty: optionalCreateRelation(input.subcontractorPartyId),
+    region: input.region,
+    siteAddress: input.siteAddress,
+    serviceType: input.serviceType,
+    status: input.status ?? "active",
+    startDate: nullableDate(input.startDate),
+    endDate: nullableDate(input.endDate),
+    primaryManager: optionalCreateRelation(input.primaryManagerEmployeeId),
+    clientContactName: input.clientContactName,
+    clientContactPhone: input.clientContactPhone,
+    subcontractorContactName: input.subcontractorContactName,
+    subcontractorContactPhone: input.subcontractorContactPhone,
+    remark: input.remark,
+  };
+}
+
+function toSiteUpdateData(input: UpdateProjectSiteInput): Record<string, unknown> {
+  return {
+    ...(input.siteCode !== undefined ? { siteCode: input.siteCode } : {}),
+    ...(input.siteName !== undefined ? { siteName: input.siteName } : {}),
+    ...(input.clientPartyId !== undefined ? { clientParty: optionalRelation(input.clientPartyId) } : {}),
+    ...(input.operatorPartyId !== undefined ? { operatorParty: optionalRelation(input.operatorPartyId) } : {}),
+    ...(input.serviceMode !== undefined ? { serviceMode: input.serviceMode } : {}),
+    ...(input.subcontractorPartyId !== undefined
+      ? { subcontractorParty: optionalRelation(input.subcontractorPartyId) }
+      : {}),
+    ...(input.serviceMode === "direct" && input.subcontractorPartyId === undefined
+      ? { subcontractorParty: { disconnect: true } }
+      : {}),
+    ...(input.region !== undefined ? { region: input.region } : {}),
+    ...(input.siteAddress !== undefined ? { siteAddress: input.siteAddress } : {}),
+    ...(input.serviceType !== undefined ? { serviceType: input.serviceType } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.startDate !== undefined ? { startDate: nullableDate(input.startDate) } : {}),
+    ...(input.endDate !== undefined ? { endDate: nullableDate(input.endDate) } : {}),
+    ...(input.primaryManagerEmployeeId !== undefined
+      ? { primaryManager: optionalRelation(input.primaryManagerEmployeeId) }
+      : {}),
+    ...(input.clientContactName !== undefined ? { clientContactName: input.clientContactName } : {}),
+    ...(input.clientContactPhone !== undefined ? { clientContactPhone: input.clientContactPhone } : {}),
+    ...(input.subcontractorContactName !== undefined
+      ? { subcontractorContactName: input.subcontractorContactName }
+      : {}),
+    ...(input.subcontractorContactPhone !== undefined
+      ? { subcontractorContactPhone: input.subcontractorContactPhone }
+      : {}),
+    ...(input.remark !== undefined ? { remark: input.remark } : {}),
+  };
+}
+
+function toUsageCreateData(input: CreateProjectUsageRequestInput): Record<string, unknown> {
+  return {
+    requestNo: input.requestNo,
+    requestDate: new Date(`${input.requestDate}T00:00:00.000Z`),
+    projectSite: { connect: { id: input.projectSiteId } },
+    warehouse: { connect: { id: input.warehouseId } },
+    material: { connect: { id: input.materialId } },
+    requestedQuantity: input.requestedQuantity,
+    approvedQuantity: input.approvedQuantity,
+    unit: input.unit,
+    purpose: input.purpose,
+    requestedBy: input.requestedBy,
+    expectedDate: nullableDate(input.expectedDate),
+    status: input.status ?? "pending",
+    remark: input.remark,
+  };
+}
+
+function toUsageUpdateData(input: UpdateProjectUsageRequestInput): Record<string, unknown> {
+  return {
+    ...(input.requestNo !== undefined ? { requestNo: input.requestNo } : {}),
+    ...(input.requestDate !== undefined ? { requestDate: nullableDate(input.requestDate) } : {}),
+    ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
+    ...(input.warehouseId !== undefined ? { warehouse: { connect: { id: input.warehouseId } } } : {}),
+    ...(input.materialId !== undefined ? { material: { connect: { id: input.materialId } } } : {}),
+    ...(input.requestedQuantity !== undefined ? { requestedQuantity: input.requestedQuantity } : {}),
+    ...(input.approvedQuantity !== undefined ? { approvedQuantity: input.approvedQuantity } : {}),
+    ...(input.unit !== undefined ? { unit: input.unit } : {}),
+    ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
+    ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
+    ...(input.expectedDate !== undefined ? { expectedDate: nullableDate(input.expectedDate) } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.remark !== undefined ? { remark: input.remark } : {}),
+  };
+}
+
+function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
+  return {
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.serviceMode ? { serviceMode: filters.serviceMode } : {}),
+    ...(filters.clientPartyId ? { clientPartyId: filters.clientPartyId } : {}),
+    ...(filters.subcontractorPartyId ? { subcontractorPartyId: filters.subcontractorPartyId } : {}),
+    ...(filters.q
+      ? {
+          OR: [
+            { siteCode: { contains: filters.q, mode: "insensitive" } },
+            { siteName: { contains: filters.q, mode: "insensitive" } },
+            { region: { contains: filters.q, mode: "insensitive" } },
+            { siteAddress: { contains: filters.q, mode: "insensitive" } },
+            { clientParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
+            { subcontractorParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
+            { primaryManager: { name: { contains: filters.q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function usageWhere(filters: ProjectUsageRequestListFilters): Record<string, unknown> {
+  return {
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
+    ...(filters.materialId ? { materialId: filters.materialId } : {}),
+    ...(filters.dateFrom || filters.dateTo
+      ? {
+          requestDate: {
+            ...(filters.dateFrom ? { gte: nullableDate(filters.dateFrom) } : {}),
+            ...(filters.dateTo ? { lte: nullableDate(filters.dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(filters.q
+      ? {
+          OR: [
+            { requestNo: { contains: filters.q, mode: "insensitive" } },
+            { requestedBy: { contains: filters.q, mode: "insensitive" } },
+            { projectSite: { siteCode: { contains: filters.q, mode: "insensitive" } } },
+            { projectSite: { siteName: { contains: filters.q, mode: "insensitive" } } },
+            { material: { materialCode: { contains: filters.q, mode: "insensitive" } } },
+            { material: { materialName: { contains: filters.q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function mapSiteError(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      if (targets.includes("site_code")) throw new ProjectSiteConflictError("siteCode");
+    }
+    if (error.code === "P2003" || error.code === "P2025") {
+      throw new ProjectSiteValidationError(["Referenced party or employee was not found"]);
+    }
+  }
+  throw error;
+}
+
+function mapUsageError(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      if (targets.includes("request_no")) throw new ProjectUsageRequestConflictError("requestNo");
+      if (targets.includes("movement_no")) throw new ProjectUsageRequestConflictError("outboundNo");
+    }
+    if (error.code === "P2003" || error.code === "P2025") {
+      throw new ProjectUsageRequestValidationError(["Referenced project site, warehouse, or material was not found"]);
+    }
+  }
+  throw error;
+}
+
+async function currentStock(client: AnyPrisma, warehouseId: string, materialId: string): Promise<number> {
+  const grouped = await client.inventoryMovement.aggregate({
+    where: { warehouseId, materialId },
+    _sum: { quantity: true },
+  });
+  return decimalToNumber(grouped._sum.quantity);
+}
+
+export function createPrismaProjectSiteRepository(prisma: PrismaClient): ProjectSiteRepository {
+  const client = prisma as AnyPrisma;
+
+  return {
+    async list(filters: ProjectSiteListFilters) {
+      const sites = await client.projectSite.findMany({
+        where: siteWhere(filters),
+        include: siteInclude,
+        orderBy: [{ updatedAt: "desc" }, { siteCode: "asc" }],
+      });
+      return sites.map(toProjectSiteDto);
+    },
+    async getById(id: string) {
+      const site = await client.projectSite.findUnique({ where: { id }, include: siteInclude });
+      return site ? toProjectSiteDto(site) : null;
+    },
+    async create(input: CreateProjectSiteInput) {
+      try {
+        const site = await client.projectSite.create({ data: toSiteCreateData(input) as any, include: siteInclude });
+        return toProjectSiteDto(site);
+      } catch (error) {
+        mapSiteError(error);
+      }
+    },
+    async update(id: string, input: UpdateProjectSiteInput) {
+      try {
+        const current = await client.projectSite.findUnique({ where: { id }, select: { serviceMode: true, subcontractorPartyId: true } });
+        if (!current) return null;
+        const nextServiceMode = input.serviceMode ?? current.serviceMode;
+        const nextSubcontractorPartyId =
+          input.serviceMode === "direct"
+            ? null
+            : input.subcontractorPartyId !== undefined
+              ? input.subcontractorPartyId
+              : current.subcontractorPartyId;
+
+        if (nextServiceMode === "direct" && nextSubcontractorPartyId) {
+          throw new ProjectSiteValidationError(["direct project sites cannot have subcontractorPartyId"]);
+        }
+        if (nextServiceMode === "subcontracted" && !nextSubcontractorPartyId) {
+          throw new ProjectSiteValidationError(["subcontracted project sites require subcontractorPartyId"]);
+        }
+
+        const site = await client.projectSite.update({
+          where: { id },
+          data: toSiteUpdateData(input),
+          include: siteInclude,
+        });
+        return toProjectSiteDto(site);
+      } catch (error) {
+        if (error instanceof ProjectSiteValidationError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        mapSiteError(error);
+      }
+    },
+  };
+}
+
+export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient): ProjectUsageRequestRepository {
+  const client = prisma as AnyPrisma;
+
+  return {
+    async list(filters: ProjectUsageRequestListFilters) {
+      const requests = await client.projectUsageRequest.findMany({
+        where: usageWhere(filters),
+        include: usageInclude,
+        orderBy: [{ requestDate: "desc" }, { updatedAt: "desc" }, { requestNo: "asc" }],
+      });
+      return requests.map(toProjectUsageRequestDto);
+    },
+    async getById(id: string) {
+      const request = await client.projectUsageRequest.findUnique({ where: { id }, include: usageInclude });
+      return request ? toProjectUsageRequestDto(request) : null;
+    },
+    async create(input: CreateProjectUsageRequestInput) {
+      try {
+        const request = await client.projectUsageRequest.create({
+          data: toUsageCreateData(input) as any,
+          include: usageInclude,
+        });
+        return toProjectUsageRequestDto(request);
+      } catch (error) {
+        mapUsageError(error);
+      }
+    },
+    async update(id: string, input: UpdateProjectUsageRequestInput) {
+      try {
+        const request = await client.projectUsageRequest.update({
+          where: { id },
+          data: toUsageUpdateData(input),
+          include: usageInclude,
+        });
+        return toProjectUsageRequestDto(request);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        mapUsageError(error);
+      }
+    },
+    async issue(id: string, input: IssueProjectUsageRequestInput) {
+      try {
+        const issued = await (client.$transaction as any)(async (tx: AnyPrisma) => {
+          const request = await tx.projectUsageRequest.findUnique({
+            where: { id },
+            include: usageInclude,
+          });
+          if (!request) return null;
+          if (request.status === "rejected" || request.status === "issued") {
+            throw new ProjectUsageRequestValidationError(["request is not open for issue"]);
+          }
+
+          const targetQuantity = decimalToNumber(request.approvedQuantity ?? request.requestedQuantity);
+          const issuedQuantity = decimalToNumber(request.issuedQuantity);
+          const remainingQuantity = Math.max(0, targetQuantity - issuedQuantity);
+          if (input.quantity > remainingQuantity) {
+            throw new ProjectUsageRequestValidationError(["issue quantity exceeds remaining request quantity"]);
+          }
+
+          const availableStock = await currentStock(tx, request.warehouseId, request.materialId);
+          if (input.quantity > availableStock) {
+            throw new ProjectUsageRequestValidationError(["insufficient stock for issue"]);
+          }
+
+          await tx.inventoryMovement.create({
+            data: {
+              movementNo: input.outboundNo,
+              movementDate: new Date(`${input.movementDate}T00:00:00.000Z`),
+              movementType: "outbound",
+              sourceType: "project_usage",
+              issueTargetType: request.projectSite.serviceMode === "subcontracted" ? "subcontractor" : "project_site",
+              warehouse: { connect: { id: request.warehouseId } },
+              material: { connect: { id: request.materialId } },
+              quantity: -input.quantity,
+              unit: request.unit,
+              projectSite: { connect: { id: request.projectSiteId } },
+              subcontractorName: request.projectSite.subcontractorParty?.partyName,
+              requestedBy: request.requestedBy,
+              handledBy: input.handledBy,
+              receivedByName: input.receivedByName,
+              purpose: request.purpose,
+              remark: input.remark,
+              usageRequest: { connect: { id: request.id } },
+            },
+          });
+
+          const nextIssuedQuantity = issuedQuantity + input.quantity;
+          const nextStatus = nextIssuedQuantity >= targetQuantity ? "issued" : "partially_issued";
+          return tx.projectUsageRequest.update({
+            where: { id },
+            data: {
+              issuedQuantity: nextIssuedQuantity,
+              outboundNo: input.outboundNo,
+              status: nextStatus,
+            },
+            include: usageInclude,
+          });
+        });
+        return issued ? toProjectUsageRequestDto(issued) : null;
+      } catch (error) {
+        if (error instanceof ProjectUsageRequestValidationError) throw error;
+        mapUsageError(error);
+      }
+    },
+  };
+}

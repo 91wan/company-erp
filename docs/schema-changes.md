@@ -121,3 +121,12 @@ Before creating migrations, confirm the MVP data model for:
 - Added relation from `purchase_record_lines` to inventory movements.
 - Confirmed no inventory balance table is added; current stock remains derived by summing `inventory_movements.quantity` grouped by warehouse, material, and unit.
 - Added migration `20260511203000_inventory_receiving_balances`.
+
+## 2026-05-11 Project Site Usage and Outbound Foundation
+
+- Reused `project_sites`, `project_usage_requests`, and `inventory_movements` for project-site usage and headquarters outbound fulfillment.
+- Added `InventorySourceType.project_usage` for outbound movements created from project-site usage requests.
+- Added `project_sites.region`, `project_sites.start_date`, and `project_sites.end_date` to match the approved project-site import template and site lifecycle fields.
+- Confirmed outbound stock remains a signed `inventory_movements.quantity` record and no separate outbound table or inventory balance table is added.
+- Confirmed usage issue creates an outbound movement, checks available current stock, and updates `project_usage_requests.issued_quantity`, `outbound_no`, and status.
+- Added migration `20260511213000_project_site_usage_foundation`.

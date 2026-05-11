@@ -10,6 +10,9 @@ import {
   MVP_ROLES,
   PARTY_METADATA,
   PARTY_TYPES,
+  PROJECT_SITE_SERVICE_MODES,
+  PROJECT_SITE_STATUSES,
+  PROJECT_USAGE_STATUSES,
   PURCHASE_RECORD_STATUSES,
   PURCHASE_REQUEST_STATUSES,
   PURCHASE_SOURCE_TYPES,
@@ -115,6 +118,7 @@ describe("MVP inventory dictionaries", () => {
       "return_material",
       "inventory_gain",
       "opening",
+      "project_usage",
       "other",
     ]);
     expect(ISSUE_TARGET_TYPES.map((targetType) => targetType.code)).toEqual([
@@ -130,7 +134,14 @@ describe("MVP inventory dictionaries", () => {
       "盘亏",
       "期初",
     ]);
-    expect(MVP_DICTIONARIES.inventorySourceType.values).toEqual(["采购", "退料", "盘盈", "期初", "其他"]);
+    expect(MVP_DICTIONARIES.inventorySourceType.values).toEqual([
+      "采购",
+      "退料",
+      "盘盈",
+      "期初",
+      "项目点领用",
+      "其他",
+    ]);
     expect(MVP_DICTIONARIES.issueTargetType.values).toEqual([
       "internal_office",
       "project_site",
@@ -142,6 +153,24 @@ describe("MVP inventory dictionaries", () => {
       "部分出库",
       "已驳回",
     ]);
+  });
+
+  it("defines project-site usage dictionaries", () => {
+    expect(PROJECT_SITE_SERVICE_MODES.map((mode) => mode.code)).toEqual(["direct", "subcontracted"]);
+    expect(PROJECT_SITE_STATUSES.map((status) => status.code)).toEqual([
+      "preparing",
+      "active",
+      "paused",
+      "ended",
+    ]);
+    expect(PROJECT_USAGE_STATUSES.map((status) => status.code)).toEqual([
+      "pending",
+      "issued",
+      "partially_issued",
+      "rejected",
+    ]);
+    expect(MVP_DICTIONARIES.projectSiteServiceMode.values).toEqual(["直营服务", "外包服务"]);
+    expect(MVP_DICTIONARIES.projectSiteStatus.values).toEqual(["筹备中", "服务中", "暂停", "已结束"]);
   });
 });
 
