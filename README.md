@@ -67,6 +67,7 @@ docker compose up -d postgres
 npm run db:generate
 npm run bootstrap:admin -w @company-erp/api
 npm run bootstrap:trial-data -w @company-erp/api
+ERP_API_BASE_URL=http://localhost:3001 npm run smoke:pilot -w @company-erp/api
 npm run test
 npm run dev
 ```

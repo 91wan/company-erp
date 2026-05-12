@@ -150,6 +150,52 @@ The script is idempotent. It upserts only these fixed pilot records and does not
 import real employees, suppliers, materials, contracts, attachments, or business
 transactions.
 
+## Pilot Workflow Smoke Test
+
+After migrations, admin bootstrap, trial master data, and Web/API startup, run
+the pilot smoke test before inviting users to try the system. The smoke test
+uses only `DEMO-*` data and writes through the public API, the same boundary used
+by the Web app.
+
+```bash
+docker compose run --rm \
+  -e ERP_API_BASE_URL=http://<NAS_IP>:${ERP_WEB_PORT:-8080} \
+  -e PILOT_ADMIN_USERNAME=<admin-username> \
+  -e PILOT_ADMIN_PASSWORD=<admin-password> \
+  api npm run smoke:pilot:prod -w @company-erp/api
+```
+
+For local development:
+
+```bash
+ERP_API_BASE_URL=http://localhost:3001 \
+PILOT_ADMIN_USERNAME=<admin-username> \
+PILOT_ADMIN_PASSWORD=<admin-password> \
+npm run smoke:pilot -w @company-erp/api
+```
+
+Expected result:
+
+- The command prints `created`, `reused`, or `verified` for each step.
+- The final JSON summary includes DEMO identifiers, record IDs, inventory
+  balance, and project-site issue charge amount.
+- The summary must not print the admin password or cookie values.
+
+Pilot acceptance checklist:
+
+- Login succeeds through `/api/auth/login`.
+- DEMO supplier, client, subcontractor, operator, material, and project site are
+  present.
+- DEMO purchase request and purchase record are present.
+- DEMO inbound movement creates or reuses stock in `WH-WX-HQ`.
+- DEMO project-site usage request can be issued by admin/warehouse permissions.
+- Inventory balance remains non-negative after the outbound movement.
+- Project-site issue charge snapshot equals the DEMO quantity multiplied by the
+  material project-site sale price.
+- DEMO contract and certificate are searchable.
+- `./scripts/nas-backup.sh` still creates a non-empty database dump and
+  attachments archive after the smoke test.
+
 ## Health Check
 
 From a machine on the same internal network:
