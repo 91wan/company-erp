@@ -174,3 +174,11 @@ Before creating migrations, confirm the MVP data model for:
 - Added cumulative charge and latest issue snapshot fields to `project_usage_requests`.
 - Confirmed charge data is an operational snapshot only; it does not create finance receivables, payment records, or settlement reports in this slice.
 - Added migration `20260511234500_project_usage_charges_consumables`.
+
+## 2026-05-12 Certificates Foundation
+
+- Added `CertificateType`, `CertificateOwnerType`, and `CertificateValidityType` enums for the later-phase certificate and qualification archive module.
+- Added `certificate_records` for certificate code, name, owner, validity, expiry/review dates, attachment/source paths, responsible/confirmed employee links, disabled flag, and remarks.
+- Confirmed certificate display status is calculated from disabled flag, validity type, expiry date, review date, and reminder days; it is not stored as a mutable database status.
+- Confirmed attachment files are not stored in the database and upload/OCR/import workflows are not added in this slice.
+- Added migration `20260512133000_certificates_foundation`.

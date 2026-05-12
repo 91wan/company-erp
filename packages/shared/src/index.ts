@@ -28,6 +28,7 @@ export type MvpPermissionMatrix = {
   procurement: MvpPermissionRule;
   inventory: MvpPermissionRule;
   contracts: MvpPermissionRule;
+  certificates: MvpPermissionRule;
   projectSites: MvpPermissionRule;
   projectUsage: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
@@ -89,6 +90,33 @@ export type ContractDirectionCode =
 export type ContractStatusCode = "active" | "terminated";
 
 export type ContractExpiryStateCode = "normal" | "expiring_soon" | "expired" | "terminated";
+
+export type CertificateTypeCode =
+  | "person_health_cert"
+  | "business_license"
+  | "food_operation_license"
+  | "project_site_license"
+  | "supplier_qualification"
+  | "management_system_cert"
+  | "food_safety_cert"
+  | "credit_rating_cert"
+  | "honor_cert"
+  | "bank_account_permit"
+  | "contract_qualification_file"
+  | "other";
+
+export type CertificateOwnerTypeCode = "person" | "project_site" | "supplier" | "company";
+
+export type CertificateValidityTypeCode = "fixed_expiry" | "long_term" | "no_expiry_visible";
+
+export type CertificateComputedStatusCode =
+  | "valid"
+  | "expiring_soon"
+  | "expired"
+  | "review_due_soon"
+  | "review_due"
+  | "archived"
+  | "disabled";
 
 export type InventoryMovementTypeCode =
   | "opening"
@@ -626,6 +654,73 @@ export type CreateContractAttachmentInput = {
 
 export type UpdateContractAttachmentInput = Partial<Omit<CreateContractAttachmentInput, "contractId">>;
 
+export type CertificateRecordDto = {
+  id: string;
+  certificateCode: string;
+  certificateName: string;
+  certificateType: CertificateTypeCode;
+  ownerType: CertificateOwnerTypeCode;
+  ownerEmployeeId?: string | null;
+  ownerEmployeeName?: string | null;
+  ownerProjectSiteId?: string | null;
+  ownerProjectSiteName?: string | null;
+  ownerPartyId?: string | null;
+  ownerPartyName?: string | null;
+  ownerNameSnapshot: string;
+  certificateNumber?: string | null;
+  issuingAuthority?: string | null;
+  certificateScope?: string | null;
+  issueDate?: string | null;
+  validityType: CertificateValidityTypeCode;
+  expiryDate?: string | null;
+  nextReviewDate?: string | null;
+  reminderDays: number;
+  computedStatus: CertificateComputedStatusCode;
+  isComplianceCritical: boolean;
+  attachmentPath?: string | null;
+  sourceFilePath?: string | null;
+  sourcePageNo?: number | null;
+  responsibleEmployeeId?: string | null;
+  responsibleEmployeeName?: string | null;
+  confirmedByEmployeeId?: string | null;
+  confirmedByEmployeeName?: string | null;
+  confirmedAt?: string | null;
+  isDisabled: boolean;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateCertificateRecordInput = {
+  certificateCode: string;
+  certificateName: string;
+  certificateType: CertificateTypeCode;
+  ownerType: CertificateOwnerTypeCode;
+  ownerEmployeeId?: string | null;
+  ownerProjectSiteId?: string | null;
+  ownerPartyId?: string | null;
+  ownerNameSnapshot: string;
+  certificateNumber?: string | null;
+  issuingAuthority?: string | null;
+  certificateScope?: string | null;
+  issueDate?: string | null;
+  validityType: CertificateValidityTypeCode;
+  expiryDate?: string | null;
+  nextReviewDate?: string | null;
+  reminderDays?: number;
+  isComplianceCritical?: boolean;
+  attachmentPath?: string | null;
+  sourceFilePath?: string | null;
+  sourcePageNo?: number | null;
+  responsibleEmployeeId?: string | null;
+  confirmedByEmployeeId?: string | null;
+  confirmedAt?: string | null;
+  isDisabled?: boolean;
+  remark?: string | null;
+};
+
+export type UpdateCertificateRecordInput = Partial<CreateCertificateRecordInput>;
+
 export type InventoryMovementDto = {
   id: string;
   movementNo: string;
@@ -956,6 +1051,44 @@ export const CONTRACT_EXPIRY_STATES = [
   { code: "terminated", label: "已终止" },
 ] as const satisfies readonly StatusMeta<ContractExpiryStateCode>[];
 
+export const CERTIFICATE_TYPES = [
+  { code: "person_health_cert", label: "人员健康证" },
+  { code: "business_license", label: "营业执照" },
+  { code: "food_operation_license", label: "食品经营许可证" },
+  { code: "project_site_license", label: "项目点许可证" },
+  { code: "supplier_qualification", label: "供应商资质" },
+  { code: "management_system_cert", label: "体系认证" },
+  { code: "food_safety_cert", label: "食品安全证书" },
+  { code: "credit_rating_cert", label: "信用评级证书" },
+  { code: "honor_cert", label: "荣誉证书" },
+  { code: "bank_account_permit", label: "开户许可证" },
+  { code: "contract_qualification_file", label: "合同相关资质文件" },
+  { code: "other", label: "其他" },
+] as const satisfies readonly StatusMeta<CertificateTypeCode>[];
+
+export const CERTIFICATE_OWNER_TYPES = [
+  { code: "person", label: "人员" },
+  { code: "project_site", label: "项目点" },
+  { code: "supplier", label: "供应商/往来方" },
+  { code: "company", label: "公司主体" },
+] as const satisfies readonly StatusMeta<CertificateOwnerTypeCode>[];
+
+export const CERTIFICATE_VALIDITY_TYPES = [
+  { code: "fixed_expiry", label: "固定到期" },
+  { code: "long_term", label: "长期有效" },
+  { code: "no_expiry_visible", label: "未见明确到期日" },
+] as const satisfies readonly StatusMeta<CertificateValidityTypeCode>[];
+
+export const CERTIFICATE_COMPUTED_STATUSES = [
+  { code: "valid", label: "正常" },
+  { code: "expiring_soon", label: "即将到期" },
+  { code: "expired", label: "已过期" },
+  { code: "review_due_soon", label: "即将复核" },
+  { code: "review_due", label: "待复核" },
+  { code: "archived", label: "归档" },
+  { code: "disabled", label: "停用" },
+] as const satisfies readonly StatusMeta<CertificateComputedStatusCode>[];
+
 export const INVENTORY_MOVEMENT_TYPES = [
   { code: "opening", label: "期初" },
   { code: "inbound", label: "入库" },
@@ -1093,6 +1226,10 @@ export const MVP_PERMISSION_MATRIX = {
     read: ["admin", "hr", "procurement", "project_site", "viewer"],
     manage: ["admin", "procurement"],
   },
+  certificates: {
+    read: ["admin", "hr", "procurement", "project_site", "viewer"],
+    manage: ["admin", "hr"],
+  },
   projectSites: {
     read: ALL_ROLES,
     manage: ["admin", "hr"],
@@ -1149,6 +1286,22 @@ export const MVP_DICTIONARIES = {
   contractExpiryState: {
     label: "合同到期显示状态",
     values: ["正常", "即将到期", "已到期", "已终止"],
+  },
+  certificateType: {
+    label: "证照类型",
+    values: CERTIFICATE_TYPES.map((item) => item.label),
+  },
+  certificateOwnerType: {
+    label: "证照归属对象",
+    values: CERTIFICATE_OWNER_TYPES.map((item) => item.label),
+  },
+  certificateValidityType: {
+    label: "证照有效期类型",
+    values: CERTIFICATE_VALIDITY_TYPES.map((item) => item.label),
+  },
+  certificateComputedStatus: {
+    label: "证照状态",
+    values: CERTIFICATE_COMPUTED_STATUSES.map((item) => item.label),
   },
   wechatProcessingStatus: {
     label: "微信处理状态",

@@ -5,6 +5,10 @@ import {
   canRead,
   calculateCurrentInventory,
   CHARGE_PRICE_SOURCES,
+  CERTIFICATE_COMPUTED_STATUSES,
+  CERTIFICATE_OWNER_TYPES,
+  CERTIFICATE_TYPES,
+  CERTIFICATE_VALIDITY_TYPES,
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
   CONTRACT_STATUSES,
@@ -238,6 +242,59 @@ describe("MVP permission constants", () => {
     expect(canManage(["project_site"], "inventory")).toBe(false);
     expect(canManage(["warehouse"], "projectUsage")).toBe(false);
     expect(canManage(["admin"], "projectUsage")).toBe(true);
+  });
+
+  it("defines certificates as an HR/admin managed risk ledger", () => {
+    expect(MVP_PERMISSION_MATRIX.certificates.read).toEqual([
+      "admin",
+      "hr",
+      "procurement",
+      "project_site",
+      "viewer",
+    ]);
+    expect(MVP_PERMISSION_MATRIX.certificates.manage).toEqual(["admin", "hr"]);
+    expect(canManage(["hr"], "certificates")).toBe(true);
+    expect(canManage(["procurement"], "certificates")).toBe(false);
+    expect(canRead(["project_site"], "certificates")).toBe(true);
+  });
+});
+
+describe("certificate dictionaries", () => {
+  it("defines certificate type, owner, validity, and computed status dictionaries", () => {
+    expect(CERTIFICATE_TYPES.map((type) => type.code)).toEqual([
+      "person_health_cert",
+      "business_license",
+      "food_operation_license",
+      "project_site_license",
+      "supplier_qualification",
+      "management_system_cert",
+      "food_safety_cert",
+      "credit_rating_cert",
+      "honor_cert",
+      "bank_account_permit",
+      "contract_qualification_file",
+      "other",
+    ]);
+    expect(CERTIFICATE_OWNER_TYPES.map((ownerType) => ownerType.code)).toEqual([
+      "person",
+      "project_site",
+      "supplier",
+      "company",
+    ]);
+    expect(CERTIFICATE_VALIDITY_TYPES.map((validityType) => validityType.code)).toEqual([
+      "fixed_expiry",
+      "long_term",
+      "no_expiry_visible",
+    ]);
+    expect(CERTIFICATE_COMPUTED_STATUSES.map((status) => status.code)).toEqual([
+      "valid",
+      "expiring_soon",
+      "expired",
+      "review_due_soon",
+      "review_due",
+      "archived",
+      "disabled",
+    ]);
   });
 });
 

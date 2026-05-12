@@ -101,6 +101,34 @@ enum ContractStatus {
   terminated
 }
 
+enum CertificateType {
+  person_health_cert
+  business_license
+  food_operation_license
+  project_site_license
+  supplier_qualification
+  management_system_cert
+  food_safety_cert
+  credit_rating_cert
+  honor_cert
+  bank_account_permit
+  contract_qualification_file
+  other
+}
+
+enum CertificateOwnerType {
+  person
+  project_site
+  supplier
+  company
+}
+
+enum CertificateValidityType {
+  fixed_expiry
+  long_term
+  no_expiry_visible
+}
+
 enum ImportTemplateType {
   parties
   materials
@@ -146,6 +174,7 @@ model Party {
   subcontractorProjectSites ProjectSite[] @relation("ProjectSiteSubcontractorParty")
   purchaseRecords           PurchaseRecord[]
   contracts                 Contract[]
+  certificates              CertificateRecord[]
 
   @@index([status])
   @@index([partyName])
@@ -394,6 +423,9 @@ model Employee {
   projectSiteAssignments EmployeeProjectSiteAssignment[]
   requestedPurchases     PurchaseRequest[]               @relation("PurchaseRequestRequester")
   handledPurchases       PurchaseRecord[]                @relation("PurchaseRecordPurchaser")
+  ownedCertificates      CertificateRecord[]             @relation("CertificateOwnerEmployee")
+  responsibleCertificates CertificateRecord[]             @relation("CertificateResponsibleEmployee")
+  confirmedCertificates  CertificateRecord[]             @relation("CertificateConfirmedByEmployee")
 
   @@index([departmentId])
   @@index([employmentStatus])
@@ -468,6 +500,7 @@ model ProjectSite {
   usageRequests   ProjectUsageRequest[]
   purchaseRequests PurchaseRequest[]
   contracts        Contract[]
+  certificates     CertificateRecord[]
 
   @@index([status])
   @@index([primaryManagerEmployeeId])
@@ -661,6 +694,53 @@ model ContractAttachment {
 
   @@index([contractId])
   @@map("contract_attachments")
+}
+
+model CertificateRecord {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  certificateCode       String                    @unique @map("certificate_code")
+  certificateName       String                    @map("certificate_name")
+  certificateType       CertificateType           @map("certificate_type")
+  ownerType             CertificateOwnerType      @map("owner_type")
+  ownerEmployeeId       String?                   @map("owner_employee_id") @db.Uuid
+  ownerProjectSiteId    String?                   @map("owner_project_site_id") @db.Uuid
+  ownerPartyId          String?                   @map("owner_party_id") @db.Uuid
+  ownerNameSnapshot     String                    @map("owner_name_snapshot")
+  certificateNumber     String?                   @map("certificate_number")
+  issuingAuthority      String?                   @map("issuing_authority")
+  certificateScope      String?                   @map("certificate_scope")
+  issueDate             DateTime?                 @map("issue_date") @db.Date
+  validityType          CertificateValidityType   @map("validity_type")
+  expiryDate            DateTime?                 @map("expiry_date") @db.Date
+  nextReviewDate        DateTime?                 @map("next_review_date") @db.Date
+  reminderDays          Int                       @default(30) @map("reminder_days")
+  isComplianceCritical  Boolean                   @default(false) @map("is_compliance_critical")
+  attachmentPath        String?                   @map("attachment_path")
+  sourceFilePath        String?                   @map("source_file_path")
+  sourcePageNo          Int?                      @map("source_page_no")
+  responsibleEmployeeId String?                   @map("responsible_employee_id") @db.Uuid
+  confirmedByEmployeeId String?                   @map("confirmed_by_employee_id") @db.Uuid
+  confirmedAt           DateTime?                 @map("confirmed_at")
+  isDisabled            Boolean                   @default(false) @map("is_disabled")
+  remark                String?
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+
+  ownerEmployee       Employee?    @relation("CertificateOwnerEmployee", fields: [ownerEmployeeId], references: [id], onDelete: SetNull)
+  ownerProjectSite    ProjectSite? @relation(fields: [ownerProjectSiteId], references: [id], onDelete: SetNull)
+  ownerParty          Party?       @relation(fields: [ownerPartyId], references: [id], onDelete: SetNull)
+  responsibleEmployee Employee?    @relation("CertificateResponsibleEmployee", fields: [responsibleEmployeeId], references: [id], onDelete: SetNull)
+  confirmedByEmployee Employee?    @relation("CertificateConfirmedByEmployee", fields: [confirmedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([certificateType])
+  @@index([ownerType])
+  @@index([ownerEmployeeId])
+  @@index([ownerProjectSiteId])
+  @@index([ownerPartyId])
+  @@index([responsibleEmployeeId])
+  @@index([expiryDate])
+  @@index([nextReviewDate])
+  @@map("certificate_records")
 }
 
 model ImportJob {

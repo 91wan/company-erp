@@ -99,6 +99,13 @@ import {
   type ContractRepository,
 } from "./contracts.js";
 import {
+  CertificateConflictError,
+  CertificateValidationError,
+  normalizeCertificateFilters,
+  normalizeCertificateInput,
+  type CertificateRepository,
+} from "./certificates.js";
+import {
   ImportJobValidationError,
   normalizeImportJobFilters,
   normalizeImportTemplateType,
@@ -123,6 +130,7 @@ type BuildAppOptions = {
   projectSiteRepository?: ProjectSiteRepository;
   projectUsageRequestRepository?: ProjectUsageRequestRepository;
   contractRepository?: ContractRepository;
+  certificateRepository?: CertificateRepository;
   importJobRepository?: ImportJobRepository;
 };
 
@@ -136,6 +144,30 @@ function scopedProjectSiteIds(request: unknown): readonly string[] | null {
 
 function isOutsideProjectSiteScope(scope: readonly string[] | null, projectSiteId?: string | null): boolean {
   return scope !== null && (!projectSiteId || !scope.includes(projectSiteId));
+}
+
+function certificateFiltersForRequest(request: unknown) {
+  const user = (request as AuthenticatedRequest).currentUser;
+  if (!user) return {};
+  if (user.roles.length === 1 && user.roles[0] === "project_site") {
+    return { ownerTypes: ["project_site" as const], projectSiteIds: [...(user.assignedProjectSiteIds ?? [])] };
+  }
+  if (user.roles.length === 1 && user.roles[0] === "procurement") {
+    return { ownerTypes: ["supplier" as const, "company" as const] };
+  }
+  return {};
+}
+
+function isOutsideCertificateScope(request: unknown, certificate?: { ownerType: string; ownerProjectSiteId?: string | null } | null): boolean {
+  const user = (request as AuthenticatedRequest).currentUser;
+  if (!user || !certificate) return false;
+  if (user.roles.length === 1 && user.roles[0] === "project_site") {
+    return certificate.ownerType !== "project_site" || !(user.assignedProjectSiteIds ?? []).includes(certificate.ownerProjectSiteId ?? "");
+  }
+  if (user.roles.length === 1 && user.roles[0] === "procurement") {
+    return certificate.ownerType !== "supplier" && certificate.ownerType !== "company";
+  }
+  return false;
 }
 
 export function buildApp(options: BuildAppOptions = {}) {
@@ -1471,6 +1503,90 @@ export function buildApp(options: BuildAppOptions = {}) {
     } catch (error) {
       if (error instanceof ContractValidationError) {
         return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/certificates", async (request, reply) => {
+    if (!options.certificateRepository) {
+      return reply.status(503).send({ error: "CERTIFICATE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const scopeFilters = certificateFiltersForRequest(request);
+      if ("projectSiteIds" in scopeFilters && scopeFilters.projectSiteIds?.length === 0) {
+        return { certificates: [] };
+      }
+      const filters = {
+        ...normalizeCertificateFilters(request.query as Record<string, unknown>),
+        ...scopeFilters,
+      };
+      const certificates = await options.certificateRepository.list(filters);
+      return { certificates };
+    } catch (error) {
+      if (error instanceof CertificateValidationError) {
+        return reply.status(400).send({ error: "CERTIFICATE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/certificates/:id", async (request, reply) => {
+    if (!options.certificateRepository) {
+      return reply.status(503).send({ error: "CERTIFICATE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const certificate = await options.certificateRepository.getById(id);
+    if (isOutsideCertificateScope(request, certificate)) {
+      return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
+    }
+    if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
+    return { certificate };
+  });
+
+  app.post("/api/certificates", async (request, reply) => {
+    if (!options.certificateRepository) {
+      return reply.status(503).send({ error: "CERTIFICATE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeCertificateInput(request.body, "create");
+      const certificate = await options.certificateRepository.create(input);
+      return reply.status(201).send({ certificate });
+    } catch (error) {
+      if (error instanceof CertificateValidationError) {
+        return reply.status(400).send({ error: "CERTIFICATE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof CertificateConflictError) {
+        return reply.status(409).send({ error: "CERTIFICATE_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/certificates/:id", async (request, reply) => {
+    if (!options.certificateRepository) {
+      return reply.status(503).send({ error: "CERTIFICATE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const current = await options.certificateRepository.getById(id);
+      if (isOutsideCertificateScope(request, current)) {
+        return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
+      }
+      const input = normalizeCertificateInput(request.body, "update");
+      const certificate = await options.certificateRepository.update(id, input);
+      if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
+      return { certificate };
+    } catch (error) {
+      if (error instanceof CertificateValidationError) {
+        return reply.status(400).send({ error: "CERTIFICATE_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof CertificateConflictError) {
+        return reply.status(409).send({ error: "CERTIFICATE_CONFLICT", field: error.field });
       }
       throw error;
     }

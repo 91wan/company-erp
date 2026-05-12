@@ -24,6 +24,7 @@ import {
   createPrismaProjectUsageRequestRepository,
 } from "./prismaProjectSitesRepository.js";
 import { createPrismaContractRepository } from "./prismaContractsRepository.js";
+import { createPrismaCertificateRepository } from "./prismaCertificatesRepository.js";
 import { createPrismaImportJobRepository } from "./prismaImportJobRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
@@ -53,6 +54,7 @@ const app = buildApp({
   projectSiteRepository: prisma ? createPrismaProjectSiteRepository(prisma) : undefined,
   projectUsageRequestRepository: prisma ? createPrismaProjectUsageRequestRepository(prisma) : undefined,
   contractRepository: prisma ? createPrismaContractRepository(prisma) : undefined,
+  certificateRepository: prisma ? createPrismaCertificateRepository(prisma) : undefined,
   importJobRepository: prisma ? createPrismaImportJobRepository(prisma) : undefined,
 });
 
