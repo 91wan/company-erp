@@ -33,6 +33,7 @@ import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWor
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
 import { ContractsWorkspace } from "./ContractsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
+import { CertificatesWorkspace } from "./CertificatesWorkspace";
 
 type DashboardShellProps = {
   currentUser: AuthenticatedUserDto;
@@ -48,6 +49,7 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
     canManage(currentUser.roles, "projectSites") ||
     canManage(currentUser.roles, "projectUsage") ||
     canManage(currentUser.roles, "contracts") ||
+    canManage(currentUser.roles, "certificates") ||
     canManage(currentUser.roles, "employees")
   );
 
@@ -84,6 +86,7 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
             canIssue={canManage(currentUser.roles, "inventory")}
           />
           <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} />
+          <CertificatesWorkspace canManage={canManage(currentUser.roles, "certificates")} />
           <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
         </div>
       </section>

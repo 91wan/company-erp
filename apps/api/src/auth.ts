@@ -196,6 +196,9 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/contracts") || pathname.startsWith("/api/contract-attachments")) {
     return { area: "contracts", requiredLevel };
   }
+  if (pathname.startsWith("/api/certificates")) {
+    return { area: "certificates", requiredLevel };
+  }
   if (pathname.startsWith("/api/import-jobs")) {
     return method === "GET"
       ? { area: "masterData", requiredLevel: "read" }

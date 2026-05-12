@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
+import { CertificatesWorkspace } from "../src/components/CertificatesWorkspace";
 import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
 import { ExcelImportWorkspace } from "../src/components/ExcelImportWorkspace";
 import { InventoryWorkspace } from "../src/components/InventoryWorkspace";
@@ -14,6 +15,7 @@ import { ReplenishmentSuggestionsWorkspace } from "../src/components/Replenishme
 import type {
   DepartmentDto,
   EmployeeDto,
+  CertificateRecordDto,
   GenerateReplenishmentSuggestionsResult,
   ContractAttachmentDto,
   ContractDto,
@@ -94,6 +96,7 @@ function mockShellFetch(user: typeof adminUser | typeof viewerUser | typeof proj
     if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
     if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
     if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
+    if (url.includes("/api/certificates")) return Promise.resolve(jsonResponse({ certificates: [] }));
     if (url.includes("/api/import-jobs/")) return Promise.resolve(jsonResponse({ importJob }));
     if (url.includes("/api/import-jobs")) return Promise.resolve(jsonResponse({ importJobs: [] }));
 
@@ -205,6 +208,60 @@ const userAccount: UserAccountDto = {
   passwordChangedAt: "2026-05-11T10:00:00.000Z",
   createdAt: "2026-05-11T10:00:00.000Z",
   updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const certificate: CertificateRecordDto = {
+  id: "51515151-5151-4151-8151-515151515151",
+  certificateCode: "CERT0001",
+  certificateName: "项目点食品经营许可证",
+  certificateType: "food_operation_license",
+  ownerType: "project_site",
+  ownerEmployeeId: null,
+  ownerEmployeeName: null,
+  ownerProjectSiteId: "12121212-1212-4121-8121-121212121212",
+  ownerProjectSiteName: "科技园一期项目点",
+  ownerPartyId: null,
+  ownerPartyName: null,
+  ownerNameSnapshot: "科技园一期项目点",
+  certificateNumber: "JY13202000000001",
+  issuingAuthority: "市场监督管理局",
+  certificateScope: "食堂经营",
+  issueDate: "2026-01-01",
+  validityType: "fixed_expiry",
+  expiryDate: "2026-06-05",
+  nextReviewDate: null,
+  reminderDays: 30,
+  computedStatus: "expiring_soon",
+  isComplianceCritical: true,
+  attachmentPath: "/volume1/company-erp/attachments/certificates/CERT0001.pdf",
+  sourceFilePath: "/volume1/company-erp/attachments/certificates/source-pack.pdf",
+  sourcePageNo: 3,
+  responsibleEmployeeId: employee.id,
+  responsibleEmployeeName: employee.name,
+  confirmedByEmployeeId: null,
+  confirmedByEmployeeName: null,
+  confirmedAt: null,
+  isDisabled: false,
+  remark: "重点证照",
+  createdAt: "2026-05-12T08:00:00.000Z",
+  updatedAt: "2026-05-12T08:00:00.000Z",
+};
+
+const expiredCertificate: CertificateRecordDto = {
+  ...certificate,
+  id: "52525252-5252-4252-8252-525252525252",
+  certificateCode: "CERT0002",
+  certificateName: "人员健康证",
+  certificateType: "person_health_cert",
+  ownerType: "person",
+  ownerEmployeeId: employee.id,
+  ownerEmployeeName: employee.name,
+  ownerProjectSiteId: null,
+  ownerProjectSiteName: null,
+  ownerNameSnapshot: employee.name,
+  expiryDate: "2026-05-01",
+  computedStatus: "expired",
+  attachmentPath: "/volume1/company-erp/attachments/certificates/CERT0002.pdf",
 };
 
 const importJobSummary: ImportJobSummaryDto = {
@@ -1268,6 +1325,108 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
     expect(await screen.findByText("附件路径保存失败，请检查合同和路径。")).toBeInTheDocument();
+  });
+
+  it("renders certificate risk ledger and read-only states", async () => {
+    render(
+      <CertificatesWorkspace
+        canManage={false}
+        loadCertificates={() => Promise.resolve([certificate, expiredCertificate])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadParties={() => Promise.resolve([party])}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { name: "证照资质" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "保存证照" })).not.toBeInTheDocument();
+    expect(await screen.findByText("CERT0001")).toBeInTheDocument();
+    expect(screen.getByText("项目点食品经营许可证")).toBeInTheDocument();
+    expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
+    expect(screen.getByText("/volume1/company-erp/attachments/certificates/CERT0001.pdf")).toBeInTheDocument();
+  });
+
+  it("renders certificate empty and error states", async () => {
+    const { rerender } = render(
+      <CertificatesWorkspace
+        loadCertificates={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+        loadProjectSites={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("暂无证照资料")).toBeInTheDocument();
+
+    rerender(
+      <CertificatesWorkspace
+        loadCertificates={() => Promise.reject(new Error("offline"))}
+        loadEmployees={() => Promise.reject(new Error("offline"))}
+        loadProjectSites={() => Promise.reject(new Error("offline"))}
+        loadParties={() => Promise.reject(new Error("offline"))}
+      />,
+    );
+
+    expect(await screen.findByText("证照台账加载失败")).toBeInTheDocument();
+  });
+
+  it("creates certificate records and shows create failures", async () => {
+    const createdCertificate = {
+      ...certificate,
+      id: "53535353-5353-4353-8353-535353535353",
+      certificateCode: "CERT0003",
+      certificateName: "供应商营业执照",
+      ownerType: "supplier" as const,
+      ownerProjectSiteId: null,
+      ownerProjectSiteName: null,
+      ownerPartyId: party.id,
+      ownerPartyName: party.partyName,
+      ownerNameSnapshot: party.partyName,
+      validityType: "long_term" as const,
+      expiryDate: null,
+      nextReviewDate: "2026-12-01",
+      computedStatus: "valid" as const,
+    };
+
+    const { rerender } = render(
+      <CertificatesWorkspace
+        loadCertificates={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadParties={() => Promise.resolve([party])}
+        createCertificate={() => Promise.resolve(createdCertificate)}
+      />,
+    );
+
+    await screen.findByText("暂无证照资料");
+    fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0003" } });
+    fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "供应商营业执照" } });
+    fireEvent.change(screen.getByLabelText("证照类型"), { target: { value: "business_license" } });
+    fireEvent.change(screen.getByLabelText("归属对象"), { target: { value: "supplier" } });
+    fireEvent.change(screen.getByLabelText("往来方"), { target: { value: party.id } });
+    fireEvent.change(screen.getByLabelText("有效期类型"), { target: { value: "long_term" } });
+    fireEvent.change(screen.getByLabelText("下次复核日期"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+
+    expect(await screen.findByText("CERT0003")).toBeInTheDocument();
+
+    rerender(
+      <CertificatesWorkspace
+        loadCertificates={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadParties={() => Promise.resolve([party])}
+        createCertificate={() => Promise.reject(new Error("duplicate"))}
+      />,
+    );
+
+    await screen.findByText("暂无证照资料");
+    fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0004" } });
+    fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "错误证照" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+
+    expect(await screen.findByText("证照保存失败，请检查编码、归属对象或日期。")).toBeInTheDocument();
   });
 
   it("previews and confirms Excel import jobs", async () => {
