@@ -653,10 +653,28 @@ describe("Company ERP app shell", () => {
     expect(screen.getAllByText("科技园一期项目部").length).toBeGreaterThan(0);
   });
 
+  it("switches workspaces from the sidebar without preloading every module", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "库存管理" })).not.toBeInTheDocument();
+
+    const inventoryButton = screen.getByRole("button", { name: /^库存$/ });
+    fireEvent.click(inventoryButton);
+
+    expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
+    expect(inventoryButton).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("heading", { name: "工作台" })).not.toBeInTheDocument();
+  });
+
   it("renders the lightweight inventory MVP workspace", async () => {
     mockShellFetch(adminUser);
 
     render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^库存$/ }));
 
     expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
     expect(screen.getByText("采购记录 -> 仓库入库 -> 库存流水 -> 当前库存余额")).toBeInTheDocument();
@@ -677,10 +695,18 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(screen.getAllByText("viewer").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^基础资料$/ }));
     expect(screen.queryByRole("button", { name: "保存往来方" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存物料" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^采购$/ }));
     expect(screen.queryByRole("button", { name: "保存采购需求" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^合同$/ }));
     expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Excel 导入$/ }));
     expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
   });
 
@@ -692,9 +718,13 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(screen.getAllByText("siteuser").length).toBeGreaterThan(0);
     expect(screen.getByText("1 个项目点")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^项目点$/ }));
     expect(screen.queryByRole("button", { name: "保存项目点" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "执行出库" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^库存$/ }));
     expect(screen.queryByRole("button", { name: "当前库存查询" })).not.toBeInTheDocument();
   });
 
@@ -702,6 +732,8 @@ describe("Company ERP app shell", () => {
     mockShellFetch(adminUser);
 
     render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Excel 导入$/ }));
 
     expect(await screen.findByRole("heading", { name: "Excel 导入" })).toBeInTheDocument();
     expect(screen.getByText("先预检基础资料和期初库存模板，确认无错误后再写入系统。")).toBeInTheDocument();

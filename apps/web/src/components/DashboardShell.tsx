@@ -7,6 +7,7 @@ import {
   Search,
   Server,
 } from "lucide-react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { canManage, canRead, type AuthenticatedUserDto } from "@company-erp/shared";
 import {
@@ -40,7 +41,10 @@ type DashboardShellProps = {
   onLogout: () => Promise<void> | void;
 };
 
+type WorkspaceKey = (typeof navigationItems)[number]["label"];
+
 export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("Dashboard");
   const isProjectSiteOnly = currentUser.roles.length === 1 && currentUser.roles[0] === "project_site";
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
@@ -55,46 +59,53 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
 
   return (
     <main className={isReadOnly ? "erp-shell read-only-shell" : "erp-shell"}>
-      <Sidebar />
-      <section className="erp-main" aria-label="Dashboard workspace">
+      <Sidebar activeWorkspace={activeWorkspace} onSelectWorkspace={setActiveWorkspace} />
+      <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
-          <DashboardHeader />
-          <MetricStrip />
-          <section className="dashboard-grid dashboard-grid-primary">
-            <ApprovalPanel />
-            <PurchasePanel />
-            <ReceivingPanel />
-          </section>
-          <section className="dashboard-grid dashboard-grid-secondary">
-            <LowStockPanel />
-            <SiteUsagePanel />
-            <SystemStatusPanel />
-          </section>
-          <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-          <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-          <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
-          <PurchaseWorkspace canManage={canManage(currentUser.roles, "procurement")} />
-          <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} />
-          <InventoryWorkspace
-            canManage={canManage(currentUser.roles, "inventory")}
-            showBalances={!isProjectSiteOnly && canRead(currentUser.roles, "inventory")}
-          />
-          <ProjectSitesWorkspace
-            canManageSites={canManage(currentUser.roles, "projectSites")}
-            canManageUsage={canManage(currentUser.roles, "projectUsage")}
-            canIssue={canManage(currentUser.roles, "inventory")}
-          />
-          <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} />
-          <CertificatesWorkspace canManage={canManage(currentUser.roles, "certificates")} />
-          <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
+          {activeWorkspace === "Dashboard" ? <DashboardOverview /> : null}
+          {activeWorkspace === "基础资料" ? (
+            <>
+              <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+              <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+            </>
+          ) : null}
+          {activeWorkspace === "采购" ? <PurchaseWorkspace canManage={canManage(currentUser.roles, "procurement")} /> : null}
+          {activeWorkspace === "库存" ? (
+            <>
+              <InventoryWorkspace
+                canManage={canManage(currentUser.roles, "inventory")}
+                showBalances={!isProjectSiteOnly && canRead(currentUser.roles, "inventory")}
+              />
+              <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
+            </>
+          ) : null}
+          {activeWorkspace === "合同" ? <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} /> : null}
+          {activeWorkspace === "证照资质" ? <CertificatesWorkspace canManage={canManage(currentUser.roles, "certificates")} /> : null}
+          {activeWorkspace === "项目点" ? (
+            <ProjectSitesWorkspace
+              canManageSites={canManage(currentUser.roles, "projectSites")}
+              canManageUsage={canManage(currentUser.roles, "projectUsage")}
+              canIssue={canManage(currentUser.roles, "inventory")}
+            />
+          ) : null}
+          {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
+          {activeWorkspace === "Excel 导入" ? (
+            <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
+          ) : null}
         </div>
       </section>
     </main>
   );
 }
 
-function Sidebar() {
+function Sidebar({
+  activeWorkspace,
+  onSelectWorkspace,
+}: {
+  activeWorkspace: WorkspaceKey;
+  onSelectWorkspace: (workspace: WorkspaceKey) => void;
+}) {
   return (
     <aside className="erp-sidebar" aria-label="ERP modules">
       <div className="sidebar-brand">
@@ -110,8 +121,9 @@ function Sidebar() {
           <button
             key={item.label}
             type="button"
-            className={item.active ? "nav-item active" : "nav-item"}
-            aria-current={item.active ? "page" : undefined}
+            className={item.label === activeWorkspace ? "nav-item active" : "nav-item"}
+            aria-current={item.label === activeWorkspace ? "page" : undefined}
+            onClick={() => onSelectWorkspace(item.label)}
           >
             <item.icon aria-hidden="true" size={20} strokeWidth={1.9} />
             <span>{item.label}</span>
@@ -125,6 +137,25 @@ function Sidebar() {
         <ChevronsRight aria-hidden="true" size={16} className="settings-chevron" />
       </button>
     </aside>
+  );
+}
+
+function DashboardOverview() {
+  return (
+    <>
+      <DashboardHeader />
+      <MetricStrip />
+      <section className="dashboard-grid dashboard-grid-primary">
+        <ApprovalPanel />
+        <PurchasePanel />
+        <ReceivingPanel />
+      </section>
+      <section className="dashboard-grid dashboard-grid-secondary">
+        <LowStockPanel />
+        <SiteUsagePanel />
+        <SystemStatusPanel />
+      </section>
+    </>
   );
 }
 
