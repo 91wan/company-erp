@@ -184,47 +184,46 @@ Expected response:
 
 ## Backup
 
-Create a timestamped PostgreSQL dump:
+Use the checked-in NAS backup script from the app directory:
 
 ```bash
-mkdir -p "${NAS_DATA_ROOT:-./data}/../backups"
-docker compose exec -T postgres pg_dump \
-  -U "${POSTGRES_USER:-company_erp}" \
-  -d "${POSTGRES_DB:-company_erp}" \
-  > "${NAS_DATA_ROOT:-./data}/../backups/company_erp_$(date +%Y%m%d_%H%M%S).sql"
+./scripts/nas-backup.sh
 ```
 
-Back up attachments separately:
+If Docker requires sudo on the NAS:
 
 ```bash
-tar -czf "${NAS_DATA_ROOT:-./data}/../backups/company_erp_attachments_$(date +%Y%m%d_%H%M%S).tar.gz" \
-  -C "${NAS_ATTACHMENTS_ROOT:-./attachments}" .
+sudo -E ./scripts/nas-backup.sh
 ```
+
+The script creates timestamped files under `${NAS_BACKUPS_ROOT}` or, by default,
+the `backups` directory next to `${NAS_DATA_ROOT}`:
+
+- `company_erp_YYYYMMDD_HHMMSS.sql`
+- `company_erp_attachments_YYYYMMDD_HHMMSS.tar.gz`
 
 ## Restore
 
-Restore the database dump into a running PostgreSQL container:
+Restore is intentionally guarded because it overwrites the current PostgreSQL
+schema. Run it only after taking a fresh backup and confirming the selected dump
+file:
 
 ```bash
-docker compose exec -T postgres psql \
-  -U "${POSTGRES_USER:-company_erp}" \
-  -d "${POSTGRES_DB:-company_erp}" \
-  < /volume1/company-erp/backups/company_erp_YYYYMMDD_HHMMSS.sql
+CONFIRM_RESTORE=restore-company-erp ./scripts/nas-restore.sh \
+  /volume1/company-erp/backups/company_erp_YYYYMMDD_HHMMSS.sql
 ```
 
-Restore attachments:
+To restore attachments in merge mode:
 
 ```bash
-mkdir -p "${NAS_ATTACHMENTS_ROOT:-./attachments}"
-tar -xzf /volume1/company-erp/backups/company_erp_attachments_YYYYMMDD_HHMMSS.tar.gz \
-  -C "${NAS_ATTACHMENTS_ROOT:-./attachments}"
+CONFIRM_RESTORE=restore-company-erp ./scripts/nas-restore.sh \
+  /volume1/company-erp/backups/company_erp_YYYYMMDD_HHMMSS.sql \
+  /volume1/company-erp/backups/company_erp_attachments_YYYYMMDD_HHMMSS.tar.gz
 ```
 
 After restore:
 
 ```bash
-docker compose run --rm migrate
-docker compose up -d api web
 curl http://<NAS_IP>:${ERP_WEB_PORT:-8080}/health
 ```
 
