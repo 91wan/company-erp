@@ -10,6 +10,8 @@
     "bootstrap:admin:prod": "node dist/bootstrapAdmin.js",
     "bootstrap:trial-data": "tsx src/bootstrapTrialData.ts",
     "bootstrap:trial-data:prod": "node dist/bootstrapTrialData.js",
+    "smoke:pilot": "tsx src/pilotSmoke.ts",
+    "smoke:pilot:prod": "node dist/pilotSmoke.js",
     "build": "tsc -p tsconfig.build.json && node -e \"import('./dist/app.js').then(() => console.log('api dist import ok'))\"",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
