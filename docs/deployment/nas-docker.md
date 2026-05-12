@@ -157,6 +157,10 @@ the pilot smoke test before inviting users to try the system. The smoke test
 uses only `DEMO-*` data and writes through the public API, the same boundary used
 by the Web app.
 
+For the full pilot runbook, including password recovery, DEMO cleanup, user
+checklists, and restore rehearsal guardrails, see
+[`pilot-runbook.md`](./pilot-runbook.md).
+
 ```bash
 docker compose run --rm \
   -e ERP_API_BASE_URL=http://<NAS_IP>:${ERP_WEB_PORT:-8080} \
@@ -195,6 +199,17 @@ Pilot acceptance checklist:
 - DEMO contract and certificate are searchable.
 - `./scripts/nas-backup.sh` still creates a non-empty database dump and
   attachments archive after the smoke test.
+
+To clear only fixed DEMO smoke records, first run a dry-run:
+
+```bash
+docker compose run --rm \
+  -e DEMO_CLEANUP_DRY_RUN=true \
+  api npm run demo:cleanup:prod -w @company-erp/api
+```
+
+Real deletion requires both `DEMO_CLEANUP_DRY_RUN=false` and
+`CONFIRM_DEMO_CLEANUP=delete-demo-data`.
 
 ## Health Check
 

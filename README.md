@@ -68,6 +68,8 @@ npm run db:generate
 npm run bootstrap:admin -w @company-erp/api
 npm run bootstrap:trial-data -w @company-erp/api
 ERP_API_BASE_URL=http://localhost:3001 npm run smoke:pilot -w @company-erp/api
+RESET_ACCOUNT_USERNAME=admin RESET_ACCOUNT_PASSWORD=<new-password> npm run account:reset-password -w @company-erp/api
+DEMO_CLEANUP_DRY_RUN=true npm run demo:cleanup -w @company-erp/api
 npm run test
 npm run dev
 ```
