@@ -66,6 +66,7 @@ cp .env.example .env
 docker compose up -d postgres
 npm run db:generate
 npm run bootstrap:admin -w @company-erp/api
+npm run bootstrap:trial-data -w @company-erp/api
 npm run test
 npm run dev
 ```

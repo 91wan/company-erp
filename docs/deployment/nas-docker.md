@@ -133,6 +133,23 @@ Then log in with `BOOTSTRAP_ADMIN_USERNAME` and the temporary
 If the account already exists, the script keeps it active and ensures it has
 the `admin` role.
 
+## Bootstrap Trial Master Data
+
+After the first admin is ready, run the trial data bootstrap once to create the
+minimum master data needed for an internal pilot:
+
+- `OUR-COMPANY` as the editable company operator party.
+- `WH-WX-HQ` as the headquarters warehouse.
+- Basic departments for administration, purchasing, warehouse, and project operations.
+
+```bash
+docker compose run --rm api npm run bootstrap:trial-data:prod -w @company-erp/api
+```
+
+The script is idempotent. It upserts only these fixed pilot records and does not
+import real employees, suppliers, materials, contracts, attachments, or business
+transactions.
+
 ## Health Check
 
 From a machine on the same internal network:
