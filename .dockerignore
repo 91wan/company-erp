@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build and test output
+dist
+**/dist
+build
+coverage
+
+# Environment and local runtime data
+.env
+.env.*
+!.env.example
+data
+storage
+attachments
+backups
+exports
+tmp
+.codex-work
+
+# Git and editor noise
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local database dumps, archives, and raw business files
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.webp
+*.tif
+*.tiff
+*.csv
