@@ -1,64 +1,42 @@
 # Company ERP
 
-This repository is for a lightweight internal company ERP.
+[中文说明](./README_ZH.md)
 
-The first version will focus on the daily operations workflow:
+Company ERP is a lightweight internal web ERP for company operations, designed
+for NAS intranet deployment. It focuses on practical daily workflows rather
+than public SaaS, finance automation, OCR, or mobile apps.
 
-```text
-Purchase request -> approval -> purchasing -> warehouse receiving -> stock movement -> project/site consumption
-```
+## Current Capabilities
 
-The project should start with planning and data modeling before any application code is written.
+- React + Vite + TypeScript web app with an Apple-style internal dashboard.
+- Fastify + TypeScript API with Prisma and PostgreSQL.
+- Fixed MVP roles, signed HttpOnly cookie login sessions, route guards, and
+  project-site data scoping.
+- Master data for parties, materials, warehouses, departments, employees, user
+  accounts, project sites, external project-site accounts, and kitchen
+  equipment.
+- Purchasing, receiving, inventory balances, replenishment suggestions,
+  project-site usage issue, contract records, certificates, Excel import jobs,
+  pilot operations scripts, and version visibility.
+- NAS Docker deployment with PostgreSQL persistence, migrations, API, Web,
+  Nginx same-origin proxy, backups, restore scripts, and deployment revision
+  metadata.
 
-## Current Status
+## Boundaries
 
-The MVP foundation is in progress:
+This project is for company internal network use by default.
 
-- `PROJECT_PLAN.md` defines the business scope, MVP boundary, roles, permissions, existing data sources, and development milestones.
-- The initial project skeleton has been created under the active project root.
-- The workspace uses npm workspaces.
-- The first application shell uses React + Vite + TypeScript.
-- The API shell uses Fastify + TypeScript.
-- PostgreSQL Docker and Prisma are the first database foundation.
-- Business foundations now exist for parties, materials, warehouses, people permissions, purchasing, receiving/inventory balances, project-site usage, contracts, and replenishment suggestions.
-- Login uses fixed MVP roles, signed HttpOnly cookie sessions, and API route guards.
-- Excel import and binary attachment upload have not been implemented yet.
+- Do not commit `.env`, NAS credentials, database dumps, attachments, scanned
+  contracts, staff private data, WeChat exports, or real business records.
+- Business writes must go through the backend API. Do not bypass the API by
+  writing directly to the database from UI or scripts.
+- Every push should be preceded by a goal-mode bug sweep: typecheck, tests,
+  build where relevant, known runtime/UI bug checks, `git status`, and a
+  sensitive data scan.
+- Demo or trial data must not be used for NAS acceptance unless explicitly
+  requested for a separate test environment.
 
-## MVP Direction
-
-The MVP is a lightweight internal Web app for:
-
-- Purchase management
-- Inventory management
-- Contract records
-- Project/site management
-- Personnel and permissions
-- Basic dashboard summaries
-
-The MVP is not intended to be a full finance, payroll, HR, BI, mobile, OCR, or workflow automation platform.
-
-## Recommended Future Structure
-
-When development begins, use this structure:
-
-```text
-<project-root>/
-  README.md
-  PROJECT_PLAN.md
-  docs/
-  apps/
-    web/
-  packages/
-    shared/
-  database/
-  scripts/
-```
-
-Do not create app code until the MVP data model and Excel import templates are confirmed.
-
-## Next Step
-
-Development entry points:
+## Local Development
 
 ```bash
 npm install
@@ -66,25 +44,41 @@ cp .env.example .env
 docker compose up -d postgres
 npm run db:generate
 npm run bootstrap:admin -w @company-erp/api
-npm run bootstrap:trial-data -w @company-erp/api
-ERP_API_BASE_URL=http://localhost:3001 npm run smoke:pilot -w @company-erp/api
-RESET_ACCOUNT_USERNAME=admin RESET_ACCOUNT_PASSWORD=<new-password> npm run account:reset-password -w @company-erp/api
-DEMO_CLEANUP_DRY_RUN=true npm run demo:cleanup -w @company-erp/api
-npm run test
 npm run dev
 ```
-
-Before starting the API with `DATABASE_URL`, replace `AUTH_SESSION_SECRET` and
-`BOOTSTRAP_ADMIN_PASSWORD` in the real `.env`. The checked-in placeholders are
-intentionally rejected or unsuitable for deployment.
 
 Local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:3001`
 
-Next business milestone:
+## Verification
 
-1. Continue isolated module slices from a clean `main`.
-2. Keep schema changes documented in `docs/schema-changes.md`.
-3. Keep each module covered by tests before moving to the next module.
+For code changes, run the standard verification chain:
+
+```bash
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run db:generate
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run db:validate
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run typecheck
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run test
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run build
+npm run test:e2e -w @company-erp/web
+```
+
+## NAS Deployment
+
+Use `docs/deployment/nas-docker.md` for NAS deployment and
+`docs/deployment/pilot-runbook.md` for pilot operations. Deployment freshness is
+checked through:
+
+- `/api/app-version`
+- `/health` with `version.shortCommitSha`
+- `/volume1/company-erp/app/.deploy-revision.json` on the NAS
+- `docker compose ps`
+
+Do not expose the API or PostgreSQL directly to the public internet.
+
+## Release Notes
+
+See [docs/releases/v0.1.0.md](./docs/releases/v0.1.0.md) for the first MVP
+release note.
