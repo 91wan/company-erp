@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   CreateInventoryMovementInput,
   InventoryBalanceDto,
@@ -13,7 +13,90 @@ import {
   type InventoryRepository,
 } from "./inventory.js";
 
-type AnyPrisma = PrismaClient & Record<string, any>;
+const movementInclude = {
+  warehouse: { select: { warehouseCode: true, warehouseName: true } },
+  material: { select: { materialCode: true, materialName: true, specification: true } },
+  projectSite: { select: { siteName: true } },
+} satisfies Prisma.InventoryMovementInclude;
+
+const purchaseRecordLineRollupInclude = {
+  purchaseRecord: {
+    select: {
+      lines: {
+        select: {
+          purchaseQuantity: true,
+          receivedQuantity: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.PurchaseRecordLineInclude;
+
+export type InventoryMovementRecord = Prisma.InventoryMovementGetPayload<{ include: typeof movementInclude }>;
+type PurchaseRecordLineRollupRecord = {
+  purchaseRecordId: string;
+  purchaseRecord: {
+    lines: Array<{
+      purchaseQuantity: unknown;
+      receivedQuantity: unknown;
+    }>;
+  };
+};
+
+type InventoryMovementFindManyArgs = Prisma.InventoryMovementFindManyArgs & { include: typeof movementInclude };
+type InventoryMovementFindUniqueArgs = Prisma.InventoryMovementFindUniqueArgs & { include: typeof movementInclude };
+type InventoryMovementCreateArgs = Prisma.InventoryMovementCreateArgs & { include: typeof movementInclude };
+type InventoryBalanceGroupByArgs = Prisma.InventoryMovementGroupByArgs & {
+  by: ["warehouseId", "materialId", "unit"];
+  _sum: { quantity: true };
+  _max: { movementDate: true };
+};
+type InventoryBalanceGroupRow = {
+  warehouseId: string;
+  materialId: string;
+  unit: string;
+  _sum: { quantity: unknown };
+  _max: { movementDate: Date | null };
+};
+type WarehouseLookupRecord = Pick<
+  Prisma.WarehouseGetPayload<Record<string, never>>,
+  "id" | "warehouseCode" | "warehouseName"
+>;
+type MaterialLookupRecord = Pick<
+  Prisma.MaterialGetPayload<Record<string, never>>,
+  "id" | "materialCode" | "materialName" | "specification" | "baseUnit" | "safeStock"
+>;
+
+type InventoryPrismaTransactionClient = {
+  inventoryMovement: {
+    create(args: InventoryMovementCreateArgs): Promise<InventoryMovementRecord>;
+  };
+  purchaseRecordLine: {
+    update(args: Prisma.PurchaseRecordLineUpdateArgs): Promise<unknown>;
+    findUnique(args: Prisma.PurchaseRecordLineFindUniqueArgs): Promise<unknown>;
+  };
+  purchaseRecord: {
+    update(args: Prisma.PurchaseRecordUpdateArgs): Promise<unknown>;
+  };
+};
+
+export type InventoryPrismaClient = {
+  inventoryMovement: {
+    findMany(args: InventoryMovementFindManyArgs): Promise<InventoryMovementRecord[]>;
+    findUnique(args: InventoryMovementFindUniqueArgs): Promise<InventoryMovementRecord | null>;
+    create(args: InventoryMovementCreateArgs): Promise<InventoryMovementRecord>;
+    groupBy(args: InventoryBalanceGroupByArgs): Promise<unknown>;
+  };
+  purchaseRecordLine: InventoryPrismaTransactionClient["purchaseRecordLine"];
+  purchaseRecord: InventoryPrismaTransactionClient["purchaseRecord"];
+  warehouse: {
+    findMany(args: Prisma.WarehouseFindManyArgs): Promise<WarehouseLookupRecord[]>;
+  };
+  material: {
+    findMany(args: Prisma.MaterialFindManyArgs): Promise<MaterialLookupRecord[]>;
+  };
+  $transaction<T>(callback: (tx: InventoryPrismaTransactionClient) => Promise<T>): Promise<T>;
+};
 
 function decimalToNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -34,15 +117,7 @@ function timestampToString(value: Date | string): string {
   return typeof value === "string" ? value : value.toISOString();
 }
 
-function movementInclude() {
-  return {
-    warehouse: true,
-    material: true,
-    projectSite: true,
-  };
-}
-
-function toInventoryMovementDto(movement: any): InventoryMovementDto {
+function toInventoryMovementDto(movement: InventoryMovementRecord): InventoryMovementDto {
   return {
     id: movement.id,
     movementNo: movement.movementNo,
@@ -75,13 +150,57 @@ function toInventoryMovementDto(movement: any): InventoryMovementDto {
   };
 }
 
-function nullableDate(value: string | null | undefined): Date | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
+function requiredDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function createMovementData(input: CreateInventoryMovementInput): Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toInventoryBalanceGroupRows(value: unknown): InventoryBalanceGroupRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!isRecord(row)) return [];
+    const sum = isRecord(row._sum) ? row._sum : {};
+    const max = isRecord(row._max) ? row._max : {};
+    if (typeof row.warehouseId !== "string" || typeof row.materialId !== "string" || typeof row.unit !== "string") {
+      return [];
+    }
+    return [
+      {
+        warehouseId: row.warehouseId,
+        materialId: row.materialId,
+        unit: row.unit,
+        _sum: { quantity: sum.quantity },
+        _max: { movementDate: max.movementDate instanceof Date ? max.movementDate : null },
+      },
+    ];
+  });
+}
+
+function toPurchaseRecordLineRollup(value: unknown): PurchaseRecordLineRollupRecord | null {
+  if (!isRecord(value) || typeof value.purchaseRecordId !== "string" || !isRecord(value.purchaseRecord)) {
+    return null;
+  }
+  const lines = Array.isArray(value.purchaseRecord.lines) ? value.purchaseRecord.lines : [];
+  return {
+    purchaseRecordId: value.purchaseRecordId,
+    purchaseRecord: {
+      lines: lines.flatMap((line) => {
+        if (!isRecord(line)) return [];
+        return [
+          {
+            purchaseQuantity: line.purchaseQuantity,
+            receivedQuantity: line.receivedQuantity,
+          },
+        ];
+      }),
+    },
+  };
+}
+
+function createMovementData(input: CreateInventoryMovementInput): Prisma.InventoryMovementCreateInput {
   return {
     movementNo: input.movementNo,
     movementDate: new Date(`${input.movementDate}T00:00:00.000Z`),
@@ -115,7 +234,7 @@ function mapInventoryError(error: unknown): never {
   throw error;
 }
 
-function movementWhere(filters: InventoryMovementListFilters): Record<string, unknown> {
+function movementWhere(filters: InventoryMovementListFilters): Prisma.InventoryMovementWhereInput {
   return {
     ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
     ...(filters.materialId ? { materialId: filters.materialId } : {}),
@@ -125,8 +244,8 @@ function movementWhere(filters: InventoryMovementListFilters): Record<string, un
     ...(filters.dateFrom || filters.dateTo
       ? {
           movementDate: {
-            ...(filters.dateFrom ? { gte: nullableDate(filters.dateFrom) } : {}),
-            ...(filters.dateTo ? { lte: nullableDate(filters.dateTo) } : {}),
+            ...(filters.dateFrom ? { gte: requiredDate(filters.dateFrom) } : {}),
+            ...(filters.dateTo ? { lte: requiredDate(filters.dateTo) } : {}),
           },
         }
       : {}),
@@ -146,7 +265,11 @@ function movementWhere(filters: InventoryMovementListFilters): Record<string, un
   };
 }
 
-async function updatePurchaseReceivingRollup(tx: AnyPrisma, purchaseRecordLineId: string, quantity: number) {
+async function updatePurchaseReceivingRollup(
+  tx: InventoryPrismaTransactionClient,
+  purchaseRecordLineId: string,
+  quantity: number,
+) {
   await tx.purchaseRecordLine.update({
     where: { id: purchaseRecordLineId },
     data: {
@@ -154,25 +277,19 @@ async function updatePurchaseReceivingRollup(tx: AnyPrisma, purchaseRecordLineId
     },
   });
 
-  const line = await tx.purchaseRecordLine.findUnique({
+  const line = toPurchaseRecordLineRollup(await tx.purchaseRecordLine.findUnique({
     where: { id: purchaseRecordLineId },
-    include: {
-      purchaseRecord: {
-        include: {
-          lines: true,
-        },
-      },
-    },
-  });
+    include: purchaseRecordLineRollupInclude,
+  }));
 
   if (!line?.purchaseRecord) return;
 
   const totalPurchased = line.purchaseRecord.lines.reduce(
-    (sum: number, item: any) => sum + (decimalToNumber(item.purchaseQuantity) ?? 0),
+    (sum, item) => sum + (decimalToNumber(item.purchaseQuantity) ?? 0),
     0,
   );
   const totalReceived = line.purchaseRecord.lines.reduce(
-    (sum: number, item: any) => sum + (decimalToNumber(item.receivedQuantity) ?? 0),
+    (sum, item) => sum + (decimalToNumber(item.receivedQuantity) ?? 0),
     0,
   );
   const status: PurchaseRecordStatusCode =
@@ -187,10 +304,9 @@ async function updatePurchaseReceivingRollup(tx: AnyPrisma, purchaseRecordLineId
   });
 }
 
-export function createPrismaInventoryRepository(prisma: PrismaClient): InventoryRepository {
-  const client = prisma as AnyPrisma;
-  const include = movementInclude();
-
+export function createPrismaInventoryRepository(prisma: InventoryPrismaClient): InventoryRepository {
+  const client = prisma;
+  const include = movementInclude;
   return {
     async listMovements(filters: InventoryMovementListFilters) {
       const movements = await client.inventoryMovement.findMany({
@@ -210,15 +326,15 @@ export function createPrismaInventoryRepository(prisma: PrismaClient): Inventory
       try {
         if (!input.purchaseRecordLineId) {
           const movement = await client.inventoryMovement.create({
-            data: createMovementData(input) as any,
+            data: createMovementData(input),
             include,
           });
           return toInventoryMovementDto(movement);
         }
 
-        const movement = await (client.$transaction as any)(async (tx: AnyPrisma) => {
+        const movement = await client.$transaction(async (tx) => {
           const created = await tx.inventoryMovement.create({
-            data: createMovementData(input) as any,
+            data: createMovementData(input),
             include,
           });
           await updatePurchaseReceivingRollup(tx, input.purchaseRecordLineId!, input.quantity);
@@ -231,7 +347,7 @@ export function createPrismaInventoryRepository(prisma: PrismaClient): Inventory
     },
 
     async listBalances(filters: InventoryBalanceListFilters) {
-      const grouped = await client.inventoryMovement.groupBy({
+      const grouped = toInventoryBalanceGroupRows(await client.inventoryMovement.groupBy({
         by: ["warehouseId", "materialId", "unit"],
         where: {
           ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
@@ -239,20 +355,33 @@ export function createPrismaInventoryRepository(prisma: PrismaClient): Inventory
         },
         _sum: { quantity: true },
         _max: { movementDate: true },
-      });
+      }));
 
-      const warehouseIds = [...new Set(grouped.map((row: any) => row.warehouseId))];
-      const materialIds = [...new Set(grouped.map((row: any) => row.materialId))];
+      const warehouseIds = [...new Set(grouped.map((row) => row.warehouseId))];
+      const materialIds = [...new Set(grouped.map((row) => row.materialId))];
       const [warehouses, materials] = await Promise.all([
-        client.warehouse.findMany({ where: { id: { in: warehouseIds } } }),
-        client.material.findMany({ where: { id: { in: materialIds } } }),
+        client.warehouse.findMany({
+          where: { id: { in: warehouseIds } },
+          select: { id: true, warehouseCode: true, warehouseName: true },
+        }),
+        client.material.findMany({
+          where: { id: { in: materialIds } },
+          select: {
+            id: true,
+            materialCode: true,
+            materialName: true,
+            specification: true,
+            baseUnit: true,
+            safeStock: true,
+          },
+        }),
       ]);
 
-      const warehouseById = new Map(warehouses.map((warehouse: any) => [warehouse.id, warehouse]));
-      const materialById = new Map(materials.map((material: any) => [material.id, material]));
+      const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+      const materialById = new Map(materials.map((material) => [material.id, material]));
 
       return grouped
-        .map((row: any): InventoryBalanceDto => {
+        .map((row): InventoryBalanceDto => {
           const warehouse = warehouseById.get(row.warehouseId);
           const material = materialById.get(row.materialId);
           const currentQuantity = decimalToNumber(row._sum.quantity) ?? 0;
