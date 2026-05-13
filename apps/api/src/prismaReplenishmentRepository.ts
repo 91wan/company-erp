@@ -11,8 +11,6 @@ import {
   type ReplenishmentSuggestionRepository,
 } from "./replenishment.js";
 
-type AnyPrisma = Record<string, any>;
-
 function decimalToNumber(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
@@ -42,9 +40,66 @@ const include = {
   warehouse: true,
   material: true,
   convertedPurchaseRequest: true,
+} as const satisfies Prisma.ReplenishmentSuggestionInclude;
+
+const purchaseRequestInclude = {
+  projectSite: true,
+  lines: { orderBy: { createdAt: "asc" } },
+} as const satisfies Prisma.PurchaseRequestInclude;
+
+type ReplenishmentSuggestionRecord = Prisma.ReplenishmentSuggestionGetPayload<{ include: typeof include }>;
+type PurchaseRequestRecord = Prisma.PurchaseRequestGetPayload<{ include: typeof purchaseRequestInclude }>;
+type StockGroupRow = {
+  warehouseId: string;
+  materialId: string;
+  _sum: { quantity: Prisma.Decimal | null };
+};
+type ReservedUsageRow = Pick<
+  Prisma.ProjectUsageRequestGetPayload<Record<string, never>>,
+  "warehouseId" | "materialId" | "requestedQuantity" | "approvedQuantity" | "issuedQuantity"
+>;
+type OpenPurchaseRequestLineRow = Pick<
+  Prisma.PurchaseRequestLineGetPayload<Record<string, never>>,
+  "materialId" | "requestedQuantity"
+>;
+type OpenPurchaseRecordLineRow = Pick<
+  Prisma.PurchaseRecordLineGetPayload<Record<string, never>>,
+  "materialId" | "purchaseQuantity" | "receivedQuantity"
+>;
+type ReplenishmentReadClient = {
+  inventoryMovement: {
+    groupBy(args: {
+      by: ["warehouseId", "materialId"];
+      _sum: { quantity: true };
+    }): Promise<StockGroupRow[]>;
+  };
+  projectUsageRequest: {
+    findMany(args: {
+      where: Prisma.ProjectUsageRequestWhereInput;
+      select: {
+        warehouseId: true;
+        materialId: true;
+        requestedQuantity: true;
+        approvedQuantity: true;
+        issuedQuantity: true;
+      };
+    }): Promise<ReservedUsageRow[]>;
+  };
+  purchaseRequestLine: {
+    findMany(args: {
+      where: Prisma.PurchaseRequestLineWhereInput;
+      select: { materialId: true; requestedQuantity: true };
+    }): Promise<OpenPurchaseRequestLineRow[]>;
+  };
+  purchaseRecordLine: {
+    findMany(args: {
+      where: Prisma.PurchaseRecordLineWhereInput;
+      select: { materialId: true; purchaseQuantity: true; receivedQuantity: true };
+    }): Promise<OpenPurchaseRecordLineRow[]>;
+  };
 };
 
-function toSuggestionDto(suggestion: any): ReplenishmentSuggestionDto {
+function toSuggestionDto(suggestion: ReplenishmentSuggestionRecord): ReplenishmentSuggestionDto {
   return {
     id: suggestion.id,
     warehouseId: suggestion.warehouseId,
@@ -69,7 +124,7 @@ function toSuggestionDto(suggestion: any): ReplenishmentSuggestionDto {
   };
 }
 
-function toPurchaseRequestDto(request: any): PurchaseRequestDto {
+function toPurchaseRequestDto(request: PurchaseRequestRecord): PurchaseRequestDto {
   return {
     id: request.id,
     requestNo: request.requestNo,
@@ -83,7 +138,7 @@ function toPurchaseRequestDto(request: any): PurchaseRequestDto {
     purpose: request.purpose,
     status: request.status,
     remark: request.remark,
-    lines: request.lines.map((line: any) => ({
+    lines: request.lines.map((line) => ({
       id: line.id,
       materialId: line.materialId,
       materialCode: line.materialCode,
@@ -102,15 +157,15 @@ function key(warehouseId: string, materialId: string): string {
   return `${warehouseId}\u0000${materialId}`;
 }
 
-async function currentStockByKey(client: AnyPrisma): Promise<Map<string, number>> {
+async function currentStockByKey(client: ReplenishmentReadClient): Promise<Map<string, number>> {
   const grouped = await client.inventoryMovement.groupBy({
     by: ["warehouseId", "materialId"],
     _sum: { quantity: true },
   });
-  return new Map(grouped.map((row: any) => [key(row.warehouseId, row.materialId), decimalToNumber(row._sum.quantity)]));
+  return new Map(grouped.map((row) => [key(row.warehouseId, row.materialId), decimalToNumber(row._sum.quantity)]));
 }
 
-async function reservedUsageByKey(client: AnyPrisma): Promise<Map<string, number>> {
+async function reservedUsageByKey(client: ReplenishmentReadClient): Promise<Map<string, number>> {
   const requests = await client.projectUsageRequest.findMany({
     where: { status: { in: ["pending", "partially_issued"] } },
     select: {
@@ -132,7 +187,7 @@ async function reservedUsageByKey(client: AnyPrisma): Promise<Map<string, number
   return totals;
 }
 
-async function openPurchaseByMaterialId(client: AnyPrisma): Promise<Map<string, number>> {
+async function openPurchaseByMaterialId(client: ReplenishmentReadClient): Promise<Map<string, number>> {
   const [requestLines, recordLines] = await Promise.all([
     client.purchaseRequestLine.findMany({
       where: {
@@ -177,7 +232,7 @@ function mapConflict(error: unknown): never {
 export function createPrismaReplenishmentSuggestionRepository(
   prisma: PrismaClient,
 ): ReplenishmentSuggestionRepository {
-  const client = prisma as unknown as AnyPrisma;
+  const client = prisma;
 
   return {
     async list(filters: ReplenishmentSuggestionListFilters) {
@@ -210,7 +265,9 @@ export function createPrismaReplenishmentSuggestionRepository(
         openPurchaseByMaterialId(client),
       ]);
 
-      const openByKey = new Map(openSuggestions.map((suggestion: any) => [key(suggestion.warehouseId, suggestion.materialId), suggestion]));
+      const openByKey = new Map(
+        openSuggestions.map((suggestion) => [key(suggestion.warehouseId, suggestion.materialId), suggestion]),
+      );
       const created: ReplenishmentSuggestionDto[] = [];
       const existingOpen: ReplenishmentSuggestionDto[] = [];
       let skipped = 0;
@@ -287,8 +344,7 @@ export function createPrismaReplenishmentSuggestionRepository(
 
     async convertToPurchaseRequest(id, input): Promise<ReplenishmentConversionResult | null> {
       try {
-        const result = await (client.$transaction as any)(
-          async (tx: AnyPrisma): Promise<ReplenishmentConversionResult | null> => {
+        const result = await client.$transaction(async (tx): Promise<ReplenishmentConversionResult | null> => {
           const suggestion = await tx.replenishmentSuggestion.findUnique({ where: { id }, include });
           if (!suggestion) return null;
           if (suggestion.status !== "open") {
@@ -320,7 +376,7 @@ export function createPrismaReplenishmentSuggestionRepository(
                 ],
               },
             },
-            include: { projectSite: true, lines: { orderBy: { createdAt: "asc" } } },
+            include: purchaseRequestInclude,
           });
 
           const updated = await tx.replenishmentSuggestion.update({
@@ -336,9 +392,8 @@ export function createPrismaReplenishmentSuggestionRepository(
             suggestion: toSuggestionDto(updated),
             purchaseRequest: toPurchaseRequestDto(request),
           };
-          },
-        );
-        return result as ReplenishmentConversionResult | null;
+        });
+        return result;
       } catch (error) {
         mapConflict(error);
       }
