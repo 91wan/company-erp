@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   CreateMarketOperationsHandoffInput,
   MarketOperationsHandoffDto,
@@ -11,13 +11,29 @@ import {
   type MarketOperationsHandoffRepository,
 } from "./marketOperationsHandoffs.js";
 
-type AnyPrisma = PrismaClient & Record<string, any>;
-
 const handoffInclude = {
-  clientParty: true,
-  projectSite: true,
-  marketOwner: true,
-  operationsOwner: true,
+  clientParty: { select: { partyName: true } },
+  projectSite: { select: { siteName: true } },
+  marketOwner: { select: { name: true } },
+  operationsOwner: { select: { name: true } },
+} satisfies Prisma.MarketOperationsHandoffInclude;
+
+export type MarketOperationsHandoffRecord = Prisma.MarketOperationsHandoffGetPayload<{
+  include: typeof handoffInclude;
+}>;
+
+type HandoffFindManyArgs = Prisma.MarketOperationsHandoffFindManyArgs & { include: typeof handoffInclude };
+type HandoffFindUniqueArgs = Prisma.MarketOperationsHandoffFindUniqueArgs & { include: typeof handoffInclude };
+type HandoffCreateArgs = Prisma.MarketOperationsHandoffCreateArgs & { include: typeof handoffInclude };
+type HandoffUpdateArgs = Prisma.MarketOperationsHandoffUpdateArgs & { include: typeof handoffInclude };
+
+export type MarketOperationsHandoffPrismaClient = {
+  marketOperationsHandoff: {
+    findMany(args: HandoffFindManyArgs): Promise<MarketOperationsHandoffRecord[]>;
+    findUnique(args: HandoffFindUniqueArgs): Promise<MarketOperationsHandoffRecord | null>;
+    create(args: HandoffCreateArgs): Promise<MarketOperationsHandoffRecord>;
+    update(args: HandoffUpdateArgs): Promise<MarketOperationsHandoffRecord>;
+  };
 };
 
 function dateToString(value: Date | string | null | undefined): string | null {
@@ -36,7 +52,7 @@ function nullableDate(value: string | null | undefined): Date | null | undefined
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function toDto(handoff: any): MarketOperationsHandoffDto {
+function toDto(handoff: MarketOperationsHandoffRecord): MarketOperationsHandoffDto {
   return {
     id: handoff.id,
     handoffNo: handoff.handoffNo,
@@ -59,16 +75,16 @@ function toDto(handoff: any): MarketOperationsHandoffDto {
   };
 }
 
-function optionalRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+function optionalRelation(id: string | null | undefined): { connect: { id: string } } | { disconnect: true } | undefined {
   if (id === undefined) return undefined;
   return id ? { connect: { id } } : { disconnect: true };
 }
 
-function optionalCreateRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+function optionalCreateRelation(id: string | null | undefined): { connect: { id: string } } | undefined {
   return id ? { connect: { id } } : undefined;
 }
 
-function toCreateData(input: CreateMarketOperationsHandoffInput): Record<string, unknown> {
+function toCreateData(input: CreateMarketOperationsHandoffInput): Prisma.MarketOperationsHandoffCreateInput {
   return {
     handoffNo: input.handoffNo,
     projectName: input.projectName,
@@ -85,7 +101,7 @@ function toCreateData(input: CreateMarketOperationsHandoffInput): Record<string,
   };
 }
 
-function toUpdateData(input: UpdateMarketOperationsHandoffInput): Record<string, unknown> {
+function toUpdateData(input: UpdateMarketOperationsHandoffInput): Prisma.MarketOperationsHandoffUpdateInput {
   return {
     ...(input.handoffNo !== undefined ? { handoffNo: input.handoffNo } : {}),
     ...(input.projectName !== undefined ? { projectName: input.projectName } : {}),
@@ -104,7 +120,7 @@ function toUpdateData(input: UpdateMarketOperationsHandoffInput): Record<string,
   };
 }
 
-function where(filters: MarketOperationsHandoffListFilters): Record<string, unknown> {
+function where(filters: MarketOperationsHandoffListFilters): Prisma.MarketOperationsHandoffWhereInput {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.clientPartyId ? { clientPartyId: filters.clientPartyId } : {}),
@@ -138,13 +154,11 @@ function mapError(error: unknown): never {
 }
 
 export function createPrismaMarketOperationsHandoffRepository(
-  prisma: PrismaClient,
+  prisma: MarketOperationsHandoffPrismaClient,
 ): MarketOperationsHandoffRepository {
-  const client = prisma as AnyPrisma;
-
   return {
     async list(filters: MarketOperationsHandoffListFilters) {
-      const handoffs = await client.marketOperationsHandoff.findMany({
+      const handoffs = await prisma.marketOperationsHandoff.findMany({
         where: where(filters),
         include: handoffInclude,
         orderBy: [{ updatedAt: "desc" }, { handoffNo: "asc" }],
@@ -152,13 +166,13 @@ export function createPrismaMarketOperationsHandoffRepository(
       return handoffs.map(toDto);
     },
     async getById(id: string) {
-      const handoff = await client.marketOperationsHandoff.findUnique({ where: { id }, include: handoffInclude });
+      const handoff = await prisma.marketOperationsHandoff.findUnique({ where: { id }, include: handoffInclude });
       return handoff ? toDto(handoff) : null;
     },
     async create(input: CreateMarketOperationsHandoffInput) {
       try {
-        const handoff = await client.marketOperationsHandoff.create({
-          data: toCreateData(input) as any,
+        const handoff = await prisma.marketOperationsHandoff.create({
+          data: toCreateData(input),
           include: handoffInclude,
         });
         return toDto(handoff);
@@ -168,7 +182,7 @@ export function createPrismaMarketOperationsHandoffRepository(
     },
     async update(id: string, input: UpdateMarketOperationsHandoffInput) {
       try {
-        const handoff = await client.marketOperationsHandoff.update({
+        const handoff = await prisma.marketOperationsHandoff.update({
           where: { id },
           data: toUpdateData(input),
           include: handoffInclude,
