@@ -5,6 +5,7 @@ import {
   PurchaseRecordConflictError,
   PurchaseRecordValidationError,
   PurchaseRequestConflictError,
+  PurchaseRequestStateConflictError,
   PurchaseRequestValidationError,
   normalizePurchaseRecordFilters,
   normalizePurchaseRecordInput,
@@ -98,16 +99,17 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
     }
 
-    const { id } = request.params as { id: string };
-    const current = await options.purchaseRequestRepository.getById(id);
-    if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
-    if (current.status !== "draft") {
-      return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+    try {
+      const { id } = request.params as { id: string };
+      const purchaseRequest = await options.purchaseRequestRepository.submit(id, "draft");
+      if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      return { purchaseRequest };
+    } catch (error) {
+      if (error instanceof PurchaseRequestStateConflictError) {
+        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+      }
+      throw error;
     }
-
-    const purchaseRequest = await options.purchaseRequestRepository.submit(id);
-    if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
-    return { purchaseRequest };
   });
 
   app.post("/api/purchase-requests/:id/approve", async (request, reply) => {
@@ -119,17 +121,15 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const input = normalizePurchaseRequestReviewInput(request.body, "approve");
-      const current = await options.purchaseRequestRepository.getById(id);
-      if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
-      if (current.status !== "pending_approval") {
-        return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
-      }
-      const purchaseRequest = await options.purchaseRequestRepository.approve(id, input);
+      const purchaseRequest = await options.purchaseRequestRepository.approve(id, "pending_approval", input);
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
         return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof PurchaseRequestStateConflictError) {
+        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
       }
       throw error;
     }
@@ -144,17 +144,15 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const input = normalizePurchaseRequestReviewInput(request.body, "reject");
-      const current = await options.purchaseRequestRepository.getById(id);
-      if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
-      if (current.status !== "pending_approval") {
-        return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
-      }
-      const purchaseRequest = await options.purchaseRequestRepository.reject(id, input);
+      const purchaseRequest = await options.purchaseRequestRepository.reject(id, "pending_approval", input);
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
         return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof PurchaseRequestStateConflictError) {
+        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
       }
       throw error;
     }

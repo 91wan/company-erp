@@ -11,6 +11,7 @@ import type {
 import {
   PurchaseRecordConflictError,
   PurchaseRequestConflictError,
+  PurchaseRequestStateConflictError,
   type PurchaseRecordListFilters,
   type PurchaseRecordRepository,
   type PurchaseRequestListFilters,
@@ -279,11 +280,14 @@ function mapRecordConflict(error: unknown): never {
   throw error;
 }
 
-function reviewData(status: PurchaseRequestStatusCode, input: PurchaseRequestReviewInput): Prisma.PurchaseRequestUpdateInput {
+function reviewData(
+  status: PurchaseRequestStatusCode,
+  input: PurchaseRequestReviewInput,
+): Prisma.PurchaseRequestUncheckedUpdateManyInput {
   return {
     status,
     reviewedAt: new Date(),
-    ...relationUpdate(input.reviewedByEmployeeId, "reviewedBy"),
+    ...(input.reviewedByEmployeeId !== undefined ? { reviewedByEmployeeId: input.reviewedByEmployeeId } : {}),
     reviewedByName: input.reviewedByName,
     reviewRemark: input.reviewRemark,
   };
@@ -294,6 +298,21 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
     projectSite: true,
     lines: { orderBy: { createdAt: "asc" } },
   } satisfies Prisma.PurchaseRequestInclude;
+  const findById = async (id: string) => {
+    const request = await prisma.purchaseRequest.findUnique({ where: { id }, include });
+    return request ? toPurchaseRequestDto(request) : null;
+  };
+  const transition = async (
+    id: string,
+    expectedStatus: PurchaseRequestStatusCode,
+    data: Prisma.PurchaseRequestUncheckedUpdateManyInput,
+  ) => {
+    const result = await prisma.purchaseRequest.updateMany({ where: { id, status: expectedStatus }, data });
+    if (result.count === 1) return findById(id);
+    const existing = await findById(id);
+    if (existing) throw new PurchaseRequestStateConflictError();
+    return null;
+  };
 
   return {
     async list(filters: PurchaseRequestListFilters) {
@@ -320,8 +339,7 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
       return requests.map(toPurchaseRequestDto);
     },
     async getById(id: string) {
-      const request = await prisma.purchaseRequest.findUnique({ where: { id }, include });
-      return request ? toPurchaseRequestDto(request) : null;
+      return findById(id);
     },
     async create(input: CreatePurchaseRequestInput) {
       try {
@@ -340,51 +358,21 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
         mapRequestConflict(error);
       }
     },
-    async submit(id: string) {
-      try {
-        const request = await prisma.purchaseRequest.update({
-          where: { id },
-          data: {
-            status: "pending_approval",
-            submittedAt: new Date(),
-            reviewedAt: null,
-            reviewedBy: { disconnect: true },
-            reviewedByName: null,
-            reviewRemark: null,
-          },
-          include,
-        });
-        return toPurchaseRequestDto(request);
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
-        throw error;
-      }
+    async submit(id: string, expectedStatus: PurchaseRequestStatusCode) {
+      return transition(id, expectedStatus, {
+        status: "pending_approval",
+        submittedAt: new Date(),
+        reviewedAt: null,
+        reviewedByEmployeeId: null,
+        reviewedByName: null,
+        reviewRemark: null,
+      });
     },
-    async approve(id: string, input: PurchaseRequestReviewInput) {
-      try {
-        const request = await prisma.purchaseRequest.update({
-          where: { id },
-          data: reviewData("pending_purchase", input),
-          include,
-        });
-        return toPurchaseRequestDto(request);
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
-        throw error;
-      }
+    async approve(id: string, expectedStatus: PurchaseRequestStatusCode, input: PurchaseRequestReviewInput) {
+      return transition(id, expectedStatus, reviewData("pending_purchase", input));
     },
-    async reject(id: string, input: PurchaseRequestReviewInput) {
-      try {
-        const request = await prisma.purchaseRequest.update({
-          where: { id },
-          data: reviewData("rejected", input),
-          include,
-        });
-        return toPurchaseRequestDto(request);
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
-        throw error;
-      }
+    async reject(id: string, expectedStatus: PurchaseRequestStatusCode, input: PurchaseRequestReviewInput) {
+      return transition(id, expectedStatus, reviewData("rejected", input));
     },
     async markPurchasing(id: string) {
       await prisma.purchaseRequest.updateMany({

@@ -6,6 +6,7 @@ import { hashPassword } from "../src/password";
 import {
   PurchaseRecordConflictError,
   PurchaseRequestConflictError,
+  PurchaseRequestStateConflictError,
   type PurchaseRecordRepository,
   type PurchaseRequestRepository,
 } from "../src/purchases";
@@ -171,17 +172,19 @@ function createFakePurchaseRequestRepository(seed: PurchaseRequestDto[] = []): P
       };
       return requests[index];
     },
-    async submit(id) {
+    async submit(id, expectedStatus) {
       const request = requests.find((candidate) => candidate.id === id);
       if (!request) return null;
+      if (request.status !== expectedStatus) throw new PurchaseRequestStateConflictError();
       request.status = "pending_approval";
       request.submittedAt = now;
       request.updatedAt = now;
       return request;
     },
-    async approve(id, input) {
+    async approve(id, expectedStatus, input) {
       const request = requests.find((candidate) => candidate.id === id);
       if (!request) return null;
+      if (request.status !== expectedStatus) throw new PurchaseRequestStateConflictError();
       request.status = "pending_purchase";
       request.reviewedAt = now;
       request.reviewedByEmployeeId = input.reviewedByEmployeeId ?? null;
@@ -190,9 +193,10 @@ function createFakePurchaseRequestRepository(seed: PurchaseRequestDto[] = []): P
       request.updatedAt = now;
       return request;
     },
-    async reject(id, input) {
+    async reject(id, expectedStatus, input) {
       const request = requests.find((candidate) => candidate.id === id);
       if (!request) return null;
+      if (request.status !== expectedStatus) throw new PurchaseRequestStateConflictError();
       request.status = "rejected";
       request.reviewedAt = now;
       request.reviewedByEmployeeId = input.reviewedByEmployeeId ?? null;
@@ -430,11 +434,65 @@ describe("purchase requests API", () => {
     });
     await app.close();
 
-    expect(invalidSubmitResponse.statusCode).toBe(400);
-    expect(invalidSubmitResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
-    expect(invalidApproveResponse.statusCode).toBe(400);
-    expect(invalidApproveResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+    expect(invalidSubmitResponse.statusCode).toBe(409);
+    expect(invalidSubmitResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+    expect(invalidApproveResponse.statusCode).toBe(409);
+    expect(invalidApproveResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("atomically allows only one concurrent purchase request approval", async () => {
+    let request = makePurchaseRequest({ status: "pending_approval" });
+    let pendingReads = 0;
+    let releaseReads: (() => void) | null = null;
+    const bothReadsStarted = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+    const repository: PurchaseRequestRepository = {
+      ...createFakePurchaseRequestRepository([]),
+      async getById(id) {
+        if (id !== request.id) return null;
+        pendingReads += 1;
+        if (pendingReads === 2) releaseReads?.();
+        await bothReadsStarted;
+        return { ...request };
+      },
+      async approve(id, expectedStatus, input) {
+        if (id !== request.id) return null;
+        if (request.status !== expectedStatus) throw new PurchaseRequestStateConflictError();
+        request = {
+          ...request,
+          status: "pending_purchase",
+          reviewedAt: now,
+          reviewedByEmployeeId: input.reviewedByEmployeeId ?? null,
+          reviewedByName: input.reviewedByName ?? null,
+          reviewRemark: input.reviewRemark ?? null,
+          updatedAt: now,
+        };
+        return request;
+      },
+    };
+    const app = await buildApp({ purchaseRequestRepository: repository });
+
+    const responses = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/approve",
+        payload: { reviewedByName: "主管 A" },
+      }),
+      app.inject({
+        method: "POST",
+        url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/approve",
+        payload: { reviewedByName: "主管 B" },
+      }),
+    ]);
+    await app.close();
+
+    const statuses = responses.map((response) => response.statusCode).sort();
+    expect(statuses).toEqual([200, 409]);
+    expect(responses.find((response) => response.statusCode === 409)?.json()).toMatchObject({
+      error: "PURCHASE_REQUEST_STATE_CONFLICT",
+    });
   });
 
   it("rejects pending approval purchase requests with a required remark", async () => {
