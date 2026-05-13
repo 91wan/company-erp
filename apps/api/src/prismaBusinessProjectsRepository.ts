@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   BusinessProjectDto,
   BusinessProjectInvestmentSummaryDto,
@@ -13,10 +13,38 @@ import {
   type BusinessProjectRepository,
 } from "./businessProjects.js";
 
-type AnyPrisma = PrismaClient & Record<string, any>;
-
 const include = {
-  managerEmployee: true,
+  managerEmployee: { select: { name: true } },
+} satisfies Prisma.BusinessProjectInclude;
+
+export type BusinessProjectRecord = Prisma.BusinessProjectGetPayload<{ include: typeof include }>;
+
+type BusinessProjectDelegate = {
+  findMany(args: Prisma.BusinessProjectFindManyArgs & { include: typeof include }): Promise<BusinessProjectRecord[]>;
+  findUnique(args: Prisma.BusinessProjectFindUniqueArgs & { include: typeof include }): Promise<BusinessProjectRecord | null>;
+  create(args: Prisma.BusinessProjectCreateArgs & { include: typeof include }): Promise<BusinessProjectRecord>;
+  update(args: Prisma.BusinessProjectUpdateArgs & { include: typeof include }): Promise<BusinessProjectRecord>;
+};
+
+type ContractAggregateResult = {
+  _count: { _all: number };
+  _sum: { amount: unknown };
+};
+
+type ContractInvestmentCategoryRow = {
+  investmentCategory: ContractInvestmentCategoryCode;
+  _count: { _all: number };
+  _sum: { amount: unknown };
+};
+
+type ContractDelegate = {
+  aggregate(args: Prisma.ContractAggregateArgs): Promise<unknown>;
+  groupBy(args: Prisma.ContractGroupByArgs): Promise<unknown>;
+};
+
+export type BusinessProjectPrismaClient = {
+  businessProject: BusinessProjectDelegate;
+  contract: ContractDelegate;
 };
 
 function decimalToNumber(value: unknown): number {
@@ -44,16 +72,55 @@ function nullableDate(value: string | null | undefined): Date | null | undefined
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function optionalRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+function optionalRelation(id: string | null | undefined): Prisma.EmployeeUpdateOneWithoutManagedBusinessProjectsNestedInput | undefined {
   if (id === undefined) return undefined;
   return id ? { connect: { id } } : { disconnect: true };
 }
 
-function optionalCreateRelation(id: string | null | undefined): Record<string, unknown> | undefined {
+function optionalCreateRelation(id: string | null | undefined): Prisma.EmployeeCreateNestedOneWithoutManagedBusinessProjectsInput | undefined {
   return id ? { connect: { id } } : undefined;
 }
 
-function toBusinessProjectDto(project: any): BusinessProjectDto {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function countAll(value: unknown): number {
+  return isRecord(value) && typeof value._all === "number" ? value._all : 0;
+}
+
+function toAggregateResult(value: unknown): ContractAggregateResult {
+  if (!isRecord(value)) return { _count: { _all: 0 }, _sum: { amount: null } };
+  const count = isRecord(value._count) ? countAll(value._count) : 0;
+  const amount = isRecord(value._sum) ? value._sum.amount : null;
+  return { _count: { _all: count }, _sum: { amount } };
+}
+
+function isInvestmentCategory(value: unknown): value is ContractInvestmentCategoryCode {
+  return (
+    value === "renovation" ||
+    value === "equipment" ||
+    value === "advertising_signage" ||
+    value === "tableware_supplies" ||
+    value === "other"
+  );
+}
+
+function toInvestmentCategoryRows(value: unknown): ContractInvestmentCategoryRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!isRecord(row) || !isInvestmentCategory(row.investmentCategory)) return [];
+    return [
+      {
+        investmentCategory: row.investmentCategory,
+        _count: { _all: isRecord(row._count) ? countAll(row._count) : 0 },
+        _sum: { amount: isRecord(row._sum) ? row._sum.amount : null },
+      },
+    ];
+  });
+}
+
+function toBusinessProjectDto(project: BusinessProjectRecord): BusinessProjectDto {
   return {
     id: project.id,
     projectCode: project.projectCode,
@@ -71,7 +138,7 @@ function toBusinessProjectDto(project: any): BusinessProjectDto {
   };
 }
 
-function toCreateData(input: CreateBusinessProjectInput): Record<string, unknown> {
+function toCreateData(input: CreateBusinessProjectInput): Prisma.BusinessProjectCreateInput {
   return {
     projectCode: input.projectCode,
     projectName: input.projectName,
@@ -85,7 +152,7 @@ function toCreateData(input: CreateBusinessProjectInput): Record<string, unknown
   };
 }
 
-function toUpdateData(input: UpdateBusinessProjectInput): Record<string, unknown> {
+function toUpdateData(input: UpdateBusinessProjectInput): Prisma.BusinessProjectUpdateInput {
   return {
     ...(input.projectCode !== undefined ? { projectCode: input.projectCode } : {}),
     ...(input.projectName !== undefined ? { projectName: input.projectName } : {}),
@@ -99,7 +166,7 @@ function toUpdateData(input: UpdateBusinessProjectInput): Record<string, unknown
   };
 }
 
-function where(filters: BusinessProjectListFilters): Record<string, unknown> {
+function where(filters: BusinessProjectListFilters): Prisma.BusinessProjectWhereInput {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.projectType ? { projectType: filters.projectType } : {}),
@@ -129,12 +196,10 @@ function mapError(error: unknown): never {
   throw error;
 }
 
-export function createPrismaBusinessProjectRepository(prisma: PrismaClient): BusinessProjectRepository {
-  const client = prisma as AnyPrisma;
-
+export function createPrismaBusinessProjectRepository(prisma: BusinessProjectPrismaClient): BusinessProjectRepository {
   return {
     async list(filters) {
-      const projects = await client.businessProject.findMany({
+      const projects = await prisma.businessProject.findMany({
         where: where(filters),
         include,
         orderBy: [{ updatedAt: "desc" }, { projectCode: "asc" }],
@@ -142,52 +207,54 @@ export function createPrismaBusinessProjectRepository(prisma: PrismaClient): Bus
       return projects.map(toBusinessProjectDto);
     },
     async getById(id) {
-      const project = await client.businessProject.findUnique({ where: { id }, include });
+      const project = await prisma.businessProject.findUnique({ where: { id }, include });
       return project ? toBusinessProjectDto(project) : null;
     },
     async create(input) {
       try {
-        const project = await client.businessProject.create({ data: toCreateData(input) as any, include });
+        const project = await prisma.businessProject.create({ data: toCreateData(input), include });
         return toBusinessProjectDto(project);
       } catch (error) {
         mapError(error);
       }
     },
     async update(id, input) {
-      const existing = await client.businessProject.findUnique({ where: { id }, select: { id: true } });
+      const existing = await prisma.businessProject.findUnique({ where: { id }, include });
       if (!existing) return null;
 
       try {
-        const project = await client.businessProject.update({ where: { id }, data: toUpdateData(input), include });
+        const project = await prisma.businessProject.update({ where: { id }, data: toUpdateData(input), include });
         return toBusinessProjectDto(project);
       } catch (error) {
         mapError(error);
       }
     },
     async getInvestmentSummary(id) {
-      const existing = await client.businessProject.findUnique({ where: { id }, select: { id: true } });
+      const existing = await prisma.businessProject.findUnique({ where: { id }, include });
       if (!existing) return null;
 
-      const [all, grouped] = await Promise.all([
-        client.contract.aggregate({
+      const [allResult, groupedResult] = await Promise.all([
+        prisma.contract.aggregate({
           where: { businessProjectId: id },
           _count: { _all: true },
           _sum: { amount: true },
         }),
-        client.contract.groupBy({
+        prisma.contract.groupBy({
           by: ["investmentCategory"],
           where: { businessProjectId: id, investmentCategory: { not: null } },
           _count: { _all: true },
           _sum: { amount: true },
         }),
       ]);
+      const all = toAggregateResult(allResult);
+      const grouped = toInvestmentCategoryRows(groupedResult);
 
       return {
         businessProjectId: id,
         contractCount: all._count._all,
         totalAmount: decimalToNumber(all._sum.amount),
-        categories: grouped.map((category: any) => ({
-          investmentCategory: category.investmentCategory as ContractInvestmentCategoryCode,
+        categories: grouped.map((category) => ({
+          investmentCategory: category.investmentCategory,
           contractCount: category._count._all,
           totalAmount: decimalToNumber(category._sum.amount),
         })),
