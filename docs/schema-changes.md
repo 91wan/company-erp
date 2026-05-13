@@ -81,6 +81,12 @@ Before creating migrations, confirm the MVP data model for:
 - Added light project-site compliance API boundaries for active roster, employer liability insurance, payroll attachment, and compliance summary without forcing roster people into `employees`.
 - Added migration `20260513170000_project_site_external_accounts`.
 
+## 2026-05-13 App Config
+
+- Added `app_config` key-value table for lightweight system display settings.
+- Added initial `companyName` setting with default value `Company ERP`.
+- Added migration `20260513190000_app_config`.
+
 ## 2026-05-11 Purchase Source and Optional Supplier Rule
 
 - Confirmed purchase records should require `purchaser` and `purchase_source_type`.

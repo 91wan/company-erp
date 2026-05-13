@@ -30,6 +30,7 @@ import { createPrismaBusinessProjectRepository } from "./prismaBusinessProjectsR
 import { createPrismaCertificateRepository } from "./prismaCertificatesRepository.js";
 import { createPrismaImportJobRepository } from "./prismaImportJobRepository.js";
 import { createPrismaMarketOperationsHandoffRepository } from "./prismaMarketOperationsHandoffsRepository.js";
+import { createPrismaAppConfigRepository } from "./prismaAppConfigRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -44,6 +45,7 @@ const app = buildApp({
       }
     : { enabled: false },
   authRepository: prisma ? createPrismaAuthRepository(prisma) : undefined,
+  appConfigRepository: prisma ? createPrismaAppConfigRepository(prisma) : undefined,
   partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
   materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,
   warehouseRepository: prisma ? createPrismaWarehouseRepository(prisma) : undefined,

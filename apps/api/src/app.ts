@@ -140,11 +140,18 @@ import {
   normalizeMarketOperationsHandoffInput,
   type MarketOperationsHandoffRepository,
 } from "./marketOperationsHandoffs.js";
+import {
+  AppConfigValidationError,
+  createMemoryAppConfigRepository,
+  normalizeAppConfigInput,
+  type AppConfigRepository,
+} from "./appConfig.js";
 import { registerAuth, type AuthenticatedRequest, type AuthOptions, type AuthRepository } from "./auth.js";
 
 type BuildAppOptions = {
   auth?: AuthOptions;
   authRepository?: AuthRepository;
+  appConfigRepository?: AppConfigRepository;
   partyRepository?: PartyRepository;
   materialRepository?: MaterialRepository;
   warehouseRepository?: WarehouseRepository;
@@ -255,6 +262,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: false,
   });
+  const appConfigRepository = options.appConfigRepository ?? createMemoryAppConfigRepository();
 
   void app.register(cors, {
     origin: true,
@@ -292,6 +300,23 @@ export function buildApp(options: BuildAppOptions = {}) {
   }));
 
   app.get("/api/meta/inventory", async () => INVENTORY_MVP_METADATA);
+
+  app.get("/api/app-config", async () => ({
+    appConfig: await appConfigRepository.get(),
+  }));
+
+  app.patch("/api/app-config", async (request, reply) => {
+    try {
+      const input = normalizeAppConfigInput(request.body);
+      const appConfig = await appConfigRepository.update(input);
+      return { appConfig };
+    } catch (error) {
+      if (error instanceof AppConfigValidationError) {
+        return reply.status(400).send({ error: "APP_CONFIG_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
 
   app.get("/api/import-jobs", async (request, reply) => {
     if (!options.importJobRepository) {

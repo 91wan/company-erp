@@ -61,6 +61,14 @@ export type LoginInput = {
   password: string;
 };
 
+export type AppConfigDto = {
+  companyName: string;
+};
+
+export type UpdateAppConfigInput = {
+  companyName?: string;
+};
+
 export type MvpDictionary = {
   label: string;
   values: readonly string[];
