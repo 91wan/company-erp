@@ -103,6 +103,12 @@ file keeps API container logs on the default `json-file` driver with rotation
 (`10m` × `5` files); adjust `LOG_LEVEL`, `max-size`, or `max-file` if the NAS has
 stricter storage limits.
 
+Backup and restore logic is also checked by the CI workflow
+`Backup Restore Verification`, which runs `scripts/test-backup-restore.sh`
+against a temporary PostgreSQL container. The workflow only seeds synthetic
+`backup_restore_smoke` rows and never touches NAS data, attachments, or real ERP
+records.
+
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
 `POSTGRES_MEMORY_LIMIT`, `API_MEMORY_LIMIT`, and `WEB_MEMORY_LIMIT` in the NAS
