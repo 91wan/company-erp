@@ -49,6 +49,11 @@ const ownerTypes = new Set(CERTIFICATE_OWNER_TYPES.map((item) => item.code));
 const validityTypes = new Set(CERTIFICATE_VALIDITY_TYPES.map((item) => item.code));
 const computedStatuses = new Set(CERTIFICATE_COMPUTED_STATUSES.map((item) => item.code));
 
+type CertificateOwnerState = Pick<
+  UpdateCertificateRecordInput,
+  "ownerType" | "ownerEmployeeId" | "ownerRosterPersonId" | "ownerProjectSiteId" | "ownerPartyId"
+>;
+
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
   if (typeof value === "string") return value.trim() || null;
@@ -83,6 +88,40 @@ function dayNumber(date: string | null | undefined): number | null {
   if (!date) return null;
   const parsed = new Date(`${date}T00:00:00.000Z`).getTime();
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function validateCertificateOwnerState(owner: CertificateOwnerState): string[] {
+  const issues: string[] = [];
+  const employeeId = owner.ownerEmployeeId || null;
+  const rosterPersonId = owner.ownerRosterPersonId || null;
+  const projectSiteId = owner.ownerProjectSiteId || null;
+  const partyId = owner.ownerPartyId || null;
+  const ownerLinks = [employeeId, rosterPersonId, projectSiteId, partyId].filter(Boolean);
+
+  if (ownerLinks.length > 1) issues.push("exactly one owner link is allowed when owner link fields are provided");
+
+  if (owner.ownerType === "person") {
+    if ((employeeId ? 1 : 0) + (rosterPersonId ? 1 : 0) !== 1) {
+      issues.push("person certificates must link exactly one person owner");
+    }
+    if (projectSiteId) issues.push("person certificates cannot link a project site as owner");
+    if (partyId) issues.push("person certificates cannot link a party owner");
+  }
+
+  if (owner.ownerType === "project_site") {
+    if (!projectSiteId) issues.push("project_site certificates must link a project site owner");
+    if (employeeId || rosterPersonId) issues.push("project_site certificates cannot link a person as owner");
+    if (partyId) issues.push("project_site certificates cannot link a party owner");
+  }
+
+  if (owner.ownerType === "supplier" || owner.ownerType === "company") {
+    if (!partyId) issues.push(`${owner.ownerType} certificates must link a party owner`);
+    if (employeeId || rosterPersonId || projectSiteId) {
+      issues.push("supplier and company certificates can only link a party owner");
+    }
+  }
+
+  return issues;
 }
 
 export function getCertificateComputedStatus(
@@ -239,26 +278,7 @@ export function normalizeCertificateInput(
   if (isComplianceCritical !== undefined) normalized.isComplianceCritical = isComplianceCritical;
   if (isDisabled !== undefined) normalized.isDisabled = isDisabled;
 
-  const ownerLinks = [
-    normalized.ownerEmployeeId,
-    normalized.ownerRosterPersonId,
-    normalized.ownerProjectSiteId,
-    normalized.ownerPartyId,
-  ].filter(Boolean);
-  if (ownerLinks.length > 1) issues.push("exactly one owner link is allowed when owner link fields are provided");
-
-  if (normalized.ownerType === "person" && normalized.ownerProjectSiteId) issues.push("person certificates cannot link a project site as owner");
-  if (normalized.ownerType === "project_site" && (normalized.ownerEmployeeId || normalized.ownerRosterPersonId)) {
-    issues.push("project_site certificates cannot link a person as owner");
-  }
-  if (
-    (normalized.ownerType === "supplier" || normalized.ownerType === "company") &&
-    (normalized.ownerEmployeeId || normalized.ownerRosterPersonId || normalized.ownerProjectSiteId)
-  ) {
-    issues.push("supplier and company certificates can only link a party owner");
-  }
-  if (normalized.ownerType === "person" && normalized.ownerPartyId) issues.push("person certificates cannot link a party owner");
-  if (normalized.ownerType === "project_site" && normalized.ownerPartyId) issues.push("project_site certificates cannot link a party owner");
+  issues.push(...validateCertificateOwnerState(normalized));
 
   if (normalized.issueDate && normalized.expiryDate && normalized.issueDate > normalized.expiryDate) {
     issues.push("issueDate cannot be later than expiryDate");
