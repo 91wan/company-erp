@@ -4,6 +4,9 @@ export type MvpRoleCode =
   | "procurement"
   | "warehouse"
   | "project_site"
+  | "marketing"
+  | "operations"
+  | "external_project_manager"
   | "viewer";
 
 export type MvpRole = {
@@ -27,10 +30,14 @@ export type MvpPermissionMatrix = {
   roleAssignment: MvpPermissionRule;
   procurement: MvpPermissionRule;
   inventory: MvpPermissionRule;
+  inventoryQuantity: MvpPermissionRule;
   contracts: MvpPermissionRule;
   certificates: MvpPermissionRule;
+  businessProjects: MvpPermissionRule;
   projectSites: MvpPermissionRule;
   projectUsage: MvpPermissionRule;
+  projectUsageRequest: MvpPermissionRule;
+  marketOperationsHandoffs: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
 };
 
@@ -42,6 +49,8 @@ export type AuthenticatedUserDto = {
   employeeId?: string | null;
   employeeNo?: string | null;
   employeeName?: string | null;
+  externalProjectManagerName?: string | null;
+  externalProjectManagerPhone?: string | null;
   roles: readonly MvpRoleCode[];
   assignedProjectSiteIds?: readonly string[];
   lastLoginAt?: string | null;
@@ -87,9 +96,26 @@ export type ContractDirectionCode =
   | "framework_contract"
   | "other";
 
+export type ContractInvestmentCategoryCode =
+  | "renovation"
+  | "equipment"
+  | "advertising_signage"
+  | "tableware_supplies"
+  | "other";
+
 export type ContractStatusCode = "active" | "terminated";
 
 export type ContractExpiryStateCode = "normal" | "expiring_soon" | "expired" | "terminated";
+
+export type BusinessProjectTypeCode = "self_operated_construction";
+
+export type BusinessProjectStatusCode =
+  | "preparing"
+  | "in_progress"
+  | "active"
+  | "paused"
+  | "ended"
+  | "cancelled";
 
 export type CertificateTypeCode =
   | "person_health_cert"
@@ -133,7 +159,7 @@ export type InventorySourceTypeCode =
   | "project_usage"
   | "other";
 
-export type IssueTargetTypeCode = "internal_office" | "project_site" | "subcontractor";
+export type IssueTargetTypeCode = "project_site" | "subcontractor" | "company_department" | "company_person";
 
 export type ChargePriceSourceCode = "project_site_price";
 
@@ -144,6 +170,8 @@ export type ProjectSiteServiceModeCode = "direct" | "subcontracted";
 export type ProjectSiteStatusCode = "preparing" | "active" | "paused" | "ended";
 
 export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
+
+export type MarketOperationsHandoffStatusCode = "pending" | "handed_over" | "accepted" | "cancelled";
 
 export type EmployeeProjectSiteRelationTypeCode = "assigned" | "manager" | "support";
 
@@ -203,6 +231,7 @@ export type StatusMeta<TCode extends string = string> = {
 };
 
 export type PartyTypeCode = "supplier" | "client" | "subcontractor" | "operator";
+export type PartyEntityTypeCode = "company" | "individual";
 
 export type PartyType = {
   code: PartyTypeCode;
@@ -215,7 +244,10 @@ export type PartyDto = {
   partyCode: string;
   partyName: string;
   partyTypes: readonly PartyTypeCode[];
+  entityType: PartyEntityTypeCode;
   unifiedSocialCreditCode?: string | null;
+  identityNoMasked?: string | null;
+  identityNoLast4?: string | null;
   primaryContactName?: string | null;
   primaryContactPhone?: string | null;
   supplyCategory?: string | null;
@@ -232,7 +264,9 @@ export type CreatePartyInput = {
   partyCode: string;
   partyName: string;
   partyTypes: readonly PartyTypeCode[];
+  entityType?: PartyEntityTypeCode;
   unifiedSocialCreditCode?: string | null;
+  identityNo?: string | null;
   primaryContactName?: string | null;
   primaryContactPhone?: string | null;
   supplyCategory?: string | null;
@@ -394,6 +428,11 @@ export type UserAccountDto = {
   employeeId?: string | null;
   employeeNo?: string | null;
   employeeName?: string | null;
+  externalProjectManagerAccountId?: string | null;
+  externalProjectManagerName?: string | null;
+  externalProjectManagerPhone?: string | null;
+  externalProjectSiteId?: string | null;
+  externalProjectSiteName?: string | null;
   username: string;
   status: UserAccountStatusCode;
   roles: readonly MvpRoleCode[];
@@ -445,6 +484,52 @@ export type UpdateUserAccountInput = {
   resetPassword?: string;
   status?: UserAccountStatusCode;
   roles?: readonly MvpRoleCode[];
+};
+
+export type ExternalProjectManagerAccountDto = {
+  id: string;
+  userAccountId: string;
+  username: string;
+  accountStatus: UserAccountStatusCode;
+  projectSiteId: string;
+  siteCode: string;
+  siteName: string;
+  subcontractorPartyId?: string | null;
+  subcontractorPartyName?: string | null;
+  managerName: string;
+  managerPhone: string;
+  status: UserAccountStatusCode;
+  startDate?: string | null;
+  endDate?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateExternalProjectManagerAccountInput = {
+  projectSiteId: string;
+  subcontractorPartyId?: string | null;
+  managerName: string;
+  managerPhone: string;
+  username: string;
+  initialPassword: string;
+  status?: UserAccountStatusCode;
+  startDate?: string | null;
+  endDate?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateExternalProjectManagerAccountInput = {
+  projectSiteId?: string;
+  subcontractorPartyId?: string | null;
+  managerName?: string;
+  managerPhone?: string;
+  username?: string;
+  resetPassword?: string;
+  status?: UserAccountStatusCode;
+  startDate?: string | null;
+  endDate?: string | null;
+  remark?: string | null;
 };
 
 export type PurchaseRequestLineDto = {
@@ -593,6 +678,9 @@ export type ContractDto = {
   counterpartyPartyName?: string | null;
   counterpartyNameSnapshot: string;
   direction: ContractDirectionCode;
+  investmentCategory?: ContractInvestmentCategoryCode | null;
+  businessProjectId?: string | null;
+  businessProjectName?: string | null;
   projectSiteId?: string | null;
   projectSiteName?: string | null;
   signedDate?: string | null;
@@ -615,6 +703,8 @@ export type CreateContractInput = {
   counterpartyPartyId: string;
   counterpartyNameSnapshot?: string | null;
   direction: ContractDirectionCode;
+  investmentCategory?: ContractInvestmentCategoryCode | null;
+  businessProjectId?: string | null;
   projectSiteId?: string | null;
   signedDate?: string | null;
   startDate: string;
@@ -628,6 +718,62 @@ export type CreateContractInput = {
 };
 
 export type UpdateContractInput = Partial<CreateContractInput>;
+
+export type BusinessProjectDto = {
+  id: string;
+  projectCode: string;
+  projectName: string;
+  projectType: BusinessProjectTypeCode;
+  status: BusinessProjectStatusCode;
+  location?: string | null;
+  managerEmployeeId?: string | null;
+  managerEmployeeName?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateBusinessProjectInput = {
+  projectCode: string;
+  projectName: string;
+  projectType?: BusinessProjectTypeCode;
+  status?: BusinessProjectStatusCode;
+  location?: string | null;
+  managerEmployeeId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateBusinessProjectInput = Partial<CreateBusinessProjectInput>;
+
+export type BusinessProjectInvestmentCategorySummaryDto = {
+  investmentCategory: ContractInvestmentCategoryCode;
+  contractCount: number;
+  totalAmount: number;
+};
+
+export type BusinessProjectInvestmentSummaryDto = {
+  businessProjectId: string;
+  contractCount: number;
+  totalAmount: number;
+  categories: readonly BusinessProjectInvestmentCategorySummaryDto[];
+};
+
+export type ProjectSiteInvestmentCategorySummaryDto = {
+  investmentCategory: ContractInvestmentCategoryCode;
+  contractCount: number;
+  totalAmount: number;
+};
+
+export type ProjectSiteInvestmentSummaryDto = {
+  projectSiteId: string;
+  contractCount: number;
+  totalAmount: number;
+  categories: readonly ProjectSiteInvestmentCategorySummaryDto[];
+};
 
 export type ContractAttachmentDto = {
   id: string;
@@ -788,6 +934,8 @@ export type ProjectSiteDto = {
   id: string;
   siteCode: string;
   siteName: string;
+  businessProjectId?: string | null;
+  businessProjectName?: string | null;
   clientPartyId?: string | null;
   clientPartyName?: string | null;
   operatorPartyId?: string | null;
@@ -815,6 +963,7 @@ export type ProjectSiteDto = {
 export type CreateProjectSiteInput = {
   siteCode: string;
   siteName: string;
+  businessProjectId?: string | null;
   clientPartyId?: string | null;
   operatorPartyId?: string | null;
   serviceMode?: ProjectSiteServiceModeCode;
@@ -854,6 +1003,9 @@ export type ProjectUsageRequestDto = {
   unit: string;
   purpose?: string | null;
   requestedBy?: string | null;
+  submittedByAccountId?: string | null;
+  submittedByNameSnapshot?: string | null;
+  submittedByPhoneSnapshot?: string | null;
   expectedDate?: string | null;
   status: ProjectUsageStatusCode;
   outboundNo?: string | null;
@@ -868,6 +1020,23 @@ export type ProjectUsageRequestDto = {
   updatedAt: string;
 };
 
+export type ProjectUsageOptionMaterialDto = {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  specification?: string | null;
+  unit: string;
+};
+
+export type ProjectUsageOptionsDto = {
+  defaultWarehouse: {
+    id: string;
+    warehouseCode: string;
+    warehouseName: string;
+  } | null;
+  materials: readonly ProjectUsageOptionMaterialDto[];
+};
+
 export type CreateProjectUsageRequestInput = {
   requestNo: string;
   requestDate: string;
@@ -879,6 +1048,9 @@ export type CreateProjectUsageRequestInput = {
   unit: string;
   purpose?: string | null;
   requestedBy?: string | null;
+  submittedByAccountId?: string | null;
+  submittedByNameSnapshot?: string | null;
+  submittedByPhoneSnapshot?: string | null;
   expectedDate?: string | null;
   status?: ProjectUsageStatusCode;
   remark?: string | null;
@@ -894,6 +1066,44 @@ export type IssueProjectUsageRequestInput = {
   receivedByName?: string | null;
   remark?: string | null;
 };
+
+export type MarketOperationsHandoffDto = {
+  id: string;
+  handoffNo: string;
+  projectName: string;
+  clientPartyId?: string | null;
+  clientName: string;
+  projectSiteId?: string | null;
+  projectSiteName?: string | null;
+  marketOwnerEmployeeId: string;
+  marketOwnerEmployeeName: string;
+  operationsOwnerEmployeeId: string;
+  operationsOwnerEmployeeName: string;
+  status: MarketOperationsHandoffStatusCode;
+  expectedStartDate?: string | null;
+  handoffDate?: string | null;
+  projectSummary?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateMarketOperationsHandoffInput = {
+  handoffNo: string;
+  projectName: string;
+  clientPartyId?: string | null;
+  clientName: string;
+  projectSiteId?: string | null;
+  marketOwnerEmployeeId: string;
+  operationsOwnerEmployeeId: string;
+  status?: MarketOperationsHandoffStatusCode;
+  expectedStartDate?: string | null;
+  handoffDate?: string | null;
+  projectSummary?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateMarketOperationsHandoffInput = Partial<CreateMarketOperationsHandoffInput>;
 
 export type ReplenishmentSuggestionDto = {
   id: string;
@@ -960,12 +1170,15 @@ export type InventoryBalance = {
 };
 
 export const MVP_ROLES = [
-  { code: "admin", label: "Admin", description: "Full system administration" },
-  { code: "hr", label: "HR", description: "Staff, departments, and assignments" },
-  { code: "procurement", label: "Procurement", description: "Purchase and contract workflow" },
-  { code: "warehouse", label: "Warehouse", description: "Receiving, stock, and outbound records" },
-  { code: "project_site", label: "Project Site", description: "Assigned project-site records and usage" },
-  { code: "viewer", label: "Viewer", description: "Read-only internal access" },
+  { code: "admin", label: "系统管理员", description: "系统配置、账号和全部数据管理" },
+  { code: "hr", label: "人事", description: "员工、部门和项目点人员关系维护" },
+  { code: "procurement", label: "采购", description: "采购和合同业务处理" },
+  { code: "warehouse", label: "仓库", description: "入库、库存和出库记录处理" },
+  { code: "project_site", label: "项目点", description: "项目点相关记录和领用处理" },
+  { code: "marketing", label: "市场", description: "客户、商机和项目前期资料交接" },
+  { code: "operations", label: "运营", description: "项目执行、库存数量查看和领用申请" },
+  { code: "external_project_manager", label: "外部项目经理", description: "外包项目点领用申请提交与状态查看" },
+  { code: "viewer", label: "只读", description: "内部只读访问" },
 ] as const satisfies readonly MvpRole[];
 
 export const USER_ROLE_ASSIGNMENT_POLICY = {
@@ -986,6 +1199,11 @@ export const PARTY_TYPES = [
   { code: "subcontractor", label: "外包方", description: "Subcontracted operator for a project site" },
   { code: "operator", label: "我方公司主体", description: "Internal company entity in service relationships" },
 ] as const satisfies readonly PartyType[];
+
+export const PARTY_ENTITY_TYPES = [
+  { code: "company", label: "公司" },
+  { code: "individual", label: "个人" },
+] as const satisfies readonly StatusMeta<PartyEntityTypeCode>[];
 
 export const PARTY_SUPPLY_CATEGORIES = ["定制物料", "办公物料", "设备", "服务", "其他"] as const;
 
@@ -1039,6 +1257,14 @@ export const CONTRACT_DIRECTIONS = [
   { code: "other", label: "其他" },
 ] as const satisfies readonly StatusMeta<ContractDirectionCode>[];
 
+export const CONTRACT_INVESTMENT_CATEGORIES = [
+  { code: "renovation", label: "装修/改造" },
+  { code: "equipment", label: "设备" },
+  { code: "advertising_signage", label: "广告标识" },
+  { code: "tableware_supplies", label: "餐具用品" },
+  { code: "other", label: "其他" },
+] as const satisfies readonly StatusMeta<ContractInvestmentCategoryCode>[];
+
 export const CONTRACT_STATUSES = [
   { code: "active", label: "履行中" },
   { code: "terminated", label: "已终止" },
@@ -1050,6 +1276,19 @@ export const CONTRACT_EXPIRY_STATES = [
   { code: "expired", label: "已到期" },
   { code: "terminated", label: "已终止" },
 ] as const satisfies readonly StatusMeta<ContractExpiryStateCode>[];
+
+export const BUSINESS_PROJECT_TYPES = [
+  { code: "self_operated_construction", label: "自营建设/资产投入" },
+] as const satisfies readonly StatusMeta<BusinessProjectTypeCode>[];
+
+export const BUSINESS_PROJECT_STATUSES = [
+  { code: "preparing", label: "筹备中" },
+  { code: "in_progress", label: "建设中" },
+  { code: "active", label: "已投运" },
+  { code: "paused", label: "暂停" },
+  { code: "ended", label: "已结束" },
+  { code: "cancelled", label: "已取消" },
+] as const satisfies readonly StatusMeta<BusinessProjectStatusCode>[];
 
 export const CERTIFICATE_TYPES = [
   { code: "person_health_cert", label: "人员健康证" },
@@ -1113,9 +1352,10 @@ export const INVENTORY_SOURCE_TYPES = [
 ] as const satisfies readonly StatusMeta<InventorySourceTypeCode>[];
 
 export const ISSUE_TARGET_TYPES = [
-  { code: "internal_office", label: "内部办公" },
   { code: "project_site", label: "项目点" },
   { code: "subcontractor", label: "外包方" },
+  { code: "company_department", label: "公司部门" },
+  { code: "company_person", label: "公司个人" },
 ] as const satisfies readonly StatusMeta<IssueTargetTypeCode>[];
 
 export const CHARGE_PRICE_SOURCES = [
@@ -1123,8 +1363,8 @@ export const CHARGE_PRICE_SOURCES = [
 ] as const satisfies readonly StatusMeta<ChargePriceSourceCode>[];
 
 export const PROJECT_SITE_SERVICE_MODES = [
-  { code: "direct", label: "直营服务" },
-  { code: "subcontracted", label: "外包服务" },
+  { code: "direct", label: "直营" },
+  { code: "subcontracted", label: "外包" },
 ] as const satisfies readonly StatusMeta<ProjectSiteServiceModeCode>[];
 
 export const PROJECT_SITE_STATUSES = [
@@ -1140,6 +1380,13 @@ export const PROJECT_USAGE_STATUSES = [
   { code: "partially_issued", label: "部分出库" },
   { code: "rejected", label: "已驳回" },
 ] as const satisfies readonly StatusMeta<ProjectUsageStatusCode>[];
+
+export const MARKET_OPERATIONS_HANDOFF_STATUSES = [
+  { code: "pending", label: "待交接" },
+  { code: "handed_over", label: "已交接" },
+  { code: "accepted", label: "运营已接收" },
+  { code: "cancelled", label: "已取消" },
+] as const satisfies readonly StatusMeta<MarketOperationsHandoffStatusCode>[];
 
 export const EMPLOYEE_PROJECT_SITE_RELATION_TYPES = [
   { code: "assigned", label: "分配" },
@@ -1177,6 +1424,7 @@ export const WAREHOUSE_TYPES = [
 
 export const PARTY_METADATA = {
   partyTypes: PARTY_TYPES,
+  entityTypes: PARTY_ENTITY_TYPES,
   supplyCategories: PARTY_SUPPLY_CATEGORIES,
   statuses: [
     { code: "enabled", label: "启用" },
@@ -1190,6 +1438,8 @@ const ALL_ROLES: readonly MvpRoleCode[] = [
   "procurement",
   "warehouse",
   "project_site",
+  "marketing",
+  "operations",
   "viewer",
 ];
 
@@ -1199,7 +1449,7 @@ export const MVP_PERMISSION_MATRIX = {
     manage: ["admin", "procurement", "warehouse"],
   },
   employees: {
-    read: ["admin", "hr", "viewer"],
+    read: ["admin", "hr", "operations", "viewer"],
     manage: ["admin", "hr"],
   },
   departments: {
@@ -1215,28 +1465,44 @@ export const MVP_PERMISSION_MATRIX = {
     manage: ["admin"],
   },
   procurement: {
-    read: ["admin", "hr", "procurement", "warehouse", "project_site", "viewer"],
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "marketing", "operations", "viewer"],
     manage: ["admin", "procurement"],
   },
   inventory: {
     read: ["admin", "hr", "procurement", "warehouse", "project_site", "viewer"],
     manage: ["admin", "warehouse"],
   },
+  inventoryQuantity: {
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "viewer"],
+    manage: ["admin", "warehouse"],
+  },
   contracts: {
-    read: ["admin", "hr", "procurement", "project_site", "viewer"],
+    read: ["admin", "hr", "procurement", "project_site", "marketing", "operations", "viewer"],
     manage: ["admin", "procurement"],
   },
   certificates: {
-    read: ["admin", "hr", "procurement", "project_site", "viewer"],
+    read: ["admin", "hr", "procurement", "project_site", "operations", "viewer"],
     manage: ["admin", "hr"],
+  },
+  businessProjects: {
+    read: ["admin", "hr", "procurement", "marketing", "operations", "viewer"],
+    manage: ["admin", "procurement"],
   },
   projectSites: {
     read: ALL_ROLES,
     manage: ["admin", "hr"],
   },
   projectUsage: {
-    read: ["admin", "hr", "procurement", "warehouse", "project_site", "viewer"],
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_manager", "viewer"],
     manage: ["admin", "project_site"],
+  },
+  projectUsageRequest: {
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_manager", "viewer"],
+    manage: ["admin", "operations", "project_site", "external_project_manager"],
+  },
+  marketOperationsHandoffs: {
+    read: ["admin", "marketing", "operations"],
+    manage: ["admin", "marketing", "operations"],
   },
   systemSettings: {
     read: ["admin"],
@@ -1283,9 +1549,21 @@ export const MVP_DICTIONARIES = {
     label: "合同方向",
     values: ["采购合同", "客户服务合同", "外包合同", "框架合同", "其他"],
   },
+  contractInvestmentCategory: {
+    label: "合同投入分类",
+    values: CONTRACT_INVESTMENT_CATEGORIES.map((item) => item.label),
+  },
   contractExpiryState: {
     label: "合同到期显示状态",
     values: ["正常", "即将到期", "已到期", "已终止"],
+  },
+  businessProjectType: {
+    label: "业务项目类型",
+    values: BUSINESS_PROJECT_TYPES.map((item) => item.label),
+  },
+  businessProjectStatus: {
+    label: "业务项目状态",
+    values: BUSINESS_PROJECT_STATUSES.map((item) => item.label),
   },
   certificateType: {
     label: "证照类型",
@@ -1331,6 +1609,10 @@ export const MVP_DICTIONARIES = {
     label: "往来方类型",
     values: ["supplier", "client", "subcontractor", "operator"],
   },
+  partyEntityType: {
+    label: "主体类型",
+    values: PARTY_ENTITY_TYPES.map((item) => item.label),
+  },
   supplierSupplyCategory: {
     label: "供应类别",
     values: PARTY_SUPPLY_CATEGORIES,
@@ -1352,8 +1634,8 @@ export const MVP_DICTIONARIES = {
     values: ["采购", "退料", "盘盈", "期初", "项目点领用", "其他"],
   },
   issueTargetType: {
-    label: "出库领用对象类型",
-    values: ["internal_office", "project_site", "subcontractor"],
+    label: "出库去向类型",
+    values: ISSUE_TARGET_TYPES.map((item) => item.label),
   },
   chargePriceSource: {
     label: "领用计费价格来源",
@@ -1363,9 +1645,13 @@ export const MVP_DICTIONARIES = {
     label: "项目点领用状态",
     values: ["待处理", "已出库", "部分出库", "已驳回"],
   },
+  marketOperationsHandoffStatus: {
+    label: "市场运营交接状态",
+    values: MARKET_OPERATIONS_HANDOFF_STATUSES.map((item) => item.label),
+  },
   projectSiteServiceMode: {
     label: "项目点服务模式",
-    values: ["直营服务", "外包服务"],
+    values: PROJECT_SITE_SERVICE_MODES.map((item) => item.label),
   },
   projectSiteStatus: {
     label: "项目点状态",

@@ -3,11 +3,14 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import {
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
+  type BusinessProjectDto,
   type ContractAttachmentDto,
   type ContractDirectionCode,
   type ContractDto,
   type ContractExpiryStateCode,
+  type ContractInvestmentCategoryCode,
   type ContractStatusCode,
   type CreateContractAttachmentInput,
   type CreateContractInput,
@@ -26,6 +29,7 @@ type ContractsWorkspaceProps = {
   ) => Promise<ContractAttachmentDto>;
   loadParties?: () => Promise<PartyDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
+  loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
   canManage?: boolean;
 };
 
@@ -34,6 +38,8 @@ type ContractFormState = {
   contractName: string;
   counterpartyPartyId: string;
   direction: ContractDirectionCode;
+  investmentCategory: "" | ContractInvestmentCategoryCode;
+  businessProjectId: string;
   projectSiteId: string;
   signedDate: string;
   startDate: string;
@@ -54,6 +60,7 @@ type AttachmentFormState = {
 };
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
+const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
 const expiryLabel = new Map(CONTRACT_EXPIRY_STATES.map((state) => [state.code, state.label]));
 
 async function defaultLoadContracts(): Promise<ContractDto[]> {
@@ -100,6 +107,11 @@ async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
   return payload.projectSites;
 }
 
+async function defaultLoadBusinessProjects(): Promise<BusinessProjectDto[]> {
+  const payload = await requestJson<{ businessProjects: BusinessProjectDto[] }>(`${apiBaseUrl}/api/business-projects`);
+  return payload.businessProjects;
+}
+
 export function ContractsWorkspace({
   loadContracts = defaultLoadContracts,
   createContract = defaultCreateContract,
@@ -107,12 +119,14 @@ export function ContractsWorkspace({
   createContractAttachment = defaultCreateContractAttachment,
   loadParties = defaultLoadParties,
   loadProjectSites = defaultLoadProjectSites,
+  loadBusinessProjects = defaultLoadBusinessProjects,
   canManage = true,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
   const [attachments, setAttachments] = useState<ContractAttachmentDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [projectSites, setProjectSites] = useState<ProjectSiteDto[]>([]);
+  const [businessProjects, setBusinessProjects] = useState<BusinessProjectDto[]>([]);
   const [contractStatus, setContractStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attachmentStatus, setAttachmentStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -126,6 +140,8 @@ export function ContractsWorkspace({
     contractName: "",
     counterpartyPartyId: "",
     direction: "purchase_contract",
+    investmentCategory: "",
+    businessProjectId: "",
     projectSiteId: "",
     signedDate: "",
     startDate: "",
@@ -166,11 +182,12 @@ export function ContractsWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
-    Promise.all([loadParties(), loadProjectSites()])
-      .then(([nextParties, nextProjectSites]) => {
+    Promise.all([loadParties(), loadProjectSites(), loadBusinessProjects()])
+      .then(([nextParties, nextProjectSites, nextBusinessProjects]) => {
         if (!mounted) return;
         setParties(nextParties);
         setProjectSites(nextProjectSites);
+        setBusinessProjects(nextBusinessProjects);
         setContractForm((current) => ({ ...current, counterpartyPartyId: current.counterpartyPartyId || nextParties[0]?.id || "" }));
         setMasterStatus("ready");
       })
@@ -181,7 +198,7 @@ export function ContractsWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadParties, loadProjectSites]);
+  }, [loadBusinessProjects, loadParties, loadProjectSites]);
 
   useEffect(() => {
     if (!attachmentForm.contractId) {
@@ -220,6 +237,8 @@ export function ContractsWorkspace({
           contract.counterpartyPartyName,
           contract.counterpartyNameSnapshot,
           contract.projectSiteName,
+          contract.businessProjectName,
+          contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : null,
           contract.attachmentRef,
         ]
           .filter(Boolean)
@@ -238,6 +257,8 @@ export function ContractsWorkspace({
         contractName: contractForm.contractName,
         counterpartyPartyId: contractForm.counterpartyPartyId,
         direction: contractForm.direction,
+        investmentCategory: contractForm.investmentCategory || null,
+        businessProjectId: contractForm.businessProjectId || null,
         projectSiteId: contractForm.projectSiteId || null,
         signedDate: contractForm.signedDate || null,
         startDate: contractForm.startDate,
@@ -255,6 +276,8 @@ export function ContractsWorkspace({
         contractName: "",
         counterpartyPartyId: parties[0]?.id ?? "",
         direction: "purchase_contract",
+        investmentCategory: "",
+        businessProjectId: "",
         projectSiteId: "",
         signedDate: "",
         startDate: "",
@@ -351,8 +374,8 @@ export function ContractsWorkspace({
               保存合同
             </button>
           </div>
-          {masterStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载往来方和项目点..." /> : null}
-          {masterStatus === "error" ? <p className="form-error">往来方或项目点接口暂不可用，暂不能新增合同。</p> : null}
+          {masterStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载往来方、业务项目和项目点..." /> : null}
+          {masterStatus === "error" ? <p className="form-error">往来方、业务项目或项目点接口暂不可用，暂不能新增合同。</p> : null}
           {masterStatus === "ready" && !hasCounterparties ? <p className="form-error">缺少往来方资料，暂不能新增合同。</p> : null}
           <label>
             <span>合同编号</span>
@@ -378,6 +401,28 @@ export function ContractsWorkspace({
               {CONTRACT_DIRECTIONS.map((direction) => (
                 <option key={direction.code} value={direction.code}>
                   {direction.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>投入分类</span>
+            <select value={contractForm.investmentCategory} onChange={(event) => setContractForm((current) => ({ ...current, investmentCategory: event.target.value as "" | ContractInvestmentCategoryCode }))}>
+              <option value="">非投入类合同</option>
+              {CONTRACT_INVESTMENT_CATEGORIES.map((category) => (
+                <option key={category.code} value={category.code}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>业务项目</span>
+            <select value={contractForm.businessProjectId} onChange={(event) => setContractForm((current) => ({ ...current, businessProjectId: event.target.value }))}>
+              <option value="">不关联业务项目</option>
+              {businessProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.projectCode} {project.projectName}
                 </option>
               ))}
             </select>
@@ -515,7 +560,7 @@ function ContractToolbar({
     <div className="party-toolbar">
       <label className="party-search">
         <Search aria-hidden="true" size={16} />
-        <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索合同编号、名称、相对方、项目点" />
+        <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索合同编号、名称、相对方、业务项目、项目点" />
       </label>
       <label className="party-filter">
         <Filter aria-hidden="true" size={16} />
@@ -553,6 +598,8 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
             <th>名称</th>
             <th>相对方</th>
             <th>方向</th>
+            <th>投入分类</th>
+            <th>业务项目</th>
             <th>项目点</th>
             <th>开始/结束日期</th>
             <th>金额/预算</th>
@@ -567,6 +614,8 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
               <td>{contract.contractName}</td>
               <td>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</td>
               <td>{directionLabel.get(contract.direction)}</td>
+              <td>{contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : "-"}</td>
+              <td>{contract.businessProjectName ?? "-"}</td>
               <td>{contract.projectSiteName ?? "-"}</td>
               <td>
                 {contract.startDate} / {contract.endDate}

@@ -71,7 +71,7 @@ All inbound, outbound, opening, stock gain, and stock loss records are stored as
 | `unit` | Yes | Snapshot of material base unit. |
 | `unit_price` | Optional | Cost reference only in MVP. |
 | `source_type` | Optional | Purchase, return, opening, inventory gain, or other. |
-| `issue_target_type` | Optional | Internal office, project site, or subcontractor for outbound records. |
+| `issue_target_type` | Optional | Project site, subcontractor, company department, or company person for outbound records. User-facing label: 出库去向类型. |
 | `purchase_record_no` | Optional | Link to purchase record before purchase tables exist. |
 | `project_site_id` | Optional | Filled when the movement relates to a project site. |
 | `usage_request_id` | Optional | Filled when outbound satisfies a project-site request. |
@@ -105,6 +105,14 @@ Outbound registration must check that the requested outbound quantity does not e
 5. Status becomes `issued` or `partially_issued`; rejected requests become `rejected`.
 
 The MVP does not add complex approval. It only preserves traceability from site request to outbound movement.
+
+## Operations Inventory Boundary
+
+- Operations users may view quantity-oriented inventory balances: current quantity, available quantity signals, unit, safe stock, and low-stock status.
+- Operations users must not receive price, cost, contract price, charge amount, or inventory amount fields from inventory and usage-request responses unless they also hold a stronger role such as `warehouse`, `procurement`, or `admin`.
+- Operations users may create usage requests.
+- Warehouse users remain responsible for formal inbound, outbound, and stocktake movements.
+- A person who is both operations and warehouse should receive both roles; effective permissions are the union of assigned roles.
 
 ## Stocktake and Difference Handling
 

@@ -31,9 +31,10 @@ enum InventorySourceType {
 }
 
 enum IssueTargetType {
-  internal_office
   project_site
   subcontractor
+  company_department
+  company_person
 }
 
 enum ChargePriceSource {
@@ -58,6 +59,11 @@ enum PartyType {
   client
   subcontractor
   operator
+}
+
+enum PartyEntityType {
+  company
+  individual
 }
 
 enum ProjectSiteServiceMode {
@@ -96,9 +102,30 @@ enum ContractDirection {
   other
 }
 
+enum ContractInvestmentCategory {
+  renovation
+  equipment
+  advertising_signage
+  tableware_supplies
+  other
+}
+
 enum ContractStatus {
   active
   terminated
+}
+
+enum BusinessProjectType {
+  self_operated_construction
+}
+
+enum BusinessProjectStatus {
+  preparing
+  in_progress
+  active
+  paused
+  ended
+  cancelled
 }
 
 enum CertificateType {
@@ -156,7 +183,10 @@ model Party {
   partyCode               String        @unique @map("party_code")
   partyName               String        @map("party_name")
   partyTypes              PartyType[]   @map("party_types")
+  entityType              PartyEntityType @default(company) @map("entity_type")
   unifiedSocialCreditCode String?       @unique @map("unified_social_credit_code")
+  identityNoEncrypted     String?       @map("identity_no_encrypted")
+  identityNoLast4         String?       @map("identity_no_last4")
   primaryContactName      String?       @map("primary_contact_name")
   primaryContactPhone     String?       @map("primary_contact_phone")
   supplyCategory          String?       @map("supply_category")
@@ -175,9 +205,12 @@ model Party {
   purchaseRecords           PurchaseRecord[]
   contracts                 Contract[]
   certificates              CertificateRecord[]
+  marketOperationsHandoffs  MarketOperationsHandoff[]
+  externalProjectManagers   ExternalProjectManagerAccount[]
 
   @@index([status])
   @@index([partyName])
+  @@index([entityType])
   @@map("parties")
 }
 
@@ -290,6 +323,9 @@ model ProjectUsageRequest {
   unit              String
   purpose           String?
   requestedBy       String?              @map("requested_by")
+  submittedByAccountId String?           @map("submitted_by_account_id") @db.Uuid
+  submittedByNameSnapshot String?        @map("submitted_by_name_snapshot")
+  submittedByPhoneSnapshot String?       @map("submitted_by_phone_snapshot")
   expectedDate      DateTime?            @map("expected_date") @db.Date
   status            ProjectUsageStatus   @default(pending)
   outboundNo        String?              @map("outbound_no")
@@ -305,11 +341,43 @@ model ProjectUsageRequest {
   projectSite       ProjectSite          @relation(fields: [projectSiteId], references: [id], onDelete: Restrict)
   warehouse         Warehouse            @relation(fields: [warehouseId], references: [id])
   material          Material             @relation(fields: [materialId], references: [id])
+  submittedByExternalManager ExternalProjectManagerAccount? @relation(fields: [submittedByAccountId], references: [userAccountId], onDelete: SetNull)
   movements         InventoryMovement[]
 
   @@index([projectSiteId, requestDate])
+  @@index([submittedByAccountId])
   @@index([status])
   @@map("project_usage_requests")
+}
+
+model MarketOperationsHandoff {
+  id                        String                         @id @default(uuid()) @db.Uuid
+  handoffNo                 String                         @unique @map("handoff_no")
+  projectName               String                         @map("project_name")
+  clientPartyId             String?                        @map("client_party_id") @db.Uuid
+  clientName                String                         @map("client_name")
+  projectSiteId             String?                        @map("project_site_id") @db.Uuid
+  marketOwnerEmployeeId     String                         @map("market_owner_employee_id") @db.Uuid
+  operationsOwnerEmployeeId String                         @map("operations_owner_employee_id") @db.Uuid
+  status                    MarketOperationsHandoffStatus  @default(pending)
+  expectedStartDate         DateTime?                      @map("expected_start_date") @db.Date
+  handoffDate               DateTime?                      @map("handoff_date") @db.Date
+  projectSummary            String?                        @map("project_summary")
+  remark                    String?
+  createdAt                 DateTime                       @default(now()) @map("created_at")
+  updatedAt                 DateTime                       @updatedAt @map("updated_at")
+
+  clientParty     Party?      @relation(fields: [clientPartyId], references: [id], onDelete: SetNull)
+  projectSite     ProjectSite? @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
+  marketOwner     Employee    @relation("MarketOperationsHandoffMarketOwner", fields: [marketOwnerEmployeeId], references: [id], onDelete: Restrict)
+  operationsOwner Employee    @relation("MarketOperationsHandoffOperationsOwner", fields: [operationsOwnerEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([clientPartyId])
+  @@index([projectSiteId])
+  @@index([marketOwnerEmployeeId])
+  @@index([operationsOwnerEmployeeId])
+  @@map("market_operations_handoffs")
 }
 
 model ReplenishmentSuggestion {
@@ -361,7 +429,17 @@ enum RoleCode {
   procurement
   warehouse
   project_site
+  marketing
+  operations
+  external_project_manager
   viewer
+}
+
+enum MarketOperationsHandoffStatus {
+  pending
+  handed_over
+  accepted
+  cancelled
 }
 
 enum ProjectSiteStatus {
@@ -426,10 +504,37 @@ model Employee {
   ownedCertificates      CertificateRecord[]             @relation("CertificateOwnerEmployee")
   responsibleCertificates CertificateRecord[]             @relation("CertificateResponsibleEmployee")
   confirmedCertificates  CertificateRecord[]             @relation("CertificateConfirmedByEmployee")
+  marketOwnedHandoffs    MarketOperationsHandoff[]       @relation("MarketOperationsHandoffMarketOwner")
+  operationsOwnedHandoffs MarketOperationsHandoff[]       @relation("MarketOperationsHandoffOperationsOwner")
+  managedBusinessProjects BusinessProject[]               @relation("BusinessProjectManager")
 
   @@index([departmentId])
   @@index([employmentStatus])
   @@map("employees")
+}
+
+model BusinessProject {
+  id                String                @id @default(uuid()) @db.Uuid
+  projectCode       String                @unique @map("project_code")
+  projectName       String                @map("project_name")
+  projectType       BusinessProjectType   @default(self_operated_construction) @map("project_type")
+  status            BusinessProjectStatus @default(preparing)
+  location          String?
+  managerEmployeeId String?               @map("manager_employee_id") @db.Uuid
+  startDate         DateTime?             @map("start_date") @db.Date
+  endDate           DateTime?             @map("end_date") @db.Date
+  remark            String?
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  managerEmployee Employee?     @relation("BusinessProjectManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  projectSites    ProjectSite[]
+  contracts       Contract[]
+
+  @@index([projectType])
+  @@index([status])
+  @@index([managerEmployeeId])
+  @@map("business_projects")
 }
 
 model UserAccount {
@@ -446,6 +551,7 @@ model UserAccount {
   employee            Employee?             @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   roles               UserRoleAssignment[]  @relation("UserAccountRoles")
   assignedRoleChanges UserRoleAssignment[]  @relation("AssignedUserRoles")
+  externalProjectManagerAccount ExternalProjectManagerAccount?
 
   @@index([status])
   @@map("user_accounts")
@@ -471,6 +577,7 @@ model ProjectSite {
   id                       String            @id @default(uuid()) @db.Uuid
   siteCode                 String            @unique @map("site_code")
   siteName                 String            @map("site_name")
+  businessProjectId        String?           @map("business_project_id") @db.Uuid
   clientPartyId            String?           @map("client_party_id") @db.Uuid
   operatorPartyId          String?           @map("operator_party_id") @db.Uuid
   serviceMode              ProjectSiteServiceMode @default(direct) @map("service_mode")
@@ -490,6 +597,7 @@ model ProjectSite {
   createdAt                DateTime          @default(now()) @map("created_at")
   updatedAt                DateTime          @updatedAt @map("updated_at")
 
+  businessProject BusinessProject?                @relation(fields: [businessProjectId], references: [id], onDelete: SetNull)
   primaryManager Employee?                       @relation("ProjectSitePrimaryManager", fields: [primaryManagerEmployeeId], references: [id], onDelete: SetNull)
   clientParty    Party?                          @relation("ProjectSiteClientParty", fields: [clientPartyId], references: [id], onDelete: Restrict)
   operatorParty  Party?                          @relation("ProjectSiteOperatorParty", fields: [operatorPartyId], references: [id], onDelete: Restrict)
@@ -498,16 +606,44 @@ model ProjectSite {
   warehouses      Warehouse[]
   inventoryMoves  InventoryMovement[]
   usageRequests   ProjectUsageRequest[]
+  marketOperationsHandoffs MarketOperationsHandoff[]
   purchaseRequests PurchaseRequest[]
   contracts        Contract[]
   certificates     CertificateRecord[]
+  externalProjectManagerAccounts ExternalProjectManagerAccount[]
 
   @@index([status])
+  @@index([businessProjectId])
   @@index([primaryManagerEmployeeId])
   @@index([clientPartyId])
   @@index([operatorPartyId])
   @@index([subcontractorPartyId])
   @@map("project_sites")
+}
+
+model ExternalProjectManagerAccount {
+  id                   String            @id @default(uuid()) @db.Uuid
+  userAccountId        String            @unique @map("user_account_id") @db.Uuid
+  projectSiteId        String            @map("project_site_id") @db.Uuid
+  subcontractorPartyId String?           @map("subcontractor_party_id") @db.Uuid
+  managerName          String            @map("manager_name")
+  managerPhone         String            @map("manager_phone")
+  status               UserAccountStatus @default(active)
+  startDate            DateTime?         @map("start_date") @db.Date
+  endDate              DateTime?         @map("end_date") @db.Date
+  remark               String?
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  userAccount        UserAccount           @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  projectSite        ProjectSite           @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  subcontractorParty Party?                @relation(fields: [subcontractorPartyId], references: [id], onDelete: SetNull)
+  usageRequests      ProjectUsageRequest[]
+
+  @@index([projectSiteId])
+  @@index([subcontractorPartyId])
+  @@index([status])
+  @@map("external_project_manager_accounts")
 }
 
 model EmployeeProjectSiteAssignment {
@@ -653,6 +789,8 @@ model Contract {
   counterpartyPartyId      String             @map("counterparty_party_id") @db.Uuid
   counterpartyNameSnapshot String             @map("counterparty_name_snapshot")
   direction                ContractDirection
+  investmentCategory       ContractInvestmentCategory? @map("investment_category")
+  businessProjectId        String?            @map("business_project_id") @db.Uuid
   projectSiteId            String?            @map("project_site_id") @db.Uuid
   signedDate               DateTime?          @map("signed_date") @db.Date
   startDate                DateTime           @map("start_date") @db.Date
@@ -667,13 +805,16 @@ model Contract {
   updatedAt                DateTime           @updatedAt @map("updated_at")
 
   counterpartyParty Party                @relation(fields: [counterpartyPartyId], references: [id], onDelete: Restrict)
+  businessProject   BusinessProject?     @relation(fields: [businessProjectId], references: [id], onDelete: SetNull)
   projectSite       ProjectSite?         @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
   attachments       ContractAttachment[]
   purchaseRecords   PurchaseRecord[]
 
   @@index([counterpartyPartyId])
+  @@index([businessProjectId])
   @@index([projectSiteId])
   @@index([direction])
+  @@index([investmentCategory])
   @@index([status])
   @@index([endDate])
   @@map("contracts")

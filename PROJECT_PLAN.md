@@ -25,6 +25,7 @@ Supporting data included in the MVP:
 - Staff
 - Departments
 - Project sites
+- Business projects for self-operated construction or asset investment aggregation
 - Canteen service points
 - Wuxi headquarters warehouse customized materials
 
@@ -193,6 +194,8 @@ MVP content:
 - Contract period
 - Contract amount when available
 - Related project/site
+- Related business project when the contract belongs to a self-operated construction or asset investment project
+- Investment category for renovation, equipment, advertising signage, tableware supplies, and other project inputs
 - Contract direction: client service contract or subcontract contract
 - Attachment reference or file path
 
@@ -213,6 +216,8 @@ MVP content:
 - Assigned staff
 - Headquarters material issue records related to the site or subcontractor
 - Client contract and subcontract contract references
+- Investment contract summary grouped by investment category
+- Optional link to a self-operated business project after commissioning
 
 Out of scope:
 

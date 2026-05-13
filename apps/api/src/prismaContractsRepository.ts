@@ -18,6 +18,7 @@ import {
 type PrismaContract = Prisma.ContractGetPayload<{
   include: {
     counterpartyParty: true;
+    businessProject: true;
     projectSite: true;
   };
 }>;
@@ -45,6 +46,9 @@ function toContractDto(contract: PrismaContract): ContractDto {
     counterpartyPartyName: contract.counterpartyParty.partyName,
     counterpartyNameSnapshot: contract.counterpartyNameSnapshot,
     direction: contract.direction,
+    investmentCategory: contract.investmentCategory,
+    businessProjectId: contract.businessProjectId,
+    businessProjectName: contract.businessProject?.projectName ?? null,
     projectSiteId: contract.projectSiteId,
     projectSiteName: contract.projectSite?.siteName ?? null,
     signedDate: dateToString(contract.signedDate),
@@ -117,6 +121,8 @@ async function contractCreateData(
     counterpartyParty: { connect: { id: input.counterpartyPartyId } },
     counterpartyNameSnapshot: counterpartyNameSnapshot ?? input.counterpartyPartyId,
     direction: input.direction,
+    investmentCategory: input.investmentCategory,
+    businessProject: input.businessProjectId ? { connect: { id: input.businessProjectId } } : undefined,
     projectSite: input.projectSiteId ? { connect: { id: input.projectSiteId } } : undefined,
     signedDate: nullableDate(input.signedDate),
     startDate: new Date(`${input.startDate}T00:00:00.000Z`),
@@ -142,6 +148,8 @@ async function contractUpdateData(
     ...relationUpdate(input.counterpartyPartyId, "counterpartyParty"),
     ...(snapshot !== undefined ? { counterpartyNameSnapshot: snapshot } : {}),
     ...(input.direction !== undefined ? { direction: input.direction } : {}),
+    ...(input.investmentCategory !== undefined ? { investmentCategory: input.investmentCategory } : {}),
+    ...relationUpdate(input.businessProjectId, "businessProject"),
     ...relationUpdate(input.projectSiteId, "projectSite"),
     ...(input.signedDate !== undefined ? { signedDate: nullableDate(input.signedDate) } : {}),
     ...(input.startDate !== undefined ? { startDate: new Date(`${input.startDate}T00:00:00.000Z`) } : {}),
@@ -191,7 +199,7 @@ function mapContractError(error: unknown): never {
     }
 
     if (error.code === "P2003" || error.code === "P2025") {
-      throw new ContractValidationError(["Referenced contract, party, or project site was not found"]);
+      throw new ContractValidationError(["Referenced contract, party, business project, or project site was not found"]);
     }
   }
   throw error;
@@ -200,6 +208,7 @@ function mapContractError(error: unknown): never {
 export function createPrismaContractRepository(prisma: PrismaClient): ContractRepository {
   const include = {
     counterpartyParty: true,
+    businessProject: true,
     projectSite: true,
   } satisfies Prisma.ContractInclude;
 
@@ -209,7 +218,9 @@ export function createPrismaContractRepository(prisma: PrismaClient): ContractRe
         where: {
           ...(filters.status ? { status: filters.status } : {}),
           ...(filters.direction ? { direction: filters.direction } : {}),
+          ...(filters.investmentCategory ? { investmentCategory: filters.investmentCategory } : {}),
           ...(filters.counterpartyPartyId ? { counterpartyPartyId: filters.counterpartyPartyId } : {}),
+          ...(filters.businessProjectId ? { businessProjectId: filters.businessProjectId } : {}),
           ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
           ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
           ...(filters.q
@@ -220,6 +231,7 @@ export function createPrismaContractRepository(prisma: PrismaClient): ContractRe
                   { counterpartyNameSnapshot: { contains: filters.q, mode: "insensitive" } },
                   { attachmentRef: { contains: filters.q, mode: "insensitive" } },
                   { counterpartyParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
+                  { businessProject: { projectName: { contains: filters.q, mode: "insensitive" } } },
                   { projectSite: { siteName: { contains: filters.q, mode: "insensitive" } } },
                 ],
               }

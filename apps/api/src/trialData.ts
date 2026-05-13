@@ -22,7 +22,8 @@ export const TRIAL_DEPARTMENTS = [
   { departmentCode: "DEP-ADMIN", name: "综合管理部", sortOrder: 10 },
   { departmentCode: "DEP-PURCHASING", name: "采购部", sortOrder: 20 },
   { departmentCode: "DEP-WAREHOUSE", name: "仓库部", sortOrder: 30 },
-  { departmentCode: "DEP-PROJECT", name: "项目运营部", sortOrder: 40 },
+  { departmentCode: "DEP-MARKETING", name: "市场部", sortOrder: 40 },
+  { departmentCode: "DEP-OPERATIONS", name: "运营部", sortOrder: 50 },
 ] as const;
 
 export interface TrialDataBootstrapResult {

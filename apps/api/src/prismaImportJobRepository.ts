@@ -10,6 +10,7 @@ import type {
   ImportRowIssueDto,
   ImportRowStatusCode,
   ImportTemplateTypeCode,
+  MvpRoleCode,
   ProjectSiteServiceModeCode,
   ProjectSiteStatusCode,
 } from "@company-erp/shared";
@@ -43,7 +44,7 @@ type NormalizedRow = {
 const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
   parties: ["供应商编码", "供应商名称", "状态"],
   materials: ["物料编码", "物料名称", "物料类别", "基本单位", "状态"],
-  employees: ["员工编码", "姓名", "部门", "状态"],
+  employees: ["员工编码", "姓名", "部门", "角色", "状态"],
   project_sites: ["项目点编码", "项目点名称", "甲方客户/服务单位", "服务模式", "负责人员工编码", "状态"],
   opening_inventory: ["仓库编码", "物料编码", "期初数量", "单位", "库存日期"],
 };
@@ -116,9 +117,49 @@ function projectStatus(value: string): ProjectSiteStatusCode | null {
 }
 
 function serviceMode(value: string): ProjectSiteServiceModeCode | null {
-  if (value === "direct" || value === "直营" || value === "直营服务") return "direct";
-  if (value === "subcontracted" || value === "外包" || value === "外包服务") return "subcontracted";
+  if (value === "直营") return "direct";
+  if (value === "外包") return "subcontracted";
   return null;
+}
+
+const roleByChineseLabel = new Map<string, MvpRoleCode>([
+  ["admin", "admin"],
+  ["系统管理员", "admin"],
+  ["hr", "hr"],
+  ["人事", "hr"],
+  ["procurement", "procurement"],
+  ["采购", "procurement"],
+  ["warehouse", "warehouse"],
+  ["仓库", "warehouse"],
+  ["仓管", "warehouse"],
+  ["project_site", "project_site"],
+  ["项目点", "project_site"],
+  ["marketing", "marketing"],
+  ["市场", "marketing"],
+  ["市场部", "marketing"],
+  ["operations", "operations"],
+  ["运营", "operations"],
+  ["运营部", "operations"],
+  ["viewer", "viewer"],
+  ["只读", "viewer"],
+]);
+
+function roleValues(value: string): { roles: MvpRoleCode[]; invalidLabels: string[] } {
+  const labels = value
+    .split(/[、,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const roles: MvpRoleCode[] = [];
+  const invalidLabels: string[] = [];
+  for (const label of labels) {
+    const role = roleByChineseLabel.get(label);
+    if (!role) {
+      invalidLabels.push(label);
+      continue;
+    }
+    if (!roles.includes(role)) roles.push(role);
+  }
+  return { roles, invalidLabels };
 }
 
 function shortHash(value: string): string {
@@ -258,11 +299,17 @@ function normalizeEmployee(row: RawRow, context: PreviewContext): NormalizedRow 
   const employeeNo = text(row.rawData, "员工编码");
   const name = text(row.rawData, "姓名");
   const departmentName = text(row.rawData, "部门");
+  const rawRoles = text(row.rawData, "角色");
+  const { roles, invalidLabels } = roleValues(rawRoles);
   const status = employeeStatus(text(row.rawData, "状态"));
   const hireDate = dateText(row.rawData, "入职日期");
   if (!employeeNo) issues.push(issue("error", "员工编码", "员工编码必填"));
   if (!name) issues.push(issue("error", "姓名", "姓名必填"));
   if (!departmentName) issues.push(issue("error", "部门", "部门必填"));
+  if (!rawRoles) issues.push(issue("error", "角色", "角色必填"));
+  if (invalidLabels.length > 0) {
+    issues.push(issue("error", "角色", "角色必须为：系统管理员、人事、采购、仓库、项目点、市场、运营、只读"));
+  }
   if (!status) issues.push(issue("error", "状态", "状态必须为在职、离职或停用"));
   if (text(row.rawData, "入职日期") && !hireDate) issues.push(issue("error", "入职日期", "入职日期必须为 yyyy-mm-dd"));
   const existing = employeeNo ? context.employeesByNo.get(employeeNo) : null;
@@ -273,6 +320,7 @@ function normalizeEmployee(row: RawRow, context: PreviewContext): NormalizedRow 
     phone: nullableText(row.rawData, "手机号"),
     departmentName,
     position: nullableText(row.rawData, "岗位"),
+    roles,
     employmentStatus: status ?? "active",
     hireDate,
     remark: nullableText(row.rawData, "备注"),
@@ -300,7 +348,7 @@ function normalizeProjectSite(row: RawRow, context: PreviewContext): NormalizedR
   if (!siteCode) issues.push(issue("error", "项目点编码", "项目点编码必填"));
   if (!siteName) issues.push(issue("error", "项目点名称", "项目点名称必填"));
   if (!clientName) issues.push(issue("error", "甲方客户/服务单位", "甲方客户/服务单位必填"));
-  if (!mode) issues.push(issue("error", "服务模式", "服务模式必须为 direct 或 subcontracted"));
+  if (!mode) issues.push(issue("error", "服务模式", "服务模式必须为：直营、外包"));
   if (mode === "direct" && subcontractorName) issues.push(issue("error", "外包方名称", "直营项目点不能填写外包方"));
   if (mode === "subcontracted" && !subcontractorName) issues.push(issue("error", "外包方名称", "外包项目点必须填写外包方"));
   if (!managerNo) issues.push(issue("error", "负责人员工编码", "负责人员工编码必填"));

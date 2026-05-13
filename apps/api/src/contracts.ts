@@ -1,11 +1,13 @@
 import {
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
   type ContractAttachmentDto,
   type ContractDirectionCode,
   type ContractDto,
   type ContractExpiryStateCode,
+  type ContractInvestmentCategoryCode,
   type ContractStatusCode,
   type CreateContractAttachmentInput,
   type CreateContractInput,
@@ -16,7 +18,9 @@ import {
 export type ContractListFilters = {
   status?: ContractStatusCode;
   direction?: ContractDirectionCode;
+  investmentCategory?: ContractInvestmentCategoryCode;
   counterpartyPartyId?: string;
+  businessProjectId?: string;
   projectSiteId?: string;
   projectSiteIds?: readonly string[];
   expiry?: ContractExpiryStateCode;
@@ -48,6 +52,7 @@ export class ContractValidationError extends Error {
 }
 
 const directions = new Set(CONTRACT_DIRECTIONS.map((direction) => direction.code));
+const investmentCategories = new Set(CONTRACT_INVESTMENT_CATEGORIES.map((category) => category.code));
 const statuses = new Set(CONTRACT_STATUSES.map((status) => status.code));
 const expiryStates = new Set(CONTRACT_EXPIRY_STATES.map((state) => state.code));
 
@@ -122,6 +127,17 @@ export function normalizeContractFilters(query: Record<string, unknown>): Contra
     }
   }
 
+  if (query.investmentCategory !== undefined) {
+    if (
+      typeof query.investmentCategory === "string" &&
+      investmentCategories.has(query.investmentCategory as ContractInvestmentCategoryCode)
+    ) {
+      filters.investmentCategory = query.investmentCategory as ContractInvestmentCategoryCode;
+    } else {
+      issues.push("investmentCategory filter is unsupported");
+    }
+  }
+
   if (query.expiry !== undefined) {
     if (typeof query.expiry === "string" && expiryStates.has(query.expiry as ContractExpiryStateCode)) {
       filters.expiry = query.expiry as ContractExpiryStateCode;
@@ -130,7 +146,7 @@ export function normalizeContractFilters(query: Record<string, unknown>): Contra
     }
   }
 
-  for (const field of ["counterpartyPartyId", "projectSiteId", "q"] as const) {
+  for (const field of ["counterpartyPartyId", "businessProjectId", "projectSiteId", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
 
@@ -162,7 +178,7 @@ export function normalizeContractInput(
     normalized.counterpartyPartyId = payload.counterpartyPartyId.trim();
   }
 
-  for (const field of ["counterpartyNameSnapshot", "projectSiteId", "attachmentRef", "remark"] as const) {
+  for (const field of ["counterpartyNameSnapshot", "businessProjectId", "projectSiteId", "attachmentRef", "remark"] as const) {
     const value = normalizeNullableString(payload[field]);
     if (value !== undefined) normalized[field] = value;
   }
@@ -186,6 +202,19 @@ export function normalizeContractInput(
       normalized.direction = payload.direction as ContractDirectionCode;
     } else {
       issues.push("direction is unsupported");
+    }
+  }
+
+  if (payload.investmentCategory !== undefined) {
+    if (payload.investmentCategory === null) {
+      normalized.investmentCategory = null;
+    } else if (
+      typeof payload.investmentCategory === "string" &&
+      investmentCategories.has(payload.investmentCategory as ContractInvestmentCategoryCode)
+    ) {
+      normalized.investmentCategory = payload.investmentCategory as ContractInvestmentCategoryCode;
+    } else {
+      issues.push("investmentCategory is unsupported");
     }
   }
 

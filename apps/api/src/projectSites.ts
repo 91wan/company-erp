@@ -6,6 +6,7 @@ import {
   type CreateProjectUsageRequestInput,
   type IssueProjectUsageRequestInput,
   type ProjectSiteDto,
+  type ProjectSiteInvestmentSummaryDto,
   type ProjectSiteServiceModeCode,
   type ProjectSiteStatusCode,
   type ProjectUsageRequestDto,
@@ -17,6 +18,7 @@ import {
 export type ProjectSiteListFilters = {
   status?: ProjectSiteStatusCode;
   serviceMode?: ProjectSiteServiceModeCode;
+  businessProjectId?: string;
   clientPartyId?: string;
   subcontractorPartyId?: string;
   projectSiteIds?: readonly string[];
@@ -37,6 +39,7 @@ export type ProjectUsageRequestListFilters = {
 export type ProjectSiteRepository = {
   list(filters: ProjectSiteListFilters): Promise<ProjectSiteDto[]>;
   getById(id: string): Promise<ProjectSiteDto | null>;
+  getInvestmentSummary(id: string): Promise<ProjectSiteInvestmentSummaryDto | null>;
   create(input: CreateProjectSiteInput): Promise<ProjectSiteDto>;
   update(id: string, input: UpdateProjectSiteInput): Promise<ProjectSiteDto | null>;
 };
@@ -136,7 +139,7 @@ export function normalizeProjectSiteFilters(query: Record<string, unknown>): Pro
     filters.serviceMode = query.serviceMode as ProjectSiteServiceModeCode;
   }
 
-  for (const field of ["clientPartyId", "subcontractorPartyId", "q"] as const) {
+  for (const field of ["businessProjectId", "clientPartyId", "subcontractorPartyId", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
 
@@ -189,6 +192,7 @@ export function normalizeProjectSiteInput(
 
   for (const field of [
     "clientPartyId",
+    "businessProjectId",
     "operatorPartyId",
     "subcontractorPartyId",
     "region",
@@ -281,7 +285,14 @@ export function normalizeProjectUsageRequestInput(
     if (typeof payload[field] === "string") normalized[field] = payload[field].trim();
   }
 
-  for (const field of ["purpose", "requestedBy", "remark"] as const) {
+  for (const field of [
+    "purpose",
+    "requestedBy",
+    "submittedByAccountId",
+    "submittedByNameSnapshot",
+    "submittedByPhoneSnapshot",
+    "remark",
+  ] as const) {
     const value = normalizeNullableString(payload[field]);
     if (value !== undefined) normalized[field] = value;
   }

@@ -1,11 +1,14 @@
 import {
+  PARTY_ENTITY_TYPES,
   PARTY_TYPES,
   type BaseStatusCode,
   type CreatePartyInput,
   type PartyDto,
+  type PartyEntityTypeCode,
   type PartyTypeCode,
   type UpdatePartyInput,
 } from "@company-erp/shared";
+import { normalizeIdentityNo } from "./identityCrypto.js";
 
 export type PartyListFilters = {
   type?: PartyTypeCode;
@@ -35,6 +38,7 @@ export class PartyValidationError extends Error {
 }
 
 const partyTypeCodes = new Set(PARTY_TYPES.map((partyType) => partyType.code));
+const partyEntityTypeCodes = new Set(PARTY_ENTITY_TYPES.map((entityType) => entityType.code));
 const statusCodes = new Set<BaseStatusCode>(["enabled", "disabled"]);
 
 export function normalizePartyInput(input: unknown, mode: "create"): CreatePartyInput;
@@ -61,6 +65,14 @@ export function normalizePartyInput(input: unknown, mode: "create" | "update"): 
     }
   }
 
+  if (payload.entityType !== undefined) {
+    if (typeof payload.entityType === "string" && partyEntityTypeCodes.has(payload.entityType as PartyEntityTypeCode)) {
+      normalized.entityType = payload.entityType as PartyEntityTypeCode;
+    } else {
+      issues.push("entityType is unsupported");
+    }
+  }
+
   for (const field of [
     "unifiedSocialCreditCode",
     "primaryContactName",
@@ -76,6 +88,12 @@ export function normalizePartyInput(input: unknown, mode: "create" | "update"): 
     } else if (typeof payload[field] === "string") {
       normalized[field] = payload[field].trim() || null;
     }
+  }
+
+  if (payload.identityNo === null) {
+    normalized.identityNo = null;
+  } else if (typeof payload.identityNo === "string") {
+    normalized.identityNo = normalizeIdentityNo(payload.identityNo) || null;
   }
 
   if (payload.status !== undefined) {
@@ -94,6 +112,16 @@ export function normalizePartyInput(input: unknown, mode: "create" | "update"): 
     issues.push("partyTypes cannot be empty");
   }
 
+  const effectiveEntityType = normalized.entityType ?? (mode === "create" ? "company" : undefined);
+  if (effectiveEntityType === "individual") {
+    if (mode === "create" && !normalized.primaryContactPhone) {
+      issues.push("primaryContactPhone is required for individual parties");
+    }
+    if (mode === "create" && !normalized.identityNo) {
+      issues.push("identityNo is required for individual parties");
+    }
+  }
+
   if (normalized.status && !statusCodes.has(normalized.status)) {
     issues.push("status must be enabled or disabled");
   }
@@ -103,7 +131,7 @@ export function normalizePartyInput(input: unknown, mode: "create" | "update"): 
   }
 
   if (mode === "create") {
-    return { ...normalized, status: normalized.status ?? "enabled" } as CreatePartyInput;
+    return { ...normalized, entityType: normalized.entityType ?? "company", status: normalized.status ?? "enabled" } as CreatePartyInput;
   }
 
   return normalized;

@@ -3,14 +3,17 @@ import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
   CreateEmployeeProjectSiteAssignmentInput,
+  CreateExternalProjectManagerAccountInput,
   CreateUserAccountInput,
   DepartmentDto,
   EmployeeDto,
   EmployeeProjectSiteAssignmentDto,
+  ExternalProjectManagerAccountDto,
   MvpRoleCode,
   UpdateDepartmentInput,
   UpdateEmployeeInput,
   UpdateEmployeeProjectSiteAssignmentInput,
+  UpdateExternalProjectManagerAccountInput,
   UpdateUserAccountInput,
   UserAccountDto,
 } from "@company-erp/shared";
@@ -19,6 +22,8 @@ import {
   EmployeeProjectSiteAssignmentConflictError,
   EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
+  ExternalProjectManagerAccountConflictError,
+  ExternalProjectManagerAccountValidationError,
   UserAccountConflictError,
   type DepartmentListFilters,
   type DepartmentRepository,
@@ -26,6 +31,8 @@ import {
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeListFilters,
   type EmployeeRepository,
+  type ExternalProjectManagerAccountListFilters,
+  type ExternalProjectManagerAccountRepository,
   type UserAccountListFilters,
   type UserAccountRepository,
 } from "./peoplePermissions.js";
@@ -50,6 +57,12 @@ type PrismaUserAccount = Prisma.UserAccountGetPayload<{
   include: {
     employee: true;
     roles: true;
+    externalProjectManagerAccount: {
+      include: {
+        projectSite: true;
+        subcontractorParty: true;
+      };
+    };
   };
 }>;
 
@@ -61,6 +74,19 @@ type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
       };
     };
     roles: true;
+    externalProjectManagerAccount: {
+      include: {
+        projectSite: true;
+      };
+    };
+  };
+}>;
+
+type PrismaExternalProjectManagerAccount = Prisma.ExternalProjectManagerAccountGetPayload<{
+  include: {
+    userAccount: true;
+    projectSite: true;
+    subcontractorParty: true;
   };
 }>;
 
@@ -129,6 +155,11 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
     username: account.username,
     status: account.status,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
+    externalProjectManagerAccountId: account.externalProjectManagerAccount?.id ?? null,
+    externalProjectManagerName: account.externalProjectManagerAccount?.managerName ?? null,
+    externalProjectManagerPhone: account.externalProjectManagerAccount?.managerPhone ?? null,
+    externalProjectSiteId: account.externalProjectManagerAccount?.projectSiteId ?? null,
+    externalProjectSiteName: account.externalProjectManagerAccount?.projectSite.siteName ?? null,
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
     createdAt: account.createdAt.toISOString(),
@@ -137,6 +168,15 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
 }
 
 function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
+  const externalManager = account.externalProjectManagerAccount;
+  const externalSiteIds =
+    externalManager && externalManager.status === "active" && isActiveAssignment(externalManager)
+      ? [externalManager.projectSiteId]
+      : [];
+  const employeeSiteIds = (account.employee?.projectSiteAssignments ?? [])
+    .filter(isActiveAssignment)
+    .map((assignment) => assignment.projectSiteId);
+
   return {
     id: account.id,
     username: account.username,
@@ -147,12 +187,35 @@ function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
     employeeName: account.employee?.name ?? null,
     employeeStatus: account.employee?.employmentStatus ?? null,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
-    assignedProjectSiteIds: (account.employee?.projectSiteAssignments ?? [])
-      .filter(isActiveAssignment)
-      .map((assignment) => assignment.projectSiteId)
-      .sort(),
+    externalProjectManagerName: externalManager?.managerName ?? null,
+    externalProjectManagerPhone: externalManager?.managerPhone ?? null,
+    assignedProjectSiteIds: Array.from(new Set([...employeeSiteIds, ...externalSiteIds])).sort(),
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
+    createdAt: account.createdAt.toISOString(),
+    updatedAt: account.updatedAt.toISOString(),
+  };
+}
+
+function toExternalProjectManagerAccountDto(
+  account: PrismaExternalProjectManagerAccount,
+): ExternalProjectManagerAccountDto {
+  return {
+    id: account.id,
+    userAccountId: account.userAccountId,
+    username: account.userAccount.username,
+    accountStatus: account.userAccount.status,
+    projectSiteId: account.projectSiteId,
+    siteCode: account.projectSite.siteCode,
+    siteName: account.projectSite.siteName,
+    subcontractorPartyId: account.subcontractorPartyId,
+    subcontractorPartyName: account.subcontractorParty?.partyName ?? null,
+    managerName: account.managerName,
+    managerPhone: account.managerPhone,
+    status: account.status,
+    startDate: dateOnly(account.startDate),
+    endDate: dateOnly(account.endDate),
+    remark: account.remark,
     createdAt: account.createdAt.toISOString(),
     updatedAt: account.updatedAt.toISOString(),
   };
@@ -216,6 +279,17 @@ function mapUserAccountConflict(error: unknown): never {
     const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
     if (targets.includes("username")) throw new UserAccountConflictError("username");
     if (targets.includes("employee_id")) throw new UserAccountConflictError("employeeId");
+  }
+  throw error;
+}
+
+function mapExternalProjectManagerConflict(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+    if (targets.includes("username")) throw new ExternalProjectManagerAccountConflictError("username");
+    if (targets.includes("project_site_id")) {
+      throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+    }
   }
   throw error;
 }
@@ -383,7 +457,11 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
 }
 
 export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAccountRepository {
-  const include = { employee: true, roles: true } satisfies Prisma.UserAccountInclude;
+  const include = {
+    employee: true,
+    roles: true,
+    externalProjectManagerAccount: { include: { projectSite: true, subcontractorParty: true } },
+  } satisfies Prisma.UserAccountInclude;
 
   return {
     async list(filters: UserAccountListFilters) {
@@ -469,6 +547,149 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
         mapUserAccountConflict(error);
+      }
+    },
+  };
+}
+
+export function createPrismaExternalProjectManagerAccountRepository(
+  prisma: PrismaClient,
+): ExternalProjectManagerAccountRepository {
+  const include = {
+    userAccount: true,
+    projectSite: true,
+    subcontractorParty: true,
+  } satisfies Prisma.ExternalProjectManagerAccountInclude;
+
+  async function assertNoActiveProjectManager(projectSiteId: string, excludeId?: string) {
+    const existing = await prisma.externalProjectManagerAccount.findFirst({
+      where: {
+        projectSiteId,
+        status: "active",
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+  }
+
+  return {
+    async list(filters: ExternalProjectManagerAccountListFilters) {
+      const accounts = await prisma.externalProjectManagerAccount.findMany({
+        where: {
+          ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+          ...(filters.status ? { status: filters.status } : {}),
+          ...(filters.q
+            ? {
+                OR: [
+                  { managerName: { contains: filters.q, mode: "insensitive" } },
+                  { managerPhone: { contains: filters.q, mode: "insensitive" } },
+                  { userAccount: { username: { contains: filters.q, mode: "insensitive" } } },
+                  { projectSite: { siteCode: { contains: filters.q, mode: "insensitive" } } },
+                  { projectSite: { siteName: { contains: filters.q, mode: "insensitive" } } },
+                  { subcontractorParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        include,
+        orderBy: [{ updatedAt: "desc" }],
+      });
+      return accounts.map(toExternalProjectManagerAccountDto);
+    },
+    async getById(id: string) {
+      const account = await prisma.externalProjectManagerAccount.findUnique({ where: { id }, include });
+      return account ? toExternalProjectManagerAccountDto(account) : null;
+    },
+    async create(input: CreateExternalProjectManagerAccountInput) {
+      try {
+        if ((input.status ?? "active") === "active") await assertNoActiveProjectManager(input.projectSiteId);
+        const passwordHash = await hashPassword(input.initialPassword);
+        const account = await prisma.$transaction(async (tx) => {
+          const userAccount = await tx.userAccount.create({
+            data: {
+              username: input.username,
+              passwordHash,
+              status: input.status ?? "active",
+              passwordChangedAt: new Date(),
+              roles: { create: [{ role: "external_project_manager" }] },
+            },
+          });
+
+          return tx.externalProjectManagerAccount.create({
+            data: {
+              userAccount: { connect: { id: userAccount.id } },
+              projectSite: { connect: { id: input.projectSiteId } },
+              subcontractorParty: input.subcontractorPartyId
+                ? { connect: { id: input.subcontractorPartyId } }
+                : undefined,
+              managerName: input.managerName,
+              managerPhone: input.managerPhone,
+              status: input.status ?? "active",
+              startDate: parseDate(input.startDate),
+              endDate: parseDate(input.endDate),
+              remark: input.remark,
+            },
+            include,
+          });
+        });
+        return toExternalProjectManagerAccountDto(account);
+      } catch (error) {
+        if (error instanceof ExternalProjectManagerAccountConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+          throw new ExternalProjectManagerAccountValidationError(["Referenced project site or subcontractor was not found"]);
+        }
+        mapExternalProjectManagerConflict(error);
+      }
+    },
+    async update(id: string, input: UpdateExternalProjectManagerAccountInput) {
+      try {
+        const current = await prisma.externalProjectManagerAccount.findUnique({ where: { id } });
+        if (!current) return null;
+        const nextProjectSiteId = input.projectSiteId ?? current.projectSiteId;
+        const nextStatus = input.status ?? current.status;
+        if (nextStatus === "active") await assertNoActiveProjectManager(nextProjectSiteId, id);
+        const passwordHash = input.resetPassword ? await hashPassword(input.resetPassword) : undefined;
+
+        const account = await prisma.$transaction(async (tx) => {
+          await tx.userAccount.update({
+            where: { id: current.userAccountId },
+            data: {
+              ...(input.username !== undefined ? { username: input.username } : {}),
+              ...(input.status !== undefined ? { status: input.status } : {}),
+              ...(passwordHash ? { passwordHash, passwordChangedAt: new Date() } : {}),
+            },
+          });
+
+          return tx.externalProjectManagerAccount.update({
+            where: { id },
+            data: {
+              ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
+              ...(input.subcontractorPartyId !== undefined
+                ? {
+                    subcontractorParty: input.subcontractorPartyId
+                      ? { connect: { id: input.subcontractorPartyId } }
+                      : { disconnect: true },
+                  }
+                : {}),
+              ...(input.managerName !== undefined ? { managerName: input.managerName } : {}),
+              ...(input.managerPhone !== undefined ? { managerPhone: input.managerPhone } : {}),
+              ...(input.status !== undefined ? { status: input.status } : {}),
+              ...(input.startDate !== undefined ? { startDate: parseDate(input.startDate) } : {}),
+              ...(input.endDate !== undefined ? { endDate: parseDate(input.endDate) } : {}),
+              ...(input.remark !== undefined ? { remark: input.remark } : {}),
+            },
+            include,
+          });
+        });
+        return toExternalProjectManagerAccountDto(account);
+      } catch (error) {
+        if (error instanceof ExternalProjectManagerAccountConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+          throw new ExternalProjectManagerAccountValidationError(["Referenced project site or subcontractor was not found"]);
+        }
+        mapExternalProjectManagerConflict(error);
       }
     },
   };
@@ -618,6 +839,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
   const include = {
     employee: { include: { projectSiteAssignments: true } },
     roles: true,
+    externalProjectManagerAccount: { include: { projectSite: true } },
   } satisfies Prisma.UserAccountInclude;
 
   return {
