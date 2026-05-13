@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app.js";
+import { validateIdentityEncryptionSecret } from "./identityCrypto.js";
 import {
   createPrismaMaterialRepository,
   createPrismaWarehouseRepository,
@@ -35,9 +36,20 @@ import { createPrismaAppConfigRepository } from "./prismaAppConfigRepository.js"
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
+const appEnvironment = process.env.APP_ENVIRONMENT?.trim() || "local";
+const requiresDatabase = appEnvironment !== "local" || process.env.NODE_ENV === "production";
+
+if (!process.env.DATABASE_URL && requiresDatabase) {
+  throw new Error("DATABASE_URL is required in production");
+}
+
 const prisma = process.env.DATABASE_URL ? new PrismaClient() : null;
 
-const app = buildApp({
+if (prisma) {
+  validateIdentityEncryptionSecret();
+}
+
+const app = await buildApp({
   auth: prisma
     ? {
         enabled: true,

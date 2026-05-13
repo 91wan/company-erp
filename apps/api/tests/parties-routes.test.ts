@@ -80,7 +80,7 @@ function createFakeRepository(seed: PartyDto[] = []): PartyRepository {
 
 describe("parties API", () => {
   it("reports parties API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/parties" });
     await app.close();
@@ -90,7 +90,7 @@ describe("parties API", () => {
   });
 
   it("lists parties with type, status, and text filters", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       partyRepository: createFakeRepository([
         makeParty(),
         makeParty({
@@ -115,7 +115,7 @@ describe("parties API", () => {
 
   it("returns a party detail by id", async () => {
     const party = makeParty();
-    const app = buildApp({ partyRepository: createFakeRepository([party]) });
+    const app = await buildApp({ partyRepository: createFakeRepository([party]) });
 
     const response = await app.inject({ method: "GET", url: `/api/parties/${party.id}` });
     await app.close();
@@ -125,7 +125,7 @@ describe("parties API", () => {
   });
 
   it("returns 404 for a missing party", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository() });
+    const app = await buildApp({ partyRepository: createFakeRepository() });
 
     const response = await app.inject({
       method: "GET",
@@ -138,7 +138,7 @@ describe("parties API", () => {
   });
 
   it("creates a party with default enabled status", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository() });
+    const app = await buildApp({ partyRepository: createFakeRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -164,7 +164,7 @@ describe("parties API", () => {
   });
 
   it("creates individual subcontractors without exposing the full identity number", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository() });
+    const app = await buildApp({ partyRepository: createFakeRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -195,7 +195,7 @@ describe("parties API", () => {
   });
 
   it("requires identity details for individual subcontractors", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository() });
+    const app = await buildApp({ partyRepository: createFakeRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -216,7 +216,7 @@ describe("parties API", () => {
 
   it("updates party fields and status", async () => {
     const party = makeParty();
-    const app = buildApp({ partyRepository: createFakeRepository([party]) });
+    const app = await buildApp({ partyRepository: createFakeRepository([party]) });
 
     const response = await app.inject({
       method: "PATCH",
@@ -239,7 +239,7 @@ describe("parties API", () => {
   });
 
   it("rejects invalid party payloads", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository() });
+    const app = await buildApp({ partyRepository: createFakeRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -257,7 +257,7 @@ describe("parties API", () => {
   });
 
   it("returns 409 when party code already exists", async () => {
-    const app = buildApp({ partyRepository: createFakeRepository([makeParty()]) });
+    const app = await buildApp({ partyRepository: createFakeRepository([makeParty()]) });
 
     const response = await app.inject({
       method: "POST",

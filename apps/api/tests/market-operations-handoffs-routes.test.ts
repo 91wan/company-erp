@@ -116,14 +116,14 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "marketing-user") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "marketing-user") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password: "ChangeMe123!" } });
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("market operations handoff API", () => {
   it("creates, lists, and updates lightweight market-to-operations handoffs", async () => {
-    const app = buildApp({ marketOperationsHandoffRepository: createFakeHandoffRepository([makeHandoff()]) });
+    const app = await buildApp({ marketOperationsHandoffRepository: createFakeHandoffRepository([makeHandoff()]) });
 
     const list = await app.inject({ method: "GET", url: "/api/market-operations-handoffs?status=pending&q=科技园" });
     const created = await app.inject({
@@ -162,7 +162,7 @@ describe("market operations handoff API", () => {
 
   it("allows marketing and operations to manage handoffs but blocks viewers", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-market-ops-handoff" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "marketing-user", passwordHash, roles: ["marketing"] }),

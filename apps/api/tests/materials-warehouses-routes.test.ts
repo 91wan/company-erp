@@ -155,7 +155,7 @@ function createFakeWarehouseRepository(seed: WarehouseDto[] = []): WarehouseRepo
 
 describe("materials API", () => {
   it("reports materials API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/materials" });
     await app.close();
@@ -165,7 +165,7 @@ describe("materials API", () => {
   });
 
   it("lists materials with status, category, supplier, and text filters", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       materialRepository: createFakeMaterialRepository([
         makeMaterial(),
         makeMaterial({
@@ -190,7 +190,7 @@ describe("materials API", () => {
   });
 
   it("returns material detail by id and 404 for missing material", async () => {
-    const app = buildApp({ materialRepository: createFakeMaterialRepository([makeMaterial()]) });
+    const app = await buildApp({ materialRepository: createFakeMaterialRepository([makeMaterial()]) });
 
     const detailResponse = await app.inject({
       method: "GET",
@@ -210,7 +210,7 @@ describe("materials API", () => {
 
   it("creates and updates a material without requiring a default supplier", async () => {
     const repository = createFakeMaterialRepository();
-    const app = buildApp({ materialRepository: repository });
+    const app = await buildApp({ materialRepository: repository });
 
     const createResponse = await app.inject({
       method: "POST",
@@ -265,7 +265,7 @@ describe("materials API", () => {
   });
 
   it("rejects invalid material payloads and duplicate material codes", async () => {
-    const app = buildApp({ materialRepository: createFakeMaterialRepository([makeMaterial()]) });
+    const app = await buildApp({ materialRepository: createFakeMaterialRepository([makeMaterial()]) });
 
     const invalidResponse = await app.inject({
       method: "POST",
@@ -291,7 +291,7 @@ describe("materials API", () => {
   });
 
   it("rejects invalid project-site charge prices for materials", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       materialRepository: createFakeMaterialRepository([
         makeMaterial({ purchaseReferencePrice: 20, projectSiteSalePrice: 25 }),
       ]),
@@ -344,7 +344,7 @@ describe("materials API", () => {
 
 describe("warehouses API", () => {
   it("reports warehouses API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/warehouses" });
     await app.close();
@@ -355,7 +355,7 @@ describe("warehouses API", () => {
 
   it("lists, creates, and updates warehouses", async () => {
     const repository = createFakeWarehouseRepository([makeWarehouse()]);
-    const app = buildApp({ warehouseRepository: repository });
+    const app = await buildApp({ warehouseRepository: repository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -389,7 +389,7 @@ describe("warehouses API", () => {
   });
 
   it("returns warehouse detail by id and 404 for missing warehouse", async () => {
-    const app = buildApp({ warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]) });
+    const app = await buildApp({ warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]) });
 
     const detailResponse = await app.inject({
       method: "GET",
@@ -408,7 +408,7 @@ describe("warehouses API", () => {
   });
 
   it("rejects invalid warehouse payloads and duplicate warehouse codes", async () => {
-    const app = buildApp({ warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]) });
+    const app = await buildApp({ warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]) });
 
     const invalidResponse = await app.inject({
       method: "POST",

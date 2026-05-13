@@ -336,7 +336,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>) {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>) {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -347,7 +347,7 @@ async function loginCookie(app: ReturnType<typeof buildApp>) {
 
 describe("purchase requests API", () => {
   it("reports purchase requests API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/purchase-requests" });
     await app.close();
@@ -358,7 +358,7 @@ describe("purchase requests API", () => {
 
   it("lists, reads, creates, updates, and reviews purchase requests", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
-    const app = buildApp({ purchaseRequestRepository: repository });
+    const app = await buildApp({ purchaseRequestRepository: repository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -412,7 +412,7 @@ describe("purchase requests API", () => {
       makePurchaseRequest({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status: "purchasing" }),
       makePurchaseRequest({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", status: "draft" }),
     ]);
-    const app = buildApp({ purchaseRequestRepository: repository });
+    const app = await buildApp({ purchaseRequestRepository: repository });
 
     const invalidSubmitResponse = await app.inject({
       method: "POST",
@@ -439,7 +439,7 @@ describe("purchase requests API", () => {
 
   it("rejects pending approval purchase requests with a required remark", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_approval" })]);
-    const app = buildApp({ purchaseRequestRepository: repository });
+    const app = await buildApp({ purchaseRequestRepository: repository });
 
     const missingRemarkResponse = await app.inject({
       method: "POST",
@@ -465,7 +465,7 @@ describe("purchase requests API", () => {
 
   it("rejects direct approval status changes through patch", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
-    const app = buildApp({ purchaseRequestRepository: repository });
+    const app = await buildApp({ purchaseRequestRepository: repository });
 
     const response = await app.inject({
       method: "PATCH",
@@ -482,7 +482,7 @@ describe("purchase requests API", () => {
   });
 
   it("rejects invalid purchase requests and duplicate request numbers", async () => {
-    const app = buildApp({ purchaseRequestRepository: createFakePurchaseRequestRepository([makePurchaseRequest()]) });
+    const app = await buildApp({ purchaseRequestRepository: createFakePurchaseRequestRepository([makePurchaseRequest()]) });
 
     const invalidResponse = await app.inject({
       method: "POST",
@@ -532,7 +532,7 @@ describe("purchase requests API", () => {
       projectSiteId: null,
       projectSiteName: null,
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-purchases" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       purchaseRequestRepository: createFakePurchaseRequestRepository([assignedRequest, unassignedRequest, globalRequest]),
@@ -565,7 +565,7 @@ describe("purchase requests API", () => {
 
   it("allows viewer read access but blocks purchase request review actions", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-purchase-viewer" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash, roles: ["viewer"] })]),
       purchaseRequestRepository: createFakePurchaseRequestRepository([makePurchaseRequest()]),
@@ -592,7 +592,7 @@ describe("purchase requests API", () => {
 
 describe("purchase records API", () => {
   it("reports purchase records API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/purchase-records" });
     await app.close();
@@ -604,7 +604,7 @@ describe("purchase records API", () => {
   it("lists, reads, creates, updates records, and moves linked approved requests to purchasing", async () => {
     const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_purchase" })]);
     const purchaseRecordRepository = createFakePurchaseRecordRepository([makePurchaseRecord()]);
-    const app = buildApp({ purchaseRequestRepository, purchaseRecordRepository });
+    const app = await buildApp({ purchaseRequestRepository, purchaseRecordRepository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -654,7 +654,7 @@ describe("purchase records API", () => {
   it("blocks purchase records linked to unapproved purchase requests", async () => {
     const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_approval" })]);
     const purchaseRecordRepository = createFakePurchaseRecordRepository();
-    const app = buildApp({ purchaseRequestRepository, purchaseRecordRepository });
+    const app = await buildApp({ purchaseRequestRepository, purchaseRecordRepository });
 
     const response = await app.inject({
       method: "POST",
@@ -680,7 +680,7 @@ describe("purchase records API", () => {
   });
 
   it("rejects invalid source payloads and duplicate purchase numbers", async () => {
-    const app = buildApp({ purchaseRecordRepository: createFakePurchaseRecordRepository([makePurchaseRecord()]) });
+    const app = await buildApp({ purchaseRecordRepository: createFakePurchaseRecordRepository([makePurchaseRecord()]) });
 
     const invalidPlatformResponse = await app.inject({
       method: "POST",
@@ -740,7 +740,7 @@ describe("purchase records API", () => {
       projectSiteId: null,
       projectSiteName: null,
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-purchase-records" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       purchaseRecordRepository: createFakePurchaseRecordRepository([assignedRecord, unassignedRecord, globalRecord]),

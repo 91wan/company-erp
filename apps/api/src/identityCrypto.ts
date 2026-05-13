@@ -1,13 +1,22 @@
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 
 const FALLBACK_SECRET = "company-erp-local-identity-secret-change-before-production";
+const INSECURE_IDENTITY_SECRET_PLACEHOLDERS = new Set([
+  FALLBACK_SECRET,
+  "change-me-long-random-local-secret",
+  "change-me-long-random-identity-secret",
+]);
 
 function encryptionKey(): Buffer {
-  const secret =
-    process.env.IDENTITY_ENCRYPTION_SECRET?.trim() ||
-    process.env.AUTH_SESSION_SECRET?.trim() ||
-    FALLBACK_SECRET;
+  const secret = process.env.IDENTITY_ENCRYPTION_SECRET?.trim() || FALLBACK_SECRET;
   return createHash("sha256").update(secret).digest();
+}
+
+export function validateIdentityEncryptionSecret(): void {
+  const secret = process.env.IDENTITY_ENCRYPTION_SECRET?.trim();
+  if (!secret || INSECURE_IDENTITY_SECRET_PLACEHOLDERS.has(secret)) {
+    throw new Error("IDENTITY_ENCRYPTION_SECRET must be set to a non-placeholder value when database is enabled");
+  }
 }
 
 export function normalizeIdentityNo(value: string): string {

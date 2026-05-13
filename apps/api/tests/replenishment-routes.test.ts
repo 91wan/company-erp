@@ -53,7 +53,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>) {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>) {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -175,7 +175,7 @@ function createFakeRepository(seed: ReplenishmentSuggestionDto[] = []): Replenis
 
 describe("replenishment suggestions API", () => {
   it("reports replenishment suggestions API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/replenishment-suggestions" });
     await app.close();
@@ -185,7 +185,7 @@ describe("replenishment suggestions API", () => {
   });
 
   it("lists suggestions with filters", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       replenishmentSuggestionRepository: createFakeRepository([
         makeSuggestion(),
         makeSuggestion({
@@ -208,7 +208,7 @@ describe("replenishment suggestions API", () => {
 
   it("blocks project-site users from global replenishment suggestions", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-replenishment" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]),
@@ -228,7 +228,7 @@ describe("replenishment suggestions API", () => {
 
   it("generates suggestions idempotently", async () => {
     const repository = createFakeRepository();
-    const app = buildApp({ replenishmentSuggestionRepository: repository });
+    const app = await buildApp({ replenishmentSuggestionRepository: repository });
 
     const firstResponse = await app.inject({ method: "POST", url: "/api/replenishment-suggestions/generate" });
     const secondResponse = await app.inject({ method: "POST", url: "/api/replenishment-suggestions/generate" });
@@ -253,7 +253,7 @@ describe("replenishment suggestions API", () => {
   });
 
   it("dismisses an open suggestion", async () => {
-    const app = buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
+    const app = await buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
 
     const response = await app.inject({
       method: "PATCH",
@@ -269,7 +269,7 @@ describe("replenishment suggestions API", () => {
   });
 
   it("converts an open suggestion to a pending purchase request", async () => {
-    const app = buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
+    const app = await buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
 
     const response = await app.inject({
       method: "POST",
@@ -299,7 +299,7 @@ describe("replenishment suggestions API", () => {
   });
 
   it("rejects converting a non-open suggestion twice", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       replenishmentSuggestionRepository: createFakeRepository([makeSuggestion({ status: "converted" })]),
     });
 
@@ -319,7 +319,7 @@ describe("replenishment suggestions API", () => {
   });
 
   it("rejects invalid filters and conversion payloads", async () => {
-    const app = buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
+    const app = await buildApp({ replenishmentSuggestionRepository: createFakeRepository([makeSuggestion()]) });
 
     const invalidFilterResponse = await app.inject({
       method: "GET",

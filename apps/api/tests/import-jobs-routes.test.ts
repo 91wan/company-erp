@@ -167,7 +167,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username: string, password = "ChangeMe123!") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username: string, password = "ChangeMe123!") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -178,7 +178,7 @@ async function loginCookie(app: ReturnType<typeof buildApp>, username: string, p
 
 describe("import jobs API", () => {
   it("reports import API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/api/import-jobs" });
     await app.close();
 
@@ -188,7 +188,7 @@ describe("import jobs API", () => {
 
   it("lists and reads import jobs with filters", async () => {
     const job = makeJob();
-    const app = buildApp({ importJobRepository: createFakeRepository([job]) });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
 
     const listResponse = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=parties&status=previewed" });
     const detailResponse = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}` });
@@ -202,7 +202,7 @@ describe("import jobs API", () => {
 
   it("previews a multipart xlsx upload and returns row-level statuses", async () => {
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "晨光贸易有限公司", "启用"]]);
-    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
     const multipart = multipartPayload({ templateType: "parties", file, fileName: "suppliers.xlsx" });
 
     const response = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...multipart });
@@ -219,7 +219,7 @@ describe("import jobs API", () => {
   });
 
   it("rejects unsupported template types and missing files", async () => {
-    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
     const unsupported = multipartPayload({ templateType: "contracts", file: Buffer.from("x"), fileName: "bad.xlsx" });
     const missingFile = multipartPayload({ templateType: "parties" });
 
@@ -235,7 +235,7 @@ describe("import jobs API", () => {
 
   it("returns structured validation errors for invalid headers or rows", async () => {
     const file = await workbookBuffer(["错误表头"], [["bad"]]);
-    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
     const multipart = multipartPayload({ templateType: "materials", file, fileName: "materials.xlsx" });
 
     const response = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...multipart });
@@ -261,7 +261,7 @@ describe("import jobs API", () => {
         },
       ],
     });
-    const app = buildApp({ importJobRepository: createFakeRepository([previewed, withErrors]) });
+    const app = await buildApp({ importJobRepository: createFakeRepository([previewed, withErrors]) });
 
     const confirmed = await app.inject({ method: "POST", url: `/api/import-jobs/${previewed.id}/confirm` });
     const repeated = await app.inject({ method: "POST", url: `/api/import-jobs/${previewed.id}/confirm` });
@@ -277,7 +277,7 @@ describe("import jobs API", () => {
   });
 
   it("validates list filters for template and status", async () => {
-    const app = buildApp({ importJobRepository: createFakeRepository() });
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
 
     const response = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=contracts&status=bad" });
     await app.close();
@@ -289,7 +289,7 @@ describe("import jobs API", () => {
   it("guards import write actions while allowing viewer read access", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const job = makeJob();
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
