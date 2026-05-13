@@ -4,10 +4,16 @@ import {
   ApiStatus,
   App,
   adminUser,
+  contract,
   externalProjectSiteUser,
+  inventoryBalance,
+  inventoryMovement,
   jsonResponse,
   mockShellFetch,
+  projectUsageRequest,
   projectSiteUser,
+  purchaseRecord,
+  purchaseRequest,
   viewerUser,
 } from "./appTestHelpers";
 
@@ -144,11 +150,11 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
-    fireEvent.click((await screen.findAllByText("科技园一期项目部"))[0]);
+    fireEvent.click((await screen.findAllByText(/科技园一期项目点/))[0]);
     expect(await screen.findByRole("heading", { name: "项目点" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
-    fireEvent.click(await screen.findByText("合同审批 HT20240509008"));
+    fireEvent.click(await screen.findByText(/HT20260511001/));
     expect((await screen.findAllByRole("heading", { name: "合同台账" })).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
@@ -174,13 +180,120 @@ describe("Company ERP app shell", () => {
       expect(screen.getByText(panel)).toBeInTheDocument();
     }
 
-    expect(screen.getByText("PO20240511012")).toBeInTheDocument();
+    expect(await screen.findByText("PO20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("采购人：李四").length).toBeGreaterThan(0);
     expect(screen.getByText("京东企业购")).toBeInTheDocument();
     expect(screen.getAllByText("未建供应商").length).toBeGreaterThan(0);
-    expect(screen.getByText("RK20240511005")).toBeInTheDocument();
-    expect(screen.getByText("6分镀锌管（4米/根）")).toBeInTheDocument();
-    expect(screen.getAllByText("科技园一期项目部").length).toBeGreaterThan(0);
+    expect(screen.getByText("RK20260511001")).toBeInTheDocument();
+    expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/科技园一期项目点/).length).toBeGreaterThan(0);
+  });
+
+  it("loads dashboard metrics and panels from live business API responses", async () => {
+    mockShellFetch(adminUser, undefined, undefined, {
+      purchaseRequests: [
+        {
+          ...purchaseRequest,
+          id: "live-pr-pending",
+          requestNo: "PR-LIVE-APPROVAL",
+          requesterName: "实时申请人",
+          status: "pending_approval",
+          submittedAt: "2026-05-13T08:30:00.000Z",
+          updatedAt: "2026-05-13T08:30:00.000Z",
+        },
+        {
+          ...purchaseRequest,
+          id: "live-pr-draft",
+          requestNo: "PR-LIVE-DRAFT",
+          status: "draft",
+          updatedAt: "2026-05-13T07:00:00.000Z",
+        },
+      ],
+      purchaseRecords: [
+        {
+          ...purchaseRecord,
+          id: "live-po",
+          purchaseNo: "PO-LIVE-001",
+          purchaserName: "实时采购人",
+          purchasePlatform: "实时平台",
+          updatedAt: "2026-05-13T09:00:00.000Z",
+        },
+      ],
+      inventoryMovements: [
+        {
+          ...inventoryMovement,
+          id: "live-in",
+          movementNo: "LIVE-IN-001",
+          movementDate: "2026-05-13",
+          movementType: "inbound",
+          materialName: "实时入库物料",
+          updatedAt: "2026-05-13T09:20:00.000Z",
+        },
+      ],
+      inventoryBalances: [
+        {
+          ...inventoryBalance,
+          materialCode: "LIVE-MAT-LOW",
+          materialName: "实时低库存物料",
+          currentQuantity: 3,
+          safeStock: 20,
+          isLowStock: true,
+          lastMovementAt: "2026-05-13",
+        },
+      ],
+      projectUsageRequests: [
+        {
+          ...projectUsageRequest,
+          id: "live-usage",
+          requestNo: "USE-LIVE-001",
+          projectSiteName: "实时项目点",
+          chargeAmount: 196,
+          status: "issued",
+          updatedAt: "2026-05-13T09:30:00.000Z",
+        },
+      ],
+      contracts: [
+        {
+          ...contract,
+          id: "live-contract",
+          contractNo: "HT-LIVE-EXPIRED",
+          contractName: "实时到期合同",
+          expiryState: "expired",
+          updatedAt: "2026-05-13T09:40:00.000Z",
+        },
+      ],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /待审批\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /采购需求\s+2/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /入库记录\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /低库存物料\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /项目点领用\s+1/ })).toBeInTheDocument();
+
+    expect(screen.getByText(/PR-LIVE-APPROVAL/)).toBeInTheDocument();
+    expect(screen.getByText(/实时申请人/)).toBeInTheDocument();
+    expect(screen.getByText("PO-LIVE-001")).toBeInTheDocument();
+    expect(screen.getByText("实时平台")).toBeInTheDocument();
+    expect(screen.getByText("LIVE-IN-001")).toBeInTheDocument();
+    expect(screen.getByText("实时低库存物料")).toBeInTheDocument();
+    expect(screen.getByText("实时项目点")).toBeInTheDocument();
+    expect(screen.getByText(/HT-LIVE-EXPIRED/)).toBeInTheDocument();
+  });
+
+  it("keeps the dashboard usable when one live summary source fails", async () => {
+    mockShellFetch(adminUser, undefined, undefined, {
+      purchaseRequests: [{ ...purchaseRequest, requestNo: "PR-LIVE-STILL-VISIBLE", status: "pending_approval" }],
+      failures: ["/api/inventory-balances"],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(await screen.findByText(/PR-LIVE-STILL-VISIBLE/)).toBeInTheDocument();
+    expect(screen.getByText("低库存数据暂不可用")).toBeInTheDocument();
   });
 
   it("switches workspaces from the sidebar without preloading every module", async () => {

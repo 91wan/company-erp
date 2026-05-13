@@ -29,6 +29,8 @@ test("admin can navigate from dashboard cards and sidebar to real workspaces", a
 
   await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   await expect(page.getByText("API online")).toBeVisible();
+  await expect(page.getByText("DEMO-PO-001")).toBeVisible();
+  await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
 
   await page.getByRole("button", { name: /采购需求/ }).first().click();
   await expect(page.getByRole("heading", { name: "采购管理" })).toBeVisible();
@@ -38,7 +40,7 @@ test("admin can navigate from dashboard cards and sidebar to real workspaces", a
   await expect(page.getByRole("heading", { name: "库存管理" })).toBeVisible();
 
   await page.getByRole("button", { name: "Dashboard" }).click();
-  await page.getByText("科技园一期项目部").first().click();
+  await page.getByText("DEMO 项目点").first().click();
   await expect(page.getByRole("heading", { name: "项目点", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "合同" }).click();

@@ -3,9 +3,14 @@ import {
   Bell,
   ChevronLeft,
   ChevronsRight,
+  ClipboardCheck,
   Database,
+  MapPin,
+  PackageCheck,
   Search,
   Server,
+  ShoppingCart,
+  Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -16,17 +21,16 @@ import {
   type AppConfigDto,
   type AppVersionDto,
   type AuthenticatedUserDto,
+  type ContractDto,
+  type InventoryBalanceDto,
+  type InventoryMovementDto,
+  type ProjectUsageRequestDto,
+  type PurchaseRecordDto,
+  type PurchaseRequestDto,
 } from "@company-erp/shared";
 import {
   SettingsIcon,
-  approvals,
-  lowStockMaterials,
-  metrics,
   navigationItems,
-  purchaseRecords,
-  receivingRecords,
-  siteUsage,
-  systemStatus,
   workflowSteps,
   type MetricCard as MetricCardType,
   type MetricTone,
@@ -45,7 +49,7 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
-import { getAppVersion, updateAppConfig } from "../apiClient";
+import { apiBaseUrl, getAppVersion, requestJson, updateAppConfig } from "../apiClient";
 
 type DashboardShellProps = {
   currentUser: AuthenticatedUserDto;
@@ -90,7 +94,9 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
-          {activeWorkspace === "Dashboard" ? <DashboardOverview onNavigate={setActiveWorkspace} /> : null}
+          {activeWorkspace === "Dashboard" ? (
+            <DashboardOverview currentUser={currentUser} onNavigate={setActiveWorkspace} />
+          ) : null}
           {activeWorkspace === "基础资料" ? (
             <>
               <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
@@ -189,20 +195,111 @@ function Sidebar({
 
 type NavigateToWorkspace = (workspace: WorkspaceKey) => void;
 
-function DashboardOverview({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+type LoadState<T> =
+  | { status: "loading"; data: T }
+  | { status: "success"; data: T }
+  | { status: "error"; data: T };
+
+type DashboardLiveData = {
+  purchaseRequests: LoadState<PurchaseRequestDto[]>;
+  purchaseRecords: LoadState<PurchaseRecordDto[]>;
+  inventoryMovements: LoadState<InventoryMovementDto[]>;
+  inventoryBalances: LoadState<InventoryBalanceDto[]>;
+  projectUsageRequests: LoadState<ProjectUsageRequestDto[]>;
+  contracts: LoadState<ContractDto[]>;
+  appVersion: LoadState<AppVersionDto | null>;
+};
+
+const emptyDashboardData: DashboardLiveData = {
+  purchaseRequests: { status: "loading", data: [] },
+  purchaseRecords: { status: "loading", data: [] },
+  inventoryMovements: { status: "loading", data: [] },
+  inventoryBalances: { status: "loading", data: [] },
+  projectUsageRequests: { status: "loading", data: [] },
+  contracts: { status: "loading", data: [] },
+  appVersion: { status: "loading", data: null },
+};
+
+async function loadDashboardResource<T>(path: string, key: string): Promise<LoadState<T[]>> {
+  try {
+    const payload = await requestJson<Record<string, T[]>>(`${apiBaseUrl}${path}`);
+    return { status: "success", data: Array.isArray(payload[key]) ? payload[key] : [] };
+  } catch {
+    return { status: "error", data: [] };
+  }
+}
+
+function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOnly: boolean): DashboardLiveData {
+  const [data, setData] = useState<DashboardLiveData>(emptyDashboardData);
+
+  useEffect(() => {
+    let mounted = true;
+    setData(emptyDashboardData);
+
+    async function load() {
+      const [
+        purchaseRequests,
+        purchaseRecords,
+        inventoryMovements,
+        inventoryBalances,
+        projectUsageRequests,
+        contracts,
+        appVersion,
+      ] = await Promise.all([
+        loadDashboardResource<PurchaseRequestDto>("/api/purchase-requests", "purchaseRequests"),
+        loadDashboardResource<PurchaseRecordDto>("/api/purchase-records", "purchaseRecords"),
+        loadDashboardResource<InventoryMovementDto>("/api/inventory-movements", "inventoryMovements"),
+        isProjectSiteOnly
+          ? Promise.resolve<LoadState<InventoryBalanceDto[]>>({ status: "error", data: [] })
+          : loadDashboardResource<InventoryBalanceDto>("/api/inventory-balances", "inventoryBalances"),
+        loadDashboardResource<ProjectUsageRequestDto>("/api/project-usage-requests", "projectUsageRequests"),
+        loadDashboardResource<ContractDto>("/api/contracts", "contracts"),
+        getAppVersion()
+          .then((version): LoadState<AppVersionDto | null> => ({ status: "success", data: version }))
+          .catch((): LoadState<AppVersionDto | null> => ({ status: "error", data: null })),
+      ]);
+
+      if (!mounted) return;
+      setData({
+        purchaseRequests,
+        purchaseRecords,
+        inventoryMovements,
+        inventoryBalances,
+        projectUsageRequests,
+        contracts,
+        appVersion,
+      });
+    }
+
+    void load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser.id, isProjectSiteOnly]);
+
+  return data;
+}
+
+function DashboardOverview({ currentUser, onNavigate }: { currentUser: AuthenticatedUserDto; onNavigate: NavigateToWorkspace }) {
+  const isProjectSiteOnly =
+    currentUser.roles.length === 1 &&
+    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_site");
+  const data = useDashboardLiveData(currentUser, isProjectSiteOnly);
+
   return (
     <>
       <DashboardHeader onNavigate={onNavigate} />
-      <MetricStrip onNavigate={onNavigate} />
+      <MetricStrip data={data} onNavigate={onNavigate} />
       <section className="dashboard-grid dashboard-grid-primary">
-        <ApprovalPanel onNavigate={onNavigate} />
-        <PurchasePanel onNavigate={onNavigate} />
-        <ReceivingPanel onNavigate={onNavigate} />
+        <ApprovalPanel data={data} onNavigate={onNavigate} />
+        <PurchasePanel purchaseRecords={data.purchaseRecords} onNavigate={onNavigate} />
+        <ReceivingPanel inventoryMovements={data.inventoryMovements} onNavigate={onNavigate} />
       </section>
       <section className="dashboard-grid dashboard-grid-secondary">
-        <LowStockPanel onNavigate={onNavigate} />
-        <SiteUsagePanel onNavigate={onNavigate} />
-        <SystemStatusPanel onNavigate={onNavigate} />
+        <LowStockPanel inventoryBalances={data.inventoryBalances} onNavigate={onNavigate} />
+        <SiteUsagePanel projectUsageRequests={data.projectUsageRequests} onNavigate={onNavigate} />
+        <SystemStatusPanel appVersion={data.appVersion} onNavigate={onNavigate} />
       </section>
     </>
   );
@@ -289,10 +386,121 @@ function DashboardHeader({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
   );
 }
 
-function MetricStrip({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function sortByUpdatedAt<T extends { updatedAt: string }>(items: T[]): T[] {
+  return [...items].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+function purchaseRequestStatusLabel(status: PurchaseRequestDto["status"]): string {
+  const labels: Record<PurchaseRequestDto["status"], string> = {
+    draft: "草稿",
+    pending_approval: "待审批",
+    pending_purchase: "待采购",
+    purchasing: "采购中",
+    partially_received: "部分到货",
+    completed: "已完成",
+    rejected: "已驳回",
+    cancelled: "已取消",
+  };
+  return labels[status] ?? status;
+}
+
+function purchaseRecordStatusLabel(status: PurchaseRecordDto["status"]): string {
+  const labels: Record<PurchaseRecordDto["status"], string> = {
+    pending_purchase: "待采购",
+    ordered: "已下单",
+    partially_received: "部分到货",
+    received: "已到货",
+    cancelled: "已取消",
+  };
+  return labels[status] ?? status;
+}
+
+function projectUsageStatusLabel(status: ProjectUsageRequestDto["status"]): string {
+  const labels: Record<ProjectUsageRequestDto["status"], string> = {
+    pending: "待处理",
+    partially_issued: "部分出库",
+    issued: "已出库",
+    rejected: "已驳回",
+  };
+  return labels[status] ?? status;
+}
+
+function contractExpiryLabel(expiryState: ContractDto["expiryState"]): string {
+  const labels: Record<ContractDto["expiryState"], string> = {
+    normal: "正常",
+    expiring_soon: "即将到期",
+    expired: "已到期",
+    terminated: "已终止",
+  };
+  return labels[expiryState] ?? expiryState;
+}
+
+function formatCurrency(value: number | null | undefined): string {
+  return `¥${Number(value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function PanelStateMessage({ text }: { text: string }) {
+  return <p className="form-hint">{text}</p>;
+}
+
+function buildMetrics(data: DashboardLiveData): MetricCardType[] {
+  const pendingApprovalCount = data.purchaseRequests.data.filter((request) => request.status === "pending_approval").length;
+  const inboundCount = data.inventoryMovements.data.filter((movement) =>
+    ["opening", "inbound", "adjustment_in"].includes(movement.movementType),
+  ).length;
+  const lowStockCount = data.inventoryBalances.data.filter((balance) => balance.isLowStock).length;
+
+  return [
+    {
+      label: "待审批",
+      value: String(pendingApprovalCount),
+      detail: data.purchaseRequests.status === "error" ? "数据暂不可用" : "待处理采购需求",
+      tone: "blue",
+      icon: ClipboardCheck,
+    },
+    {
+      label: "采购需求",
+      value: String(data.purchaseRequests.data.length),
+      detail: data.purchaseRequests.status === "error" ? "数据暂不可用" : "当前可见",
+      tone: "green",
+      icon: ShoppingCart,
+    },
+    {
+      label: "入库记录",
+      value: String(inboundCount),
+      detail: data.inventoryMovements.status === "error" ? "数据暂不可用" : "当前可见",
+      tone: "purple",
+      icon: Truck,
+    },
+    {
+      label: "低库存物料",
+      value: String(lowStockCount),
+      detail: data.inventoryBalances.status === "error" ? "数据暂不可用" : "低于安全库存",
+      tone: "orange",
+      icon: PackageCheck,
+    },
+    {
+      label: "项目点领用",
+      value: String(data.projectUsageRequests.data.length),
+      detail: data.projectUsageRequests.status === "error" ? "数据暂不可用" : "当前可见",
+      tone: "cyan",
+      icon: MapPin,
+    },
+  ];
+}
+
+function MetricStrip({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+  const metricCards = buildMetrics(data);
   return (
     <section className="metric-strip" aria-label="运营指标">
-      {metrics.map((metric) => (
+      {metricCards.map((metric) => (
         <MetricCard key={metric.label} metric={metric} onNavigate={onNavigate} />
       ))}
     </section>
@@ -326,13 +534,41 @@ function PanelHeader({ title, badge, onNavigate }: { title: string; badge?: stri
   );
 }
 
-function ApprovalPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
   const navigateTo = (title: string) => onNavigate(dashboardTarget(title));
+  const pendingRequests = sortByUpdatedAt(data.purchaseRequests.data)
+    .filter((request) => request.status === "pending_approval")
+    .slice(0, 4);
+  const riskyContracts = sortByUpdatedAt(data.contracts.data)
+    .filter((contract) => contract.expiryState === "expired" || contract.expiryState === "expiring_soon")
+    .slice(0, 2);
+  const items = [
+    ...pendingRequests.map((request) => ({
+      title: `采购需求单 ${request.requestNo}`,
+      applicant: request.requesterName,
+      amount: `${request.lines.length} 行物料`,
+      age: formatDateTime(request.submittedAt ?? request.updatedAt),
+      risk: purchaseRequestStatusLabel(request.status),
+    })),
+    ...riskyContracts.map((contract) => ({
+      title: `合同风险 ${contract.contractNo}`,
+      applicant: contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot,
+      amount: formatCurrency(contract.amount),
+      age: formatDateTime(contract.endDate ?? contract.updatedAt),
+      risk: contractExpiryLabel(contract.expiryState),
+    })),
+  ];
+
   return (
     <section className="dashboard-panel approval-panel">
-      <PanelHeader title="待审批" badge="12" onNavigate={() => onNavigate("采购")} />
+      <PanelHeader title="待审批" badge={String(pendingRequests.length)} onNavigate={() => onNavigate("采购")} />
+      {data.purchaseRequests.status === "error" ? <PanelStateMessage text="待审批数据暂不可用" /> : null}
+      {data.contracts.status === "error" ? <PanelStateMessage text="合同风险数据暂不可用" /> : null}
+      {items.length === 0 && data.purchaseRequests.status !== "error" && data.contracts.status !== "error" ? (
+        <PanelStateMessage text="暂无待审批或到期风险" />
+      ) : null}
       <div className="approval-list">
-        {approvals.map((item) => (
+        {items.map((item) => (
           <button key={item.title} type="button" className="approval-item clickable-row" onClick={() => navigateTo(item.title)}>
             <span className="document-icon">
               <Server aria-hidden="true" size={16} />
@@ -355,78 +591,143 @@ function ApprovalPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
   );
 }
 
-function PurchasePanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function PurchasePanel({
+  purchaseRecords,
+  onNavigate,
+}: {
+  purchaseRecords: LoadState<PurchaseRecordDto[]>;
+  onNavigate: NavigateToWorkspace;
+}) {
+  const rows = sortByUpdatedAt(purchaseRecords.data).slice(0, 5);
   return (
     <section className="dashboard-panel table-panel">
       <PanelHeader title="最近采购记录" onNavigate={() => onNavigate("采购")} />
+      {purchaseRecords.status === "error" ? <PanelStateMessage text="采购记录数据暂不可用" /> : null}
+      {purchaseRecords.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无采购记录" /> : null}
       <ResponsiveTable
         headers={["采购单号", "采购人", "来源", "供应商", "物料数", "状态", "下单时间"]}
         onRowClick={() => onNavigate("采购")}
-        rows={purchaseRecords.map((row) => [
-          row.id,
-          `采购人：${row.purchaser}`,
-          row.sourceName,
-          row.supplierName || "未建供应商",
-          row.materials,
-          <StatusBadge key={`${row.id}-status`} status={row.status} />,
-          row.time,
+        rows={rows.map((row) => [
+          row.purchaseNo,
+          `采购人：${row.purchaserName}`,
+          row.purchasePlatform || row.shopName || row.purchaseDescription || row.sourceType,
+          row.supplierPartyName || row.supplierNameText || "未建供应商",
+          String(row.lines.length),
+          <StatusBadge key={`${row.id}-status`} status={purchaseRecordStatusLabel(row.status)} />,
+          formatDateTime(row.purchaseDate ?? row.updatedAt),
         ])}
       />
     </section>
   );
 }
 
-function ReceivingPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function ReceivingPanel({
+  inventoryMovements,
+  onNavigate,
+}: {
+  inventoryMovements: LoadState<InventoryMovementDto[]>;
+  onNavigate: NavigateToWorkspace;
+}) {
+  const rows = sortByUpdatedAt(inventoryMovements.data)
+    .filter((movement) => ["opening", "inbound", "adjustment_in"].includes(movement.movementType))
+    .slice(0, 5);
   return (
     <section className="dashboard-panel table-panel">
       <PanelHeader title="最近入库记录" onNavigate={() => onNavigate("库存")} />
+      {inventoryMovements.status === "error" ? <PanelStateMessage text="入库记录数据暂不可用" /> : null}
+      {inventoryMovements.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无入库记录" /> : null}
       <ResponsiveTable
-        headers={["入库单号", "供应商", "物料数", "金额", "入库时间"]}
+        headers={["入库单号", "仓库", "物料/数量", "金额", "入库时间"]}
         onRowClick={() => onNavigate("库存")}
-        rows={receivingRecords.map((row) => [row.id, row.supplier, row.materials, row.amount, row.time])}
-      />
-    </section>
-  );
-}
-
-function LowStockPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
-  return (
-    <section className="dashboard-panel table-panel">
-      <PanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
-      <ResponsiveTable
-        headers={["物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
-        onRowClick={() => onNavigate("库存")}
-        rows={lowStockMaterials.map((row) => [
-          row.code,
-          row.name,
-          row.current,
-          row.safe,
-          <StatusBadge key={`${row.code}-status`} status={row.status} />,
+        rows={rows.map((row) => [
+          row.movementNo,
+          row.warehouseName,
+          `${row.materialName} ${row.quantity} ${row.unit}`,
+          formatCurrency(row.unitPrice ? Number(row.unitPrice) * Number(row.quantity) : 0),
+          formatDateTime(row.movementDate),
         ])}
       />
     </section>
   );
 }
 
-function SiteUsagePanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function LowStockPanel({
+  inventoryBalances,
+  onNavigate,
+}: {
+  inventoryBalances: LoadState<InventoryBalanceDto[]>;
+  onNavigate: NavigateToWorkspace;
+}) {
+  const rows = inventoryBalances.data.filter((balance) => balance.isLowStock).slice(0, 5);
   return (
     <section className="dashboard-panel table-panel">
-      <PanelHeader title="项目点领用汇总（本月）" onNavigate={() => onNavigate("项目点")} />
+      <PanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
+      {inventoryBalances.status === "error" ? <PanelStateMessage text="低库存数据暂不可用" /> : null}
+      {inventoryBalances.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无低库存物料" /> : null}
       <ResponsiveTable
-        headers={["项目点", "领用金额", "领用次数", "物料数"]}
-        onRowClick={() => onNavigate("项目点")}
-        rows={siteUsage.map((row) => [row.site, row.amount, row.count, row.materials])}
+        headers={["物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
+        onRowClick={() => onNavigate("库存")}
+        rows={rows.map((row) => [
+          row.materialCode,
+          row.materialName,
+          `${row.currentQuantity} ${row.unit}`,
+          String(row.safeStock ?? "-"),
+          <StatusBadge key={`${row.materialCode}-status`} status={row.isLowStock ? "低库存" : "正常"} />,
+        ])}
       />
     </section>
   );
 }
 
-function SystemStatusPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function SiteUsagePanel({
+  projectUsageRequests,
+  onNavigate,
+}: {
+  projectUsageRequests: LoadState<ProjectUsageRequestDto[]>;
+  onNavigate: NavigateToWorkspace;
+}) {
+  const rows = sortByUpdatedAt(projectUsageRequests.data).slice(0, 5);
+  return (
+    <section className="dashboard-panel table-panel">
+      <PanelHeader title="项目点领用汇总（本月）" onNavigate={() => onNavigate("项目点")} />
+      {projectUsageRequests.status === "error" ? <PanelStateMessage text="项目点领用数据暂不可用" /> : null}
+      {projectUsageRequests.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无项目点领用申请" /> : null}
+      <ResponsiveTable
+        headers={["项目点", "领用金额", "状态", "更新时间"]}
+        onRowClick={() => onNavigate("项目点")}
+        rows={rows.map((row) => [
+          row.projectSiteName,
+          formatCurrency(row.chargeAmount),
+          <StatusBadge key={`${row.id}-status`} status={projectUsageStatusLabel(row.status)} />,
+          formatDateTime(row.updatedAt),
+        ])}
+      />
+    </section>
+  );
+}
+
+function SystemStatusPanel({
+  appVersion,
+  onNavigate,
+}: {
+  appVersion: LoadState<AppVersionDto | null>;
+  onNavigate: NavigateToWorkspace;
+}) {
+  const items = [
+    { label: "API 服务", detail: "运行正常", side: "同源接口", tone: "success" },
+    { label: "数据库连接", detail: "运行正常", side: "PostgreSQL", tone: "success" },
+    {
+      label: "应用版本",
+      detail: appVersion.status === "success" && appVersion.data ? appVersion.data.shortCommitSha : "版本信息不可用",
+      side: appVersion.status === "success" && appVersion.data ? appVersion.data.environment : "检查系统设置",
+      tone: appVersion.status === "success" ? "info" : "warning",
+    },
+  ];
   return (
     <section className="dashboard-panel system-panel">
       <PanelHeader title="系统状态" onNavigate={() => onNavigate("系统设置")} />
       <div className="system-list">
-        {systemStatus.map((item) => (
+        {items.map((item) => (
           <button key={item.label} type="button" className="system-item clickable-row" onClick={() => onNavigate("系统设置")}>
             <span className={item.tone === "success" ? "system-dot success" : "system-dot info"} />
             <div>
