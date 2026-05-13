@@ -405,7 +405,6 @@ async function ensurePurchaseRequest(client: PilotApiClient, material: JsonRecor
       projectSiteId,
       expectedArrivalDate: expectedDate,
       purpose: "DEMO 试运行采购需求",
-      status: "pending_purchase",
       lines: [
         {
           materialId: stringValue(material, "id"),
@@ -419,7 +418,21 @@ async function ensurePurchaseRequest(client: PilotApiClient, material: JsonRecor
     },
   });
   logStep(`purchase request ${DEMO_CODES.purchaseRequestNo}`, result.status);
-  return result.record;
+  let request = result.record;
+  if (stringValue(request, "status") === "draft") {
+    const submittedPayload = await client.post(`/api/purchase-requests/${stringValue(request, "id")}/submit`, {});
+    request = entity<JsonRecord>(submittedPayload, "purchaseRequest");
+    logStep(`purchase request submit ${DEMO_CODES.purchaseRequestNo}`, "created");
+  }
+  if (stringValue(request, "status") === "pending_approval") {
+    const approvedPayload = await client.post(`/api/purchase-requests/${stringValue(request, "id")}/approve`, {
+      reviewedByName: "DEMO 审批人",
+      reviewRemark: "DEMO 试运行采购需求审批通过",
+    });
+    request = entity<JsonRecord>(approvedPayload, "purchaseRequest");
+    logStep(`purchase request approve ${DEMO_CODES.purchaseRequestNo}`, "created");
+  }
+  return request;
 }
 
 async function ensurePurchaseRecord(

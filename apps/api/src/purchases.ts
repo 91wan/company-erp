@@ -35,7 +35,16 @@ export type PurchaseRequestRepository = {
   getById(id: string): Promise<PurchaseRequestDto | null>;
   create(input: CreatePurchaseRequestInput): Promise<PurchaseRequestDto>;
   update(id: string, input: UpdatePurchaseRequestInput): Promise<PurchaseRequestDto | null>;
+  submit(id: string): Promise<PurchaseRequestDto | null>;
+  approve(id: string, input: PurchaseRequestReviewInput): Promise<PurchaseRequestDto | null>;
+  reject(id: string, input: PurchaseRequestReviewInput): Promise<PurchaseRequestDto | null>;
   markPurchasing(id: string): Promise<void>;
+};
+
+export type PurchaseRequestReviewInput = {
+  reviewedByEmployeeId?: string | null;
+  reviewedByName?: string | null;
+  reviewRemark?: string | null;
 };
 
 export type PurchaseRecordRepository = {
@@ -76,6 +85,7 @@ export class PurchaseRecordValidationError extends Error {
 const requestStatuses = new Set(PURCHASE_REQUEST_STATUSES.map((status) => status.code));
 const recordStatuses = new Set(PURCHASE_RECORD_STATUSES.map((status) => status.code));
 const sourceTypes = new Set(PURCHASE_SOURCE_TYPES.map((sourceType) => sourceType.code));
+const patchableRequestStatuses = new Set<PurchaseRequestStatusCode>(["draft", "cancelled"]);
 
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -207,7 +217,13 @@ export function normalizePurchaseRequestInput(
 
   if (payload.status !== undefined) {
     if (typeof payload.status === "string" && requestStatuses.has(payload.status as PurchaseRequestStatusCode)) {
-      normalized.status = payload.status as PurchaseRequestStatusCode;
+      if (mode === "create" && payload.status !== "draft") {
+        issues.push("status must be draft when creating purchase request");
+      } else if (mode === "update" && !patchableRequestStatuses.has(payload.status as PurchaseRequestStatusCode)) {
+        issues.push("Use approval endpoints to change purchase request approval status");
+      } else {
+        normalized.status = payload.status as PurchaseRequestStatusCode;
+      }
     } else {
       issues.push("status is unsupported");
     }
@@ -231,6 +247,32 @@ export function normalizePurchaseRequestInput(
       status: normalized.status ?? "draft",
       lines: normalized.lines ?? [],
     } as CreatePurchaseRequestInput;
+  }
+
+  return normalized;
+}
+
+export function normalizePurchaseRequestReviewInput(input: unknown, mode: "approve" | "reject"): PurchaseRequestReviewInput {
+  if (input === undefined || input === null) {
+    if (mode === "reject") throw new PurchaseRequestValidationError(["reviewRemark is required"]);
+    return {};
+  }
+  if (typeof input !== "object" || Array.isArray(input)) {
+    throw new PurchaseRequestValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const reviewRemark = normalizeNullableString(payload.reviewRemark);
+  const normalized: PurchaseRequestReviewInput = {};
+
+  for (const field of ["reviewedByEmployeeId", "reviewedByName"] as const) {
+    const value = normalizeNullableString(payload[field]);
+    if (value !== undefined) normalized[field] = value;
+  }
+  if (reviewRemark !== undefined) normalized.reviewRemark = reviewRemark;
+
+  if (mode === "reject" && !normalized.reviewRemark) {
+    throw new PurchaseRequestValidationError(["reviewRemark is required"]);
   }
 
   return normalized;

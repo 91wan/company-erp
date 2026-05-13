@@ -134,6 +134,31 @@ describe("MVP replenishment helpers", () => {
   });
 });
 
+describe("MVP purchase dictionaries", () => {
+  it("defines purchase request approval statuses", () => {
+    expect(PURCHASE_REQUEST_STATUSES.map((status) => status.code)).toEqual([
+      "draft",
+      "pending_approval",
+      "pending_purchase",
+      "purchasing",
+      "partially_received",
+      "completed",
+      "rejected",
+      "cancelled",
+    ]);
+    expect(PURCHASE_REQUEST_STATUSES.map((status) => status.label)).toEqual([
+      "草稿",
+      "待审批",
+      "待采购",
+      "采购中",
+      "部分到货",
+      "已完成",
+      "已驳回",
+      "已取消",
+    ]);
+  });
+});
+
 describe("MVP inventory dictionaries", () => {
   it("defines the fixed inventory status and movement dictionaries", () => {
     expect(INVENTORY_MOVEMENT_TYPES.map((movementType) => movementType.code)).toEqual([
@@ -526,10 +551,12 @@ describe("MVP dictionary constants", () => {
     ]);
     expect(PURCHASE_REQUEST_STATUSES.map((status) => status.code)).toEqual([
       "draft",
+      "pending_approval",
       "pending_purchase",
       "purchasing",
       "partially_received",
       "completed",
+      "rejected",
       "cancelled",
     ]);
     expect(PURCHASE_RECORD_STATUSES.map((status) => status.code)).toEqual([
@@ -542,10 +569,12 @@ describe("MVP dictionary constants", () => {
     expect(MVP_DICTIONARIES.purchaseSourceType.values).toEqual(["平台采购", "供应商采购", "线下采购"]);
     expect(MVP_DICTIONARIES.purchaseRequestStatus.values).toEqual([
       "草稿",
+      "待审批",
       "待采购",
       "采购中",
       "部分到货",
       "已完成",
+      "已驳回",
       "已取消",
     ]);
     expect(MVP_DICTIONARIES.purchaseRecordStatus.values).toEqual([

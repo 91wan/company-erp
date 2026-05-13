@@ -1,4 +1,4 @@
-import { ClipboardList, Filter, PackageCheck, RefreshCw, Save, Search, ShoppingCart } from "lucide-react";
+import { Check, ClipboardList, Filter, PackageCheck, RefreshCw, Save, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   PURCHASE_RECORD_STATUSES,
@@ -21,7 +21,15 @@ type PurchaseWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
   createPurchaseRequest?: (input: CreatePurchaseRequestInput) => Promise<PurchaseRequestDto>;
   createPurchaseRecord?: (input: CreatePurchaseRecordInput) => Promise<PurchaseRecordDto>;
+  submitPurchaseRequest?: (id: string) => Promise<PurchaseRequestDto>;
+  approvePurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
+  rejectPurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
   canManage?: boolean;
+};
+
+type PurchaseRequestReviewPayload = {
+  reviewedByName?: string | null;
+  reviewRemark?: string | null;
 };
 
 type RequestFormState = {
@@ -83,12 +91,38 @@ async function defaultCreatePurchaseRecord(input: CreatePurchaseRecordInput): Pr
   return payload.purchaseRecord;
 }
 
+async function defaultSubmitPurchaseRequest(id: string): Promise<PurchaseRequestDto> {
+  const payload = await requestJson<{ purchaseRequest: PurchaseRequestDto }>(`${apiBaseUrl}/api/purchase-requests/${id}/submit`, {
+    method: "POST",
+  });
+  return payload.purchaseRequest;
+}
+
+async function defaultApprovePurchaseRequest(id: string, input: PurchaseRequestReviewPayload): Promise<PurchaseRequestDto> {
+  const payload = await requestJson<{ purchaseRequest: PurchaseRequestDto }>(`${apiBaseUrl}/api/purchase-requests/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return payload.purchaseRequest;
+}
+
+async function defaultRejectPurchaseRequest(id: string, input: PurchaseRequestReviewPayload): Promise<PurchaseRequestDto> {
+  const payload = await requestJson<{ purchaseRequest: PurchaseRequestDto }>(`${apiBaseUrl}/api/purchase-requests/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return payload.purchaseRequest;
+}
+
 export function PurchaseWorkspace({
   loadPurchaseRequests = defaultLoadPurchaseRequests,
   loadPurchaseRecords = defaultLoadPurchaseRecords,
   loadContracts = defaultLoadContracts,
   createPurchaseRequest = defaultCreatePurchaseRequest,
   createPurchaseRecord = defaultCreatePurchaseRecord,
+  submitPurchaseRequest = defaultSubmitPurchaseRequest,
+  approvePurchaseRequest = defaultApprovePurchaseRequest,
+  rejectPurchaseRequest = defaultRejectPurchaseRequest,
   canManage = true,
 }: PurchaseWorkspaceProps) {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDto[]>([]);
@@ -102,6 +136,8 @@ export function PurchaseWorkspace({
   const [recordFilter, setRecordFilter] = useState<"all" | PurchaseRecordStatusCode>("all");
   const [requestSubmitState, setRequestSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [recordSubmitState, setRecordSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [reviewState, setReviewState] = useState<"idle" | "saving" | "error">("idle");
+  const [reviewRemark, setReviewRemark] = useState("");
   const [requestForm, setRequestForm] = useState<RequestFormState>({
     requestNo: "",
     requesterName: "",
@@ -213,6 +249,33 @@ export function PurchaseWorkspace({
     });
   }, [purchaseRecords, recordFilter, recordQuery]);
 
+  const pendingApprovalRequests = useMemo(
+    () => purchaseRequests.filter((request) => request.status === "pending_approval"),
+    [purchaseRequests],
+  );
+
+  function replacePurchaseRequest(nextRequest: PurchaseRequestDto) {
+    setPurchaseRequests((current) => current.map((request) => (request.id === nextRequest.id ? nextRequest : request)));
+  }
+
+  async function handleRequestReview(action: "submit" | "approve" | "reject", target: PurchaseRequestDto) {
+    setReviewState("saving");
+    try {
+      const payload = { reviewedByName: "", reviewRemark: reviewRemark || null };
+      const updated =
+        action === "submit"
+          ? await submitPurchaseRequest(target.id)
+          : action === "approve"
+            ? await approvePurchaseRequest(target.id, payload)
+            : await rejectPurchaseRequest(target.id, payload);
+      replacePurchaseRequest(updated);
+      setReviewRemark("");
+      setReviewState("idle");
+    } catch {
+      setReviewState("error");
+    }
+  }
+
   async function handleRequestSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRequestSubmitState("saving");
@@ -305,11 +368,69 @@ export function PurchaseWorkspace({
 
       <div className="party-summary material-summary" aria-label="采购摘要指标">
         <SummaryCard label="采购需求" value={purchaseRequests.length} />
+        <SummaryCard label="待审批" value={pendingApprovalRequests.length} />
         <SummaryCard label="待采购" value={purchaseRequests.filter((request) => request.status === "pending_purchase").length} />
         <SummaryCard label="采购记录" value={purchaseRecords.length} />
         <SummaryCard label="已下单" value={purchaseRecords.filter((record) => record.status === "ordered").length} />
-        <SummaryCard label="未建供应商" value={purchaseRecords.filter((record) => !record.supplierPartyId).length} />
       </div>
+
+      <section className="dashboard-panel table-panel" aria-label="采购需求审批">
+        <div className="panel-header people-panel-title">
+          <h3>
+            <Check aria-hidden="true" size={17} />
+            待审批
+          </h3>
+        </div>
+        {pendingApprovalRequests.length === 0 ? <StateMessage text="暂无待审批采购需求" /> : null}
+        {pendingApprovalRequests.length > 0 ? (
+          <>
+            <label className="full-width-field">
+              <span>审批备注</span>
+              <input value={reviewRemark} onChange={(event) => setReviewRemark(event.target.value)} />
+            </label>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>编号</th>
+                    <th>申请人</th>
+                    <th>物料</th>
+                    <th>提交时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingApprovalRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td>{request.requestNo}</td>
+                      <td>{request.requesterName}</td>
+                      <td>{request.lines[0]?.materialName ?? "-"}</td>
+                      <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
+                      <td>
+                        {canManage ? (
+                          <div className="inline-actions">
+                            <button type="button" disabled={reviewState === "saving"} onClick={() => handleRequestReview("approve", request)}>
+                              <Check aria-hidden="true" size={14} />
+                              审批通过 {request.requestNo}
+                            </button>
+                            <button type="button" disabled={reviewState === "saving"} onClick={() => handleRequestReview("reject", request)}>
+                              <X aria-hidden="true" size={14} />
+                              驳回 {request.requestNo}
+                            </button>
+                          </div>
+                        ) : (
+                          "只读"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+        {reviewState === "error" ? <p className="form-error">审批操作失败</p> : null}
+      </section>
 
       <div className="people-section-grid">
         <section className="dashboard-panel table-panel">
@@ -330,7 +451,14 @@ export function PurchaseWorkspace({
           {requestStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载采购需求..." /> : null}
           {requestStatus === "error" ? <StateMessage text="采购需求加载失败" /> : null}
           {requestStatus === "ready" && filteredRequests.length === 0 ? <StateMessage text="暂无采购需求" /> : null}
-          {requestStatus === "ready" && filteredRequests.length > 0 ? <PurchaseRequestsTable requests={filteredRequests} /> : null}
+          {requestStatus === "ready" && filteredRequests.length > 0 ? (
+            <PurchaseRequestsTable
+              requests={filteredRequests}
+              canManage={canManage}
+              reviewState={reviewState}
+              onSubmitRequest={(request) => handleRequestReview("submit", request)}
+            />
+          ) : null}
         </section>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit}>
@@ -512,7 +640,17 @@ function Toolbar({
   );
 }
 
-function PurchaseRequestsTable({ requests }: { requests: PurchaseRequestDto[] }) {
+function PurchaseRequestsTable({
+  requests,
+  canManage,
+  reviewState,
+  onSubmitRequest,
+}: {
+  requests: PurchaseRequestDto[];
+  canManage: boolean;
+  reviewState: "idle" | "saving" | "error";
+  onSubmitRequest: (request: PurchaseRequestDto) => void;
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -525,8 +663,11 @@ function PurchaseRequestsTable({ requests }: { requests: PurchaseRequestDto[] })
             <th>数量</th>
             <th>来源</th>
             <th>状态</th>
+            <th>提交时间</th>
+            <th>审批人/备注</th>
             <th>期望到货</th>
             <th>更新时间</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -541,12 +682,23 @@ function PurchaseRequestsTable({ requests }: { requests: PurchaseRequestDto[] })
                 <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
                 <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
                 <td>
-                  <span className={`status-badge ${request.status === "cancelled" ? "orange" : "blue"}`}>
+                  <span className={`status-badge ${request.status === "cancelled" || request.status === "rejected" ? "orange" : "blue"}`}>
                     {requestStatusLabel.get(request.status)}
                   </span>
                 </td>
+                <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
+                <td>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "-"}</td>
                 <td>{request.expectedArrivalDate || "-"}</td>
                 <td>{formatDateTime(request.updatedAt)}</td>
+                <td>
+                  {canManage && request.status === "draft" ? (
+                    <button type="button" disabled={reviewState === "saving"} onClick={() => onSubmitRequest(request)}>
+                      提交 {request.requestNo}
+                    </button>
+                  ) : (
+                    "-"
+                  )}
+                </td>
               </tr>
             );
           })}

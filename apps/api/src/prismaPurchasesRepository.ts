@@ -4,6 +4,7 @@ import type {
   CreatePurchaseRequestInput,
   PurchaseRecordDto,
   PurchaseRequestDto,
+  PurchaseRequestStatusCode,
   UpdatePurchaseRecordInput,
   UpdatePurchaseRequestInput,
 } from "@company-erp/shared";
@@ -13,6 +14,7 @@ import {
   type PurchaseRecordListFilters,
   type PurchaseRecordRepository,
   type PurchaseRequestListFilters,
+  type PurchaseRequestReviewInput,
   type PurchaseRequestRepository,
 } from "./purchases.js";
 
@@ -59,6 +61,11 @@ function toPurchaseRequestDto(request: PrismaPurchaseRequest): PurchaseRequestDt
     expectedArrivalDate: dateToString(request.expectedArrivalDate),
     purpose: request.purpose,
     status: request.status,
+    submittedAt: request.submittedAt?.toISOString() ?? null,
+    reviewedAt: request.reviewedAt?.toISOString() ?? null,
+    reviewedByEmployeeId: request.reviewedByEmployeeId,
+    reviewedByName: request.reviewedByName,
+    reviewRemark: request.reviewRemark,
     remark: request.remark,
     lines: request.lines.map((line) => ({
       id: line.id,
@@ -160,6 +167,11 @@ function requestCreateData(input: CreatePurchaseRequestInput): Prisma.PurchaseRe
     expectedArrivalDate: nullableDate(input.expectedArrivalDate),
     purpose: input.purpose,
     status: input.status ?? "draft",
+    submittedAt: input.submittedAt ? new Date(input.submittedAt) : undefined,
+    reviewedAt: input.reviewedAt ? new Date(input.reviewedAt) : undefined,
+    reviewedBy: input.reviewedByEmployeeId ? { connect: { id: input.reviewedByEmployeeId } } : undefined,
+    reviewedByName: input.reviewedByName,
+    reviewRemark: input.reviewRemark,
     remark: input.remark,
     lines: { create: requestLineCreateData(input.lines) },
   };
@@ -204,6 +216,11 @@ function requestUpdateData(input: UpdatePurchaseRequestInput): Prisma.PurchaseRe
     ...(input.expectedArrivalDate !== undefined ? { expectedArrivalDate: nullableDate(input.expectedArrivalDate) } : {}),
     ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.submittedAt !== undefined ? { submittedAt: input.submittedAt ? new Date(input.submittedAt) : null } : {}),
+    ...(input.reviewedAt !== undefined ? { reviewedAt: input.reviewedAt ? new Date(input.reviewedAt) : null } : {}),
+    ...relationUpdate(input.reviewedByEmployeeId, "reviewedBy"),
+    ...(input.reviewedByName !== undefined ? { reviewedByName: input.reviewedByName } : {}),
+    ...(input.reviewRemark !== undefined ? { reviewRemark: input.reviewRemark } : {}),
     ...(input.remark !== undefined ? { remark: input.remark } : {}),
     ...(input.lines
       ? {
@@ -262,6 +279,16 @@ function mapRecordConflict(error: unknown): never {
   throw error;
 }
 
+function reviewData(status: PurchaseRequestStatusCode, input: PurchaseRequestReviewInput): Prisma.PurchaseRequestUpdateInput {
+  return {
+    status,
+    reviewedAt: new Date(),
+    ...relationUpdate(input.reviewedByEmployeeId, "reviewedBy"),
+    reviewedByName: input.reviewedByName,
+    reviewRemark: input.reviewRemark,
+  };
+}
+
 export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): PurchaseRequestRepository {
   const include = {
     projectSite: true,
@@ -313,11 +340,57 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
         mapRequestConflict(error);
       }
     },
+    async submit(id: string) {
+      try {
+        const request = await prisma.purchaseRequest.update({
+          where: { id },
+          data: {
+            status: "pending_approval",
+            submittedAt: new Date(),
+            reviewedAt: null,
+            reviewedBy: { disconnect: true },
+            reviewedByName: null,
+            reviewRemark: null,
+          },
+          include,
+        });
+        return toPurchaseRequestDto(request);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        throw error;
+      }
+    },
+    async approve(id: string, input: PurchaseRequestReviewInput) {
+      try {
+        const request = await prisma.purchaseRequest.update({
+          where: { id },
+          data: reviewData("pending_purchase", input),
+          include,
+        });
+        return toPurchaseRequestDto(request);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        throw error;
+      }
+    },
+    async reject(id: string, input: PurchaseRequestReviewInput) {
+      try {
+        const request = await prisma.purchaseRequest.update({
+          where: { id },
+          data: reviewData("rejected", input),
+          include,
+        });
+        return toPurchaseRequestDto(request);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        throw error;
+      }
+    },
     async markPurchasing(id: string) {
       await prisma.purchaseRequest.updateMany({
         where: {
           id,
-          status: { in: ["draft", "pending_purchase"] },
+          status: { in: ["pending_purchase", "purchasing"] },
         },
         data: { status: "purchasing" },
       });

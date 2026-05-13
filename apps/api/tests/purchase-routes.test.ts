@@ -27,6 +27,11 @@ function makePurchaseRequest(overrides: Partial<PurchaseRequestDto> = {}): Purch
     expectedArrivalDate: "2026-05-20",
     purpose: "项目点补充工服",
     status: "draft",
+    submittedAt: null,
+    reviewedAt: null,
+    reviewedByEmployeeId: null,
+    reviewedByName: null,
+    reviewRemark: null,
     remark: null,
     lines: [
       {
@@ -165,6 +170,36 @@ function createFakePurchaseRequestRepository(seed: PurchaseRequestDto[] = []): P
         updatedAt: now,
       };
       return requests[index];
+    },
+    async submit(id) {
+      const request = requests.find((candidate) => candidate.id === id);
+      if (!request) return null;
+      request.status = "pending_approval";
+      request.submittedAt = now;
+      request.updatedAt = now;
+      return request;
+    },
+    async approve(id, input) {
+      const request = requests.find((candidate) => candidate.id === id);
+      if (!request) return null;
+      request.status = "pending_purchase";
+      request.reviewedAt = now;
+      request.reviewedByEmployeeId = input.reviewedByEmployeeId ?? null;
+      request.reviewedByName = input.reviewedByName ?? null;
+      request.reviewRemark = input.reviewRemark ?? null;
+      request.updatedAt = now;
+      return request;
+    },
+    async reject(id, input) {
+      const request = requests.find((candidate) => candidate.id === id);
+      if (!request) return null;
+      request.status = "rejected";
+      request.reviewedAt = now;
+      request.reviewedByEmployeeId = input.reviewedByEmployeeId ?? null;
+      request.reviewedByName = input.reviewedByName ?? null;
+      request.reviewRemark = input.reviewRemark ?? null;
+      request.updatedAt = now;
+      return request;
     },
     async markPurchasing(id) {
       const request = requests.find((candidate) => candidate.id === id);
@@ -321,7 +356,7 @@ describe("purchase requests API", () => {
     expect(response.json()).toMatchObject({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
   });
 
-  it("lists, reads, creates, and updates purchase requests", async () => {
+  it("lists, reads, creates, updates, and reviews purchase requests", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
     const app = buildApp({ purchaseRequestRepository: repository });
 
@@ -346,7 +381,16 @@ describe("purchase requests API", () => {
     const updateResponse = await app.inject({
       method: "PATCH",
       url: `/api/purchase-requests/${createResponse.json().purchaseRequest.id}`,
-      payload: { status: "pending_purchase" },
+      payload: { purpose: "项目点补充纸杯" },
+    });
+    const submitResponse = await app.inject({
+      method: "POST",
+      url: `/api/purchase-requests/${createResponse.json().purchaseRequest.id}/submit`,
+    });
+    const approveResponse = await app.inject({
+      method: "POST",
+      url: `/api/purchase-requests/${createResponse.json().purchaseRequest.id}/approve`,
+      payload: { reviewedByName: "采购主管", reviewRemark: "同意采购" },
     });
     await app.close();
 
@@ -356,7 +400,85 @@ describe("purchase requests API", () => {
     expect(createResponse.json()).toMatchObject({
       purchaseRequest: { requestNo: "PR20260511002", requesterName: "王五", status: "draft" },
     });
-    expect(updateResponse.json()).toMatchObject({ purchaseRequest: { status: "pending_purchase" } });
+    expect(updateResponse.json()).toMatchObject({ purchaseRequest: { purpose: "项目点补充纸杯" } });
+    expect(submitResponse.json()).toMatchObject({ purchaseRequest: { status: "pending_approval" } });
+    expect(approveResponse.json()).toMatchObject({
+      purchaseRequest: { status: "pending_purchase", reviewedByName: "采购主管", reviewRemark: "同意采购" },
+    });
+  });
+
+  it("rejects invalid purchase request review transitions", async () => {
+    const repository = createFakePurchaseRequestRepository([
+      makePurchaseRequest({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status: "purchasing" }),
+      makePurchaseRequest({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", status: "draft" }),
+    ]);
+    const app = buildApp({ purchaseRequestRepository: repository });
+
+    const invalidSubmitResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/submit",
+    });
+    const invalidApproveResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/approve",
+      payload: { reviewedByName: "采购主管" },
+    });
+    const missingResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/99999999-9999-4999-8999-999999999999/reject",
+      payload: { reviewRemark: "资料不完整" },
+    });
+    await app.close();
+
+    expect(invalidSubmitResponse.statusCode).toBe(400);
+    expect(invalidSubmitResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+    expect(invalidApproveResponse.statusCode).toBe(400);
+    expect(invalidApproveResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+    expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("rejects pending approval purchase requests with a required remark", async () => {
+    const repository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_approval" })]);
+    const app = buildApp({ purchaseRequestRepository: repository });
+
+    const missingRemarkResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/reject",
+      payload: {},
+    });
+    const rejectResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/reject",
+      payload: { reviewedByName: "采购主管", reviewRemark: "资料不完整" },
+    });
+    await app.close();
+
+    expect(missingRemarkResponse.statusCode).toBe(400);
+    expect(missingRemarkResponse.json()).toMatchObject({
+      error: "PURCHASE_REQUEST_VALIDATION_FAILED",
+      issues: ["reviewRemark is required"],
+    });
+    expect(rejectResponse.json()).toMatchObject({
+      purchaseRequest: { status: "rejected", reviewedByName: "采购主管", reviewRemark: "资料不完整" },
+    });
+  });
+
+  it("rejects direct approval status changes through patch", async () => {
+    const repository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
+    const app = buildApp({ purchaseRequestRepository: repository });
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111",
+      payload: { status: "pending_purchase" },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "PURCHASE_REQUEST_VALIDATION_FAILED",
+      issues: ["Use approval endpoints to change purchase request approval status"],
+    });
   });
 
   it("rejects invalid purchase requests and duplicate request numbers", async () => {
@@ -440,6 +562,32 @@ describe("purchase requests API", () => {
     expect(unassignedDetailResponse.statusCode).toBe(404);
     expect(globalDetailResponse.statusCode).toBe(404);
   });
+
+  it("allows viewer read access but blocks purchase request review actions", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-purchase-viewer" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash, roles: ["viewer"] })]),
+      purchaseRequestRepository: createFakePurchaseRequestRepository([makePurchaseRequest()]),
+    });
+    const cookie = await loginCookie(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/purchase-requests",
+      cookies: { company_erp_session: cookie },
+    });
+    const submitResponse = await app.inject({
+      method: "POST",
+      url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/submit",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(submitResponse.statusCode).toBe(403);
+    expect(submitResponse.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "procurement" });
+  });
 });
 
 describe("purchase records API", () => {
@@ -453,8 +601,8 @@ describe("purchase records API", () => {
     expect(response.json()).toMatchObject({ error: "PURCHASE_RECORD_REPOSITORY_NOT_CONFIGURED" });
   });
 
-  it("lists, reads, creates, updates records, and moves linked requests to purchasing", async () => {
-    const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
+  it("lists, reads, creates, updates records, and moves linked approved requests to purchasing", async () => {
+    const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_purchase" })]);
     const purchaseRecordRepository = createFakePurchaseRecordRepository([makePurchaseRecord()]);
     const app = buildApp({ purchaseRequestRepository, purchaseRecordRepository });
 
@@ -501,6 +649,34 @@ describe("purchase records API", () => {
     });
     expect(requestAfterCreate?.status).toBe("purchasing");
     expect(updateResponse.json()).toMatchObject({ purchaseRecord: { status: "ordered" } });
+  });
+
+  it("blocks purchase records linked to unapproved purchase requests", async () => {
+    const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_approval" })]);
+    const purchaseRecordRepository = createFakePurchaseRecordRepository();
+    const app = buildApp({ purchaseRequestRepository, purchaseRecordRepository });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/purchase-records",
+      payload: {
+        purchaseNo: "PO20260511002",
+        purchaseRequestId: "11111111-1111-4111-8111-111111111111",
+        purchaseRequestNo: "PR20260511001",
+        purchaserName: "赵六",
+        sourceType: "offline",
+        purchaseDescription: "线下门店临时采购",
+        purchaseDate: "2026-05-11",
+        lines: [{ materialName: "办公复印纸", purchaseQuantity: 5, unit: "箱" }],
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "PURCHASE_RECORD_VALIDATION_FAILED",
+      issues: ["purchaseRequestId must reference an approved request"],
+    });
   });
 
   it("rejects invalid source payloads and duplicate purchase numbers", async () => {

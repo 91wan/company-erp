@@ -1442,6 +1442,52 @@ tbody tr.clickable-row {
   font-weight: 650;
 }
 
+.full-width-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.full-width-field input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inline-actions button,
+.table-wrap td > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.inline-actions button:disabled,
+.table-wrap td > button:disabled {
+  opacity: 0.55;
+}
+
 .form-error {
   margin: 0;
   color: #dc2626;

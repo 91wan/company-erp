@@ -1,7 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { BuildAppOptions } from "./appRouteContext.js";
 import { isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
-import { PurchaseRecordConflictError, PurchaseRecordValidationError, PurchaseRequestConflictError, PurchaseRequestValidationError, normalizePurchaseRecordFilters, normalizePurchaseRecordInput, normalizePurchaseRequestFilters, normalizePurchaseRequestInput } from "./purchases.js";
+import {
+  PurchaseRecordConflictError,
+  PurchaseRecordValidationError,
+  PurchaseRequestConflictError,
+  PurchaseRequestValidationError,
+  normalizePurchaseRecordFilters,
+  normalizePurchaseRecordInput,
+  normalizePurchaseRequestFilters,
+  normalizePurchaseRequestInput,
+  normalizePurchaseRequestReviewInput,
+} from "./purchases.js";
 
 export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/purchase-requests", async (request, reply) => {
@@ -83,6 +93,73 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
     }
   });
 
+  app.post("/api/purchase-requests/:id/submit", async (request, reply) => {
+    if (!options.purchaseRequestRepository) {
+      return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const current = await options.purchaseRequestRepository.getById(id);
+    if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+    if (current.status !== "draft") {
+      return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+    }
+
+    const purchaseRequest = await options.purchaseRequestRepository.submit(id);
+    if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+    return { purchaseRequest };
+  });
+
+  app.post("/api/purchase-requests/:id/approve", async (request, reply) => {
+    if (!options.purchaseRequestRepository) {
+      return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+
+    try {
+      const input = normalizePurchaseRequestReviewInput(request.body, "approve");
+      const current = await options.purchaseRequestRepository.getById(id);
+      if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      if (current.status !== "pending_approval") {
+        return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+      }
+      const purchaseRequest = await options.purchaseRequestRepository.approve(id, input);
+      if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      return { purchaseRequest };
+    } catch (error) {
+      if (error instanceof PurchaseRequestValidationError) {
+        return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/purchase-requests/:id/reject", async (request, reply) => {
+    if (!options.purchaseRequestRepository) {
+      return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+
+    try {
+      const input = normalizePurchaseRequestReviewInput(request.body, "reject");
+      const current = await options.purchaseRequestRepository.getById(id);
+      if (!current) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      if (current.status !== "pending_approval") {
+        return reply.status(400).send({ error: "PURCHASE_REQUEST_REVIEW_INVALID_STATE" });
+      }
+      const purchaseRequest = await options.purchaseRequestRepository.reject(id, input);
+      if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      return { purchaseRequest };
+    } catch (error) {
+      if (error instanceof PurchaseRequestValidationError) {
+        return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/purchase-records", async (request, reply) => {
     if (!options.purchaseRecordRepository) {
       return reply.status(503).send({ error: "PURCHASE_RECORD_REPOSITORY_NOT_CONFIGURED" });
@@ -126,6 +203,18 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const input = normalizePurchaseRecordInput(request.body, "create");
+      if (input.purchaseRequestId) {
+        if (!options.purchaseRequestRepository) {
+          return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
+        }
+        const purchaseRequest = await options.purchaseRequestRepository.getById(input.purchaseRequestId);
+        if (!purchaseRequest || !["pending_purchase", "purchasing"].includes(purchaseRequest.status)) {
+          return reply.status(400).send({
+            error: "PURCHASE_RECORD_VALIDATION_FAILED",
+            issues: ["purchaseRequestId must reference an approved request"],
+          });
+        }
+      }
       const purchaseRecord = await options.purchaseRecordRepository.create(input);
       if (input.purchaseRequestId && options.purchaseRequestRepository) {
         await options.purchaseRequestRepository.markPurchasing(input.purchaseRequestId);
