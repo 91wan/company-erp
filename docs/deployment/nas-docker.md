@@ -79,6 +79,10 @@ IDENTITY_ENCRYPTION_SECRET=<long-random-secret-distinct-from-session-secret>
 AUTH_COOKIE_SECURE=false
 LOG_LEVEL=info
 
+POSTGRES_MEMORY_LIMIT=1g
+API_MEMORY_LIMIT=512m
+WEB_MEMORY_LIMIT=128m
+
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=<temporary-strong-admin-password>
 
@@ -98,6 +102,11 @@ password hashes, and session cookies are redacted from request logs. The Compose
 file keeps API container logs on the default `json-file` driver with rotation
 (`10m` × `5` files); adjust `LOG_LEVEL`, `max-size`, or `max-file` if the NAS has
 stricter storage limits.
+
+The default container memory caps are conservative for a lightweight internal
+ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
+`POSTGRES_MEMORY_LIMIT`, `API_MEMORY_LIMIT`, and `WEB_MEMORY_LIMIT` in the NAS
+`.env` after checking actual RAM pressure in Container Manager.
 
 `DATABASE_URL` in `.env.example` is for local development. In Docker Compose,
 the API container uses the internal `postgres` service name automatically.

@@ -11,6 +11,11 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${NAS_DATA_ROOT:-./data}/postgres:/var/lib/postgresql/data
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-1g}
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -67,6 +72,11 @@ services:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-nas}
     volumes:
       - ${NAS_ATTACHMENTS_ROOT:-./attachments}:/attachments
+    mem_limit: ${API_MEMORY_LIMIT:-512m}
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY_LIMIT:-512m}
     healthcheck:
       test:
         [
@@ -96,3 +106,8 @@ services:
         condition: service_healthy
     ports:
       - "${ERP_WEB_PORT:-8080}:80"
+    mem_limit: ${WEB_MEMORY_LIMIT:-128m}
+    deploy:
+      resources:
+        limits:
+          memory: ${WEB_MEMORY_LIMIT:-128m}
