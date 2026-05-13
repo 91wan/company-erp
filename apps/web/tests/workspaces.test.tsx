@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { GenerateReplenishmentSuggestionsResult, ImportJobDto, InventoryBalanceDto } from "@company-erp/shared";
 import {
@@ -311,6 +311,9 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("入库登记").length).toBeGreaterThan(0);
     expect(screen.getAllByText("库存流水").length).toBeGreaterThan(0);
     expect(screen.getAllByText("当前库存查询").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "公司内部出库 后续开放" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).toBeDisabled();
+    expect(within(screen.getByLabelText("流水类型")).queryByRole("option", { name: "出库" })).not.toBeInTheDocument();
     expect(await screen.findByText("RK20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("MAT0001").length).toBeGreaterThan(0);

@@ -285,8 +285,8 @@ export function InventoryWorkspace({
         <button type="button" aria-current="page">入库登记</button>
         <button type="button">库存流水</button>
         {showBalances ? <button type="button">当前库存查询</button> : null}
-        <button type="button" disabled>出库登记 后续开放</button>
-        <button type="button" disabled>项目点领用记录 后续开放</button>
+        <button type="button" disabled>公司内部出库 后续开放</button>
+        <button type="button" disabled>项目点领用出库 请到项目点模块办理</button>
       </div>
 
       <div className="party-summary people-summary" aria-label="库存指标摘要">
