@@ -326,8 +326,8 @@ describe("Company ERP app shell", () => {
       expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
     }
 
-    expect(screen.getByRole("button", { name: "出库登记 后续开放" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "项目点领用记录 后续开放" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "公司内部出库 后续开放" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).toBeDisabled();
     expect(screen.getByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).toBeInTheDocument();
   });
 
