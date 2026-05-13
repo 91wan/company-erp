@@ -23,3 +23,7 @@ Completed:
 - Do not combine this cleanup with business feature changes.
 - Preserve public API response shapes and existing route behavior.
 - Add focused tests before replacing broad Prisma casts in each repository.
+
+## CI Maintenance
+
+- GitHub Actions official actions were upgraded to Node 24 runtime compatible major versions in the CI Node 24 Actions hardening slice: `actions/checkout@v5` and `actions/setup-node@v5`. The project test runtime remains Node 22.
