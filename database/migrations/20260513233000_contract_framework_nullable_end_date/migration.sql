@@ -1,0 +1,1 @@
+ALTER TABLE "contracts" ALTER COLUMN "end_date" DROP NOT NULL;

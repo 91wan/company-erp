@@ -9,7 +9,14 @@ import {
   normalizeCertificateInput,
   validateCertificateOwnerState,
 } from "./certificates.js";
-import { ContractConflictError, ContractValidationError, normalizeContractAttachmentInput, normalizeContractFilters, normalizeContractInput } from "./contracts.js";
+import {
+  ContractConflictError,
+  ContractValidationError,
+  normalizeContractAttachmentInput,
+  normalizeContractFilters,
+  normalizeContractInput,
+  validateContractEndDateState,
+} from "./contracts.js";
 
 export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/contracts", async (request, reply) => {
@@ -157,6 +164,16 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     const { id } = request.params as { id: string };
     try {
       const input = normalizeContractInput(request.body, "update");
+      const current = await options.contractRepository.getById(id);
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), current?.projectSiteId)) {
+        return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+      }
+      if (!current) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+      const finalStateIssues = validateContractEndDateState({
+        contractForm: input.contractForm ?? current.contractForm,
+        endDate: input.endDate !== undefined ? input.endDate : current.endDate,
+      });
+      if (finalStateIssues.length > 0) throw new ContractValidationError(finalStateIssues);
       const contract = await options.contractRepository.update(id, input);
       if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
       return { contract };

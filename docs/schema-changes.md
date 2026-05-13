@@ -261,3 +261,10 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed approved change reports update the formal equipment ledger; rejected reports remain as history only.
 - Confirmed kitchen equipment records do not create inventory movements, do not affect headquarters stock balance, and do not store financial depreciation fields.
 - Added migration `20260513183000_project_site_kitchen_equipment`.
+
+## 2026-05-13 Contract Framework Nullable End Date
+
+- Made `contracts.end_date` nullable so framework contracts can be open-ended without fake expiry dates.
+- Confirmed non-framework contracts still require an end date through application validation.
+- Confirmed missing framework end dates display as normal expiry state, while terminated contracts still override expiry display.
+- Added migration `20260513233000_contract_framework_nullable_end_date`.

@@ -753,7 +753,7 @@ export type ContractDto = {
   projectSiteName?: string | null;
   signedDate?: string | null;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   amount?: number | null;
   budgetAmount?: number | null;
   currency: string;
@@ -778,7 +778,7 @@ export type CreateContractInput = {
   projectSiteId?: string | null;
   signedDate?: string | null;
   startDate: string;
-  endDate: string;
+  endDate?: string | null;
   amount?: number | null;
   budgetAmount?: number | null;
   currency?: string;
