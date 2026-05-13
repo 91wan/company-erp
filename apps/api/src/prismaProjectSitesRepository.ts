@@ -2,6 +2,8 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   CertificateComputedStatusCode,
   CreateProjectSiteInput,
+  CreateProjectSiteKitchenEquipmentChangeRequestInput,
+  CreateProjectSiteKitchenEquipmentInput,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
   ProjectSiteEmployerLiabilityInsurancePolicyDto,
@@ -12,8 +14,12 @@ import type {
   IssueProjectUsageRequestInput,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
+  ProjectSiteKitchenEquipmentChangeRequestDto,
+  ProjectSiteKitchenEquipmentDto,
   ProjectUsageRequestDto,
+  ReviewProjectSiteKitchenEquipmentChangeRequestInput,
   UpdateProjectSiteInput,
+  UpdateProjectSiteKitchenEquipmentInput,
   UpdateProjectUsageRequestInput,
 } from "@company-erp/shared";
 import { getCertificateComputedStatus } from "./certificates.js";
@@ -28,6 +34,9 @@ import {
   ProjectUsageRequestValidationError,
   type ProjectSiteComplianceRepository,
   type ProjectSiteInsurancePolicyListFilters,
+  type ProjectSiteKitchenEquipmentChangeRequestListFilters,
+  type ProjectSiteKitchenEquipmentListFilters,
+  type ProjectSiteKitchenEquipmentRepository,
   type ProjectSiteListFilters,
   type ProjectSitePayrollSubmissionListFilters,
   type ProjectSiteRepository,
@@ -106,6 +115,16 @@ const payrollSubmissionInclude = {
   reviewedByEmployee: true,
 } as const satisfies Prisma.ProjectSitePayrollSubmissionInclude;
 
+const kitchenEquipmentInclude = {
+  projectSite: true,
+  sourceContract: true,
+} as const satisfies Prisma.ProjectSiteKitchenEquipmentInclude;
+
+const kitchenEquipmentChangeRequestInclude = {
+  projectSite: true,
+  reviewedByEmployee: true,
+} as const satisfies Prisma.ProjectSiteKitchenEquipmentChangeRequestInclude;
+
 type ProjectSiteRecord = Prisma.ProjectSiteGetPayload<{ include: typeof siteInclude }>;
 type ProjectUsageRequestRecord = Prisma.ProjectUsageRequestGetPayload<{ include: typeof usageInclude }>;
 type ProjectSiteRosterPersonRecord = Prisma.ProjectSiteRosterPersonGetPayload<{ include: typeof rosterPersonInclude }>;
@@ -116,6 +135,12 @@ type ProjectSiteEmployerLiabilityInsuranceCoveredPersonRecord =
   Prisma.ProjectSiteEmployerLiabilityInsuranceCoveredPersonGetPayload<{ include: typeof coveredPersonInclude }>;
 type ProjectSitePayrollSubmissionRecord = Prisma.ProjectSitePayrollSubmissionGetPayload<{
   include: typeof payrollSubmissionInclude;
+}>;
+type ProjectSiteKitchenEquipmentRecord = Prisma.ProjectSiteKitchenEquipmentGetPayload<{
+  include: typeof kitchenEquipmentInclude;
+}>;
+type ProjectSiteKitchenEquipmentChangeRequestRecord = Prisma.ProjectSiteKitchenEquipmentChangeRequestGetPayload<{
+  include: typeof kitchenEquipmentChangeRequestInclude;
 }>;
 type CertificateStatusRecord = Pick<
   Prisma.CertificateRecordGetPayload<Record<string, never>>,
@@ -275,6 +300,58 @@ function toPayrollSubmissionDto(submission: ProjectSitePayrollSubmissionRecord):
     remark: submission.remark,
     createdAt: timestampToString(submission.createdAt),
     updatedAt: timestampToString(submission.updatedAt),
+  };
+}
+
+function toKitchenEquipmentDto(equipment: ProjectSiteKitchenEquipmentRecord): ProjectSiteKitchenEquipmentDto {
+  return {
+    id: equipment.id,
+    projectSiteId: equipment.projectSiteId,
+    projectSiteName: equipment.projectSite?.siteName ?? null,
+    equipmentName: equipment.equipmentName,
+    equipmentCategory: equipment.equipmentCategory,
+    specification: equipment.specification,
+    quantity: decimalToNumber(equipment.quantity),
+    unit: equipment.unit,
+    location: equipment.location,
+    status: equipment.status,
+    companyAssetTag: equipment.companyAssetTag,
+    sourceContractId: equipment.sourceContractId,
+    sourceContractNo: equipment.sourceContract?.contractNo ?? null,
+    sourceContractName: equipment.sourceContract?.contractName ?? null,
+    lastCheckedDate: dateToString(equipment.lastCheckedDate),
+    attachmentPath: equipment.attachmentPath,
+    remark: equipment.remark,
+    createdAt: timestampToString(equipment.createdAt),
+    updatedAt: timestampToString(equipment.updatedAt),
+  };
+}
+
+function toKitchenEquipmentChangeRequestDto(
+  request: ProjectSiteKitchenEquipmentChangeRequestRecord,
+): ProjectSiteKitchenEquipmentChangeRequestDto {
+  return {
+    id: request.id,
+    projectSiteId: request.projectSiteId,
+    projectSiteName: request.projectSite?.siteName ?? null,
+    equipmentId: request.equipmentId,
+    equipmentName: request.equipmentName,
+    changeType: request.changeType,
+    proposedQuantity: decimalToNullableNumber(request.proposedQuantity),
+    proposedLocation: request.proposedLocation,
+    proposedStatus: request.proposedStatus,
+    attachmentPath: request.attachmentPath,
+    description: request.description,
+    submittedByAccountId: request.submittedByAccountId,
+    submittedByNameSnapshot: request.submittedByNameSnapshot,
+    submittedByPhoneSnapshot: request.submittedByPhoneSnapshot,
+    reviewStatus: request.reviewStatus,
+    reviewedByEmployeeId: request.reviewedByEmployeeId,
+    reviewedByEmployeeName: request.reviewedByEmployee?.name ?? null,
+    reviewedAt: request.reviewedAt?.toISOString() ?? null,
+    reviewRemark: request.reviewRemark,
+    createdAt: timestampToString(request.createdAt),
+    updatedAt: timestampToString(request.updatedAt),
   };
 }
 
@@ -530,6 +607,80 @@ function payrollSubmissionWhere(
   };
 }
 
+function kitchenEquipmentWhere(filters: ProjectSiteKitchenEquipmentListFilters): Prisma.ProjectSiteKitchenEquipmentWhereInput {
+  return {
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+  };
+}
+
+function kitchenEquipmentChangeRequestWhere(
+  filters: ProjectSiteKitchenEquipmentChangeRequestListFilters,
+): Prisma.ProjectSiteKitchenEquipmentChangeRequestWhereInput {
+  return {
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+    ...(filters.reviewStatus ? { reviewStatus: filters.reviewStatus } : {}),
+  };
+}
+
+function toKitchenEquipmentCreateData(input: CreateProjectSiteKitchenEquipmentInput): Prisma.ProjectSiteKitchenEquipmentCreateInput {
+  return {
+    projectSite: { connect: { id: input.projectSiteId } },
+    equipmentName: input.equipmentName,
+    equipmentCategory: input.equipmentCategory,
+    specification: input.specification,
+    quantity: input.quantity,
+    unit: input.unit,
+    location: input.location,
+    status: input.status ?? "in_use",
+    companyAssetTag: input.companyAssetTag,
+    sourceContract: optionalCreateRelation(input.sourceContractId),
+    lastCheckedDate: nullableDate(input.lastCheckedDate),
+    attachmentPath: input.attachmentPath,
+    remark: input.remark,
+  };
+}
+
+function toKitchenEquipmentUpdateData(input: UpdateProjectSiteKitchenEquipmentInput): Prisma.ProjectSiteKitchenEquipmentUpdateInput {
+  return {
+    ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
+    ...(input.equipmentName !== undefined ? { equipmentName: input.equipmentName } : {}),
+    ...(input.equipmentCategory !== undefined ? { equipmentCategory: input.equipmentCategory } : {}),
+    ...(input.specification !== undefined ? { specification: input.specification } : {}),
+    ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
+    ...(input.unit !== undefined ? { unit: input.unit } : {}),
+    ...(input.location !== undefined ? { location: input.location } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.companyAssetTag !== undefined ? { companyAssetTag: input.companyAssetTag } : {}),
+    ...(input.sourceContractId !== undefined ? { sourceContract: optionalRelation(input.sourceContractId) } : {}),
+    ...(input.lastCheckedDate !== undefined ? { lastCheckedDate: nullableDate(input.lastCheckedDate) } : {}),
+    ...(input.attachmentPath !== undefined ? { attachmentPath: input.attachmentPath } : {}),
+    ...(input.remark !== undefined ? { remark: input.remark } : {}),
+  };
+}
+
+function toKitchenEquipmentChangeRequestCreateData(
+  input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
+): Prisma.ProjectSiteKitchenEquipmentChangeRequestCreateInput {
+  return {
+    projectSite: { connect: { id: input.projectSiteId } },
+    equipment: optionalCreateRelation(input.equipmentId),
+    equipmentName: input.equipmentName,
+    changeType: input.changeType,
+    proposedQuantity: input.proposedQuantity,
+    proposedLocation: input.proposedLocation,
+    proposedStatus: input.proposedStatus,
+    attachmentPath: input.attachmentPath,
+    description: input.description,
+    submittedByAccountId: input.submittedByAccountId,
+    submittedByNameSnapshot: input.submittedByNameSnapshot,
+    submittedByPhoneSnapshot: input.submittedByPhoneSnapshot,
+    reviewStatus: "pending",
+  };
+}
+
 function mapComplianceError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
@@ -542,6 +693,13 @@ function mapComplianceError(error: unknown): never {
     if (error.code === "P2003" || error.code === "P2025") {
       throw new ProjectSiteValidationError(["Referenced project site, roster person, policy, or employee was not found"]);
     }
+  }
+  throw error;
+}
+
+function mapKitchenEquipmentError(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2003" || error.code === "P2025")) {
+    throw new ProjectSiteValidationError(["Referenced project site, equipment, contract, or employee was not found"]);
   }
   throw error;
 }
@@ -896,6 +1054,116 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
         warningIssueCount,
         generatedAt: now.toISOString(),
       } satisfies ProjectSiteComplianceSummaryDto;
+    },
+  };
+}
+
+export function createPrismaProjectSiteKitchenEquipmentRepository(prisma: PrismaClient): ProjectSiteKitchenEquipmentRepository {
+  const client = prisma;
+
+  return {
+    async listEquipment(filters: ProjectSiteKitchenEquipmentListFilters) {
+      const equipment = await client.projectSiteKitchenEquipment.findMany({
+        where: kitchenEquipmentWhere(filters),
+        include: kitchenEquipmentInclude,
+        orderBy: [{ updatedAt: "desc" }, { equipmentName: "asc" }],
+      });
+      return equipment.map(toKitchenEquipmentDto);
+    },
+    async createEquipment(input: CreateProjectSiteKitchenEquipmentInput) {
+      try {
+        const equipment = await client.projectSiteKitchenEquipment.create({
+          data: toKitchenEquipmentCreateData(input),
+          include: kitchenEquipmentInclude,
+        });
+        return toKitchenEquipmentDto(equipment);
+      } catch (error) {
+        mapKitchenEquipmentError(error);
+      }
+    },
+    async updateEquipment(id: string, input: UpdateProjectSiteKitchenEquipmentInput) {
+      try {
+        const equipment = await client.projectSiteKitchenEquipment.update({
+          where: { id },
+          data: toKitchenEquipmentUpdateData(input),
+          include: kitchenEquipmentInclude,
+        });
+        return toKitchenEquipmentDto(equipment);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        mapKitchenEquipmentError(error);
+      }
+    },
+    async listChangeRequests(filters: ProjectSiteKitchenEquipmentChangeRequestListFilters) {
+      const requests = await client.projectSiteKitchenEquipmentChangeRequest.findMany({
+        where: kitchenEquipmentChangeRequestWhere(filters),
+        include: kitchenEquipmentChangeRequestInclude,
+        orderBy: [{ reviewStatus: "asc" }, { updatedAt: "desc" }],
+      });
+      return requests.map(toKitchenEquipmentChangeRequestDto);
+    },
+    async createChangeRequest(input: CreateProjectSiteKitchenEquipmentChangeRequestInput) {
+      try {
+        const request = await client.projectSiteKitchenEquipmentChangeRequest.create({
+          data: toKitchenEquipmentChangeRequestCreateData(input),
+          include: kitchenEquipmentChangeRequestInclude,
+        });
+        return toKitchenEquipmentChangeRequestDto(request);
+      } catch (error) {
+        mapKitchenEquipmentError(error);
+      }
+    },
+    async reviewChangeRequest(id: string, input: ReviewProjectSiteKitchenEquipmentChangeRequestInput) {
+      try {
+        return await client.$transaction(async (tx) => {
+          const existing = await tx.projectSiteKitchenEquipmentChangeRequest.findUnique({ where: { id } });
+          if (!existing) return null;
+
+          if (input.reviewStatus === "approved") {
+            if (existing.equipmentId) {
+              await tx.projectSiteKitchenEquipment.update({
+                where: { id: existing.equipmentId },
+                data: {
+                  ...(existing.proposedQuantity !== null ? { quantity: existing.proposedQuantity } : {}),
+                  ...(existing.proposedLocation !== null ? { location: existing.proposedLocation } : {}),
+                  ...(existing.proposedStatus ? { status: existing.proposedStatus } : {}),
+                  ...(existing.attachmentPath ? { attachmentPath: existing.attachmentPath } : {}),
+                  ...(existing.description ? { remark: existing.description } : {}),
+                  lastCheckedDate: new Date(),
+                },
+              });
+            } else if (existing.changeType === "add") {
+              await tx.projectSiteKitchenEquipment.create({
+                data: {
+                  projectSite: { connect: { id: existing.projectSiteId } },
+                  equipmentName: existing.equipmentName,
+                  quantity: existing.proposedQuantity ?? 1,
+                  unit: "台",
+                  location: existing.proposedLocation,
+                  status: existing.proposedStatus ?? "in_use",
+                  attachmentPath: existing.attachmentPath,
+                  remark: existing.description,
+                  lastCheckedDate: new Date(),
+                },
+              });
+            }
+          }
+
+          const reviewed = await tx.projectSiteKitchenEquipmentChangeRequest.update({
+            where: { id },
+            data: {
+              reviewStatus: input.reviewStatus,
+              reviewRemark: input.reviewRemark,
+              reviewedByEmployee: optionalRelation(input.reviewedByEmployeeId),
+              reviewedAt: new Date(),
+            },
+            include: kitchenEquipmentChangeRequestInclude,
+          });
+          return toKitchenEquipmentChangeRequestDto(reviewed);
+        });
+      } catch (error) {
+        mapKitchenEquipmentError(error);
+      }
     },
   };
 }

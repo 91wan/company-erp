@@ -42,6 +42,8 @@ Included in MVP:
 - Project-site contract references
 - Lightweight market-to-operations handoff records
 - Project-site investment contract references and grouped amount summary
+- Company-owned kitchen equipment status ledger for project sites
+- Kitchen equipment change reports submitted by project-site external accounts and reviewed by headquarters
 - Direct and subcontracted operating modes
 - One subcontractor per subcontracted site
 - Company and individual subcontractors under the unified Party master data
@@ -57,6 +59,7 @@ Not included in MVP:
 - Canteen operation analytics
 - Project-site on-site warehouse
 - Project-site stock balance
+- Fixed-asset finance, depreciation, residual value, disposal, or repair work orders
 - Multi-subcontractor project-site operation
 - Full opportunity CRM or complex project initiation workflow
 - Monthly operating report tables or submission workflow; only permission/menu naming is reserved
@@ -288,6 +291,8 @@ Allowed for `external_project_site`:
 
 - Create usage requests for the bound project site. The backend injects the account's `project_site_id`; the frontend must not decide it.
 - View usage requests and processing status for the bound project site.
+- View the bound project's company-owned kitchen equipment list.
+- Submit kitchen equipment change, damage, photo, or note reports for the bound project site. Reports stay pending until headquarters reviews them.
 - Load a narrow usage-options API containing requestable materials, unit, and default Wuxi headquarters warehouse.
 
 Not allowed for `external_project_site`:
@@ -295,6 +300,35 @@ Not allowed for `external_project_site`:
 - Project-site ledger management or other project sites.
 - Contracts, procurement, inventory balance, supplier/subcontractor master data, employees, departments, and user-account administration.
 - Full inventory availability or stock balance numbers.
+
+## Project Site Kitchen Equipment
+
+Kitchen equipment is a company-owned asset status ledger under the project-site module. It is not project-site stock, food inventory, or a fixed-asset finance module.
+
+MVP rules:
+
+- Only company-owned kitchen equipment is maintained in the formal list. Customer-owned or subcontractor-owned equipment can be mentioned in remarks or attachments only.
+- The first version records by equipment category or item group, such as `六门冰柜 2 台`; it does not require one row per physical machine.
+- Headquarters can create and maintain the formal equipment list.
+- Project-site external accounts can submit equipment change reports for their bound project site, but cannot directly edit the formal list.
+- Approved change reports update the formal list; rejected reports remain as history only.
+- Kitchen equipment records do not create inventory movements and do not affect headquarters stock balance.
+- `source_contract_id` may reference an equipment investment contract, but the equipment row does not expose contract attachments or amounts to external accounts.
+
+Recommended fields:
+
+- Project site
+- Equipment name
+- Equipment category
+- Specification/model
+- Quantity and unit
+- Location
+- Status: `in_use`, `damaged`, `repair_needed`, `returned`, `retired`
+- Company asset tag, optional
+- Source contract, optional
+- Last checked date
+- Attachment/photo path
+- Remark
 
 ## Recommended First Data Model
 

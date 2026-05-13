@@ -14,6 +14,8 @@ Included in MVP:
 - Contract name
 - Counterparty
 - Contract direction
+- Contract form
+- Contract subject category
 - Related project site
 - Related business project
 - Investment category
@@ -41,10 +43,12 @@ Not included in MVP:
 | `contract_name` | text | Yes | Human-readable contract name. |
 | `counterparty_party_id` | foreign key | Yes | Links to the supplier, client, or subcontractor counterparty master record. |
 | `counterparty_name_snapshot` | text | Optional | Stores the counterparty name at signing time so historical records do not change if the master data name changes later. |
-| `contract_direction` | text | Yes | Suggested values: `purchase_contract`, `client_service_contract`, `subcontract_contract`, `framework_contract`, `other`. |
+| `contract_direction` | text | Yes | Answers "who is the business relationship with". Values: `purchase_contract`, `client_service_contract`, `subcontract_contract`, `other`. Framework is not a direction. |
+| `contract_form` | text | Yes | Answers "what legal/business form is this". Values: `one_time`, `fixed_term`, `framework`, `project_construction`. |
+| `subject_category` | text | Yes | Answers "what is being bought, built, or served". Values: `food_ingredients`, `tableware_supplies`, `kitchen_equipment`, `advertising_signage`, `renovation`, `civil_construction`, `elevator`, `service_operation`, `labor_subcontract`, `other`. |
 | `project_site_id` | foreign key | Optional | Links to the related project site. Empty means a headquarters-level or general framework contract. |
 | `business_project_id` | foreign key | Optional | Links to a self-operated construction or asset investment project, such as a central kitchen build. |
-| `investment_category` | text | Optional | Fixed dictionary for investment contracts: `renovation`, `equipment`, `advertising_signage`, `tableware_supplies`, `other`. Empty for ordinary service or framework contracts. |
+| `investment_category` | text | Optional | Narrow aggregation field for project-site or business-project investment summaries: `renovation`, `equipment`, `advertising_signage`, `tableware_supplies`, `other`. Empty for ordinary service or non-investment framework contracts. |
 | `start_date` | date | Yes | Contract start date. |
 | `end_date` | date | Yes | Contract end date. |
 | `amount` | decimal(14,2) | Optional | Fixed contract amount when known. |
@@ -52,7 +56,7 @@ Not included in MVP:
 | `currency` | text | Yes | Default to `CNY` for MVP. |
 | `attachment_ref` | text | Optional | Simple primary attachment reference for list and import use. Detailed files should use `contract_attachments`. |
 | `remark` | text | Optional | Free-form business remarks. |
-| `status` | text | Yes | Suggested values: `active`, `expired`, `terminated`. MVP can calculate `expired` from `end_date` for display. |
+| `status` | text | Yes | Manual business status: `draft`, `active`, `completed`, `terminated`, `cancelled`. `completed` is manually confirmed, such as a one-time purchase contract after delivery and payment are settled. Expiry display is derived separately from `end_date`. |
 | `created_at` | timestamp | Yes | Created time. |
 | `updated_at` | timestamp | Yes | Last updated time. |
 | `created_by` | foreign key | Optional | User who created the record. Useful for later audit, but not required for the first manual data import. |
@@ -90,14 +94,14 @@ Rules:
 
 - A contract can link to one project site in MVP.
 - One project site can have multiple contracts with our company, including multiple client service contracts with the same client or service unit.
-- Do not add a unique constraint on `project_site_id` or on `(project_site_id, contract_direction)`.
+- Do not add a unique constraint on `project_site_id` or on `(project_site_id, contract_direction, contract_form, subject_category, investment_category)`.
 - Do not add `is_primary_for_site` to the current schema. If the UI later needs one contract to appear as the main summary contract for a project site, add it through a separate future migration.
 - If a contract applies company-wide or to headquarters purchasing, `project_site_id` may be empty.
 - Ordinary project-site investment contracts, such as renovation, equipment, advertising signage, and tableware supplies, should fill `project_site_id` and `investment_category`.
 - The project-site detail page should show an "investment contracts" area grouped by `investment_category`, with contract count and amount total.
 - A direct project site may have a `client_service_contract`.
 - A subcontracted project site may have both a `client_service_contract` and a `subcontract_contract`.
-- The contract module stores these as contract records with `project_site_id` and `contract_direction`; the project-site module displays them as references.
+- The contract module stores these as contract records with `project_site_id`, `contract_direction`, `contract_form`, `subject_category`, and optional `investment_category`; the project-site module displays them as references.
 - If the business strongly needs one contract to cover multiple sites, add a future join table:
 
 ```text
@@ -216,7 +220,9 @@ The manual Excel import template for contracts should include:
 | Contract Number | Yes | Maps to `contract_no`. |
 | Contract Name | Yes | Maps to `contract_name`. |
 | Counterparty Name | Yes | Used to match or create supplier, client, or subcontractor reference depending on import policy. |
-| Contract Direction | Yes | Purchase contract, client service contract, subcontract contract, framework contract, or other. |
+| Contract Direction | Yes | Purchase contract, client service contract, subcontract contract, or other. |
+| Contract Form | Yes | One-time, fixed-term, framework, or project construction. |
+| Subject Category | Yes | Food ingredients, tableware supplies, kitchen equipment, advertising signage, renovation, civil construction, elevator, service operation, labor subcontract, or other. |
 | Project Site Name | Optional | Empty means headquarters-level or general contract. |
 | Business Project Code | Optional | Fill for self-operated construction or asset investment contracts. |
 | Investment Category | Optional | Fixed values: renovation, equipment, advertising signage, tableware supplies, or other. Required for project-site investment and business-project construction contracts. |
@@ -237,9 +243,11 @@ Minimum validation:
 - `contract_name` must not be empty.
 - `counterparty_party_id` must be present after import or manual entry.
 - `contract_direction` must use a fixed dictionary value.
+- `contract_form` must use a fixed dictionary value.
+- `subject_category` must use a fixed dictionary value.
 - `investment_category` must be empty or use the fixed dictionary value.
 - Project-site investment contracts and business-project construction contracts should fill `investment_category`.
-- Multiple contracts may share the same `project_site_id`, `counterparty_party_id`, and `contract_direction`.
+- Multiple contracts may share the same `project_site_id`, `counterparty_party_id`, `contract_direction`, `contract_form`, and `subject_category`.
 - Multiple contracts may share the same `project_site_id`, `business_project_id`, and `investment_category`.
 - If a future `is_primary_for_site` field is added and several contracts are marked primary for the same project site and direction, the UI or import review should ask the user to choose one main display contract, but the records themselves remain valid.
 - `start_date` must not be later than `end_date`.
@@ -257,6 +265,8 @@ contracts
 - counterparty_party_id
 - counterparty_name_snapshot
 - contract_direction
+- contract_form
+- subject_category
 - project_site_id
 - business_project_id
 - investment_category
@@ -292,4 +302,4 @@ These decisions can wait until after supplier, project site, and purchase data m
 - Whether clients, suppliers, and subcontractors share one generic `parties` table or are stored in separate master tables.
 - Whether imports may auto-create missing counterparties or must reject rows with unknown counterparties.
 - Whether the first UI allows multiple attachments or only one primary attachment field.
-- Whether `status` is manually editable or derived from `end_date` except for `terminated`.
+- Whether later workflow modules should automatically suggest `completed` from procurement receiving, payment, or settlement data. MVP keeps it manual.

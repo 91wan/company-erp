@@ -10,6 +10,8 @@ import type {
   ProjectSiteEmployerLiabilityInsurancePolicyDto,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
+  ProjectSiteKitchenEquipmentChangeRequestDto,
+  ProjectSiteKitchenEquipmentDto,
   ProjectSitePayrollSubmissionDto,
   ProjectSiteRosterPersonDto,
   ProjectUsageRequestDto,
@@ -25,6 +27,7 @@ import {
   ProjectUsageRequestConflictError,
   ProjectUsageRequestValidationError,
   type ProjectSiteComplianceRepository,
+  type ProjectSiteKitchenEquipmentRepository,
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
 } from "../src/projectSites";
@@ -35,6 +38,8 @@ const warehouseId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const materialId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const rosterPersonId = "12121212-1212-4121-8121-121212121212";
 const insurancePolicyId = "13131313-1313-4131-8131-131313131313";
+const kitchenEquipmentId = "24242424-2424-4242-8242-242424242424";
+const kitchenEquipmentChangeRequestId = "25252525-2525-4252-8252-252525252525";
 
 function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDto {
   return {
@@ -143,6 +148,60 @@ function makePayrollSubmission(overrides: Partial<ProjectSitePayrollSubmissionDt
     reviewedByEmployeeName: null,
     reviewedAt: null,
     remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeKitchenEquipment(overrides: Partial<ProjectSiteKitchenEquipmentDto> = {}): ProjectSiteKitchenEquipmentDto {
+  return {
+    id: kitchenEquipmentId,
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    equipmentName: "六门冰柜",
+    equipmentCategory: "冷藏设备",
+    specification: "1800L",
+    quantity: 2,
+    unit: "台",
+    location: "后厨冷藏区",
+    status: "in_use",
+    companyAssetTag: "WX-ZC-ICE-001",
+    sourceContractId: "33333333-3333-4333-8333-333333333333",
+    sourceContractNo: "HT-SB-2026-001",
+    sourceContractName: "厨房设备采购合同",
+    lastCheckedDate: "2026-05-10",
+    attachmentPath: "/volume1/company-erp/attachments/equipment/icebox.jpg",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeKitchenEquipmentChangeRequest(
+  overrides: Partial<ProjectSiteKitchenEquipmentChangeRequestDto> = {},
+): ProjectSiteKitchenEquipmentChangeRequestDto {
+  return {
+    id: kitchenEquipmentChangeRequestId,
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    equipmentId: kitchenEquipmentId,
+    equipmentName: "六门冰柜",
+    changeType: "status_change",
+    proposedQuantity: null,
+    proposedLocation: null,
+    proposedStatus: "repair_needed",
+    attachmentPath: "/volume1/company-erp/attachments/equipment/repair-needed.jpg",
+    description: "压缩机异响，需要维修",
+    submittedByAccountId: "abababab-abab-4bab-8bab-abababababab",
+    submittedByNameSnapshot: "王项目",
+    submittedByPhoneSnapshot: "13900000000",
+    reviewStatus: "pending",
+    reviewedByEmployeeId: null,
+    reviewedByEmployeeName: null,
+    reviewedAt: null,
+    reviewRemark: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -374,6 +433,109 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
     },
     async getComplianceSummary(projectSiteId) {
       return projectSiteId === "11111111-1111-4111-8111-111111111111" ? makeComplianceSummary({ projectSiteId }) : null;
+    },
+  };
+}
+
+function createFakeKitchenEquipmentRepository(): ProjectSiteKitchenEquipmentRepository {
+  const equipment = [
+    makeKitchenEquipment(),
+    makeKitchenEquipment({
+      id: "26262626-2626-4262-8262-262626262626",
+      projectSiteId: "22222222-2222-4222-8222-222222222222",
+      projectSiteName: "滨江项目点",
+      equipmentName: "蒸饭车",
+      companyAssetTag: "WX-ZC-STEAM-001",
+    }),
+  ];
+  const changeRequests = [makeKitchenEquipmentChangeRequest()];
+
+  return {
+    async listEquipment(filters) {
+      return equipment.filter((item) => {
+        const matchesSite = filters.projectSiteId ? item.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(item.projectSiteId) : true;
+        const matchesStatus = filters.status ? item.status === filters.status : true;
+        return matchesSite && matchesScopedSites && matchesStatus;
+      });
+    },
+    async createEquipment(input) {
+      const item = makeKitchenEquipment({ id: "27272727-2727-4272-8272-272727272727", status: input.status ?? "in_use", ...input });
+      equipment.unshift(item);
+      return item;
+    },
+    async updateEquipment(id, input) {
+      const index = equipment.findIndex((item) => item.id === id);
+      if (index === -1) return null;
+      equipment[index] = { ...equipment[index], ...input, updatedAt: now };
+      return equipment[index];
+    },
+    async listChangeRequests(filters) {
+      return changeRequests.filter((request) => {
+        const matchesSite = filters.projectSiteId ? request.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(request.projectSiteId) : true;
+        const matchesStatus = filters.reviewStatus ? request.reviewStatus === filters.reviewStatus : true;
+        return matchesSite && matchesScopedSites && matchesStatus;
+      });
+    },
+    async createChangeRequest(input) {
+      const request = makeKitchenEquipmentChangeRequest({
+        id: "28282828-2828-4282-8282-282828282828",
+        ...input,
+        proposedQuantity: input.proposedQuantity ?? null,
+        proposedLocation: input.proposedLocation ?? null,
+        proposedStatus: input.proposedStatus ?? null,
+        reviewStatus: "pending",
+      });
+      changeRequests.unshift(request);
+      return request;
+    },
+    async reviewChangeRequest(id, input) {
+      const index = changeRequests.findIndex((request) => request.id === id);
+      if (index === -1) return null;
+      const reviewed = {
+        ...changeRequests[index],
+        reviewStatus: input.reviewStatus,
+        reviewedByEmployeeId: input.reviewedByEmployeeId ?? null,
+        reviewedByEmployeeName: input.reviewedByEmployeeName ?? null,
+        reviewedAt: now,
+        reviewRemark: input.reviewRemark ?? null,
+        updatedAt: now,
+      };
+      changeRequests[index] = reviewed;
+      if (input.reviewStatus === "approved") {
+        if (reviewed.equipmentId) {
+          const equipmentIndex = equipment.findIndex((item) => item.id === reviewed.equipmentId);
+          if (equipmentIndex !== -1) {
+            equipment[equipmentIndex] = {
+              ...equipment[equipmentIndex],
+              ...(reviewed.proposedQuantity !== null && reviewed.proposedQuantity !== undefined
+                ? { quantity: reviewed.proposedQuantity }
+                : {}),
+              ...(reviewed.proposedLocation !== null && reviewed.proposedLocation !== undefined
+                ? { location: reviewed.proposedLocation }
+                : {}),
+              ...(reviewed.proposedStatus ? { status: reviewed.proposedStatus } : {}),
+              updatedAt: now,
+            };
+          }
+        } else if (reviewed.changeType === "add") {
+          equipment.unshift(
+            makeKitchenEquipment({
+              id: "29292929-2929-4292-8292-292929292929",
+              projectSiteId: reviewed.projectSiteId,
+              projectSiteName: reviewed.projectSiteName,
+              equipmentName: reviewed.equipmentName,
+              quantity: reviewed.proposedQuantity ?? 1,
+              location: reviewed.proposedLocation,
+              status: reviewed.proposedStatus ?? "in_use",
+              attachmentPath: reviewed.attachmentPath,
+              remark: reviewed.description,
+            }),
+          );
+        }
+      }
+      return reviewed;
     },
   };
 }
@@ -1174,5 +1336,163 @@ describe("project usage request API", () => {
     expect(contractAccess.statusCode).toBe(403);
     expect(inventoryAccess.statusCode).toBe(403);
     expect(projectSiteAccess.statusCode).toBe(403);
+  });
+});
+
+describe("project-site kitchen equipment API", () => {
+  it("lets headquarters maintain project-site kitchen equipment without inventory movement", async () => {
+    const app = buildApp({
+      projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
+    });
+
+    const list = await app.inject({ method: "GET", url: "/api/project-site-kitchen-equipment?projectSiteId=11111111-1111-4111-8111-111111111111" });
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/project-site-kitchen-equipment",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        equipmentName: "单头大锅灶",
+        equipmentCategory: "灶具",
+        quantity: 1,
+        unit: "台",
+        location: "热厨区",
+        sourceContractId: "33333333-3333-4333-8333-333333333333",
+      },
+    });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/project-site-kitchen-equipment/${kitchenEquipmentId}`,
+      payload: { status: "damaged", location: "待维修区" },
+    });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({
+      kitchenEquipment: [{ id: kitchenEquipmentId, equipmentName: "六门冰柜", quantity: 2, status: "in_use" }],
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      kitchenEquipment: { equipmentName: "单头大锅灶", status: "in_use", quantity: 1 },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({
+      kitchenEquipment: { id: kitchenEquipmentId, status: "damaged", location: "待维修区" },
+    });
+  });
+
+  it("scopes external project-site accounts to assigned-site equipment and pending change requests", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-external-equipment" },
+      authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
+      projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
+      contractRepository: undefined,
+      inventoryRepository: undefined,
+    });
+    const cookie = await loginCookie(app, "site-manager");
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/project-site-kitchen-equipment",
+      cookies: { company_erp_session: cookie },
+    });
+    const createDirectEquipment = await app.inject({
+      method: "POST",
+      url: "/api/project-site-kitchen-equipment",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        equipmentName: "绕过新增",
+        quantity: 1,
+        unit: "台",
+      },
+    });
+    const report = await app.inject({
+      method: "POST",
+      url: "/api/project-site-kitchen-equipment-change-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "22222222-2222-4222-8222-222222222222",
+        equipmentId: kitchenEquipmentId,
+        equipmentName: "六门冰柜",
+        changeType: "status_change",
+        proposedStatus: "repair_needed",
+        description: "压缩机异响，需要维修",
+      },
+    });
+    const requests = await app.inject({
+      method: "GET",
+      url: "/api/project-site-kitchen-equipment-change-requests",
+      cookies: { company_erp_session: cookie },
+    });
+    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: cookie } });
+    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: cookie } });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().kitchenEquipment).toHaveLength(1);
+    expect(list.json()).toMatchObject({
+      kitchenEquipment: [{ id: kitchenEquipmentId, projectSiteId: "11111111-1111-4111-8111-111111111111" }],
+    });
+    expect(JSON.stringify(list.json())).not.toContain("滨江项目点");
+    expect(createDirectEquipment.statusCode).toBe(403);
+    expect(report.statusCode).toBe(201);
+    expect(report.json()).toMatchObject({
+      kitchenEquipmentChangeRequest: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        reviewStatus: "pending",
+        submittedByAccountId: "abababab-abab-4bab-8bab-abababababab",
+        submittedByNameSnapshot: "王项目",
+        submittedByPhoneSnapshot: "13900000000",
+      },
+    });
+    expect(requests.statusCode).toBe(200);
+    expect(requests.json().kitchenEquipmentChangeRequests.every((request: ProjectSiteKitchenEquipmentChangeRequestDto) => request.projectSiteId === "11111111-1111-4111-8111-111111111111")).toBe(true);
+    expect(contractAccess.statusCode).toBe(403);
+    expect(inventoryAccess.statusCode).toBe(403);
+  });
+
+  it("applies approved equipment change requests and keeps rejected requests as history only", async () => {
+    const repository = createFakeKitchenEquipmentRepository();
+    const app = buildApp({ projectSiteKitchenEquipmentRepository: repository });
+
+    const approved = await app.inject({
+      method: "POST",
+      url: `/api/project-site-kitchen-equipment-change-requests/${kitchenEquipmentChangeRequestId}/review`,
+      payload: { reviewStatus: "approved", reviewedByEmployeeId: "44444444-4444-4444-8444-444444444444", reviewedByEmployeeName: "张三" },
+    });
+    const afterApproved = await app.inject({ method: "GET", url: "/api/project-site-kitchen-equipment" });
+    const addRequest = await app.inject({
+      method: "POST",
+      url: "/api/project-site-kitchen-equipment-change-requests",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        equipmentName: "双门消毒柜",
+        changeType: "add",
+        proposedQuantity: 1,
+        proposedLocation: "备餐间",
+        proposedStatus: "in_use",
+      },
+    });
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/project-site-kitchen-equipment-change-requests/${addRequest.json().kitchenEquipmentChangeRequest.id}/review`,
+      payload: { reviewStatus: "rejected", reviewRemark: "重复上报" },
+    });
+    const afterRejected = await app.inject({ method: "GET", url: "/api/project-site-kitchen-equipment" });
+    await app.close();
+
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toMatchObject({
+      kitchenEquipmentChangeRequest: { id: kitchenEquipmentChangeRequestId, reviewStatus: "approved" },
+    });
+    expect(afterApproved.json()).toMatchObject({
+      kitchenEquipment: expect.arrayContaining([
+        expect.objectContaining({ id: kitchenEquipmentId, status: "repair_needed" }),
+      ]),
+    });
+    expect(rejected.statusCode).toBe(200);
+    expect(rejected.json()).toMatchObject({ kitchenEquipmentChangeRequest: { reviewStatus: "rejected" } });
+    expect(JSON.stringify(afterRejected.json())).not.toContain("双门消毒柜");
   });
 });

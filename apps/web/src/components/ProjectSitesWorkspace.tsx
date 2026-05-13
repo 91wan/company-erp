@@ -1,11 +1,15 @@
-import { ClipboardList, Filter, MapPin, PackageMinus, RefreshCw, Save, Search } from "lucide-react";
+import { ClipboardList, Filter, MapPin, PackageMinus, RefreshCw, Save, Search, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
   type BusinessProjectDto,
+  type CreateProjectSiteKitchenEquipmentChangeRequestInput,
+  type CreateProjectSiteKitchenEquipmentInput,
   type CreateProjectSiteInput,
   type CreateProjectUsageRequestInput,
   type IssueProjectUsageRequestInput,
@@ -14,6 +18,10 @@ import {
   type ProjectSiteComplianceSummaryDto,
   type ProjectSiteDto,
   type ProjectSiteInvestmentSummaryDto,
+  type ProjectSiteKitchenEquipmentChangeRequestDto,
+  type ProjectSiteKitchenEquipmentChangeTypeCode,
+  type ProjectSiteKitchenEquipmentDto,
+  type ProjectSiteKitchenEquipmentStatusCode,
   type ProjectUsageOptionMaterialDto,
   type ProjectUsageOptionsDto,
   type ProjectUsageRequestDto,
@@ -35,6 +43,16 @@ type ProjectSitesWorkspaceProps = {
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
   loadInvestmentSummary?: (projectSiteId: string) => Promise<ProjectSiteInvestmentSummaryDto>;
   loadComplianceSummary?: (projectSiteId: string) => Promise<ProjectSiteComplianceSummaryDto>;
+  loadKitchenEquipment?: () => Promise<ProjectSiteKitchenEquipmentDto[]>;
+  loadKitchenEquipmentChangeRequests?: () => Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]>;
+  createKitchenEquipment?: (input: CreateProjectSiteKitchenEquipmentInput) => Promise<ProjectSiteKitchenEquipmentDto>;
+  createKitchenEquipmentChangeRequest?: (
+    input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
+  ) => Promise<ProjectSiteKitchenEquipmentChangeRequestDto>;
+  reviewKitchenEquipmentChangeRequest?: (
+    id: string,
+    input: { reviewStatus: "approved" | "rejected"; reviewRemark?: string | null },
+  ) => Promise<ProjectSiteKitchenEquipmentChangeRequestDto>;
   canManage?: boolean;
   canManageSites?: boolean;
   canManageUsage?: boolean;
@@ -78,6 +96,34 @@ type UsageFormState = {
   expectedDate: string;
 };
 
+type KitchenEquipmentFormState = {
+  projectSiteId: string;
+  equipmentName: string;
+  equipmentCategory: string;
+  specification: string;
+  quantity: string;
+  unit: string;
+  location: string;
+  status: ProjectSiteKitchenEquipmentStatusCode;
+  companyAssetTag: string;
+  sourceContractId: string;
+  lastCheckedDate: string;
+  attachmentPath: string;
+  remark: string;
+};
+
+type KitchenEquipmentChangeFormState = {
+  projectSiteId: string;
+  equipmentId: string;
+  equipmentName: string;
+  changeType: ProjectSiteKitchenEquipmentChangeTypeCode;
+  proposedQuantity: string;
+  proposedLocation: string;
+  proposedStatus: "" | ProjectSiteKitchenEquipmentStatusCode;
+  attachmentPath: string;
+  description: string;
+};
+
 type IssueFormState = {
   requestId: string;
   outboundNo: string;
@@ -91,6 +137,8 @@ const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.co
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
 const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
+const kitchenEquipmentStatusLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => [status.code, status.label]));
+const kitchenEquipmentChangeTypeLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => [type.code, type.label]));
 const complianceComputedStatusLabel = new Map([
   ["valid", "有效"],
   ["expiring_soon", "即将到期"],
@@ -160,12 +208,64 @@ async function defaultLoadComplianceSummary(projectSiteId: string): Promise<Proj
   return payload.complianceSummary;
 }
 
+async function defaultLoadKitchenEquipment(): Promise<ProjectSiteKitchenEquipmentDto[]> {
+  const payload = await requestJson<{ kitchenEquipment: ProjectSiteKitchenEquipmentDto[] }>(
+    `${apiBaseUrl}/api/project-site-kitchen-equipment`,
+  );
+  return payload.kitchenEquipment;
+}
+
+async function defaultLoadKitchenEquipmentChangeRequests(): Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]> {
+  const payload = await requestJson<{ kitchenEquipmentChangeRequests: ProjectSiteKitchenEquipmentChangeRequestDto[] }>(
+    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests`,
+  );
+  return payload.kitchenEquipmentChangeRequests;
+}
+
 async function defaultCreateProjectSite(input: CreateProjectSiteInput): Promise<ProjectSiteDto> {
   const payload = await requestJson<{ projectSite: ProjectSiteDto }>(`${apiBaseUrl}/api/project-sites`, {
     method: "POST",
     body: JSON.stringify(input),
   });
   return payload.projectSite;
+}
+
+async function defaultCreateKitchenEquipment(input: CreateProjectSiteKitchenEquipmentInput): Promise<ProjectSiteKitchenEquipmentDto> {
+  const payload = await requestJson<{ kitchenEquipment: ProjectSiteKitchenEquipmentDto }>(
+    `${apiBaseUrl}/api/project-site-kitchen-equipment`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.kitchenEquipment;
+}
+
+async function defaultCreateKitchenEquipmentChangeRequest(
+  input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
+): Promise<ProjectSiteKitchenEquipmentChangeRequestDto> {
+  const payload = await requestJson<{ kitchenEquipmentChangeRequest: ProjectSiteKitchenEquipmentChangeRequestDto }>(
+    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.kitchenEquipmentChangeRequest;
+}
+
+async function defaultReviewKitchenEquipmentChangeRequest(
+  id: string,
+  input: { reviewStatus: "approved" | "rejected"; reviewRemark?: string | null },
+): Promise<ProjectSiteKitchenEquipmentChangeRequestDto> {
+  const payload = await requestJson<{ kitchenEquipmentChangeRequest: ProjectSiteKitchenEquipmentChangeRequestDto }>(
+    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests/${id}/review`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return payload.kitchenEquipmentChangeRequest;
 }
 
 async function defaultCreateUsageRequest(input: CreateProjectUsageRequestInput): Promise<ProjectUsageRequestDto> {
@@ -206,6 +306,11 @@ export function ProjectSitesWorkspace({
   loadBusinessProjects = defaultLoadBusinessProjects,
   loadInvestmentSummary = defaultLoadInvestmentSummary,
   loadComplianceSummary = defaultLoadComplianceSummary,
+  loadKitchenEquipment = defaultLoadKitchenEquipment,
+  loadKitchenEquipmentChangeRequests = defaultLoadKitchenEquipmentChangeRequests,
+  createKitchenEquipment = defaultCreateKitchenEquipment,
+  createKitchenEquipmentChangeRequest = defaultCreateKitchenEquipmentChangeRequest,
+  reviewKitchenEquipmentChangeRequest = defaultReviewKitchenEquipmentChangeRequest,
   canManage = true,
   canManageSites,
   canManageUsage,
@@ -226,6 +331,9 @@ export function ProjectSitesWorkspace({
   const [investmentSummaryStatus, setInvestmentSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [complianceSummaries, setComplianceSummaries] = useState<Record<string, ProjectSiteComplianceSummaryDto>>({});
   const [complianceStatus, setComplianceStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [kitchenEquipment, setKitchenEquipment] = useState<ProjectSiteKitchenEquipmentDto[]>([]);
+  const [kitchenEquipmentChangeRequests, setKitchenEquipmentChangeRequests] = useState<ProjectSiteKitchenEquipmentChangeRequestDto[]>([]);
+  const [kitchenEquipmentStatus, setKitchenEquipmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [siteStatus, setSiteStatus] = useState<"loading" | "ready" | "error">("loading");
   const [usageStatus, setUsageStatus] = useState<"loading" | "ready" | "error">("loading");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -234,6 +342,8 @@ export function ProjectSitesWorkspace({
   const [siteSubmitState, setSiteSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [usageSubmitState, setUsageSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [issueSubmitState, setIssueSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [kitchenEquipmentSubmitState, setKitchenEquipmentSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [kitchenEquipmentChangeSubmitState, setKitchenEquipmentChangeSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [siteForm, setSiteForm] = useState<SiteFormState>({
     siteCode: "",
     siteName: "",
@@ -270,6 +380,32 @@ export function ProjectSitesWorkspace({
     handledBy: "",
     receivedByName: "",
   });
+  const [kitchenEquipmentForm, setKitchenEquipmentForm] = useState<KitchenEquipmentFormState>({
+    projectSiteId: "",
+    equipmentName: "",
+    equipmentCategory: "",
+    specification: "",
+    quantity: "",
+    unit: "台",
+    location: "",
+    status: "in_use",
+    companyAssetTag: "",
+    sourceContractId: "",
+    lastCheckedDate: "",
+    attachmentPath: "",
+    remark: "",
+  });
+  const [kitchenEquipmentChangeForm, setKitchenEquipmentChangeForm] = useState<KitchenEquipmentChangeFormState>({
+    projectSiteId: "",
+    equipmentId: "",
+    equipmentName: "",
+    changeType: "status_change",
+    proposedQuantity: "",
+    proposedLocation: "",
+    proposedStatus: "",
+    attachmentPath: "",
+    description: "",
+  });
 
   useEffect(() => {
     if (usageOnly) {
@@ -286,6 +422,8 @@ export function ProjectSitesWorkspace({
         setSites(nextSites);
         setSiteStatus("ready");
         setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+        setKitchenEquipmentForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+        setKitchenEquipmentChangeForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
         setSelectedInvestmentSiteId((current) => current || nextSites[0]?.id || "");
       })
       .catch(() => {
@@ -438,6 +576,38 @@ export function ProjectSitesWorkspace({
     };
   }, [loadComplianceSummary, siteStatus, sites, usageOnly]);
 
+  useEffect(() => {
+    let mounted = true;
+    setKitchenEquipmentStatus("loading");
+    Promise.all([loadKitchenEquipment(), loadKitchenEquipmentChangeRequests()])
+      .then(([nextEquipment, nextChangeRequests]) => {
+        if (!mounted) return;
+        const equipment = Array.isArray(nextEquipment) ? nextEquipment : [];
+        const changeRequests = Array.isArray(nextChangeRequests) ? nextChangeRequests : [];
+        setKitchenEquipment(equipment);
+        setKitchenEquipmentChangeRequests(changeRequests);
+        setKitchenEquipmentStatus("ready");
+        setKitchenEquipmentChangeForm((current) => {
+          const firstEquipment = equipment[0];
+          return {
+            ...current,
+            projectSiteId: current.projectSiteId || firstEquipment?.projectSiteId || "",
+            equipmentId: current.equipmentId || firstEquipment?.id || "",
+            equipmentName: current.equipmentName || firstEquipment?.equipmentName || "",
+          };
+        });
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setKitchenEquipment([]);
+        setKitchenEquipmentChangeRequests([]);
+        setKitchenEquipmentStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadKitchenEquipment, loadKitchenEquipmentChangeRequests]);
+
   const filteredSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return sites.filter((site) => {
@@ -469,10 +639,36 @@ export function ProjectSitesWorkspace({
     });
   }, [query, usageFilter, usageRequests]);
 
+  const filteredKitchenEquipment = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return kitchenEquipment.filter((item) => {
+      if (!normalizedQuery) return true;
+      return [
+        item.projectSiteName,
+        item.equipmentName,
+        item.equipmentCategory,
+        item.specification,
+        item.location,
+        item.companyAssetTag,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedQuery));
+    });
+  }, [kitchenEquipment, query]);
+
+  const filteredKitchenEquipmentChangeRequests = useMemo(() => {
+    const visibleSiteIds = new Set(filteredKitchenEquipment.map((item) => item.projectSiteId));
+    return kitchenEquipmentChangeRequests.filter((request) => {
+      if (usageOnly) return true;
+      return visibleSiteIds.size === 0 || visibleSiteIds.has(request.projectSiteId);
+    });
+  }, [filteredKitchenEquipment, kitchenEquipmentChangeRequests, usageOnly]);
+
   const activeSiteCount = sites.filter((site) => site.status === "active").length;
   const pendingUsageCount = usageRequests.filter((request) => request.status === "pending").length;
   const totalRequestedQuantity = usageRequests.reduce((sum, request) => sum + request.requestedQuantity, 0);
   const totalIssuedQuantity = usageRequests.reduce((sum, request) => sum + request.issuedQuantity, 0);
+  const pendingKitchenEquipmentChangeCount = kitchenEquipmentChangeRequests.filter((request) => request.reviewStatus === "pending").length;
   const complianceBlockingIssueCount = Object.values(complianceSummaries).reduce(
     (sum, summary) => sum + summary.blockingIssueCount,
     0,
@@ -605,6 +801,97 @@ export function ProjectSitesWorkspace({
     }
   }
 
+  async function handleCreateKitchenEquipment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setKitchenEquipmentSubmitState("saving");
+    try {
+      const created = await createKitchenEquipment({
+        projectSiteId: kitchenEquipmentForm.projectSiteId,
+        equipmentName: kitchenEquipmentForm.equipmentName,
+        equipmentCategory: kitchenEquipmentForm.equipmentCategory || null,
+        specification: kitchenEquipmentForm.specification || null,
+        quantity: Number(kitchenEquipmentForm.quantity),
+        unit: kitchenEquipmentForm.unit,
+        location: kitchenEquipmentForm.location || null,
+        status: kitchenEquipmentForm.status,
+        companyAssetTag: kitchenEquipmentForm.companyAssetTag || null,
+        sourceContractId: kitchenEquipmentForm.sourceContractId || null,
+        lastCheckedDate: kitchenEquipmentForm.lastCheckedDate || null,
+        attachmentPath: kitchenEquipmentForm.attachmentPath || null,
+        remark: kitchenEquipmentForm.remark || null,
+      });
+      setKitchenEquipment((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+      setKitchenEquipmentChangeForm((current) => ({
+        ...current,
+        projectSiteId: current.projectSiteId || created.projectSiteId,
+        equipmentId: current.equipmentId || created.id,
+        equipmentName: current.equipmentName || created.equipmentName,
+      }));
+      setKitchenEquipmentForm((current) => ({
+        ...current,
+        equipmentName: "",
+        equipmentCategory: "",
+        specification: "",
+        quantity: "",
+        unit: "台",
+        location: "",
+        status: "in_use",
+        companyAssetTag: "",
+        sourceContractId: "",
+        lastCheckedDate: "",
+        attachmentPath: "",
+        remark: "",
+      }));
+      setKitchenEquipmentSubmitState("idle");
+    } catch {
+      setKitchenEquipmentSubmitState("error");
+    }
+  }
+
+  async function handleCreateKitchenEquipmentChangeRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setKitchenEquipmentChangeSubmitState("saving");
+    try {
+      const selectedEquipment = kitchenEquipment.find((item) => item.id === kitchenEquipmentChangeForm.equipmentId);
+      const created = await createKitchenEquipmentChangeRequest({
+        projectSiteId: usageOnly ? "" : kitchenEquipmentChangeForm.projectSiteId || selectedEquipment?.projectSiteId || "",
+        equipmentId: kitchenEquipmentChangeForm.equipmentId || null,
+        equipmentName: kitchenEquipmentChangeForm.equipmentName || selectedEquipment?.equipmentName || "",
+        changeType: kitchenEquipmentChangeForm.changeType,
+        proposedQuantity: kitchenEquipmentChangeForm.proposedQuantity ? Number(kitchenEquipmentChangeForm.proposedQuantity) : null,
+        proposedLocation: kitchenEquipmentChangeForm.proposedLocation || null,
+        proposedStatus: kitchenEquipmentChangeForm.proposedStatus || null,
+        attachmentPath: kitchenEquipmentChangeForm.attachmentPath || null,
+        description: kitchenEquipmentChangeForm.description || null,
+      });
+      setKitchenEquipmentChangeRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
+      setKitchenEquipmentChangeForm((current) => ({
+        ...current,
+        proposedQuantity: "",
+        proposedLocation: "",
+        proposedStatus: "",
+        attachmentPath: "",
+        description: "",
+      }));
+      setKitchenEquipmentChangeSubmitState("idle");
+    } catch {
+      setKitchenEquipmentChangeSubmitState("error");
+    }
+  }
+
+  async function handleReviewKitchenEquipmentChangeRequest(id: string, reviewStatus: "approved" | "rejected") {
+    try {
+      const reviewed = await reviewKitchenEquipmentChangeRequest(id, { reviewStatus });
+      setKitchenEquipmentChangeRequests((current) => [reviewed, ...current.filter((request) => request.id !== reviewed.id)]);
+      if (reviewStatus === "approved") {
+        const refreshed = await loadKitchenEquipment();
+        setKitchenEquipment(refreshed);
+      }
+    } catch {
+      setKitchenEquipmentStatus("error");
+    }
+  }
+
   return (
     <section className="project-sites-workspace" aria-label="项目点">
       <div className="parties-heading">
@@ -626,6 +913,7 @@ export function ProjectSitesWorkspace({
 
       <div className="inventory-tabs" aria-label="项目点模块功能">
         {!usageOnly ? <button type="button" aria-current="page">项目点台账</button> : null}
+        <button type="button" disabled={false}>厨房设备</button>
         <button type="button" aria-current={usageOnly ? "page" : undefined}>领用申请</button>
         {!usageOnly ? <button type="button" disabled={!canIssueUsage}>出库登记</button> : null}
         <button type="button" disabled>月度经营报表 后续开放</button>
@@ -651,11 +939,255 @@ export function ProjectSitesWorkspace({
             {totalRequestedQuantity}/{totalIssuedQuantity}
           </strong>
         </article>
+        <article>
+          <span>设备/待审</span>
+          <strong>{kitchenEquipment.length}/{pendingKitchenEquipmentChangeCount}</strong>
+        </article>
         {!usageOnly ? <article>
           <span>合规风险</span>
           <strong>{complianceBlockingIssueCount}/{complianceWarningIssueCount}</strong>
         </article> : null}
       </div>
+
+      <section className="dashboard-panel table-panel" aria-label="项目点厨房设备">
+        <PanelTitle icon={<Wrench size={16} />} title="厨房设备" />
+        {kitchenEquipmentStatus === "loading" ? (
+          <StateMessage icon={<RefreshCw size={16} />} text="厨房设备加载中" />
+        ) : kitchenEquipmentStatus === "error" ? (
+          <StateMessage icon={<Wrench size={16} />} text="厨房设备加载失败" />
+        ) : filteredKitchenEquipment.length === 0 ? (
+          <StateMessage icon={<Wrench size={16} />} text="暂无厨房设备" />
+        ) : (
+          <ResponsiveTable
+            headers={[
+              ...(usageOnly ? [] : ["项目点"]),
+              "设备",
+              "类目",
+              "规格",
+              "数量",
+              "位置",
+              "状态",
+              "资产标签",
+              "最近核对",
+            ]}
+            rows={filteredKitchenEquipment.map((item) => [
+              ...(usageOnly ? [] : [item.projectSiteName ?? "-"]),
+              item.equipmentName,
+              item.equipmentCategory ?? "-",
+              item.specification ?? "-",
+              `${item.quantity} ${item.unit}`,
+              item.location ?? "-",
+              kitchenEquipmentStatusLabel.get(item.status) ?? item.status,
+              item.companyAssetTag ?? "-",
+              item.lastCheckedDate ?? "-",
+            ])}
+          />
+        )}
+      </section>
+
+      <section className="dashboard-panel table-panel" aria-label="厨房设备变更上报">
+        <PanelTitle icon={<ClipboardList size={16} />} title="厨房设备变更上报" />
+        {filteredKitchenEquipmentChangeRequests.length === 0 ? (
+          <StateMessage icon={<ClipboardList size={16} />} text="暂无设备变更上报" />
+        ) : (
+          <ResponsiveTable
+            headers={[
+              "设备",
+              "类型",
+              "数量",
+              "位置",
+              "状态",
+              "说明",
+              "审核",
+              ...(usageOnly ? [] : ["操作"]),
+            ]}
+            rows={filteredKitchenEquipmentChangeRequests.map((request) => [
+              request.equipmentName,
+              kitchenEquipmentChangeTypeLabel.get(request.changeType) ?? request.changeType,
+              request.proposedQuantity ?? "-",
+              request.proposedLocation ?? "-",
+              request.proposedStatus ? kitchenEquipmentStatusLabel.get(request.proposedStatus) ?? request.proposedStatus : "-",
+              request.description ?? "-",
+              complianceReviewStatusLabel.get(request.reviewStatus) ?? request.reviewStatus,
+              ...(usageOnly
+                ? []
+                : [
+                    request.reviewStatus === "pending" ? (
+                      <div className="table-actions" key={request.id}>
+                        <button type="button" onClick={() => void handleReviewKitchenEquipmentChangeRequest(request.id, "approved")}>
+                          通过
+                        </button>
+                        <button type="button" onClick={() => void handleReviewKitchenEquipmentChangeRequest(request.id, "rejected")}>
+                          驳回
+                        </button>
+                      </div>
+                    ) : "-",
+                  ]),
+            ])}
+          />
+        )}
+      </section>
+
+      {!usageOnly && canEditSites ? (
+        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipment} aria-label="新增厨房设备表单">
+          <div className="panel-header people-panel-title">
+            <h3>
+              <Wrench aria-hidden="true" size={16} />
+              新增厨房设备
+            </h3>
+            <button type="submit" disabled={kitchenEquipmentSubmitState === "saving"}>
+              <Save aria-hidden="true" size={15} />
+              保存设备
+            </button>
+          </div>
+          <label>
+            <span>项目点</span>
+            <select
+              aria-label="设备项目点"
+              value={kitchenEquipmentForm.projectSiteId}
+              onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, projectSiteId: event.target.value })}
+              required
+            >
+              <option value="">选择项目点</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>{site.siteName}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>设备名称</span>
+            <input value={kitchenEquipmentForm.equipmentName} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, equipmentName: event.target.value })} required />
+          </label>
+          <label>
+            <span>设备类目</span>
+            <input value={kitchenEquipmentForm.equipmentCategory} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, equipmentCategory: event.target.value })} />
+          </label>
+          <label>
+            <span>规格型号</span>
+            <input value={kitchenEquipmentForm.specification} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, specification: event.target.value })} />
+          </label>
+          <label>
+            <span>数量</span>
+            <input type="number" min="0.0001" step="0.0001" value={kitchenEquipmentForm.quantity} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, quantity: event.target.value })} required />
+          </label>
+          <label>
+            <span>单位</span>
+            <input value={kitchenEquipmentForm.unit} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, unit: event.target.value })} required />
+          </label>
+          <label>
+            <span>位置</span>
+            <input value={kitchenEquipmentForm.location} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, location: event.target.value })} />
+          </label>
+          <label>
+            <span>状态</span>
+            <select value={kitchenEquipmentForm.status} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, status: event.target.value as ProjectSiteKitchenEquipmentStatusCode })}>
+              {PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => (
+                <option key={status.code} value={status.code}>{status.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>资产标签</span>
+            <input value={kitchenEquipmentForm.companyAssetTag} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, companyAssetTag: event.target.value })} />
+          </label>
+          <label>
+            <span>最近核对</span>
+            <input type="date" value={kitchenEquipmentForm.lastCheckedDate} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, lastCheckedDate: event.target.value })} />
+          </label>
+          <label className="wide">
+            <span>附件路径</span>
+            <input value={kitchenEquipmentForm.attachmentPath} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, attachmentPath: event.target.value })} />
+          </label>
+          {kitchenEquipmentSubmitState === "error" ? <p className="form-error">厨房设备保存失败，请检查必填项或项目点。</p> : null}
+        </form>
+      ) : null}
+
+      <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipmentChangeRequest} aria-label="厨房设备变更上报表单">
+        <div className="panel-header people-panel-title">
+          <h3>
+            <ClipboardList aria-hidden="true" size={16} />
+            上报设备变更
+          </h3>
+          <button type="submit" disabled={kitchenEquipmentChangeSubmitState === "saving"}>
+            <Save aria-hidden="true" size={15} />
+            提交上报
+          </button>
+        </div>
+        {!usageOnly ? (
+          <label>
+            <span>项目点</span>
+            <select
+              aria-label="上报项目点"
+              value={kitchenEquipmentChangeForm.projectSiteId}
+              onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, projectSiteId: event.target.value })}
+            >
+              <option value="">选择项目点</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>{site.siteName}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label>
+          <span>关联设备</span>
+          <select
+            aria-label="关联设备"
+            value={kitchenEquipmentChangeForm.equipmentId}
+            onChange={(event) => {
+              const selected = kitchenEquipment.find((item) => item.id === event.target.value);
+              setKitchenEquipmentChangeForm({
+                ...kitchenEquipmentChangeForm,
+                equipmentId: event.target.value,
+                equipmentName: selected?.equipmentName ?? kitchenEquipmentChangeForm.equipmentName,
+                projectSiteId: selected?.projectSiteId ?? kitchenEquipmentChangeForm.projectSiteId,
+              });
+            }}
+          >
+            <option value="">新增设备或不关联</option>
+            {filteredKitchenEquipment.map((item) => (
+              <option key={item.id} value={item.id}>{item.equipmentName}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>设备名称</span>
+          <input value={kitchenEquipmentChangeForm.equipmentName} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, equipmentName: event.target.value })} required />
+        </label>
+        <label>
+          <span>变更类型</span>
+          <select value={kitchenEquipmentChangeForm.changeType} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, changeType: event.target.value as ProjectSiteKitchenEquipmentChangeTypeCode })}>
+            {PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => (
+              <option key={type.code} value={type.code}>{type.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>变更数量</span>
+          <input type="number" min="0.0001" step="0.0001" value={kitchenEquipmentChangeForm.proposedQuantity} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedQuantity: event.target.value })} />
+        </label>
+        <label>
+          <span>变更位置</span>
+          <input value={kitchenEquipmentChangeForm.proposedLocation} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedLocation: event.target.value })} />
+        </label>
+        <label>
+          <span>变更状态</span>
+          <select value={kitchenEquipmentChangeForm.proposedStatus} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedStatus: event.target.value as "" | ProjectSiteKitchenEquipmentStatusCode })}>
+            <option value="">不变更状态</option>
+            {PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => (
+              <option key={status.code} value={status.code}>{status.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="wide">
+          <span>照片/附件路径</span>
+          <input value={kitchenEquipmentChangeForm.attachmentPath} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, attachmentPath: event.target.value })} />
+        </label>
+        <label className="wide">
+          <span>说明</span>
+          <textarea value={kitchenEquipmentChangeForm.description} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, description: event.target.value })} />
+        </label>
+        {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">设备变更上报失败，请检查设备名称或项目点。</p> : null}
+      </form>
 
       {!usageOnly ? <section className="dashboard-panel table-panel" aria-label="项目点合规资料">
         <PanelTitle icon={<ClipboardList size={16} />} title="合规资料" />

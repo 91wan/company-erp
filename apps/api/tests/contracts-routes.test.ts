@@ -32,6 +32,8 @@ function makeContract(overrides: Partial<ContractDto> = {}): ContractDto {
     counterpartyPartyName: "无锡客户单位",
     counterpartyNameSnapshot: "无锡客户单位",
     direction: "client_service_contract",
+    contractForm: "fixed_term",
+    subjectCategory: "service_operation",
     projectSiteId: "44444444-4444-4444-8444-444444444444",
     projectSiteName: "科技园一期项目点",
     signedDate: "2026-05-01",
@@ -77,6 +79,8 @@ function createFakeContractRepository(
       return contracts.filter((contract) => {
         const matchesStatus = filters.status ? contract.status === filters.status : true;
         const matchesDirection = filters.direction ? contract.direction === filters.direction : true;
+        const matchesContractForm = filters.contractForm ? contract.contractForm === filters.contractForm : true;
+        const matchesSubjectCategory = filters.subjectCategory ? contract.subjectCategory === filters.subjectCategory : true;
         const matchesInvestmentCategory = filters.investmentCategory
           ? contract.investmentCategory === filters.investmentCategory
           : true;
@@ -103,6 +107,8 @@ function createFakeContractRepository(
         return (
           matchesStatus &&
           matchesDirection &&
+          matchesContractForm &&
+          matchesSubjectCategory &&
           matchesInvestmentCategory &&
           matchesCounterparty &&
           matchesBusinessProject &&
@@ -256,7 +262,7 @@ describe("contracts API", () => {
 
     const listResponse = await app.inject({
       method: "GET",
-      url: "/api/contracts?status=active&direction=client_service_contract&expiry=expiring_soon&q=无锡",
+      url: "/api/contracts?status=active&direction=client_service_contract&contractForm=fixed_term&subjectCategory=service_operation&expiry=expiring_soon&q=无锡",
     });
     const detailResponse = await app.inject({ method: "GET", url: `/api/contracts/${contractId}` });
     const createResponse = await app.inject({
@@ -267,6 +273,8 @@ describe("contracts API", () => {
         contractName: "采购框架合同",
         counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
         direction: "purchase_contract",
+        contractForm: "framework",
+        subjectCategory: "food_ingredients",
         investmentCategory: "equipment",
         businessProjectId: "77777777-7777-4777-8777-777777777777",
         signedDate: "2026-05-11",
@@ -290,6 +298,8 @@ describe("contracts API", () => {
         contractNo: "HT20260511002",
         contractName: "采购框架合同",
         status: "active",
+        contractForm: "framework",
+        subjectCategory: "food_ingredients",
         investmentCategory: "equipment",
         businessProjectId: "77777777-7777-4777-8777-777777777777",
       },
@@ -307,7 +317,9 @@ describe("contracts API", () => {
         contractNo: "HT20260511002",
         contractName: "日期错误合同",
         counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
-        direction: "purchase_contract",
+        direction: "framework_contract",
+        contractForm: "free-text-form",
+        subjectCategory: "free-text-subject",
         investmentCategory: "free-text-category",
         startDate: "2026-06-01",
         endDate: "2026-05-01",
@@ -322,6 +334,8 @@ describe("contracts API", () => {
         contractName: "重复合同",
         counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
         direction: "purchase_contract",
+        contractForm: "one_time",
+        subjectCategory: "food_ingredients",
         startDate: "2026-05-11",
         endDate: "2027-05-10",
       },
@@ -337,9 +351,51 @@ describe("contracts API", () => {
       error: "CONTRACT_VALIDATION_FAILED",
       issues: expect.arrayContaining(["investmentCategory is unsupported"]),
     });
+    expect(invalidResponse.json().issues).toEqual(
+      expect.arrayContaining([
+        "direction is unsupported",
+        "contractForm is unsupported",
+        "subjectCategory is unsupported",
+      ]),
+    );
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "CONTRACT_CONFLICT", field: "contractNo" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+
+  it("allows one-time purchase contracts to be manually completed without changing expiry derivation", async () => {
+    const app = buildApp({ contractRepository: createFakeContractRepository([]) });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT20260511003",
+        contractName: "餐具一次性采购合同",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "purchase_contract",
+        contractForm: "one_time",
+        subjectCategory: "tableware_supplies",
+        investmentCategory: "tableware_supplies",
+        startDate: "2026-05-11",
+        endDate: "2026-05-20",
+        amount: 12000,
+        status: "completed",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      contract: {
+        contractNo: "HT20260511003",
+        status: "completed",
+        contractForm: "one_time",
+        subjectCategory: "tableware_supplies",
+        investmentCategory: "tableware_supplies",
+        expiryState: "normal",
+      },
+    });
   });
 
   it("scopes project-site users to assigned project contracts and attachments", async () => {

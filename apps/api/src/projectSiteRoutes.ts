@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { BuildAppOptions } from "./appRouteContext.js";
 import type { AuthenticatedRequest } from "./auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds } from "./appRouteContext.js";
-import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
+import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
 export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/project-sites", async (request, reply) => {
@@ -240,6 +240,164 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
     const complianceSummary = await options.projectSiteComplianceRepository.getComplianceSummary(id);
     if (!complianceSummary) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
     return { complianceSummary };
+  });
+
+  app.get("/api/project-site-kitchen-equipment", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { kitchenEquipment: [] };
+      const filters = {
+        ...normalizeProjectSiteKitchenEquipmentFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
+      if (filters.projectSiteId && isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { kitchenEquipment: [] };
+      const kitchenEquipment = await options.projectSiteKitchenEquipmentRepository.listEquipment(filters);
+      return { kitchenEquipment };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-site-kitchen-equipment", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    if (externalProjectSiteAccountSiteIds(request) !== null) {
+      return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSiteKitchenEquipment", requiredLevel: "manage" });
+    }
+    try {
+      const input = normalizeProjectSiteKitchenEquipmentInput(request.body, "create");
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const kitchenEquipment = await options.projectSiteKitchenEquipmentRepository.createEquipment(input);
+      return reply.status(201).send({ kitchenEquipment });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/project-site-kitchen-equipment/:id", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    if (externalProjectSiteAccountSiteIds(request) !== null) {
+      return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSiteKitchenEquipment", requiredLevel: "manage" });
+    }
+    try {
+      const { id } = request.params as { id: string };
+      const input = normalizeProjectSiteKitchenEquipmentInput(request.body, "update");
+      if (input.projectSiteId && isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const kitchenEquipment = await options.projectSiteKitchenEquipmentRepository.updateEquipment(id, input);
+      if (!kitchenEquipment) return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_NOT_FOUND" });
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), kitchenEquipment.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_NOT_FOUND" });
+      }
+      return { kitchenEquipment };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-site-kitchen-equipment-change-requests", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { kitchenEquipmentChangeRequests: [] };
+      const filters = {
+        ...normalizeProjectSiteKitchenEquipmentChangeRequestFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
+      if (filters.projectSiteId && isOutsideProjectSiteScope(scope, filters.projectSiteId)) {
+        return { kitchenEquipmentChangeRequests: [] };
+      }
+      const kitchenEquipmentChangeRequests = await options.projectSiteKitchenEquipmentRepository.listChangeRequests(filters);
+      return { kitchenEquipmentChangeRequests };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-site-kitchen-equipment-change-requests", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const input = normalizeProjectSiteKitchenEquipmentChangeRequestInput(request.body);
+      const externalSiteIds = externalProjectSiteAccountSiteIds(request);
+      const scopedInput =
+        externalSiteIds !== null
+          ? {
+              ...input,
+              projectSiteId: externalSiteIds[0] ?? input.projectSiteId,
+              submittedByAccountId: (request as AuthenticatedRequest).currentUser?.id ?? input.submittedByAccountId,
+              submittedByNameSnapshot:
+                (request as AuthenticatedRequest).currentUser?.externalProjectSiteContactName ?? input.submittedByNameSnapshot,
+              submittedByPhoneSnapshot:
+                (request as AuthenticatedRequest).currentUser?.externalProjectSiteContactPhone ?? input.submittedByPhoneSnapshot,
+            }
+          : input;
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), scopedInput.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const kitchenEquipmentChangeRequest = await options.projectSiteKitchenEquipmentRepository.createChangeRequest(scopedInput);
+      return reply.status(201).send({ kitchenEquipmentChangeRequest });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-site-kitchen-equipment-change-requests/:id/review", async (request, reply) => {
+    if (!options.projectSiteKitchenEquipmentRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+    if (externalProjectSiteAccountSiteIds(request) !== null) {
+      return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSiteKitchenEquipment", requiredLevel: "manage" });
+    }
+    try {
+      const { id } = request.params as { id: string };
+      const user = (request as AuthenticatedRequest).currentUser;
+      const input = normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput(request.body);
+      const kitchenEquipmentChangeRequest = await options.projectSiteKitchenEquipmentRepository.reviewChangeRequest(id, {
+        ...input,
+        reviewedByEmployeeId: input.reviewedByEmployeeId ?? user?.employeeId ?? null,
+        reviewedByEmployeeName: input.reviewedByEmployeeName ?? user?.employeeName ?? null,
+      });
+      if (!kitchenEquipmentChangeRequest) {
+        return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_REQUEST_NOT_FOUND" });
+      }
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), kitchenEquipmentChangeRequest.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_REQUEST_NOT_FOUND" });
+      }
+      return { kitchenEquipmentChangeRequest };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
   });
 
   app.get("/api/project-usage-options", async (_request, reply) => {

@@ -193,6 +193,16 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed procurement records do not get separate investment statistics fields in this slice; optional `purchase_records.contract_id` remains the trace-back path.
 - Added migration `20260513110000_business_project_contract_investments`.
 
+## 2026-05-13 Contract Status Form And Subject Classification
+
+- Split contract classification into direction, form, subject category, investment category, and manual business status.
+- Removed `framework_contract` from `ContractDirection`; framework contracts now use `contract_form = framework`.
+- Added `ContractForm` for one-time, fixed-term, framework, and project construction contracts.
+- Added `ContractSubjectCategory` for food ingredients, tableware supplies, kitchen equipment, advertising signage, renovation, civil construction, elevator, service operation, labor subcontract, and other.
+- Expanded `ContractStatus` to `draft`, `active`, `completed`, `terminated`, and `cancelled`; `completed` is manually confirmed and is not derived from payment, receiving, or expiry.
+- Confirmed expiry display remains derived from `contracts.end_date` and manual `terminated` status; it does not automatically change `contracts.status` to `completed`.
+- Added migration `20260513184500_contract_status_form_subject`.
+
 ## 2026-05-11 Login and Permission Guard Foundation
 
 - Reused existing `user_accounts`, `user_role_assignments`, `employees`, and `departments` schema for login and fixed-role authorization.
@@ -235,3 +245,12 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed certificate display status is calculated from disabled flag, validity type, expiry date, review date, and reminder days; it is not stored as a mutable database status.
 - Confirmed attachment files are not stored in the database and upload/OCR/import workflows are not added in this slice.
 - Added migration `20260512133000_certificates_foundation`.
+
+## 2026-05-13 Project Site Kitchen Equipment Ledger
+
+- Added `ProjectSiteKitchenEquipmentStatus` and `ProjectSiteKitchenEquipmentChangeType` enums.
+- Added `project_site_kitchen_equipment` as a project-site-scoped company-owned equipment status ledger.
+- Added `project_site_kitchen_equipment_change_requests` for external project-site equipment change, damage, photo, and note reports.
+- Confirmed approved change reports update the formal equipment ledger; rejected reports remain as history only.
+- Confirmed kitchen equipment records do not create inventory movements, do not affect headquarters stock balance, and do not store financial depreciation fields.
+- Added migration `20260513183000_project_site_kitchen_equipment`.
