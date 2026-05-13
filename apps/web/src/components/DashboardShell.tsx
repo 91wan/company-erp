@@ -21,6 +21,7 @@ import {
   type AppConfigDto,
   type AppVersionDto,
   type AuthenticatedUserDto,
+  type CertificateRecordDto,
   type ContractDto,
   type InventoryBalanceDto,
   type InventoryMovementDto,
@@ -207,6 +208,7 @@ type DashboardLiveData = {
   inventoryBalances: LoadState<InventoryBalanceDto[]>;
   projectUsageRequests: LoadState<ProjectUsageRequestDto[]>;
   contracts: LoadState<ContractDto[]>;
+  certificates: LoadState<CertificateRecordDto[]>;
   appVersion: LoadState<AppVersionDto | null>;
 };
 
@@ -217,6 +219,7 @@ const emptyDashboardData: DashboardLiveData = {
   inventoryBalances: { status: "loading", data: [] },
   projectUsageRequests: { status: "loading", data: [] },
   contracts: { status: "loading", data: [] },
+  certificates: { status: "loading", data: [] },
   appVersion: { status: "loading", data: null },
 };
 
@@ -244,6 +247,7 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         inventoryBalances,
         projectUsageRequests,
         contracts,
+        certificates,
         appVersion,
       ] = await Promise.all([
         loadDashboardResource<PurchaseRequestDto>("/api/purchase-requests", "purchaseRequests"),
@@ -254,6 +258,7 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
           : loadDashboardResource<InventoryBalanceDto>("/api/inventory-balances", "inventoryBalances"),
         loadDashboardResource<ProjectUsageRequestDto>("/api/project-usage-requests", "projectUsageRequests"),
         loadDashboardResource<ContractDto>("/api/contracts", "contracts"),
+        loadDashboardResource<CertificateRecordDto>("/api/certificates", "certificates"),
         getAppVersion()
           .then((version): LoadState<AppVersionDto | null> => ({ status: "success", data: version }))
           .catch((): LoadState<AppVersionDto | null> => ({ status: "error", data: null })),
@@ -267,6 +272,7 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         inventoryBalances,
         projectUsageRequests,
         contracts,
+        certificates,
         appVersion,
       });
     }
@@ -348,6 +354,7 @@ function TopBar({ currentUser, onLogout }: { currentUser: AuthenticatedUserDto; 
 }
 
 function dashboardTarget(label: string): WorkspaceKey {
+  if (/证照|资质/.test(label)) return "证照资质";
   if (/合同/.test(label)) return "合同";
   if (/入库|库存/.test(label)) return "库存";
   if (/项目点|领用/.test(label)) return "项目点";
@@ -440,6 +447,19 @@ function contractExpiryLabel(expiryState: ContractDto["expiryState"]): string {
     terminated: "已终止",
   };
   return labels[expiryState] ?? expiryState;
+}
+
+function certificateStatusLabel(status: CertificateRecordDto["computedStatus"]): string {
+  const labels: Record<CertificateRecordDto["computedStatus"], string> = {
+    valid: "正常",
+    expiring_soon: "即将到期",
+    expired: "已过期",
+    review_due_soon: "即将复核",
+    review_due: "待复核",
+    archived: "归档",
+    disabled: "停用",
+  };
+  return labels[status] ?? status;
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -542,11 +562,17 @@ function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNaviga
   const riskyContracts = sortByUpdatedAt(data.contracts.data)
     .filter((contract) => contract.expiryState === "expired" || contract.expiryState === "expiring_soon")
     .slice(0, 2);
+  const riskyCertificates = sortByUpdatedAt(data.certificates.data)
+    .filter((certificate) =>
+      ["expired", "expiring_soon", "review_due", "review_due_soon"].includes(certificate.computedStatus),
+    )
+    .slice(0, 2);
   const items = [
     ...pendingRequests.map((request) => ({
       title: `采购需求单 ${request.requestNo}`,
       applicant: request.requesterName,
       amount: `${request.lines.length} 行物料`,
+      amountLabel: "内容",
       age: formatDateTime(request.submittedAt ?? request.updatedAt),
       risk: purchaseRequestStatusLabel(request.status),
     })),
@@ -554,8 +580,17 @@ function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNaviga
       title: `合同风险 ${contract.contractNo}`,
       applicant: contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot,
       amount: formatCurrency(contract.amount),
+      amountLabel: "金额",
       age: formatDateTime(contract.endDate ?? contract.updatedAt),
       risk: contractExpiryLabel(contract.expiryState),
+    })),
+    ...riskyCertificates.map((certificate) => ({
+      title: `证照风险 ${certificate.certificateCode} ${certificate.certificateName}`,
+      applicant: certificate.ownerNameSnapshot || certificate.ownerPartyName || certificate.ownerProjectSiteName || "-",
+      amount: certificate.certificateName,
+      amountLabel: "证照",
+      age: formatDateTime(certificate.expiryDate ?? certificate.nextReviewDate ?? certificate.updatedAt),
+      risk: certificateStatusLabel(certificate.computedStatus),
     })),
   ];
 
@@ -564,7 +599,11 @@ function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNaviga
       <PanelHeader title="待审批" badge={String(pendingRequests.length)} onNavigate={() => onNavigate("采购")} />
       {data.purchaseRequests.status === "error" ? <PanelStateMessage text="待审批数据暂不可用" /> : null}
       {data.contracts.status === "error" ? <PanelStateMessage text="合同风险数据暂不可用" /> : null}
-      {items.length === 0 && data.purchaseRequests.status !== "error" && data.contracts.status !== "error" ? (
+      {data.certificates.status === "error" ? <PanelStateMessage text="证照风险数据暂不可用" /> : null}
+      {items.length === 0 &&
+      data.purchaseRequests.status !== "error" &&
+      data.contracts.status !== "error" &&
+      data.certificates.status !== "error" ? (
         <PanelStateMessage text="暂无待审批或到期风险" />
       ) : null}
       <div className="approval-list">
@@ -577,7 +616,7 @@ function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNaviga
               <strong>{item.title}</strong>
               <small>
                 申请人：{item.applicant}
-                <span>金额：{item.amount}</span>
+                <span>{item.amountLabel}：{item.amount}</span>
               </small>
             </div>
             <div className="approval-age">

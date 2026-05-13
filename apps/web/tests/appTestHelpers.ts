@@ -97,6 +97,7 @@ type MockShellData = {
   inventoryBalances?: InventoryBalanceDto[];
   projectUsageRequests?: ProjectUsageRequestDto[];
   contracts?: ContractDto[];
+  certificates?: CertificateRecordDto[];
   failures?: string[];
 };
 
@@ -194,7 +195,9 @@ export function mockShellFetch(
     }
     if (url.includes("/api/business-projects")) return Promise.resolve(jsonResponse({ businessProjects: [] }));
     if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: data.contracts ?? [contract] }));
-    if (url.includes("/api/certificates")) return Promise.resolve(jsonResponse({ certificates: [] }));
+    if (url.includes("/api/certificates")) {
+      return Promise.resolve(jsonResponse({ certificates: data.certificates ?? [] }));
+    }
     if (url.includes("/api/import-jobs/")) return Promise.resolve(jsonResponse({ importJob }));
     if (url.includes("/api/import-jobs")) return Promise.resolve(jsonResponse({ importJobs: [] }));
 
