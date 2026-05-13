@@ -81,6 +81,12 @@ BOOTSTRAP_ADMIN_PASSWORD=<temporary-strong-admin-password>
 NAS_DATA_ROOT=/volume1/company-erp/data
 NAS_ATTACHMENTS_ROOT=/volume1/company-erp/attachments
 ERP_WEB_PORT=8080
+
+APP_COMMIT_SHA=<git-commit-sha>
+APP_BUILD_TIME=<utc-build-time>
+APP_DEPLOYED_AT=<utc-deploy-time>
+APP_PACKAGE_VERSION=0.1.0
+APP_ENVIRONMENT=nas
 ```
 
 `DATABASE_URL` in `.env.example` is for local development. In Docker Compose,
@@ -92,11 +98,32 @@ constructs the container `DATABASE_URL` from `POSTGRES_*` values.
 web image builds with an empty API base URL so browser requests use same-origin
 `/api/*` and `/health`.
 
+The `APP_*` deployment metadata values are non-secret. They are shown in the
+System Settings page, `/health`, `/api/app-version`, and
+`.deploy-revision.json` so operators can confirm the NAS is running the
+expected revision.
+
 ## Start On NAS
 
 From the repository directory in NAS Container Manager or an SSH shell:
 
 ```bash
+export APP_COMMIT_SHA=<git-commit-sha>
+export APP_BUILD_TIME=<utc-build-time>
+export APP_DEPLOYED_AT=<utc-deploy-time>
+export APP_PACKAGE_VERSION=0.1.0
+export APP_ENVIRONMENT=nas
+
+cat > .deploy-revision.json <<EOF
+{
+  "commitSha": "${APP_COMMIT_SHA}",
+  "buildTime": "${APP_BUILD_TIME}",
+  "deployedAt": "${APP_DEPLOYED_AT}",
+  "packageVersion": "${APP_PACKAGE_VERSION}",
+  "environment": "${APP_ENVIRONMENT}"
+}
+EOF
+
 docker compose build api web
 docker compose up -d postgres
 docker compose run --rm migrate
@@ -110,7 +137,22 @@ names in `schema_migrations` and skips them on later runs.
 For later updates:
 
 ```bash
-git pull --ff-only origin main
+export APP_COMMIT_SHA=<git-commit-sha>
+export APP_BUILD_TIME=<utc-build-time>
+export APP_DEPLOYED_AT=<utc-deploy-time>
+export APP_PACKAGE_VERSION=0.1.0
+export APP_ENVIRONMENT=nas
+
+cat > .deploy-revision.json <<EOF
+{
+  "commitSha": "${APP_COMMIT_SHA}",
+  "buildTime": "${APP_BUILD_TIME}",
+  "deployedAt": "${APP_DEPLOYED_AT}",
+  "packageVersion": "${APP_PACKAGE_VERSION}",
+  "environment": "${APP_ENVIRONMENT}"
+}
+EOF
+
 docker compose build api web
 docker compose run --rm migrate
 docker compose up -d api web
@@ -227,9 +269,24 @@ Expected response:
   "service": "company-erp-api",
   "database": {
     "configured": true
+  },
+  "version": {
+    "shortCommitSha": "<short-sha>"
   }
 }
 ```
+
+Use all three signals below for deployment freshness. Do not rely on `/health`
+alone to prove the NAS app directory is at the newest commit:
+
+```bash
+cat .deploy-revision.json
+curl http://<NAS_IP>:${ERP_WEB_PORT:-8080}/api/app-version
+docker compose ps
+```
+
+The `commitSha` in `.deploy-revision.json` and `/api/app-version` should match
+the commit used for the latest code sync and Docker build.
 
 Before login, the auth status endpoint should return no user:
 
@@ -305,3 +362,11 @@ Local URLs:
 - API: `http://localhost:3001`
 
 Use a real local `.env`; do not commit it.
+
+## Browser Acceptance Notes
+
+If Chrome shows `ERR_BLOCKED_BY_CLIENT` while the same NAS URL works from curl
+or another browser, first check Chrome extensions, content blockers, security
+policies, or antivirus web filtering. Treat it as a client-side browser block
+until `/health`, `/api/auth/me`, and the Web page fail from another clean
+browser as well.

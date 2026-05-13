@@ -28,6 +28,7 @@ import type {
   PartyDto,
   EmployeeProjectSiteAssignmentDto,
   ExternalProjectSiteAccountDto,
+  AppVersionDto,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
@@ -78,6 +79,14 @@ export const externalProjectSiteUser = {
 };
 
 export const defaultAppConfig = { companyName: "Company ERP" };
+export const defaultAppVersion: AppVersionDto = {
+  packageVersion: "0.1.0",
+  commitSha: "9ac5cb74a9eb36136c2634399e9812def3be26d6",
+  shortCommitSha: "9ac5cb7",
+  buildTime: "2026-05-13T07:00:00.000Z",
+  deployedAt: "2026-05-13T07:30:00.000Z",
+  environment: "nas",
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -94,12 +103,17 @@ export function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 50
 export function mockShellFetch(
   user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectSiteUser | null = adminUser,
   appConfig = defaultAppConfig,
+  appVersion: AppVersionDto | "error" = defaultAppVersion,
 ) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
 
     if (url.endsWith("/api/app-config") && method === "GET") return Promise.resolve(jsonResponse({ appConfig }));
+    if (url.endsWith("/api/app-version") && method === "GET") {
+      if (appVersion === "error") return Promise.resolve(jsonResponse({ error: "VERSION_UNAVAILABLE" }, false, 500));
+      return Promise.resolve(jsonResponse({ appVersion }));
+    }
     if (url.endsWith("/api/app-config") && method === "PATCH") {
       const payload = init?.body ? JSON.parse(String(init.body)) : {};
       if (!payload.companyName?.trim()) return Promise.resolve(jsonResponse({ error: "APP_CONFIG_VALIDATION_FAILED" }, false, 400));

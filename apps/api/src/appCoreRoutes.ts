@@ -12,6 +12,7 @@ import {
   normalizeAppConfigInput,
   type AppConfigRepository,
 } from "./appConfig.js";
+import { getAppVersion } from "./appVersion.js";
 
 type AppCoreRoutesOptions = {
   appConfigRepository?: AppConfigRepository;
@@ -26,6 +27,13 @@ export function registerAppCoreRoutes(app: FastifyInstance, options: AppCoreRout
     database: {
       configured: Boolean(process.env.DATABASE_URL),
     },
+    version: {
+      shortCommitSha: getAppVersion().shortCommitSha,
+    },
+  }));
+
+  app.get("/api/app-version", async () => ({
+    appVersion: getAppVersion(),
   }));
 
   app.get("/api/meta/roles", async () => ({

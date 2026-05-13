@@ -256,6 +256,7 @@ function isPublicPath(pathname: string, method: string): boolean {
     pathname === "/health" ||
     pathname.startsWith("/api/meta/") ||
     pathname.startsWith("/api/auth/") ||
+    pathname === "/api/app-version" ||
     (pathname === "/api/app-config" && method === "GET")
   );
 }

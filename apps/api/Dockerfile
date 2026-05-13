@@ -20,9 +20,17 @@ RUN npm run db:generate \
 FROM node:22-alpine AS runtime
 
 WORKDIR /app
+ARG APP_COMMIT_SHA=unknown
+ARG APP_BUILD_TIME=unknown
+ARG APP_PACKAGE_VERSION=unknown
 ENV NODE_ENV=production
 ENV API_HOST=0.0.0.0
 ENV API_PORT=3001
+ENV APP_COMMIT_SHA=${APP_COMMIT_SHA}
+ENV APP_BUILD_TIME=${APP_BUILD_TIME}
+ENV APP_PACKAGE_VERSION=${APP_PACKAGE_VERSION}
+ENV APP_DEPLOYED_AT=unknown
+ENV APP_ENVIRONMENT=container
 
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules node_modules

@@ -32,6 +32,15 @@ type MockApiOptions = {
   failures?: ApiFailure[];
 };
 
+const demoAppVersion = {
+  packageVersion: "0.1.0",
+  commitSha: "9ac5cb74a9eb36136c2634399e9812def3be26d6",
+  shortCommitSha: "9ac5cb7",
+  buildTime: "2026-05-13T07:00:00.000Z",
+  deployedAt: "2026-05-13T07:30:00.000Z",
+  environment: "e2e",
+};
+
 export const adminUser: MockUser = {
   id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
   username: "admin",
@@ -377,6 +386,10 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
 
     if (path === "/api/app-config" && method === "PATCH") {
       return fulfill(route, { appConfig: { companyName } });
+    }
+
+    if (path === "/api/app-version" && method === "GET") {
+      return fulfill(route, { appVersion: demoAppVersion });
     }
 
     if (path === "/api/auth/me") {

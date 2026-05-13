@@ -17,6 +17,15 @@ Expected:
 
 - `/health` returns `status: ok`.
 - `/api/auth/me` returns `{ "user": null }` before login.
+- `/api/app-version` returns the same commit as `.deploy-revision.json`.
+
+Version freshness check:
+
+```bash
+cat /volume1/company-erp/app/.deploy-revision.json
+curl http://<NAS_IP>:${ERP_WEB_PORT:-8080}/api/app-version
+docker compose ps
+```
 
 ## 2. Admin Account Recovery
 
@@ -135,3 +144,6 @@ human approval for destructive restore.
   permissions or `sudo`.
 - Smoke duplicate conflict: rerun `demo:cleanup` dry-run first and inspect fixed
   `DEMO-*` records before deleting anything.
+- Chrome `ERR_BLOCKED_BY_CLIENT`: inspect local Chrome extensions, client
+  security filters, or ad blockers before treating it as an ERP server outage.
+  Recheck with curl or a clean browser profile.
