@@ -139,6 +139,9 @@ function mockShellFetch(
     }
     if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
     if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
+    if (user?.roles.length === 1 && user.roles[0] === "project_site" && url.includes("/api/business-projects")) {
+      return Promise.resolve(jsonResponse({ error: "FORBIDDEN" }, false, 403));
+    }
     if (url.includes("/api/business-projects")) return Promise.resolve(jsonResponse({ businessProjects: [] }));
     if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
     if (url.includes("/api/certificates")) return Promise.resolve(jsonResponse({ certificates: [] }));
@@ -819,7 +822,7 @@ describe("Company ERP app shell", () => {
   });
 
   it("shows project-site users only usage actions and hides global stock balance", async () => {
-    mockShellFetch(projectSiteUser);
+    const fetchMock = mockShellFetch(projectSiteUser);
 
     render(<App />);
 
@@ -834,6 +837,13 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^库存$/ }));
     expect(screen.queryByRole("button", { name: "当前库存查询" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^合同$/ }));
+    expect((await screen.findAllByRole("heading", { name: "合同台账" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.some((url) => url.includes("/api/business-projects"))).toBe(false);
   });
 
   it("shows external project managers only the usage request workspace", async () => {
@@ -1562,7 +1572,7 @@ describe("Company ERP app shell", () => {
 
     expect(screen.getByRole("heading", { name: "业务项目" })).toBeInTheDocument();
     expect((await screen.findAllByText("扬中中央厨房")).length).toBeGreaterThan(0);
-    expect(screen.getByText("CNY 1,680,000")).toBeInTheDocument();
+    expect(await screen.findByText("CNY 1,680,000")).toBeInTheDocument();
     expect(screen.getAllByText("装修/改造").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("项目编码"), { target: { value: "BP-YZ-CK-002" } });

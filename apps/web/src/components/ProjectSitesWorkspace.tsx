@@ -314,7 +314,7 @@ export function ProjectSitesWorkspace({
       };
     }
 
-    Promise.all([loadParties(), loadMaterials(), loadWarehouses(), loadBusinessProjects()])
+    Promise.all([loadParties(), loadMaterials(), loadWarehouses(), canEditSites ? loadBusinessProjects() : Promise.resolve([])])
       .then(([nextParties, nextMaterials, nextWarehouses, nextBusinessProjects]) => {
         if (!mounted) return;
         setParties(nextParties);
@@ -346,7 +346,7 @@ export function ProjectSitesWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadBusinessProjects, loadMaterials, loadParties, loadUsageOptions, loadWarehouses, usageOnly]);
+  }, [canEditSites, loadBusinessProjects, loadMaterials, loadParties, loadUsageOptions, loadWarehouses, usageOnly]);
 
   useEffect(() => {
     if (usageOnly) {
