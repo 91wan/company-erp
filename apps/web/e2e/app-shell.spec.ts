@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { expectHealthyShell, trackBrowserIssues } from "./browserAssertions";
 import {
   adminUser,
   externalProjectSiteUser,
@@ -6,26 +7,6 @@ import {
   projectSiteUser,
   viewerUser,
 } from "./mockApi";
-
-function trackBrowserIssues(page: Page) {
-  const issues: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") {
-      issues.push(`${message.type()}: ${message.text()}`);
-    }
-  });
-  page.on("pageerror", (error) => {
-    issues.push(`pageerror: ${error.message}`);
-  });
-  return issues;
-}
-
-async function expectHealthyShell(page: Page, issues: string[]) {
-  await expect(page).toHaveTitle("Company ERP");
-  await expect(page.locator("vite-error-overlay")).toHaveCount(0);
-  await expect(page.locator("#root")).not.toBeEmpty();
-  expect(issues).toEqual([]);
-}
 
 test("anonymous visitors see the login screen with configured company name", async ({ page }) => {
   const issues = trackBrowserIssues(page);
