@@ -10,7 +10,7 @@ import {
   createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
-  createPrismaExternalProjectManagerAccountRepository,
+  createPrismaExternalProjectSiteAccountRepository,
   createPrismaProjectSiteAssignmentRepository,
   createPrismaUserAccountRepository,
 } from "./prismaPeoplePermissionsRepository.js";
@@ -21,6 +21,7 @@ import {
 import { createPrismaReplenishmentSuggestionRepository } from "./prismaReplenishmentRepository.js";
 import { createPrismaInventoryRepository } from "./prismaInventoryRepository.js";
 import {
+  createPrismaProjectSiteComplianceRepository,
   createPrismaProjectSiteRepository,
   createPrismaProjectUsageRequestRepository,
 } from "./prismaProjectSitesRepository.js";
@@ -49,8 +50,8 @@ const app = buildApp({
   departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
   employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
   userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
-  externalProjectManagerAccountRepository: prisma
-    ? createPrismaExternalProjectManagerAccountRepository(prisma)
+  externalProjectSiteAccountRepository: prisma
+    ? createPrismaExternalProjectSiteAccountRepository(prisma)
     : undefined,
   projectSiteAssignmentRepository: prisma ? createPrismaProjectSiteAssignmentRepository(prisma) : undefined,
   purchaseRequestRepository: prisma ? createPrismaPurchaseRequestRepository(prisma) : undefined,
@@ -58,6 +59,7 @@ const app = buildApp({
   inventoryRepository: prisma ? createPrismaInventoryRepository(prisma) : undefined,
   replenishmentSuggestionRepository: prisma ? createPrismaReplenishmentSuggestionRepository(prisma) : undefined,
   projectSiteRepository: prisma ? createPrismaProjectSiteRepository(prisma) : undefined,
+  projectSiteComplianceRepository: prisma ? createPrismaProjectSiteComplianceRepository(prisma) : undefined,
   projectUsageRequestRepository: prisma ? createPrismaProjectUsageRequestRepository(prisma) : undefined,
   contractRepository: prisma ? createPrismaContractRepository(prisma) : undefined,
   businessProjectRepository: prisma ? createPrismaBusinessProjectRepository(prisma) : undefined,

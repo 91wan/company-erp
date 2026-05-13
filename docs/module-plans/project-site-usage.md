@@ -28,7 +28,7 @@ MVP rules:
 - Our company is the fixed operator in the middle of the service relationship.
 - A direct site has no subcontractor.
 - A subcontracted site has exactly one subcontractor operating the whole site. The subcontractor can be a company or an individual contractor.
-- The subcontractor Party is the contract/project counterparty; the external project manager account is only a login identity for usage requests.
+- The subcontractor Party is the contract/project counterparty; the project-site external account is only a login identity for usage requests.
 - The MVP does not support multiple subcontractors, windows, stalls, service lines, subcontractor internal teams, subcontractor settlement, or subcontractor performance evaluation.
 
 ## MVP Scope
@@ -45,7 +45,7 @@ Included in MVP:
 - Direct and subcontracted operating modes
 - One subcontractor per subcontracted site
 - Company and individual subcontractors under the unified Party master data
-- One active external project manager account per project site, for usage request submission only
+- One active project-site external account per project site, for usage request submission only
 
 Not included in MVP:
 
@@ -139,16 +139,15 @@ Rules:
 - The primary manager remains a single field on the project site for clear responsibility.
 - Subcontractor staff are not system users in MVP. Store only contact name and phone on the project site or issue record.
 
-## External Project Manager Account
+## Project-Site External Account
 
-Subcontracted sites can have one external project manager login account. This account is not an employee, does not bind to `employees.id`, and is not the contract counterparty master record.
+Subcontracted sites can have one project-site external login account. This account is not an employee, does not bind to `employees.id`, and is not the contract counterparty master record.
 
 Rules:
 
-- One project site can have at most one active external project manager account at the same time.
+- One project site can have at most one active project-site external account at the same time.
 - The account binds to `project_site_id`; `subcontractor_party_id` is optional context.
-- The project manager may be the individual subcontractor himself/herself or another person arranged by the subcontractor.
-- When the person changes, disable the old account and create a new account. Historical usage requests keep the old submitter snapshot.
+- When the current contact changes, keep the same account, require the new contact name, new contact phone, and a password reset, and invalidate old sessions. Historical usage requests keep the old submitter snapshot.
 - The first version only allows creating and viewing this project site's usage requests and status.
 - Monthly operating reports are reserved as a future menu/permission name only; no report schema is created in this phase.
 
@@ -156,12 +155,12 @@ Minimum fields:
 
 | Field | Type | Required | Notes |
 |---|---|---:|---|
-| `id` | UUID | Yes | External project manager account id. |
-| `user_account_id` | foreign key | Yes | Login account with fixed role `external_project_manager`. |
+| `id` | UUID | Yes | Project-site external account account id. |
+| `user_account_id` | foreign key | Yes | Login account with fixed role `external_project_site`. |
 | `project_site_id` | foreign key | Yes | The only project site this account can access. |
 | `subcontractor_party_id` | foreign key | Optional | The subcontractor source when known. |
-| `manager_name` | text | Yes | Display name and submitter snapshot source. |
-| `manager_phone` | text | Yes | Contact phone and submitter snapshot source. |
+| `current_contact_name` | text | Yes | Current contact name and submitter snapshot source. |
+| `current_contact_phone` | text | Yes | Current contact phone and submitter snapshot source. |
 | `status` | enum | Yes | `active`, `disabled`, `locked`. |
 | `start_date` | date | Optional | Effective start date. |
 | `end_date` | date | Optional | Effective end date after replacement or disablement. |
@@ -283,15 +282,15 @@ Not allowed:
 - Company-wide staff data
 - Purchase, warehouse, or contract records unrelated to assigned sites
 
-External project manager users have a narrower scope than internal project-site users.
+Project-site external account users have a narrower scope than internal project-site users.
 
-Allowed for `external_project_manager`:
+Allowed for `external_project_site`:
 
 - Create usage requests for the bound project site. The backend injects the account's `project_site_id`; the frontend must not decide it.
 - View usage requests and processing status for the bound project site.
 - Load a narrow usage-options API containing requestable materials, unit, and default Wuxi headquarters warehouse.
 
-Not allowed for `external_project_manager`:
+Not allowed for `external_project_site`:
 
 - Project-site ledger management or other project sites.
 - Contracts, procurement, inventory balance, supplier/subcontractor master data, employees, departments, and user-account administration.

@@ -10,15 +10,15 @@ import {
   type CreateDepartmentInput,
   type CreateEmployeeInput,
   type CreateEmployeeProjectSiteAssignmentInput,
-  type CreateExternalProjectManagerAccountInput,
+  type CreateExternalProjectSiteAccountInput,
   type CreateUserAccountInput,
   type DepartmentDto,
   type EmployeeDto,
   type EmployeeProjectSiteAssignmentDto,
-  type ExternalProjectManagerAccountDto,
+  type ExternalProjectSiteAccountDto,
   type ProjectSiteDto,
   type MvpRoleCode,
-  type UpdateExternalProjectManagerAccountInput,
+  type UpdateExternalProjectSiteAccountInput,
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
@@ -27,19 +27,19 @@ type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
   loadEmployees?: () => Promise<EmployeeDto[]>;
   loadUserAccounts?: () => Promise<UserAccountDto[]>;
-  loadExternalProjectManagerAccounts?: () => Promise<ExternalProjectManagerAccountDto[]>;
+  loadExternalProjectSiteAccounts?: () => Promise<ExternalProjectSiteAccountDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadProjectSiteAssignments?: () => Promise<EmployeeProjectSiteAssignmentDto[]>;
   createDepartment?: (input: CreateDepartmentInput) => Promise<DepartmentDto>;
   createEmployee?: (input: CreateEmployeeInput) => Promise<EmployeeDto>;
   createUserAccount?: (input: CreateUserAccountInput) => Promise<UserAccountDto>;
-  createExternalProjectManagerAccount?: (
-    input: CreateExternalProjectManagerAccountInput,
-  ) => Promise<ExternalProjectManagerAccountDto>;
-  updateExternalProjectManagerAccount?: (
+  createExternalProjectSiteAccount?: (
+    input: CreateExternalProjectSiteAccountInput,
+  ) => Promise<ExternalProjectSiteAccountDto>;
+  updateExternalProjectSiteAccount?: (
     id: string,
-    input: UpdateExternalProjectManagerAccountInput,
-  ) => Promise<ExternalProjectManagerAccountDto>;
+    input: UpdateExternalProjectSiteAccountInput,
+  ) => Promise<ExternalProjectSiteAccountDto>;
   createProjectSiteAssignment?: (
     input: CreateEmployeeProjectSiteAssignmentInput,
   ) => Promise<EmployeeProjectSiteAssignmentDto>;
@@ -67,11 +67,11 @@ async function defaultLoadUserAccounts(): Promise<UserAccountDto[]> {
   return payload.userAccounts;
 }
 
-async function defaultLoadExternalProjectManagerAccounts(): Promise<ExternalProjectManagerAccountDto[]> {
-  const payload = await requestJson<{ externalProjectManagerAccounts: ExternalProjectManagerAccountDto[] }>(
-    `${apiBaseUrl}/api/external-project-manager-accounts`,
+async function defaultLoadExternalProjectSiteAccounts(): Promise<ExternalProjectSiteAccountDto[]> {
+  const payload = await requestJson<{ externalProjectSiteAccounts: ExternalProjectSiteAccountDto[] }>(
+    `${apiBaseUrl}/api/external-project-site-accounts`,
   );
-  return payload.externalProjectManagerAccounts;
+  return payload.externalProjectSiteAccounts;
 }
 
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
@@ -110,31 +110,31 @@ async function defaultCreateUserAccount(input: CreateUserAccountInput): Promise<
   return payload.userAccount;
 }
 
-async function defaultCreateExternalProjectManagerAccount(
-  input: CreateExternalProjectManagerAccountInput,
-): Promise<ExternalProjectManagerAccountDto> {
-  const payload = await requestJson<{ externalProjectManagerAccount: ExternalProjectManagerAccountDto }>(
-    `${apiBaseUrl}/api/external-project-manager-accounts`,
+async function defaultCreateExternalProjectSiteAccount(
+  input: CreateExternalProjectSiteAccountInput,
+): Promise<ExternalProjectSiteAccountDto> {
+  const payload = await requestJson<{ externalProjectSiteAccount: ExternalProjectSiteAccountDto }>(
+    `${apiBaseUrl}/api/external-project-site-accounts`,
     {
       method: "POST",
       body: JSON.stringify(input),
     },
   );
-  return payload.externalProjectManagerAccount;
+  return payload.externalProjectSiteAccount;
 }
 
-async function defaultUpdateExternalProjectManagerAccount(
+async function defaultUpdateExternalProjectSiteAccount(
   id: string,
-  input: UpdateExternalProjectManagerAccountInput,
-): Promise<ExternalProjectManagerAccountDto> {
-  const payload = await requestJson<{ externalProjectManagerAccount: ExternalProjectManagerAccountDto }>(
-    `${apiBaseUrl}/api/external-project-manager-accounts/${id}`,
+  input: UpdateExternalProjectSiteAccountInput,
+): Promise<ExternalProjectSiteAccountDto> {
+  const payload = await requestJson<{ externalProjectSiteAccount: ExternalProjectSiteAccountDto }>(
+    `${apiBaseUrl}/api/external-project-site-accounts/${id}`,
     {
       method: "PATCH",
       body: JSON.stringify(input),
     },
   );
-  return payload.externalProjectManagerAccount;
+  return payload.externalProjectSiteAccount;
 }
 
 async function defaultCreateProjectSiteAssignment(
@@ -154,21 +154,21 @@ export function PeoplePermissionsWorkspace({
   loadDepartments = defaultLoadDepartments,
   loadEmployees = defaultLoadEmployees,
   loadUserAccounts = defaultLoadUserAccounts,
-  loadExternalProjectManagerAccounts = defaultLoadExternalProjectManagerAccounts,
+  loadExternalProjectSiteAccounts = defaultLoadExternalProjectSiteAccounts,
   loadProjectSites = defaultLoadProjectSites,
   loadProjectSiteAssignments = defaultLoadProjectSiteAssignments,
   createDepartment = defaultCreateDepartment,
   createEmployee = defaultCreateEmployee,
   createUserAccount = defaultCreateUserAccount,
-  createExternalProjectManagerAccount = defaultCreateExternalProjectManagerAccount,
-  updateExternalProjectManagerAccount = defaultUpdateExternalProjectManagerAccount,
+  createExternalProjectSiteAccount = defaultCreateExternalProjectSiteAccount,
+  updateExternalProjectSiteAccount = defaultUpdateExternalProjectSiteAccount,
   createProjectSiteAssignment = defaultCreateProjectSiteAssignment,
   canManage = true,
 }: PeoplePermissionsWorkspaceProps) {
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [userAccounts, setUserAccounts] = useState<UserAccountDto[]>([]);
-  const [externalProjectManagerAccounts, setExternalProjectManagerAccounts] = useState<ExternalProjectManagerAccountDto[]>([]);
+  const [externalProjectSiteAccounts, setExternalProjectSiteAccounts] = useState<ExternalProjectSiteAccountDto[]>([]);
   const [projectSites, setProjectSites] = useState<ProjectSiteDto[]>([]);
   const [projectSiteAssignments, setProjectSiteAssignments] = useState<EmployeeProjectSiteAssignmentDto[]>([]);
   const [departmentStatus, setDepartmentStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -205,10 +205,10 @@ export function PeoplePermissionsWorkspace({
     relationType: "assigned",
     isPrimary: false,
   });
-  const [externalAccountForm, setExternalAccountForm] = useState<CreateExternalProjectManagerAccountInput>({
+  const [externalAccountForm, setExternalAccountForm] = useState<CreateExternalProjectSiteAccountInput>({
     projectSiteId: "",
-    managerName: "",
-    managerPhone: "",
+    currentContactName: "",
+    currentContactPhone: "",
     username: "",
     initialPassword: "",
     status: "active",
@@ -310,10 +310,10 @@ export function PeoplePermissionsWorkspace({
   useEffect(() => {
     let mounted = true;
     setExternalAccountStatus("loading");
-    loadExternalProjectManagerAccounts()
+    loadExternalProjectSiteAccounts()
       .then((nextAccounts) => {
         if (!mounted) return;
-        setExternalProjectManagerAccounts(nextAccounts);
+        setExternalProjectSiteAccounts(nextAccounts);
         setExternalAccountStatus("ready");
       })
       .catch(() => {
@@ -323,7 +323,7 @@ export function PeoplePermissionsWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadExternalProjectManagerAccounts]);
+  }, [loadExternalProjectSiteAccounts]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredDepartments = useMemo(() => {
@@ -350,14 +350,14 @@ export function PeoplePermissionsWorkspace({
         .some((value) => value!.toLowerCase().includes(normalizedQuery)),
     );
   }, [normalizedQuery, userAccounts]);
-  const filteredExternalProjectManagerAccounts = useMemo(() => {
-    if (!normalizedQuery) return externalProjectManagerAccounts;
-    return externalProjectManagerAccounts.filter((account) =>
-      [account.username, account.managerName, account.managerPhone, account.siteCode, account.siteName, account.subcontractorPartyName]
+  const filteredExternalProjectSiteAccounts = useMemo(() => {
+    if (!normalizedQuery) return externalProjectSiteAccounts;
+    return externalProjectSiteAccounts.filter((account) =>
+      [account.username, account.currentContactName, account.currentContactPhone, account.siteCode, account.siteName, account.subcontractorPartyName]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(normalizedQuery)),
     );
-  }, [externalProjectManagerAccounts, normalizedQuery]);
+  }, [externalProjectSiteAccounts, normalizedQuery]);
   const filteredProjectSiteAssignments = useMemo(() => {
     if (!normalizedQuery) return projectSiteAssignments;
     return projectSiteAssignments.filter((assignment) =>
@@ -421,15 +421,15 @@ export function PeoplePermissionsWorkspace({
     event.preventDefault();
     setExternalAccountSubmit("saving");
     try {
-      const created = await createExternalProjectManagerAccount(externalAccountForm);
-      setExternalProjectManagerAccounts((current) => [
+      const created = await createExternalProjectSiteAccount(externalAccountForm);
+      setExternalProjectSiteAccounts((current) => [
         created,
         ...current.filter((account) => account.id !== created.id),
       ]);
       setExternalAccountForm({
         projectSiteId: projectSites[0]?.id || "",
-        managerName: "",
-        managerPhone: "",
+        currentContactName: "",
+        currentContactPhone: "",
         username: "",
         initialPassword: "",
         status: "active",
@@ -440,14 +440,14 @@ export function PeoplePermissionsWorkspace({
     }
   }
 
-  async function deactivateExternalAccount(account: ExternalProjectManagerAccountDto) {
+  async function deactivateExternalAccount(account: ExternalProjectSiteAccountDto) {
     setExternalAccountSubmit("saving");
     try {
-      const updated = await updateExternalProjectManagerAccount(account.id, {
+      const updated = await updateExternalProjectSiteAccount(account.id, {
         status: "disabled",
         endDate: new Date().toISOString().slice(0, 10),
       });
-      setExternalProjectManagerAccounts((current) => [
+      setExternalProjectSiteAccounts((current) => [
         updated,
         ...current.filter((candidate) => candidate.id !== updated.id),
       ]);
@@ -504,7 +504,7 @@ export function PeoplePermissionsWorkspace({
         <SummaryItem label="部门" value={departments.length} />
         <SummaryItem label="在职员工" value={employees.filter((employee) => employee.employmentStatus === "active").length} />
         <SummaryItem label="启用账号" value={userAccounts.filter((account) => account.status === "active").length} />
-        <SummaryItem label="外部经理" value={externalProjectManagerAccounts.filter((account) => account.status === "active").length} />
+        <SummaryItem label="外部账号" value={externalProjectSiteAccounts.filter((account) => account.status === "active").length} />
         <SummaryItem label="Admin账号" value={userAccounts.filter((account) => account.roles.includes("admin")).length} />
       </div>
 
@@ -532,15 +532,15 @@ export function PeoplePermissionsWorkspace({
 
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<KeyRound size={18} />} title="项目点外部项目经理账号" />
-          {externalAccountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载外部项目经理账号..." /> : null}
-          {externalAccountStatus === "error" ? <StateMessage text="外部项目经理账号加载失败" /> : null}
-          {externalAccountStatus === "ready" && filteredExternalProjectManagerAccounts.length === 0 ? (
-            <StateMessage text="暂无外部项目经理账号" />
+          <PanelTitle icon={<KeyRound size={18} />} title="项目点外部账号管理" />
+          {externalAccountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点外部账号..." /> : null}
+          {externalAccountStatus === "error" ? <StateMessage text="项目点外部账号加载失败" /> : null}
+          {externalAccountStatus === "ready" && filteredExternalProjectSiteAccounts.length === 0 ? (
+            <StateMessage text="暂无项目点外部账号" />
           ) : null}
-          {externalAccountStatus === "ready" && filteredExternalProjectManagerAccounts.length > 0 ? (
-            <ExternalProjectManagerAccountsTable
-              accounts={filteredExternalProjectManagerAccounts}
+          {externalAccountStatus === "ready" && filteredExternalProjectSiteAccounts.length > 0 ? (
+            <ExternalProjectSiteAccountsTable
+              accounts={filteredExternalProjectSiteAccounts}
               canManage={canManage}
               saving={externalAccountSubmit === "saving"}
               onDeactivate={deactivateExternalAccount}
@@ -548,15 +548,20 @@ export function PeoplePermissionsWorkspace({
           ) : null}
         </section>
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleExternalAccountSubmit}>
-          <FormHeader title="新增外部项目经理账号" buttonText="保存外部账号" saving={externalAccountSubmit === "saving"} />
+          <FormHeader title="新增项目点外部账号" buttonText="保存外部账号" saving={externalAccountSubmit === "saving"} />
           <label>
             <span>外部账号项目点</span>
             <select
               required
               value={externalAccountForm.projectSiteId}
-              onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, projectSiteId: event.target.value }))
-              }
+              onChange={(event) => {
+                const site = projectSites.find((item) => item.id === event.target.value);
+                setExternalAccountForm((current) => ({
+                  ...current,
+                  projectSiteId: event.target.value,
+                  username: current.username || site?.siteCode || "",
+                }));
+              }}
             >
               <option value="">请选择项目点</option>
               {projectSites.map((site) => (
@@ -567,12 +572,12 @@ export function PeoplePermissionsWorkspace({
             </select>
           </label>
           <label>
-            <span>项目经理姓名</span>
+            <span>当前联系人</span>
             <input
               required
-              value={externalAccountForm.managerName}
+              value={externalAccountForm.currentContactName}
               onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, managerName: event.target.value }))
+                setExternalAccountForm((current) => ({ ...current, currentContactName: event.target.value }))
               }
             />
           </label>
@@ -580,9 +585,9 @@ export function PeoplePermissionsWorkspace({
             <span>手机号</span>
             <input
               required
-              value={externalAccountForm.managerPhone}
+              value={externalAccountForm.currentContactPhone}
               onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, managerPhone: event.target.value }))
+                setExternalAccountForm((current) => ({ ...current, currentContactPhone: event.target.value }))
               }
             />
           </label>
@@ -617,7 +622,7 @@ export function PeoplePermissionsWorkspace({
               }
             />
           </label>
-          {externalAccountSubmit === "error" ? <p className="form-error">保存失败，请检查账号是否重复或项目点是否已有启用外部经理。</p> : null}
+          {externalAccountSubmit === "error" ? <p className="form-error">保存失败，请检查账号是否重复或项目点是否已有启用外部账号。</p> : null}
         </form> : null}
       </section>
 
@@ -925,16 +930,16 @@ function UserAccountsTable({ userAccounts }: { userAccounts: UserAccountDto[] })
   );
 }
 
-function ExternalProjectManagerAccountsTable({
+function ExternalProjectSiteAccountsTable({
   accounts,
   canManage,
   saving,
   onDeactivate,
 }: {
-  accounts: ExternalProjectManagerAccountDto[];
+  accounts: ExternalProjectSiteAccountDto[];
   canManage: boolean;
   saving: boolean;
-  onDeactivate: (account: ExternalProjectManagerAccountDto) => void;
+  onDeactivate: (account: ExternalProjectSiteAccountDto) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -942,7 +947,7 @@ function ExternalProjectManagerAccountsTable({
         <thead>
           <tr>
             <th>项目点</th>
-            <th>项目经理</th>
+            <th>当前联系人</th>
             <th>手机号</th>
             <th>登录账号</th>
             <th>外包方</th>
@@ -957,8 +962,8 @@ function ExternalProjectManagerAccountsTable({
               <td>
                 {account.siteCode} {account.siteName}
               </td>
-              <td>{account.managerName}</td>
-              <td>{account.managerPhone}</td>
+              <td>{account.currentContactName}</td>
+              <td>{account.currentContactPhone}</td>
               <td>{account.username}</td>
               <td>{account.subcontractorPartyName || "-"}</td>
               <td>

@@ -30,7 +30,7 @@ describe("metadata API", () => {
         { code: "project_site", label: "项目点", description: "项目点相关记录和领用处理" },
         { code: "marketing", label: "市场", description: "客户、商机和项目前期资料交接" },
         { code: "operations", label: "运营", description: "项目执行、库存数量查看和领用申请" },
-        { code: "external_project_manager", label: "外部项目经理", description: "外包项目点领用申请提交与状态查看" },
+        { code: "external_project_site", label: "项目点外部账号", description: "外部项目点领用申请提交与状态查看" },
         { code: "viewer", label: "只读", description: "内部只读访问" },
       ],
     });
@@ -55,7 +55,7 @@ describe("metadata API", () => {
         employees: { manage: ["admin", "hr"] },
         businessProjects: { manage: ["admin", "procurement"] },
         inventoryQuantity: { read: expect.arrayContaining(["operations"]) },
-        projectUsageRequest: { manage: ["admin", "operations", "project_site", "external_project_manager"] },
+        projectUsageRequest: { manage: ["admin", "operations", "project_site", "external_project_site"] },
         userAccounts: { manage: ["admin"] },
         roleAssignment: { manage: ["admin"] },
       },

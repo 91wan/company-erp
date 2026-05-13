@@ -6,7 +6,7 @@ export type MvpRoleCode =
   | "project_site"
   | "marketing"
   | "operations"
-  | "external_project_manager"
+  | "external_project_site"
   | "viewer";
 
 export type MvpRole = {
@@ -49,8 +49,8 @@ export type AuthenticatedUserDto = {
   employeeId?: string | null;
   employeeNo?: string | null;
   employeeName?: string | null;
-  externalProjectManagerName?: string | null;
-  externalProjectManagerPhone?: string | null;
+  externalProjectSiteContactName?: string | null;
+  externalProjectSiteContactPhone?: string | null;
   roles: readonly MvpRoleCode[];
   assignedProjectSiteIds?: readonly string[];
   lastLoginAt?: string | null;
@@ -119,6 +119,7 @@ export type BusinessProjectStatusCode =
 
 export type CertificateTypeCode =
   | "person_health_cert"
+  | "employer_liability_insurance"
   | "business_license"
   | "food_operation_license"
   | "project_site_license"
@@ -168,6 +169,14 @@ export type ReplenishmentSuggestionStatusCode = "open" | "converted" | "dismisse
 export type ProjectSiteServiceModeCode = "direct" | "subcontracted";
 
 export type ProjectSiteStatusCode = "preparing" | "active" | "paused" | "ended";
+
+export type ProjectSiteRosterWorkerTypeCode = "direct_site_staff" | "subcontractor_site_staff";
+
+export type ProjectSiteRosterStatusCode = "active" | "left";
+
+export type ProjectSitePayrollRequirementStatusCode = "not_required" | "required";
+
+export type ProjectSiteComplianceReviewStatusCode = "pending" | "approved" | "rejected";
 
 export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
 
@@ -428,9 +437,9 @@ export type UserAccountDto = {
   employeeId?: string | null;
   employeeNo?: string | null;
   employeeName?: string | null;
-  externalProjectManagerAccountId?: string | null;
-  externalProjectManagerName?: string | null;
-  externalProjectManagerPhone?: string | null;
+  externalProjectSiteAccountId?: string | null;
+  externalProjectSiteContactName?: string | null;
+  externalProjectSiteContactPhone?: string | null;
   externalProjectSiteId?: string | null;
   externalProjectSiteName?: string | null;
   username: string;
@@ -486,7 +495,7 @@ export type UpdateUserAccountInput = {
   roles?: readonly MvpRoleCode[];
 };
 
-export type ExternalProjectManagerAccountDto = {
+export type ExternalProjectSiteAccountDto = {
   id: string;
   userAccountId: string;
   username: string;
@@ -496,8 +505,8 @@ export type ExternalProjectManagerAccountDto = {
   siteName: string;
   subcontractorPartyId?: string | null;
   subcontractorPartyName?: string | null;
-  managerName: string;
-  managerPhone: string;
+  currentContactName: string;
+  currentContactPhone: string;
   status: UserAccountStatusCode;
   startDate?: string | null;
   endDate?: string | null;
@@ -506,11 +515,11 @@ export type ExternalProjectManagerAccountDto = {
   updatedAt: string;
 };
 
-export type CreateExternalProjectManagerAccountInput = {
+export type CreateExternalProjectSiteAccountInput = {
   projectSiteId: string;
   subcontractorPartyId?: string | null;
-  managerName: string;
-  managerPhone: string;
+  currentContactName: string;
+  currentContactPhone: string;
   username: string;
   initialPassword: string;
   status?: UserAccountStatusCode;
@@ -519,11 +528,11 @@ export type CreateExternalProjectManagerAccountInput = {
   remark?: string | null;
 };
 
-export type UpdateExternalProjectManagerAccountInput = {
+export type UpdateExternalProjectSiteAccountInput = {
   projectSiteId?: string;
   subcontractorPartyId?: string | null;
-  managerName?: string;
-  managerPhone?: string;
+  currentContactName?: string;
+  currentContactPhone?: string;
   username?: string;
   resetPassword?: string;
   status?: UserAccountStatusCode;
@@ -808,6 +817,9 @@ export type CertificateRecordDto = {
   ownerType: CertificateOwnerTypeCode;
   ownerEmployeeId?: string | null;
   ownerEmployeeName?: string | null;
+  ownerRosterPersonId?: string | null;
+  ownerRosterPersonName?: string | null;
+  ownerRosterPersonProjectSiteId?: string | null;
   ownerProjectSiteId?: string | null;
   ownerProjectSiteName?: string | null;
   ownerPartyId?: string | null;
@@ -843,6 +855,7 @@ export type CreateCertificateRecordInput = {
   certificateType: CertificateTypeCode;
   ownerType: CertificateOwnerTypeCode;
   ownerEmployeeId?: string | null;
+  ownerRosterPersonId?: string | null;
   ownerProjectSiteId?: string | null;
   ownerPartyId?: string | null;
   ownerNameSnapshot: string;
@@ -947,6 +960,7 @@ export type ProjectSiteDto = {
   siteAddress?: string | null;
   serviceType?: string | null;
   status: ProjectSiteStatusCode;
+  payrollAgencyRequired: boolean;
   startDate?: string | null;
   endDate?: string | null;
   primaryManagerEmployeeId?: string | null;
@@ -972,6 +986,7 @@ export type CreateProjectSiteInput = {
   siteAddress?: string | null;
   serviceType?: string | null;
   status?: ProjectSiteStatusCode;
+  payrollAgencyRequired?: boolean;
   startDate?: string | null;
   endDate?: string | null;
   primaryManagerEmployeeId?: string | null;
@@ -983,6 +998,89 @@ export type CreateProjectSiteInput = {
 };
 
 export type UpdateProjectSiteInput = Partial<CreateProjectSiteInput>;
+
+export type ProjectSiteRosterPersonDto = {
+  id: string;
+  projectSiteId: string;
+  projectSiteName?: string | null;
+  personName: string;
+  phone?: string | null;
+  identityNoLast4?: string | null;
+  workerType: ProjectSiteRosterWorkerTypeCode;
+  jobRole?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status: ProjectSiteRosterStatusCode;
+  sourceAttachmentPath?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectSiteEmployerLiabilityInsurancePolicyDto = {
+  id: string;
+  projectSiteId: string;
+  projectSiteName?: string | null;
+  policyNo: string;
+  insurerName: string;
+  startDate: string;
+  endDate: string;
+  attachmentPath?: string | null;
+  reviewStatus: ProjectSiteComplianceReviewStatusCode;
+  reviewedByEmployeeId?: string | null;
+  reviewedByEmployeeName?: string | null;
+  reviewedAt?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto = {
+  id: string;
+  policyId: string;
+  rosterPersonId?: string | null;
+  rosterPersonName?: string | null;
+  coveredNameSnapshot: string;
+  identityNoLast4Snapshot?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectSitePayrollSubmissionDto = {
+  id: string;
+  projectSiteId: string;
+  projectSiteName?: string | null;
+  payrollMonth: string;
+  attachmentPath: string;
+  submittedBy?: string | null;
+  submittedAt: string;
+  reviewStatus: ProjectSiteComplianceReviewStatusCode;
+  reviewedByEmployeeId?: string | null;
+  reviewedByEmployeeName?: string | null;
+  reviewedAt?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectSiteComplianceSummaryDto = {
+  projectSiteId: string;
+  projectSiteName: string;
+  payrollAgencyRequired: boolean;
+  activeRosterCount: number;
+  missingHealthCertificateCount: number;
+  expiringHealthCertificateCount: number;
+  expiredHealthCertificateCount: number;
+  insuranceUncoveredActiveRosterCount: number;
+  insuranceExpiringSoonCount: number;
+  insuranceExpiredCount: number;
+  foodOperationLicenseStatus: CertificateComputedStatusCode | "missing" | "not_applicable";
+  payrollCurrentMonthStatus?: ProjectSiteComplianceReviewStatusCode | "missing" | "not_required" | null;
+  blockingIssueCount: number;
+  warningIssueCount: number;
+  generatedAt: string;
+};
 
 export type ProjectUsageRequestDto = {
   id: string;
@@ -1177,7 +1275,7 @@ export const MVP_ROLES = [
   { code: "project_site", label: "项目点", description: "项目点相关记录和领用处理" },
   { code: "marketing", label: "市场", description: "客户、商机和项目前期资料交接" },
   { code: "operations", label: "运营", description: "项目执行、库存数量查看和领用申请" },
-  { code: "external_project_manager", label: "外部项目经理", description: "外包项目点领用申请提交与状态查看" },
+  { code: "external_project_site", label: "项目点外部账号", description: "外部项目点领用申请提交与状态查看" },
   { code: "viewer", label: "只读", description: "内部只读访问" },
 ] as const satisfies readonly MvpRole[];
 
@@ -1292,6 +1390,7 @@ export const BUSINESS_PROJECT_STATUSES = [
 
 export const CERTIFICATE_TYPES = [
   { code: "person_health_cert", label: "人员健康证" },
+  { code: "employer_liability_insurance", label: "雇主责任险" },
   { code: "business_license", label: "营业执照" },
   { code: "food_operation_license", label: "食品经营许可证" },
   { code: "project_site_license", label: "项目点许可证" },
@@ -1373,6 +1472,27 @@ export const PROJECT_SITE_STATUSES = [
   { code: "paused", label: "暂停" },
   { code: "ended", label: "已结束" },
 ] as const satisfies readonly StatusMeta<ProjectSiteStatusCode>[];
+
+export const PROJECT_SITE_ROSTER_WORKER_TYPES = [
+  { code: "direct_site_staff", label: "直营现场人员" },
+  { code: "subcontractor_site_staff", label: "外包现场人员" },
+] as const satisfies readonly StatusMeta<ProjectSiteRosterWorkerTypeCode>[];
+
+export const PROJECT_SITE_ROSTER_STATUSES = [
+  { code: "active", label: "在场" },
+  { code: "left", label: "已离场" },
+] as const satisfies readonly StatusMeta<ProjectSiteRosterStatusCode>[];
+
+export const PROJECT_SITE_PAYROLL_REQUIREMENT_STATUSES = [
+  { code: "not_required", label: "不代发工资" },
+  { code: "required", label: "代发工资" },
+] as const satisfies readonly StatusMeta<ProjectSitePayrollRequirementStatusCode>[];
+
+export const PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES = [
+  { code: "pending", label: "待审核" },
+  { code: "approved", label: "已通过" },
+  { code: "rejected", label: "已驳回" },
+] as const satisfies readonly StatusMeta<ProjectSiteComplianceReviewStatusCode>[];
 
 export const PROJECT_USAGE_STATUSES = [
   { code: "pending", label: "待处理" },
@@ -1493,12 +1613,12 @@ export const MVP_PERMISSION_MATRIX = {
     manage: ["admin", "hr"],
   },
   projectUsage: {
-    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_manager", "viewer"],
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_site", "viewer"],
     manage: ["admin", "project_site"],
   },
   projectUsageRequest: {
-    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_manager", "viewer"],
-    manage: ["admin", "operations", "project_site", "external_project_manager"],
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_site", "viewer"],
+    manage: ["admin", "operations", "project_site", "external_project_site"],
   },
   marketOperationsHandoffs: {
     read: ["admin", "marketing", "operations"],

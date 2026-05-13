@@ -47,15 +47,15 @@ type DashboardShellProps = {
 type WorkspaceKey = (typeof navigationItems)[number]["label"];
 
 export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
-  const isExternalProjectManagerOnly =
-    currentUser.roles.length === 1 && currentUser.roles[0] === "external_project_manager";
+  const isExternalProjectSiteOnly =
+    currentUser.roles.length === 1 && currentUser.roles[0] === "external_project_site";
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
-    isExternalProjectManagerOnly ? "项目点" : "Dashboard",
+    isExternalProjectSiteOnly ? "项目点" : "Dashboard",
   );
   const isProjectSiteOnly =
     currentUser.roles.length === 1 &&
-    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_manager");
-  const visibleNavigationItems = isExternalProjectManagerOnly
+    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_site");
+  const visibleNavigationItems = isExternalProjectSiteOnly
     ? navigationItems.filter((item) => item.label === "项目点")
     : navigationItems;
   const isReadOnly = !(
@@ -106,7 +106,7 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
               canManageSites={canManage(currentUser.roles, "projectSites")}
               canManageUsage={canManage(currentUser.roles, "projectUsageRequest")}
               canIssue={canManage(currentUser.roles, "inventory")}
-              usageOnly={isExternalProjectManagerOnly}
+              usageOnly={isExternalProjectSiteOnly}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}

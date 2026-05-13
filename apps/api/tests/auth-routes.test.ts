@@ -176,6 +176,29 @@ describe("auth API", () => {
     expect(logout.cookies[0]).toMatchObject({ name: "company_erp_session", value: "" });
   });
 
+  it("rejects sessions issued before the account password changed", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const account = makeAuthAccount({
+      passwordHash,
+      passwordChangedAt: "2026-05-11T10:00:00.000Z",
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([account]),
+    });
+
+    const staleToken = createSessionToken(
+      account.id,
+      "test-secret",
+      12 * 60 * 60,
+      Math.floor(new Date("2026-05-11T09:59:00.000Z").getTime() / 1000),
+    );
+    const response = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: staleToken } });
+    await app.close();
+
+    expect(response.json()).toEqual({ user: null });
+  });
+
   it("guards business routes by fixed role permissions while keeping meta routes public", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const app = buildApp({

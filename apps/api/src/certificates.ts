@@ -204,6 +204,7 @@ export function normalizeCertificateInput(
 
   for (const field of [
     "ownerEmployeeId",
+    "ownerRosterPersonId",
     "ownerProjectSiteId",
     "ownerPartyId",
     "certificateNumber",
@@ -238,12 +239,22 @@ export function normalizeCertificateInput(
   if (isComplianceCritical !== undefined) normalized.isComplianceCritical = isComplianceCritical;
   if (isDisabled !== undefined) normalized.isDisabled = isDisabled;
 
-  const ownerLinks = [normalized.ownerEmployeeId, normalized.ownerProjectSiteId, normalized.ownerPartyId].filter(Boolean);
+  const ownerLinks = [
+    normalized.ownerEmployeeId,
+    normalized.ownerRosterPersonId,
+    normalized.ownerProjectSiteId,
+    normalized.ownerPartyId,
+  ].filter(Boolean);
   if (ownerLinks.length > 1) issues.push("exactly one owner link is allowed when owner link fields are provided");
 
   if (normalized.ownerType === "person" && normalized.ownerProjectSiteId) issues.push("person certificates cannot link a project site as owner");
-  if (normalized.ownerType === "project_site" && normalized.ownerEmployeeId) issues.push("project_site certificates cannot link an employee as owner");
-  if ((normalized.ownerType === "supplier" || normalized.ownerType === "company") && (normalized.ownerEmployeeId || normalized.ownerProjectSiteId)) {
+  if (normalized.ownerType === "project_site" && (normalized.ownerEmployeeId || normalized.ownerRosterPersonId)) {
+    issues.push("project_site certificates cannot link a person as owner");
+  }
+  if (
+    (normalized.ownerType === "supplier" || normalized.ownerType === "company") &&
+    (normalized.ownerEmployeeId || normalized.ownerRosterPersonId || normalized.ownerProjectSiteId)
+  ) {
     issues.push("supplier and company certificates can only link a party owner");
   }
   if (normalized.ownerType === "person" && normalized.ownerPartyId) issues.push("person certificates cannot link a party owner");

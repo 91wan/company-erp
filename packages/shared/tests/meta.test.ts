@@ -30,6 +30,10 @@ import {
   PARTY_TYPES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
+  PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES,
+  PROJECT_SITE_PAYROLL_REQUIREMENT_STATUSES,
+  PROJECT_SITE_ROSTER_STATUSES,
+  PROJECT_SITE_ROSTER_WORKER_TYPES,
   PROJECT_USAGE_STATUSES,
   PURCHASE_RECORD_STATUSES,
   PURCHASE_REQUEST_STATUSES,
@@ -53,7 +57,7 @@ describe("MVP role constants", () => {
       "project_site",
       "marketing",
       "operations",
-      "external_project_manager",
+      "external_project_site",
       "viewer",
     ]);
   });
@@ -263,13 +267,13 @@ describe("MVP permission constants", () => {
     expect(canManage(["admin"], "projectUsage")).toBe(true);
   });
 
-  it("limits external project managers to project usage request work", () => {
-    expect(canRead(["external_project_manager"], "projectUsage")).toBe(true);
-    expect(canManage(["external_project_manager"], "projectUsageRequest")).toBe(true);
-    expect(canRead(["external_project_manager"], "projectSites")).toBe(false);
-    expect(canRead(["external_project_manager"], "contracts")).toBe(false);
-    expect(canRead(["external_project_manager"], "inventoryQuantity")).toBe(false);
-    expect(canRead(["external_project_manager"], "masterData")).toBe(false);
+  it("limits external project-site accounts to project usage request work", () => {
+    expect(canRead(["external_project_site"], "projectUsage")).toBe(true);
+    expect(canManage(["external_project_site"], "projectUsageRequest")).toBe(true);
+    expect(canRead(["external_project_site"], "projectSites")).toBe(false);
+    expect(canRead(["external_project_site"], "contracts")).toBe(false);
+    expect(canRead(["external_project_site"], "inventoryQuantity")).toBe(false);
+    expect(canRead(["external_project_site"], "masterData")).toBe(false);
   });
 
   it("defines certificates as an HR/admin managed risk ledger", () => {
@@ -300,7 +304,7 @@ describe("MVP permission constants", () => {
     expect(canRead(["operations"], "businessProjects")).toBe(true);
     expect(canManage(["procurement"], "businessProjects")).toBe(true);
     expect(canRead(["project_site"], "businessProjects")).toBe(false);
-    expect(canRead(["external_project_manager"], "businessProjects")).toBe(false);
+    expect(canRead(["external_project_site"], "businessProjects")).toBe(false);
   });
 });
 
@@ -308,6 +312,7 @@ describe("certificate dictionaries", () => {
   it("defines certificate type, owner, validity, and computed status dictionaries", () => {
     expect(CERTIFICATE_TYPES.map((type) => type.code)).toEqual([
       "person_health_cert",
+      "employer_liability_insurance",
       "business_license",
       "food_operation_license",
       "project_site_license",
@@ -339,6 +344,25 @@ describe("certificate dictionaries", () => {
       "review_due",
       "archived",
       "disabled",
+    ]);
+  });
+});
+
+describe("project-site compliance dictionaries", () => {
+  it("defines roster, payroll, and headquarters review constants", () => {
+    expect(PROJECT_SITE_ROSTER_WORKER_TYPES.map((type) => type.code)).toEqual([
+      "direct_site_staff",
+      "subcontractor_site_staff",
+    ]);
+    expect(PROJECT_SITE_ROSTER_STATUSES.map((status) => status.code)).toEqual(["active", "left"]);
+    expect(PROJECT_SITE_PAYROLL_REQUIREMENT_STATUSES.map((status) => status.code)).toEqual([
+      "not_required",
+      "required",
+    ]);
+    expect(PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES.map((status) => status.code)).toEqual([
+      "pending",
+      "approved",
+      "rejected",
     ]);
   });
 });

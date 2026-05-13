@@ -47,6 +47,7 @@ export type AuthenticatedRequest = FastifyRequest & {
 
 type SessionPayload = {
   sub: string;
+  iat: number;
   exp: number;
 };
 
@@ -68,13 +69,23 @@ export function createSessionToken(
   accountId: string,
   secret: string,
   ttlSeconds = DEFAULT_SESSION_TTL_SECONDS,
+  issuedAtSeconds = Math.floor(Date.now() / 1000),
 ): string {
   const payload: SessionPayload = {
     sub: accountId,
-    exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+    iat: issuedAtSeconds,
+    exp: issuedAtSeconds + ttlSeconds,
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   return `${encodedPayload}.${sign(encodedPayload, secret)}`;
+}
+
+function getSessionIssuedAtForAccount(account: AuthAccountRecord): number {
+  const now = Math.floor(Date.now() / 1000);
+  if (!account.passwordChangedAt) return now;
+
+  const passwordChangedAt = Math.floor(new Date(account.passwordChangedAt).getTime() / 1000);
+  return Number.isFinite(passwordChangedAt) ? Math.max(now, passwordChangedAt) : now;
 }
 
 function verifySessionToken(token: string, secret: string): SessionPayload | null {
@@ -85,8 +96,9 @@ function verifySessionToken(token: string, secret: string): SessionPayload | nul
   try {
     const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as Partial<SessionPayload>;
     if (!payload.sub || typeof payload.sub !== "string") return null;
+    if (typeof payload.iat !== "number") return null;
     if (typeof payload.exp !== "number" || payload.exp <= Math.floor(Date.now() / 1000)) return null;
-    return { sub: payload.sub, exp: payload.exp };
+    return { sub: payload.sub, iat: payload.iat, exp: payload.exp };
   } catch {
     return null;
   }
@@ -131,8 +143,8 @@ function toAuthenticatedUser(account: AuthAccountRecord): AuthenticatedUserDto {
     employeeId: account.employeeId ?? null,
     employeeNo: account.employeeNo ?? null,
     employeeName: account.employeeName ?? null,
-    externalProjectManagerName: account.externalProjectManagerName ?? null,
-    externalProjectManagerPhone: account.externalProjectManagerPhone ?? null,
+    externalProjectSiteContactName: account.externalProjectSiteContactName ?? null,
+    externalProjectSiteContactPhone: account.externalProjectSiteContactPhone ?? null,
     roles: [...account.roles].sort(),
     assignedProjectSiteIds: [...(account.assignedProjectSiteIds ?? [])].sort(),
     lastLoginAt: account.lastLoginAt ?? null,
@@ -170,6 +182,10 @@ async function resolveSessionUser(
   if (!payload) return null;
   const account = await authRepository.findById(payload.sub);
   if (!account || !accountCanLogin(account)) return null;
+  if (account.passwordChangedAt) {
+    const passwordChangedAt = Math.floor(new Date(account.passwordChangedAt).getTime() / 1000);
+    if (Number.isFinite(passwordChangedAt) && payload.iat < passwordChangedAt) return null;
+  }
   return toAuthenticatedUser(account);
 }
 
@@ -181,7 +197,7 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/departments")) return { area: "departments", requiredLevel };
   if (pathname.startsWith("/api/employees")) return { area: "employees", requiredLevel };
   if (pathname.startsWith("/api/user-accounts")) return { area: "userAccounts", requiredLevel };
-  if (pathname.startsWith("/api/external-project-manager-accounts")) return { area: "userAccounts", requiredLevel };
+  if (pathname.startsWith("/api/external-project-site-accounts")) return { area: "userAccounts", requiredLevel };
   if (pathname.startsWith("/api/project-site-assignments")) return { area: "employees", requiredLevel };
   if (pathname.startsWith("/api/purchase-requests") || pathname.startsWith("/api/purchase-records") || pathname.startsWith("/api/replenishment-suggestions")) {
     return { area: "procurement", requiredLevel };
@@ -211,6 +227,15 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   }
   if (pathname.startsWith("/api/contracts") || pathname.startsWith("/api/contract-attachments")) {
     return { area: "contracts", requiredLevel };
+  }
+  if (
+    pathname.startsWith("/api/project-site-roster-persons") ||
+    pathname.startsWith("/api/employer-liability-insurance-policies") ||
+    pathname.startsWith("/api/employer-liability-insurance-covered-persons") ||
+    pathname.startsWith("/api/project-site-payroll-submissions") ||
+    pathname.includes("/compliance-summary")
+  ) {
+    return { area: "certificates", requiredLevel };
   }
   if (pathname.startsWith("/api/certificates")) {
     return { area: "certificates", requiredLevel };
@@ -285,7 +310,7 @@ export function registerAuth(
     await authRepository.updateLastLogin(account.id, new Date());
     const refreshed = await authRepository.findById(account.id);
     const user = toAuthenticatedUser(refreshed ?? account);
-    const token = createSessionToken(account.id, secret, ttlSeconds);
+    const token = createSessionToken(account.id, secret, ttlSeconds, getSessionIssuedAtForAccount(refreshed ?? account));
     reply.header(
       "Set-Cookie",
       serializeCookie(AUTH_COOKIE_NAME, token, {

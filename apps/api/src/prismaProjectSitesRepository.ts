@@ -1,8 +1,14 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type {
+  CertificateComputedStatusCode,
   CreateProjectSiteInput,
+  ProjectSiteComplianceSummaryDto,
+  ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
   CreateProjectUsageRequestInput,
   ContractInvestmentCategoryCode,
+  ProjectSitePayrollSubmissionDto,
+  ProjectSiteRosterPersonDto,
   IssueProjectUsageRequestInput,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
@@ -10,13 +16,22 @@ import type {
   UpdateProjectSiteInput,
   UpdateProjectUsageRequestInput,
 } from "@company-erp/shared";
+import { getCertificateComputedStatus } from "./certificates.js";
 import {
+  type CreateProjectSiteInsuranceCoveredPersonInput,
+  type CreateProjectSiteInsurancePolicyInput,
+  type CreateProjectSitePayrollSubmissionInput,
+  type CreateProjectSiteRosterPersonInput,
   ProjectSiteConflictError,
   ProjectSiteValidationError,
   ProjectUsageRequestConflictError,
   ProjectUsageRequestValidationError,
+  type ProjectSiteComplianceRepository,
+  type ProjectSiteInsurancePolicyListFilters,
   type ProjectSiteListFilters,
+  type ProjectSitePayrollSubmissionListFilters,
   type ProjectSiteRepository,
+  type ProjectSiteRosterPersonListFilters,
   type ProjectUsageRequestListFilters,
   type ProjectUsageRequestRepository,
 } from "./projectSites.js";
@@ -67,6 +82,24 @@ const usageInclude = {
   material: true,
 };
 
+const rosterPersonInclude = {
+  projectSite: true,
+};
+
+const insurancePolicyInclude = {
+  projectSite: true,
+  reviewedByEmployee: true,
+};
+
+const coveredPersonInclude = {
+  rosterPerson: true,
+};
+
+const payrollSubmissionInclude = {
+  projectSite: true,
+  reviewedByEmployee: true,
+};
+
 function toProjectSiteDto(site: any): ProjectSiteDto {
   return {
     id: site.id,
@@ -85,6 +118,7 @@ function toProjectSiteDto(site: any): ProjectSiteDto {
     siteAddress: site.siteAddress,
     serviceType: site.serviceType,
     status: site.status,
+    payrollAgencyRequired: site.payrollAgencyRequired,
     startDate: dateToString(site.startDate),
     endDate: dateToString(site.endDate),
     primaryManagerEmployeeId: site.primaryManagerEmployeeId,
@@ -137,6 +171,79 @@ function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
   };
 }
 
+function toRosterPersonDto(person: any): ProjectSiteRosterPersonDto {
+  return {
+    id: person.id,
+    projectSiteId: person.projectSiteId,
+    projectSiteName: person.projectSite?.siteName ?? null,
+    personName: person.personName,
+    phone: person.phone,
+    identityNoLast4: person.identityNoLast4,
+    workerType: person.workerType,
+    jobRole: person.jobRole,
+    startDate: dateToString(person.startDate),
+    endDate: dateToString(person.endDate),
+    status: person.status,
+    sourceAttachmentPath: person.sourceAttachmentPath,
+    remark: person.remark,
+    createdAt: timestampToString(person.createdAt),
+    updatedAt: timestampToString(person.updatedAt),
+  };
+}
+
+function toInsurancePolicyDto(policy: any): ProjectSiteEmployerLiabilityInsurancePolicyDto {
+  return {
+    id: policy.id,
+    projectSiteId: policy.projectSiteId,
+    projectSiteName: policy.projectSite?.siteName ?? null,
+    policyNo: policy.policyNo,
+    insurerName: policy.insurerName,
+    startDate: dateToString(policy.startDate) ?? "",
+    endDate: dateToString(policy.endDate) ?? "",
+    attachmentPath: policy.attachmentPath,
+    reviewStatus: policy.reviewStatus,
+    reviewedByEmployeeId: policy.reviewedByEmployeeId,
+    reviewedByEmployeeName: policy.reviewedByEmployee?.name ?? null,
+    reviewedAt: policy.reviewedAt?.toISOString() ?? null,
+    remark: policy.remark,
+    createdAt: timestampToString(policy.createdAt),
+    updatedAt: timestampToString(policy.updatedAt),
+  };
+}
+
+function toCoveredPersonDto(person: any): ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto {
+  return {
+    id: person.id,
+    policyId: person.policyId,
+    rosterPersonId: person.rosterPersonId,
+    rosterPersonName: person.rosterPerson?.personName ?? null,
+    coveredNameSnapshot: person.coveredNameSnapshot,
+    identityNoLast4Snapshot: person.identityNoLast4Snapshot,
+    remark: person.remark,
+    createdAt: timestampToString(person.createdAt),
+    updatedAt: timestampToString(person.updatedAt),
+  };
+}
+
+function toPayrollSubmissionDto(submission: any): ProjectSitePayrollSubmissionDto {
+  return {
+    id: submission.id,
+    projectSiteId: submission.projectSiteId,
+    projectSiteName: submission.projectSite?.siteName ?? null,
+    payrollMonth: submission.payrollMonth,
+    attachmentPath: submission.attachmentPath,
+    submittedBy: submission.submittedBy,
+    submittedAt: timestampToString(submission.submittedAt),
+    reviewStatus: submission.reviewStatus,
+    reviewedByEmployeeId: submission.reviewedByEmployeeId,
+    reviewedByEmployeeName: submission.reviewedByEmployee?.name ?? null,
+    reviewedAt: submission.reviewedAt?.toISOString() ?? null,
+    remark: submission.remark,
+    createdAt: timestampToString(submission.createdAt),
+    updatedAt: timestampToString(submission.updatedAt),
+  };
+}
+
 function optionalRelation(id: string | null | undefined): Record<string, unknown> | undefined {
   if (id === undefined) return undefined;
   return id ? { connect: { id } } : { disconnect: true };
@@ -159,6 +266,7 @@ function toSiteCreateData(input: CreateProjectSiteInput): Record<string, unknown
     siteAddress: input.siteAddress,
     serviceType: input.serviceType,
     status: input.status ?? "active",
+    payrollAgencyRequired: input.payrollAgencyRequired ?? false,
     startDate: nullableDate(input.startDate),
     endDate: nullableDate(input.endDate),
     primaryManager: optionalCreateRelation(input.primaryManagerEmployeeId),
@@ -188,6 +296,7 @@ function toSiteUpdateData(input: UpdateProjectSiteInput): Record<string, unknown
     ...(input.siteAddress !== undefined ? { siteAddress: input.siteAddress } : {}),
     ...(input.serviceType !== undefined ? { serviceType: input.serviceType } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.payrollAgencyRequired !== undefined ? { payrollAgencyRequired: input.payrollAgencyRequired } : {}),
     ...(input.startDate !== undefined ? { startDate: nullableDate(input.startDate) } : {}),
     ...(input.endDate !== undefined ? { endDate: nullableDate(input.endDate) } : {}),
     ...(input.primaryManagerEmployeeId !== undefined
@@ -356,6 +465,84 @@ function calculateChargeSnapshot(material: any, quantity: number) {
   };
 }
 
+function rosterWhere(filters: ProjectSiteRosterPersonListFilters): Record<string, unknown> {
+  return {
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+  };
+}
+
+function insurancePolicyWhere(filters: ProjectSiteInsurancePolicyListFilters): Record<string, unknown> {
+  return {
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+  };
+}
+
+function payrollSubmissionWhere(filters: ProjectSitePayrollSubmissionListFilters): Record<string, unknown> {
+  return {
+    ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
+    ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+    ...(filters.payrollMonth ? { payrollMonth: filters.payrollMonth } : {}),
+  };
+}
+
+function mapComplianceError(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const targets = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : "";
+      if (targets.includes("policy_no")) throw new ProjectSiteValidationError(["policyNo already exists"]);
+      if (targets.includes("project_site_id") && targets.includes("payroll_month")) {
+        throw new ProjectSiteValidationError(["payroll submission for this month already exists"]);
+      }
+    }
+    if (error.code === "P2003" || error.code === "P2025") {
+      throw new ProjectSiteValidationError(["Referenced project site, roster person, policy, or employee was not found"]);
+    }
+  }
+  throw error;
+}
+
+function dayNumber(value: Date | string | null | undefined): number | null {
+  const date = dateToString(value);
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00.000Z`).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function daysFromToday(value: Date | string | null | undefined, now = new Date()): number | null {
+  const target = dayNumber(value);
+  if (target === null) return null;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.floor((target - today) / 86_400_000);
+}
+
+function certificateDtoForStatus(record: any) {
+  return {
+    isDisabled: record.isDisabled,
+    validityType: record.validityType,
+    expiryDate: dateToString(record.expiryDate),
+    nextReviewDate: dateToString(record.nextReviewDate),
+    reminderDays: record.reminderDays,
+  };
+}
+
+function summarizeFoodLicense(records: any[], now: Date): CertificateComputedStatusCode | "missing" {
+  const statuses = records
+    .filter((record) => !record.isDisabled)
+    .map((record) => getCertificateComputedStatus(certificateDtoForStatus(record), now));
+  if (statuses.length === 0) return "missing";
+  if (statuses.includes("expired")) return "expired";
+  if (statuses.includes("expiring_soon")) return "expiring_soon";
+  if (statuses.includes("valid")) return "valid";
+  return statuses[0] ?? "missing";
+}
+
+function currentPayrollMonth(now = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 export function createPrismaProjectSiteRepository(prisma: PrismaClient): ProjectSiteRepository {
   const client = prisma as AnyPrisma;
 
@@ -440,6 +627,233 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
         mapSiteError(error);
       }
+    },
+  };
+}
+
+export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient): ProjectSiteComplianceRepository {
+  const client = prisma as AnyPrisma;
+
+  return {
+    async listRosterPeople(filters: ProjectSiteRosterPersonListFilters) {
+      const people = await client.projectSiteRosterPerson.findMany({
+        where: rosterWhere(filters),
+        include: rosterPersonInclude,
+        orderBy: [{ status: "asc" }, { personName: "asc" }],
+      });
+      return people.map(toRosterPersonDto);
+    },
+    async createRosterPerson(input: CreateProjectSiteRosterPersonInput) {
+      try {
+        const person = await client.projectSiteRosterPerson.create({
+          data: {
+            projectSite: { connect: { id: input.projectSiteId } },
+            personName: input.personName,
+            phone: input.phone,
+            identityNoLast4: input.identityNoLast4,
+            workerType: input.workerType,
+            jobRole: input.jobRole,
+            startDate: nullableDate(input.startDate),
+            endDate: nullableDate(input.endDate),
+            status: input.status ?? "active",
+            sourceAttachmentPath: input.sourceAttachmentPath,
+            remark: input.remark,
+          },
+          include: rosterPersonInclude,
+        });
+        return toRosterPersonDto(person);
+      } catch (error) {
+        mapComplianceError(error);
+      }
+    },
+    async listInsurancePolicies(filters: ProjectSiteInsurancePolicyListFilters) {
+      const policies = await client.projectSiteEmployerLiabilityInsurancePolicy.findMany({
+        where: insurancePolicyWhere(filters),
+        include: insurancePolicyInclude,
+        orderBy: [{ endDate: "asc" }, { updatedAt: "desc" }],
+      });
+      return policies.map(toInsurancePolicyDto);
+    },
+    async createInsurancePolicy(input: CreateProjectSiteInsurancePolicyInput) {
+      try {
+        const policy = await client.projectSiteEmployerLiabilityInsurancePolicy.create({
+          data: {
+            projectSite: { connect: { id: input.projectSiteId } },
+            policyNo: input.policyNo,
+            insurerName: input.insurerName,
+            startDate: new Date(`${input.startDate}T00:00:00.000Z`),
+            endDate: new Date(`${input.endDate}T00:00:00.000Z`),
+            attachmentPath: input.attachmentPath,
+            reviewStatus: input.reviewStatus ?? "pending",
+            remark: input.remark,
+          },
+          include: insurancePolicyInclude,
+        });
+        return toInsurancePolicyDto(policy);
+      } catch (error) {
+        mapComplianceError(error);
+      }
+    },
+    async createCoveredPerson(input: CreateProjectSiteInsuranceCoveredPersonInput) {
+      try {
+        const person = await client.projectSiteEmployerLiabilityInsuranceCoveredPerson.create({
+          data: {
+            policy: { connect: { id: input.policyId } },
+            rosterPerson: input.rosterPersonId ? { connect: { id: input.rosterPersonId } } : undefined,
+            coveredNameSnapshot: input.coveredNameSnapshot,
+            identityNoLast4Snapshot: input.identityNoLast4Snapshot,
+            remark: input.remark,
+          },
+          include: coveredPersonInclude,
+        });
+        return toCoveredPersonDto(person);
+      } catch (error) {
+        mapComplianceError(error);
+      }
+    },
+    async listPayrollSubmissions(filters: ProjectSitePayrollSubmissionListFilters) {
+      const submissions = await client.projectSitePayrollSubmission.findMany({
+        where: payrollSubmissionWhere(filters),
+        include: payrollSubmissionInclude,
+        orderBy: [{ payrollMonth: "desc" }, { updatedAt: "desc" }],
+      });
+      return submissions.map(toPayrollSubmissionDto);
+    },
+    async createPayrollSubmission(input: CreateProjectSitePayrollSubmissionInput) {
+      try {
+        const submission = await client.projectSitePayrollSubmission.create({
+          data: {
+            projectSite: { connect: { id: input.projectSiteId } },
+            payrollMonth: input.payrollMonth,
+            attachmentPath: input.attachmentPath,
+            submittedBy: input.submittedBy,
+            reviewStatus: input.reviewStatus ?? "pending",
+            remark: input.remark,
+          },
+          include: payrollSubmissionInclude,
+        });
+        return toPayrollSubmissionDto(submission);
+      } catch (error) {
+        mapComplianceError(error);
+      }
+    },
+    async getComplianceSummary(projectSiteId: string) {
+      const now = new Date();
+      const site = await client.projectSite.findUnique({ where: { id: projectSiteId } });
+      if (!site) return null;
+
+      const activeRosterPeople = await client.projectSiteRosterPerson.findMany({
+        where: { projectSiteId, status: "active" },
+        select: { id: true },
+      });
+      const activeRosterIds = activeRosterPeople.map((person: { id: string }) => person.id);
+
+      const [healthCertificates, policies, foodLicenses, payrollSubmission] = await Promise.all([
+        activeRosterIds.length === 0
+          ? Promise.resolve([])
+          : client.certificateRecord.findMany({
+              where: {
+                certificateType: "person_health_cert",
+                ownerRosterPersonId: { in: activeRosterIds },
+              },
+            }),
+        client.projectSiteEmployerLiabilityInsurancePolicy.findMany({
+          where: { projectSiteId },
+          include: { coveredPeople: true },
+        }),
+        client.certificateRecord.findMany({
+          where: {
+            certificateType: "food_operation_license",
+            ownerType: "project_site",
+            ownerProjectSiteId: projectSiteId,
+          },
+        }),
+        site.payrollAgencyRequired
+          ? client.projectSitePayrollSubmission.findFirst({
+              where: { projectSiteId, payrollMonth: currentPayrollMonth(now) },
+              orderBy: { updatedAt: "desc" },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      const healthByRoster = new Map<string, any[]>();
+      for (const certificate of healthCertificates) {
+        if (!certificate.ownerRosterPersonId || certificate.isDisabled) continue;
+        const existing = healthByRoster.get(certificate.ownerRosterPersonId) ?? [];
+        existing.push(certificate);
+        healthByRoster.set(certificate.ownerRosterPersonId, existing);
+      }
+
+      let missingHealthCertificateCount = 0;
+      let expiringHealthCertificateCount = 0;
+      let expiredHealthCertificateCount = 0;
+      for (const rosterPersonId of activeRosterIds) {
+        const certificates = healthByRoster.get(rosterPersonId) ?? [];
+        if (certificates.length === 0) {
+          missingHealthCertificateCount += 1;
+          continue;
+        }
+        const statuses = certificates.map((certificate) => getCertificateComputedStatus(certificateDtoForStatus(certificate), now));
+        if (statuses.includes("expired")) expiredHealthCertificateCount += 1;
+        if (statuses.includes("expiring_soon")) expiringHealthCertificateCount += 1;
+      }
+
+      const coveredRosterIds = new Set<string>();
+      let insuranceExpiringSoonCount = 0;
+      let insuranceExpiredCount = 0;
+      for (const policy of policies) {
+        const daysToStart = daysFromToday(policy.startDate, now);
+        const daysToEnd = daysFromToday(policy.endDate, now);
+        if (daysToEnd !== null && daysToEnd < 0) {
+          insuranceExpiredCount += 1;
+          continue;
+        }
+        if (daysToEnd !== null && daysToEnd <= 30) insuranceExpiringSoonCount += 1;
+        const isCurrentlyValid =
+          policy.reviewStatus !== "rejected" &&
+          (daysToStart === null || daysToStart <= 0) &&
+          (daysToEnd === null || daysToEnd >= 0);
+        if (!isCurrentlyValid) continue;
+        for (const coveredPerson of policy.coveredPeople ?? []) {
+          if (coveredPerson.rosterPersonId) coveredRosterIds.add(coveredPerson.rosterPersonId);
+        }
+      }
+
+      const insuranceUncoveredActiveRosterCount = activeRosterIds.filter((id) => !coveredRosterIds.has(id)).length;
+      const foodOperationLicenseStatus = summarizeFoodLicense(foodLicenses, now);
+      const payrollCurrentMonthStatus = site.payrollAgencyRequired
+        ? payrollSubmission?.reviewStatus ?? "missing"
+        : "not_required";
+
+      const blockingIssueCount =
+        missingHealthCertificateCount +
+        expiredHealthCertificateCount +
+        insuranceUncoveredActiveRosterCount +
+        insuranceExpiredCount +
+        (foodOperationLicenseStatus === "missing" || foodOperationLicenseStatus === "expired" ? 1 : 0) +
+        (payrollCurrentMonthStatus === "missing" ? 1 : 0);
+      const warningIssueCount =
+        expiringHealthCertificateCount +
+        insuranceExpiringSoonCount +
+        (foodOperationLicenseStatus === "expiring_soon" ? 1 : 0);
+
+      return {
+        projectSiteId: site.id,
+        projectSiteName: site.siteName,
+        payrollAgencyRequired: site.payrollAgencyRequired,
+        activeRosterCount: activeRosterIds.length,
+        missingHealthCertificateCount,
+        expiringHealthCertificateCount,
+        expiredHealthCertificateCount,
+        insuranceUncoveredActiveRosterCount,
+        insuranceExpiringSoonCount,
+        insuranceExpiredCount,
+        foodOperationLicenseStatus,
+        payrollCurrentMonthStatus,
+        blockingIssueCount,
+        warningIssueCount,
+        generatedAt: now.toISOString(),
+      } satisfies ProjectSiteComplianceSummaryDto;
     },
   };
 }

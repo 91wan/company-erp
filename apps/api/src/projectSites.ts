@@ -1,12 +1,23 @@
 import {
+  PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES,
+  PROJECT_SITE_ROSTER_STATUSES,
+  PROJECT_SITE_ROSTER_WORKER_TYPES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
   type CreateProjectSiteInput,
   type CreateProjectUsageRequestInput,
   type IssueProjectUsageRequestInput,
+  type ProjectSiteComplianceReviewStatusCode,
+  type ProjectSiteComplianceSummaryDto,
+  type ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
+  type ProjectSiteEmployerLiabilityInsurancePolicyDto,
   type ProjectSiteDto,
   type ProjectSiteInvestmentSummaryDto,
+  type ProjectSitePayrollSubmissionDto,
+  type ProjectSiteRosterPersonDto,
+  type ProjectSiteRosterStatusCode,
+  type ProjectSiteRosterWorkerTypeCode,
   type ProjectSiteServiceModeCode,
   type ProjectSiteStatusCode,
   type ProjectUsageRequestDto,
@@ -36,12 +47,82 @@ export type ProjectUsageRequestListFilters = {
   dateTo?: string;
 };
 
+export type ProjectSiteRosterPersonListFilters = {
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+  status?: ProjectSiteRosterStatusCode;
+};
+
+export type ProjectSiteInsurancePolicyListFilters = {
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+};
+
+export type ProjectSitePayrollSubmissionListFilters = {
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+  payrollMonth?: string;
+};
+
+export type CreateProjectSiteRosterPersonInput = {
+  projectSiteId: string;
+  personName: string;
+  phone?: string | null;
+  identityNoLast4?: string | null;
+  workerType: ProjectSiteRosterWorkerTypeCode;
+  jobRole?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status?: ProjectSiteRosterStatusCode;
+  sourceAttachmentPath?: string | null;
+  remark?: string | null;
+};
+
+export type CreateProjectSiteInsurancePolicyInput = {
+  projectSiteId: string;
+  policyNo: string;
+  insurerName: string;
+  startDate: string;
+  endDate: string;
+  attachmentPath?: string | null;
+  reviewStatus?: ProjectSiteComplianceReviewStatusCode;
+  remark?: string | null;
+};
+
+export type CreateProjectSiteInsuranceCoveredPersonInput = {
+  policyId: string;
+  rosterPersonId?: string | null;
+  coveredNameSnapshot: string;
+  identityNoLast4Snapshot?: string | null;
+  remark?: string | null;
+};
+
+export type CreateProjectSitePayrollSubmissionInput = {
+  projectSiteId: string;
+  payrollMonth: string;
+  attachmentPath: string;
+  submittedBy?: string | null;
+  reviewStatus?: ProjectSiteComplianceReviewStatusCode;
+  remark?: string | null;
+};
+
 export type ProjectSiteRepository = {
   list(filters: ProjectSiteListFilters): Promise<ProjectSiteDto[]>;
   getById(id: string): Promise<ProjectSiteDto | null>;
   getInvestmentSummary(id: string): Promise<ProjectSiteInvestmentSummaryDto | null>;
   create(input: CreateProjectSiteInput): Promise<ProjectSiteDto>;
   update(id: string, input: UpdateProjectSiteInput): Promise<ProjectSiteDto | null>;
+};
+
+export type ProjectSiteComplianceRepository = {
+  listRosterPeople(filters: ProjectSiteRosterPersonListFilters): Promise<ProjectSiteRosterPersonDto[]>;
+  createRosterPerson(input: CreateProjectSiteRosterPersonInput): Promise<ProjectSiteRosterPersonDto>;
+  listInsurancePolicies(filters: ProjectSiteInsurancePolicyListFilters): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto[]>;
+  createInsurancePolicy(input: CreateProjectSiteInsurancePolicyInput): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto>;
+  createCoveredPerson(input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto>;
+  listPayrollSubmissions(filters: ProjectSitePayrollSubmissionListFilters): Promise<ProjectSitePayrollSubmissionDto[]>;
+  createPayrollSubmission(input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto>;
+  getComplianceSummary(projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null>;
 };
 
 export type ProjectUsageRequestRepository = {
@@ -83,6 +164,9 @@ export class ProjectUsageRequestValidationError extends Error {
 const siteStatuses = new Set(PROJECT_SITE_STATUSES.map((status) => status.code));
 const serviceModes = new Set(PROJECT_SITE_SERVICE_MODES.map((mode) => mode.code));
 const usageStatuses = new Set(PROJECT_USAGE_STATUSES.map((status) => status.code));
+const rosterStatuses = new Set(PROJECT_SITE_ROSTER_STATUSES.map((status) => status.code));
+const rosterWorkerTypes = new Set(PROJECT_SITE_ROSTER_WORKER_TYPES.map((type) => type.code));
+const complianceReviewStatuses = new Set(PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES.map((status) => status.code));
 
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -122,6 +206,14 @@ function normalizeOptionalDate(value: unknown, field: string, issues: string[]):
   return value.trim();
 }
 
+function normalizeBoolean(value: unknown, field: string, issues: string[]): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  issues.push(`${field} must be boolean`);
+  return undefined;
+}
+
 export function normalizeProjectSiteFilters(query: Record<string, unknown>): ProjectSiteListFilters {
   const filters: ProjectSiteListFilters = {};
 
@@ -145,6 +237,184 @@ export function normalizeProjectSiteFilters(query: Record<string, unknown>): Pro
 
   return filters;
 }
+
+export function normalizeProjectSiteRosterPersonFilters(query: Record<string, unknown>): ProjectSiteRosterPersonListFilters {
+  const issues: string[] = [];
+  const filters: ProjectSiteRosterPersonListFilters = {};
+
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  if (query.status !== undefined) {
+    if (typeof query.status === "string" && rosterStatuses.has(query.status as ProjectSiteRosterStatusCode)) {
+      filters.status = query.status as ProjectSiteRosterStatusCode;
+    } else {
+      issues.push("status filter is unsupported");
+    }
+  }
+
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return filters;
+}
+
+export function normalizeProjectSiteInsurancePolicyFilters(query: Record<string, unknown>): ProjectSiteInsurancePolicyListFilters {
+  const filters: ProjectSiteInsurancePolicyListFilters = {};
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  return filters;
+}
+
+export function normalizeProjectSitePayrollSubmissionFilters(query: Record<string, unknown>): ProjectSitePayrollSubmissionListFilters {
+  const issues: string[] = [];
+  const filters: ProjectSitePayrollSubmissionListFilters = {};
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  if (query.payrollMonth !== undefined) {
+    if (typeof query.payrollMonth === "string" && /^\d{4}-\d{2}$/.test(query.payrollMonth.trim())) {
+      filters.payrollMonth = query.payrollMonth.trim();
+    } else {
+      issues.push("payrollMonth filter must be YYYY-MM");
+    }
+  }
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return filters;
+}
+
+export function normalizeProjectSiteRosterPersonInput(input: unknown): CreateProjectSiteRosterPersonInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const projectSiteId = normalizeRequiredString(payload.projectSiteId, "projectSiteId", issues);
+  const personName = normalizeRequiredString(payload.personName, "personName", issues);
+  const workerType =
+    typeof payload.workerType === "string" && rosterWorkerTypes.has(payload.workerType as ProjectSiteRosterWorkerTypeCode)
+      ? (payload.workerType as ProjectSiteRosterWorkerTypeCode)
+      : undefined;
+  if (!workerType) issues.push("workerType is unsupported");
+
+  const startDate = normalizeOptionalDate(payload.startDate, "startDate", issues);
+  const endDate = normalizeOptionalDate(payload.endDate, "endDate", issues);
+  const status =
+    payload.status === undefined
+      ? "active"
+      : typeof payload.status === "string" && rosterStatuses.has(payload.status as ProjectSiteRosterStatusCode)
+        ? (payload.status as ProjectSiteRosterStatusCode)
+        : undefined;
+  if (!status) issues.push("status is unsupported");
+  if (startDate && endDate && startDate > endDate) issues.push("startDate cannot be later than endDate");
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+
+  return {
+    projectSiteId: projectSiteId!,
+    personName: personName!,
+    phone: normalizeNullableString(payload.phone),
+    identityNoLast4: normalizeNullableString(payload.identityNoLast4),
+    workerType: workerType!,
+    jobRole: normalizeNullableString(payload.jobRole),
+    startDate,
+    endDate,
+    status: status!,
+    sourceAttachmentPath: normalizeNullableString(payload.sourceAttachmentPath),
+    remark: normalizeNullableString(payload.remark),
+  };
+}
+
+export function normalizeProjectSiteInsurancePolicyInput(input: unknown): CreateProjectSiteInsurancePolicyInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const projectSiteId = normalizeRequiredString(payload.projectSiteId, "projectSiteId", issues);
+  const policyNo = normalizeRequiredString(payload.policyNo, "policyNo", issues);
+  const insurerName = normalizeRequiredString(payload.insurerName, "insurerName", issues);
+  const startDate = normalizeOptionalDate(payload.startDate, "startDate", issues);
+  const endDate = normalizeOptionalDate(payload.endDate, "endDate", issues);
+  if (!startDate) issues.push("startDate is required");
+  if (!endDate) issues.push("endDate is required");
+  if (startDate && endDate && startDate > endDate) issues.push("startDate cannot be later than endDate");
+  const reviewStatus =
+    payload.reviewStatus === undefined
+      ? "pending"
+      : typeof payload.reviewStatus === "string" &&
+          complianceReviewStatuses.has(payload.reviewStatus as ProjectSiteComplianceReviewStatusCode)
+        ? (payload.reviewStatus as ProjectSiteComplianceReviewStatusCode)
+        : undefined;
+  if (!reviewStatus) issues.push("reviewStatus is unsupported");
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+
+  return {
+    projectSiteId: projectSiteId!,
+    policyNo: policyNo!,
+    insurerName: insurerName!,
+    startDate: startDate!,
+    endDate: endDate!,
+    attachmentPath: normalizeNullableString(payload.attachmentPath),
+    reviewStatus,
+    remark: normalizeNullableString(payload.remark),
+  };
+}
+
+export function normalizeProjectSiteInsuranceCoveredPersonInput(input: unknown): CreateProjectSiteInsuranceCoveredPersonInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const policyId = normalizeRequiredString(payload.policyId, "policyId", issues);
+  const coveredNameSnapshot = normalizeRequiredString(payload.coveredNameSnapshot, "coveredNameSnapshot", issues);
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return {
+    policyId: policyId!,
+    rosterPersonId: normalizeNullableString(payload.rosterPersonId),
+    coveredNameSnapshot: coveredNameSnapshot!,
+    identityNoLast4Snapshot: normalizeNullableString(payload.identityNoLast4Snapshot),
+    remark: normalizeNullableString(payload.remark),
+  };
+}
+
+export function normalizeProjectSitePayrollSubmissionInput(input: unknown): CreateProjectSitePayrollSubmissionInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const projectSiteId = normalizeRequiredString(payload.projectSiteId, "projectSiteId", issues);
+  const attachmentPath = normalizeRequiredString(payload.attachmentPath, "attachmentPath", issues);
+  const payrollMonth =
+    typeof payload.payrollMonth === "string" && /^\d{4}-\d{2}$/.test(payload.payrollMonth.trim())
+      ? payload.payrollMonth.trim()
+      : undefined;
+  if (!payrollMonth) issues.push("payrollMonth must be YYYY-MM");
+  const reviewStatus =
+    payload.reviewStatus === undefined
+      ? "pending"
+      : typeof payload.reviewStatus === "string" &&
+          complianceReviewStatuses.has(payload.reviewStatus as ProjectSiteComplianceReviewStatusCode)
+        ? (payload.reviewStatus as ProjectSiteComplianceReviewStatusCode)
+        : undefined;
+  if (!reviewStatus) issues.push("reviewStatus is unsupported");
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+
+  return {
+    projectSiteId: projectSiteId!,
+    payrollMonth: payrollMonth!,
+    attachmentPath: attachmentPath!,
+    submittedBy: normalizeNullableString(payload.submittedBy),
+    reviewStatus,
+    remark: normalizeNullableString(payload.remark),
+  };
+}
+
+export const normalizeRosterPersonFilters = normalizeProjectSiteRosterPersonFilters;
+export const normalizeRosterPersonInput = normalizeProjectSiteRosterPersonInput;
+export const normalizeInsurancePolicyFilters = normalizeProjectSiteInsurancePolicyFilters;
+export const normalizeInsurancePolicyInput = normalizeProjectSiteInsurancePolicyInput;
+export const normalizeCoveredPersonInput = normalizeProjectSiteInsuranceCoveredPersonInput;
+export const normalizePayrollSubmissionFilters = normalizeProjectSitePayrollSubmissionFilters;
+export const normalizePayrollSubmissionInput = normalizeProjectSitePayrollSubmissionInput;
 
 export function normalizeProjectUsageRequestFilters(
   query: Record<string, unknown>,
@@ -213,6 +483,9 @@ export function normalizeProjectSiteInput(
   const endDate = normalizeOptionalDate(payload.endDate, "endDate", issues);
   if (startDate !== undefined) normalized.startDate = startDate;
   if (endDate !== undefined) normalized.endDate = endDate;
+
+  const payrollAgencyRequired = normalizeBoolean(payload.payrollAgencyRequired, "payrollAgencyRequired", issues);
+  if (payrollAgencyRequired !== undefined) normalized.payrollAgencyRequired = payrollAgencyRequired;
 
   if (payload.serviceMode !== undefined) {
     if (typeof payload.serviceMode === "string" && serviceModes.has(payload.serviceMode as ProjectSiteServiceModeCode)) {

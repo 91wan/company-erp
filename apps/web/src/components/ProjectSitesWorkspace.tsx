@@ -11,6 +11,7 @@ import {
   type IssueProjectUsageRequestInput,
   type MaterialDto,
   type PartyDto,
+  type ProjectSiteComplianceSummaryDto,
   type ProjectSiteDto,
   type ProjectSiteInvestmentSummaryDto,
   type ProjectUsageOptionMaterialDto,
@@ -33,6 +34,7 @@ type ProjectSitesWorkspaceProps = {
   loadUsageOptions?: () => Promise<ProjectUsageOptionsDto>;
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
   loadInvestmentSummary?: (projectSiteId: string) => Promise<ProjectSiteInvestmentSummaryDto>;
+  loadComplianceSummary?: (projectSiteId: string) => Promise<ProjectSiteComplianceSummaryDto>;
   canManage?: boolean;
   canManageSites?: boolean;
   canManageUsage?: boolean;
@@ -89,6 +91,24 @@ const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.co
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
 const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
+const complianceComputedStatusLabel = new Map([
+  ["valid", "有效"],
+  ["expiring_soon", "即将到期"],
+  ["expired", "已过期"],
+  ["review_due_soon", "即将复核"],
+  ["review_due", "待复核"],
+  ["archived", "归档"],
+  ["disabled", "已停用"],
+  ["missing", "缺失"],
+  ["not_applicable", "不适用"],
+]);
+const complianceReviewStatusLabel = new Map([
+  ["pending", "待审核"],
+  ["approved", "已通过"],
+  ["rejected", "已驳回"],
+  ["missing", "缺失"],
+  ["not_required", "不需要"],
+]);
 
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
   const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
@@ -131,6 +151,13 @@ async function defaultLoadInvestmentSummary(projectSiteId: string): Promise<Proj
     `${apiBaseUrl}/api/project-sites/${projectSiteId}/investment-summary`,
   );
   return payload.investmentSummary;
+}
+
+async function defaultLoadComplianceSummary(projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto> {
+  const payload = await requestJson<{ complianceSummary: ProjectSiteComplianceSummaryDto }>(
+    `${apiBaseUrl}/api/project-sites/${projectSiteId}/compliance-summary`,
+  );
+  return payload.complianceSummary;
 }
 
 async function defaultCreateProjectSite(input: CreateProjectSiteInput): Promise<ProjectSiteDto> {
@@ -178,6 +205,7 @@ export function ProjectSitesWorkspace({
   loadUsageOptions = defaultLoadUsageOptions,
   loadBusinessProjects = defaultLoadBusinessProjects,
   loadInvestmentSummary = defaultLoadInvestmentSummary,
+  loadComplianceSummary = defaultLoadComplianceSummary,
   canManage = true,
   canManageSites,
   canManageUsage,
@@ -196,6 +224,8 @@ export function ProjectSitesWorkspace({
   const [selectedInvestmentSiteId, setSelectedInvestmentSiteId] = useState("");
   const [investmentSummary, setInvestmentSummary] = useState<ProjectSiteInvestmentSummaryDto | null>(null);
   const [investmentSummaryStatus, setInvestmentSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [complianceSummaries, setComplianceSummaries] = useState<Record<string, ProjectSiteComplianceSummaryDto>>({});
+  const [complianceStatus, setComplianceStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [siteStatus, setSiteStatus] = useState<"loading" | "ready" | "error">("loading");
   const [usageStatus, setUsageStatus] = useState<"loading" | "ready" | "error">("loading");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -378,6 +408,36 @@ export function ProjectSitesWorkspace({
     };
   }, [loadInvestmentSummary, selectedInvestmentSiteId, usageOnly]);
 
+  useEffect(() => {
+    if (usageOnly) {
+      setComplianceSummaries({});
+      setComplianceStatus("idle");
+      return;
+    }
+    if (sites.length === 0) {
+      setComplianceSummaries({});
+      setComplianceStatus(siteStatus === "ready" ? "ready" : "idle");
+      return;
+    }
+
+    let mounted = true;
+    setComplianceStatus("loading");
+    Promise.all(sites.map((site) => loadComplianceSummary(site.id).then((summary) => [site.id, summary] as const)))
+      .then((entries) => {
+        if (!mounted) return;
+        setComplianceSummaries(Object.fromEntries(entries));
+        setComplianceStatus("ready");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setComplianceSummaries({});
+        setComplianceStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadComplianceSummary, siteStatus, sites, usageOnly]);
+
   const filteredSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return sites.filter((site) => {
@@ -413,6 +473,14 @@ export function ProjectSitesWorkspace({
   const pendingUsageCount = usageRequests.filter((request) => request.status === "pending").length;
   const totalRequestedQuantity = usageRequests.reduce((sum, request) => sum + request.requestedQuantity, 0);
   const totalIssuedQuantity = usageRequests.reduce((sum, request) => sum + request.issuedQuantity, 0);
+  const complianceBlockingIssueCount = Object.values(complianceSummaries).reduce(
+    (sum, summary) => sum + summary.blockingIssueCount,
+    0,
+  );
+  const complianceWarningIssueCount = Object.values(complianceSummaries).reduce(
+    (sum, summary) => sum + summary.warningIssueCount,
+    0,
+  );
 
   const clientParties = parties.filter((party) => party.partyTypes.includes("client"));
   const operatorParties = parties.filter((party) => party.partyTypes.includes("operator"));
@@ -583,7 +651,60 @@ export function ProjectSitesWorkspace({
             {totalRequestedQuantity}/{totalIssuedQuantity}
           </strong>
         </article>
+        {!usageOnly ? <article>
+          <span>合规风险</span>
+          <strong>{complianceBlockingIssueCount}/{complianceWarningIssueCount}</strong>
+        </article> : null}
       </div>
+
+      {!usageOnly ? <section className="dashboard-panel table-panel" aria-label="项目点合规资料">
+        <PanelTitle icon={<ClipboardList size={16} />} title="合规资料" />
+        {complianceStatus === "loading" ? (
+          <StateMessage icon={<RefreshCw size={16} />} text="合规资料加载中" />
+        ) : complianceStatus === "error" ? (
+          <StateMessage icon={<ClipboardList size={16} />} text="合规资料加载失败" />
+        ) : filteredSites.length === 0 ? (
+          <StateMessage icon={<ClipboardList size={16} />} text="暂无合规资料" />
+        ) : (
+          <ResponsiveTable
+            headers={[
+              "项目点",
+              "现场人员名单",
+              "人员健康证",
+              "雇主责任险",
+              "食品经营许可证",
+              "人员工资表",
+              "风险",
+            ]}
+            rows={filteredSites.map((site) => {
+              const summary = complianceSummaries[site.id];
+              return [
+                `${site.siteCode} ${site.siteName}`,
+                summary ? `${summary.activeRosterCount} 人` : "-",
+                summary
+                  ? `缺 ${summary.missingHealthCertificateCount} / 临期 ${summary.expiringHealthCertificateCount} / 过期 ${summary.expiredHealthCertificateCount}`
+                  : "-",
+                summary
+                  ? `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} / 临期 ${summary.insuranceExpiringSoonCount} / 过期 ${summary.insuranceExpiredCount}`
+                  : "-",
+                summary ? (
+                  <StatusBadge key={`${site.id}-food-license`} tone={complianceStatusTone(summary.foodOperationLicenseStatus)}>
+                    {complianceComputedStatusLabel.get(summary.foodOperationLicenseStatus) ?? summary.foodOperationLicenseStatus}
+                  </StatusBadge>
+                ) : "-",
+                site.payrollAgencyRequired ? (
+                  <StatusBadge key={`${site.id}-payroll`} tone={complianceStatusTone(summary?.payrollCurrentMonthStatus ?? "missing")}>
+                    {complianceReviewStatusLabel.get(summary?.payrollCurrentMonthStatus ?? "missing") ??
+                      summary?.payrollCurrentMonthStatus ??
+                      "缺失"}
+                  </StatusBadge>
+                ) : "不需要",
+                summary ? `${summary.blockingIssueCount} 阻断 / ${summary.warningIssueCount} 提醒` : "-",
+              ];
+            })}
+          />
+        )}
+      </section> : null}
 
       <div className="party-toolbar">
         <label className="party-search">
@@ -1049,6 +1170,14 @@ function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
       {text}
     </div>
   );
+}
+
+function complianceStatusTone(status: string): "green" | "orange" | "gray" {
+  if (status === "valid" || status === "approved" || status === "not_required" || status === "not_applicable") {
+    return "green";
+  }
+  if (status === "expiring_soon" || status === "pending" || status === "review_due_soon") return "orange";
+  return "gray";
 }
 
 function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray"; children: ReactNode }) {

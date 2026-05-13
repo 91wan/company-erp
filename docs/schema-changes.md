@@ -62,15 +62,24 @@ Before creating migrations, confirm the MVP data model for:
 - Added `PartyEntityType` with `company` and `individual`.
 - Added encrypted identity-number storage for individual Parties: encrypted full value plus `identity_no_last4`; APIs expose only masked/last-four fields.
 - Confirmed `PartyType.subcontractor` remains the subcontractor identity flag for both companies and individuals, and one Party may still have multiple types such as supplier plus subcontractor.
-- Added fixed role `external_project_manager`.
-- Added `external_project_manager_accounts` as a login identity bound to one `project_site_id`, with optional `subcontractor_party_id` context.
-- Confirmed one project site can have only one active external project manager account; replacement is disabling the old account then creating a new one.
-- Confirmed external project manager accounts do not require or create internal employee records.
+- Added fixed role `external_project_site`.
+- Added `project_site_external_accounts` as a login identity bound to one `project_site_id`, with optional `subcontractor_party_id` context.
+- Confirmed one project site can have only one active project-site external account.
+- Confirmed project-site external accounts do not require or create internal employee records.
 - Added submitter audit snapshots to `project_usage_requests`: submitted account id, submitter name snapshot, and submitter phone snapshot.
-- Confirmed external project manager usage-request creation forces `project_site_id` from the authenticated account and does not trust the frontend project-site value.
+- Confirmed project-site external usage-request creation forces `project_site_id` from the authenticated account and does not trust the frontend project-site value.
 - Confirmed `/api/project-usage-options` exposes requestable material options and the Wuxi headquarters default warehouse without stock balance quantities.
 - Confirmed monthly operating reports are only reserved as permission/menu wording in this phase; no report table or fields were added.
 - Added migration `20260513143000_external_project_managers`.
+
+## 2026-05-13 Project-Site External Account Rename and Compliance Pack Boundary
+
+- Renamed the external login identity to project-site external account: `external_project_site` role, `project_site_external_accounts` table, and `current_contact_name/current_contact_phone` fields.
+- Contact replacement keeps the same project-site account but requires the new current contact name, new current contact phone, and password reset; sessions issued before `password_changed_at` are rejected.
+- Added `employer_liability_insurance` certificate type and project-site compliance dictionaries for roster worker type, roster status, payroll requirement, and headquarters review status.
+- Added `project_sites.payroll_agency_required` to reserve the optional payroll-sheet branch.
+- Added light project-site compliance API boundaries for active roster, employer liability insurance, payroll attachment, and compliance summary without forcing roster people into `employees`.
+- Added migration `20260513170000_project_site_external_accounts`.
 
 ## 2026-05-11 Purchase Source and Optional Supplier Rule
 

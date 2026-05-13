@@ -29,7 +29,8 @@ import type {
   MaterialDto,
   PartyDto,
   EmployeeProjectSiteAssignmentDto,
-  ExternalProjectManagerAccountDto,
+  ExternalProjectSiteAccountDto,
+  ProjectSiteComplianceSummaryDto,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
   ProjectUsageRequestDto,
@@ -65,16 +66,16 @@ const projectSiteUser = {
   assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
 };
 
-const externalProjectManagerUser = {
+const externalProjectSiteUser = {
   ...adminUser,
   id: "dededede-dede-4ded-8ded-dededededede",
   username: "site-manager",
   employeeId: null,
   employeeNo: null,
   employeeName: null,
-  externalProjectManagerName: "王项目",
-  externalProjectManagerPhone: "13900000000",
-  roles: ["external_project_manager"] as const,
+  externalProjectSiteContactName: "王项目",
+  externalProjectSiteContactPhone: "13900000000",
+  roles: ["external_project_site"] as const,
   assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
 };
 
@@ -91,7 +92,7 @@ function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Res
 }
 
 function mockShellFetch(
-  user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectManagerUser | null = adminUser,
+  user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectSiteUser | null = adminUser,
 ) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
@@ -106,8 +107,8 @@ function mockShellFetch(
     if (url.includes("/api/warehouses")) return Promise.resolve(jsonResponse({ warehouses: [] }));
     if (url.includes("/api/departments")) return Promise.resolve(jsonResponse({ departments: [] }));
     if (url.includes("/api/employees")) return Promise.resolve(jsonResponse({ employees: [] }));
-    if (url.includes("/api/external-project-manager-accounts")) {
-      return Promise.resolve(jsonResponse({ externalProjectManagerAccounts: [] }));
+    if (url.includes("/api/external-project-site-accounts")) {
+      return Promise.resolve(jsonResponse({ externalProjectSiteAccounts: [] }));
     }
     if (url.includes("/api/user-accounts")) return Promise.resolve(jsonResponse({ userAccounts: [] }));
     if (url.includes("/api/project-site-assignments")) return Promise.resolve(jsonResponse({ projectSiteAssignments: [] }));
@@ -259,7 +260,7 @@ const userAccount: UserAccountDto = {
   updatedAt: "2026-05-11T10:00:00.000Z",
 };
 
-const externalProjectManagerAccount: ExternalProjectManagerAccountDto = {
+const externalProjectSiteAccount: ExternalProjectSiteAccountDto = {
   id: "56565656-5656-4656-8656-565656565656",
   userAccountId: "57575757-5757-4757-8757-575757575757",
   username: "site-manager",
@@ -269,8 +270,8 @@ const externalProjectManagerAccount: ExternalProjectManagerAccountDto = {
   siteName: "科技园一期项目点",
   subcontractorPartyId: null,
   subcontractorPartyName: null,
-  managerName: "王项目",
-  managerPhone: "13900000000",
+  currentContactName: "王项目",
+  currentContactPhone: "13900000000",
   status: "active",
   startDate: "2026-05-11",
   endDate: null,
@@ -530,6 +531,7 @@ const projectSite: ProjectSiteDto = {
   siteAddress: "无锡市新吴区",
   serviceType: "园区综合服务",
   status: "active",
+  payrollAgencyRequired: false,
   startDate: "2026-05-01",
   endDate: null,
   primaryManagerEmployeeId: employee.id,
@@ -541,6 +543,24 @@ const projectSite: ProjectSiteDto = {
   remark: null,
   createdAt: "2026-05-11T13:00:00.000Z",
   updatedAt: "2026-05-11T13:00:00.000Z",
+};
+
+const projectSiteComplianceSummary: ProjectSiteComplianceSummaryDto = {
+  projectSiteId: projectSite.id,
+  projectSiteName: projectSite.siteName,
+  payrollAgencyRequired: true,
+  activeRosterCount: 12,
+  missingHealthCertificateCount: 1,
+  expiringHealthCertificateCount: 2,
+  expiredHealthCertificateCount: 1,
+  insuranceUncoveredActiveRosterCount: 1,
+  insuranceExpiringSoonCount: 1,
+  insuranceExpiredCount: 0,
+  foodOperationLicenseStatus: "expiring_soon",
+  payrollCurrentMonthStatus: "pending",
+  blockingIssueCount: 3,
+  warningIssueCount: 4,
+  generatedAt: "2026-05-13T12:00:00.000Z",
 };
 
 const businessProject: BusinessProjectDto = {
@@ -847,7 +867,7 @@ describe("Company ERP app shell", () => {
   });
 
   it("shows external project managers only the usage request workspace", async () => {
-    const fetchMock = mockShellFetch(externalProjectManagerUser);
+    const fetchMock = mockShellFetch(externalProjectSiteUser);
 
     render(<App />);
 
@@ -1056,7 +1076,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([userAccount])}
-        loadExternalProjectManagerAccounts={() => Promise.resolve([externalProjectManagerAccount])}
+        loadExternalProjectSiteAccounts={() => Promise.resolve([externalProjectSiteAccount])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([projectSiteAssignment])}
       />,
@@ -1066,7 +1086,7 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("部门管理")).toBeInTheDocument();
     expect(screen.getByText("员工台账")).toBeInTheDocument();
     expect(screen.getByText("账号角色")).toBeInTheDocument();
-    expect(screen.getByText("项目点外部项目经理账号")).toBeInTheDocument();
+    expect(screen.getByText("项目点外部账号管理")).toBeInTheDocument();
     expect(screen.getByText("项目点分配")).toBeInTheDocument();
     expect(screen.getByText("权限矩阵")).toBeInTheDocument();
     expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
@@ -1280,6 +1300,33 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("¥260,000.00")).toBeInTheDocument();
     expect(screen.getByText("USE20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
+  });
+
+  it("renders project-site compliance pack summary", async () => {
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([{ ...projectSite, payrollAgencyRequired: true }])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+      />,
+    );
+
+    expect(await screen.findByText("合规资料")).toBeInTheDocument();
+    expect(screen.getByText("现场人员名单")).toBeInTheDocument();
+    expect(screen.getByText("雇主责任险")).toBeInTheDocument();
+    expect(screen.getByText("人员健康证")).toBeInTheDocument();
+    expect(screen.getByText("食品经营许可证")).toBeInTheDocument();
+    expect(screen.getByText("人员工资表")).toBeInTheDocument();
+    expect(await screen.findByText("12 人")).toBeInTheDocument();
+    expect(screen.getByText("缺 1 / 临期 2 / 过期 1")).toBeInTheDocument();
+    expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
+    expect(screen.getByText("即将到期")).toBeInTheDocument();
+    expect(screen.getByText("待审核")).toBeInTheDocument();
   });
 
   it("renders project site empty and error states", async () => {
@@ -1854,7 +1901,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([])}
         loadEmployees={() => Promise.resolve([])}
         loadUserAccounts={() => Promise.resolve([])}
-        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
+        loadExternalProjectSiteAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
       />,
@@ -1863,7 +1910,7 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无员工资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无账号资料")).toBeInTheDocument();
-    expect(await screen.findByText("暂无外部项目经理账号")).toBeInTheDocument();
+    expect(await screen.findByText("暂无项目点外部账号")).toBeInTheDocument();
     expect(await screen.findByText("暂无项目点分配")).toBeInTheDocument();
 
     rerender(
@@ -1871,7 +1918,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.reject(new Error("offline"))}
         loadEmployees={() => Promise.reject(new Error("offline"))}
         loadUserAccounts={() => Promise.reject(new Error("offline"))}
-        loadExternalProjectManagerAccounts={() => Promise.reject(new Error("offline"))}
+        loadExternalProjectSiteAccounts={() => Promise.reject(new Error("offline"))}
         loadProjectSites={() => Promise.reject(new Error("offline"))}
         loadProjectSiteAssignments={() => Promise.reject(new Error("offline"))}
       />,
@@ -1880,7 +1927,7 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("员工资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("账号资料加载失败")).toBeInTheDocument();
-    expect(await screen.findByText("外部项目经理账号加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("项目点外部账号加载失败")).toBeInTheDocument();
     expect(await screen.findByText("项目点分配加载失败")).toBeInTheDocument();
   });
 
@@ -1889,11 +1936,11 @@ describe("Company ERP app shell", () => {
     const createdEmployee = { ...employee, employeeNo: "EMP0002", name: "李四", username: null, accountStatus: null };
     const createdAccount = { ...userAccount, username: "lisi", employeeNo: "EMP0002", employeeName: "李四", roles: ["viewer"] as const };
     const createdExternalAccount = {
-      ...externalProjectManagerAccount,
+      ...externalProjectSiteAccount,
       id: "58585858-5858-4858-8858-585858585858",
       username: "site-new",
-      managerName: "赵项目",
-      managerPhone: "13811112222",
+      currentContactName: "赵项目",
+      currentContactPhone: "13811112222",
     };
     const createdAssignment = { ...projectSiteAssignment, id: "24242424-2424-4242-8242-242424242424" };
 
@@ -1902,13 +1949,13 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
-        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
+        loadExternalProjectSiteAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.resolve(createdDepartment)}
         createEmployee={() => Promise.resolve(createdEmployee)}
         createUserAccount={() => Promise.resolve(createdAccount)}
-        createExternalProjectManagerAccount={() => Promise.resolve(createdExternalAccount)}
+        createExternalProjectSiteAccount={() => Promise.resolve(createdExternalAccount)}
         createProjectSiteAssignment={() => Promise.resolve(createdAssignment)}
       />,
     );
@@ -1926,7 +1973,7 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
 
-    fireEvent.change(screen.getByLabelText("项目经理姓名"), { target: { value: "赵项目" } });
+    fireEvent.change(screen.getByLabelText("当前联系人"), { target: { value: "赵项目" } });
     fireEvent.change(screen.getByLabelText("手机号"), { target: { value: "13811112222" } });
     fireEvent.change(screen.getByLabelText("外部登录账号"), { target: { value: "site-new" } });
     fireEvent.change(screen.getByLabelText("外部初始密码"), { target: { value: "ChangeMe123!" } });
@@ -1953,7 +2000,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
-        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
+        loadExternalProjectSiteAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.reject(new Error("duplicate department"))}

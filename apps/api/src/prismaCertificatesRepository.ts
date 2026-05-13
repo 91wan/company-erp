@@ -15,6 +15,7 @@ import {
 type PrismaCertificateRecord = Prisma.CertificateRecordGetPayload<{
   include: {
     ownerEmployee: true;
+    ownerRosterPerson: true;
     ownerProjectSite: true;
     ownerParty: true;
     responsibleEmployee: true;
@@ -47,6 +48,9 @@ function toCertificateDto(record: PrismaCertificateRecord): CertificateRecordDto
     ownerType: record.ownerType,
     ownerEmployeeId: record.ownerEmployeeId,
     ownerEmployeeName: record.ownerEmployee?.name ?? null,
+    ownerRosterPersonId: record.ownerRosterPersonId,
+    ownerRosterPersonName: record.ownerRosterPerson?.personName ?? null,
+    ownerRosterPersonProjectSiteId: record.ownerRosterPerson?.projectSiteId ?? null,
     ownerProjectSiteId: record.ownerProjectSiteId,
     ownerProjectSiteName: record.ownerProjectSite?.siteName ?? null,
     ownerPartyId: record.ownerPartyId,
@@ -94,6 +98,7 @@ function createData(input: CreateCertificateRecordInput): Prisma.CertificateReco
     certificateType: input.certificateType,
     ownerType: input.ownerType,
     ownerEmployee: input.ownerEmployeeId ? { connect: { id: input.ownerEmployeeId } } : undefined,
+    ownerRosterPerson: input.ownerRosterPersonId ? { connect: { id: input.ownerRosterPersonId } } : undefined,
     ownerProjectSite: input.ownerProjectSiteId ? { connect: { id: input.ownerProjectSiteId } } : undefined,
     ownerParty: input.ownerPartyId ? { connect: { id: input.ownerPartyId } } : undefined,
     ownerNameSnapshot: input.ownerNameSnapshot,
@@ -124,6 +129,7 @@ function updateData(input: UpdateCertificateRecordInput): Prisma.CertificateReco
     ...(input.certificateType !== undefined ? { certificateType: input.certificateType } : {}),
     ...(input.ownerType !== undefined ? { ownerType: input.ownerType } : {}),
     ...relationUpdate(input.ownerEmployeeId, "ownerEmployee"),
+    ...relationUpdate(input.ownerRosterPersonId, "ownerRosterPerson"),
     ...relationUpdate(input.ownerProjectSiteId, "ownerProjectSite"),
     ...relationUpdate(input.ownerPartyId, "ownerParty"),
     ...(input.ownerNameSnapshot !== undefined ? { ownerNameSnapshot: input.ownerNameSnapshot } : {}),
@@ -155,7 +161,7 @@ function mapCertificateError(error: unknown): never {
     }
 
     if (error.code === "P2003" || error.code === "P2025") {
-      throw new CertificateValidationError(["Referenced owner, party, project site, or employee was not found"]);
+      throw new CertificateValidationError(["Referenced owner, roster person, party, project site, or employee was not found"]);
     }
   }
   throw error;
@@ -164,6 +170,7 @@ function mapCertificateError(error: unknown): never {
 export function createPrismaCertificateRepository(prisma: PrismaClient): CertificateRepository {
   const include = {
     ownerEmployee: true,
+    ownerRosterPerson: true,
     ownerProjectSite: true,
     ownerParty: true,
     responsibleEmployee: true,
@@ -179,7 +186,14 @@ export function createPrismaCertificateRepository(prisma: PrismaClient): Certifi
           ...(filters.ownerTypes ? { ownerType: { in: [...filters.ownerTypes] } } : {}),
           ...(filters.responsibleEmployeeId ? { responsibleEmployeeId: filters.responsibleEmployeeId } : {}),
           ...(filters.isComplianceCritical !== undefined ? { isComplianceCritical: filters.isComplianceCritical } : {}),
-          ...(filters.projectSiteIds ? { ownerProjectSiteId: { in: [...filters.projectSiteIds] } } : {}),
+          ...(filters.projectSiteIds
+            ? {
+                OR: [
+                  { ownerProjectSiteId: { in: [...filters.projectSiteIds] } },
+                  { ownerRosterPerson: { projectSiteId: { in: [...filters.projectSiteIds] } } },
+                ],
+              }
+            : {}),
           ...(filters.q
             ? {
                 OR: [

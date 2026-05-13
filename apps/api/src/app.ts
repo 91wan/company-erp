@@ -36,16 +36,16 @@ import {
   EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
   EmployeeValidationError,
-  ExternalProjectManagerAccountConflictError,
-  ExternalProjectManagerAccountValidationError,
+  ExternalProjectSiteAccountConflictError,
+  ExternalProjectSiteAccountValidationError,
   UserAccountConflictError,
   UserAccountValidationError,
   normalizeDepartmentFilters,
   normalizeDepartmentInput,
   normalizeEmployeeFilters,
   normalizeEmployeeInput,
-  normalizeExternalProjectManagerAccountFilters,
-  normalizeExternalProjectManagerAccountInput,
+  normalizeExternalProjectSiteAccountFilters,
+  normalizeExternalProjectSiteAccountInput,
   normalizeProjectSiteAssignmentFilters,
   normalizeProjectSiteAssignmentInput,
   normalizeUserAccountFilters,
@@ -53,7 +53,7 @@ import {
   type DepartmentRepository,
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
-  type ExternalProjectManagerAccountRepository,
+  type ExternalProjectSiteAccountRepository,
   type UserAccountRepository,
 } from "./peoplePermissions.js";
 import {
@@ -89,11 +89,19 @@ import {
   ProjectSiteValidationError,
   ProjectUsageRequestConflictError,
   ProjectUsageRequestValidationError,
+  normalizeCoveredPersonInput,
+  normalizeInsurancePolicyFilters,
+  normalizeInsurancePolicyInput,
   normalizeIssueProjectUsageRequestInput,
+  normalizePayrollSubmissionFilters,
+  normalizePayrollSubmissionInput,
   normalizeProjectSiteFilters,
   normalizeProjectSiteInput,
   normalizeProjectUsageRequestFilters,
   normalizeProjectUsageRequestInput,
+  normalizeRosterPersonFilters,
+  normalizeRosterPersonInput,
+  type ProjectSiteComplianceRepository,
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
 } from "./projectSites.js";
@@ -143,13 +151,14 @@ type BuildAppOptions = {
   departmentRepository?: DepartmentRepository;
   employeeRepository?: EmployeeRepository;
   userAccountRepository?: UserAccountRepository;
-  externalProjectManagerAccountRepository?: ExternalProjectManagerAccountRepository;
+  externalProjectSiteAccountRepository?: ExternalProjectSiteAccountRepository;
   projectSiteAssignmentRepository?: EmployeeProjectSiteAssignmentRepository;
   purchaseRequestRepository?: PurchaseRequestRepository;
   purchaseRecordRepository?: PurchaseRecordRepository;
   inventoryRepository?: InventoryRepository;
   replenishmentSuggestionRepository?: ReplenishmentSuggestionRepository;
   projectSiteRepository?: ProjectSiteRepository;
+  projectSiteComplianceRepository?: ProjectSiteComplianceRepository;
   projectUsageRequestRepository?: ProjectUsageRequestRepository;
   contractRepository?: ContractRepository;
   businessProjectRepository?: BusinessProjectRepository;
@@ -161,15 +170,15 @@ type BuildAppOptions = {
 function scopedProjectSiteIds(request: unknown): readonly string[] | null {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return null;
-  return user.roles.length === 1 && (user.roles[0] === "project_site" || user.roles[0] === "external_project_manager")
+  return user.roles.length === 1 && (user.roles[0] === "project_site" || user.roles[0] === "external_project_site")
     ? [...(user.assignedProjectSiteIds ?? [])]
     : null;
 }
 
-function externalProjectManagerSiteIds(request: unknown): readonly string[] | null {
+function externalProjectSiteAccountSiteIds(request: unknown): readonly string[] | null {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return null;
-  return user.roles.length === 1 && user.roles[0] === "external_project_manager"
+  return user.roles.length === 1 && user.roles[0] === "external_project_site"
     ? [...(user.assignedProjectSiteIds ?? [])]
     : null;
 }
@@ -183,7 +192,7 @@ const FINANCIAL_PROJECT_USAGE_ROLES = new Set<MvpRoleCode>(["admin", "hr", "proc
 function shouldHideProjectUsageFinancialFields(request: unknown): boolean {
   const roles = ((request as AuthenticatedRequest).currentUser?.roles ?? []) as readonly MvpRoleCode[];
   return (
-    (roles.includes("operations") || roles.includes("external_project_manager")) &&
+    (roles.includes("operations") || roles.includes("external_project_site")) &&
     !roles.some((role) => FINANCIAL_PROJECT_USAGE_ROLES.has(role))
   );
 }
@@ -212,7 +221,7 @@ function certificateFiltersForRequest(request: unknown) {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return {};
   if (user.roles.length === 1 && user.roles[0] === "project_site") {
-    return { ownerTypes: ["project_site" as const], projectSiteIds: [...(user.assignedProjectSiteIds ?? [])] };
+    return { ownerTypes: ["project_site" as const, "person" as const], projectSiteIds: [...(user.assignedProjectSiteIds ?? [])] };
   }
   if (user.roles.length === 1 && user.roles[0] === "procurement") {
     return { ownerTypes: ["supplier" as const, "company" as const] };
@@ -220,11 +229,21 @@ function certificateFiltersForRequest(request: unknown) {
   return {};
 }
 
-function isOutsideCertificateScope(request: unknown, certificate?: { ownerType: string; ownerProjectSiteId?: string | null } | null): boolean {
+function isOutsideCertificateScope(
+  request: unknown,
+  certificate?: {
+    ownerType: string;
+    ownerProjectSiteId?: string | null;
+    ownerRosterPersonProjectSiteId?: string | null;
+  } | null,
+): boolean {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user || !certificate) return false;
   if (user.roles.length === 1 && user.roles[0] === "project_site") {
-    return certificate.ownerType !== "project_site" || !(user.assignedProjectSiteIds ?? []).includes(certificate.ownerProjectSiteId ?? "");
+    const assigned = user.assignedProjectSiteIds ?? [];
+    if (certificate.ownerType === "project_site") return !assigned.includes(certificate.ownerProjectSiteId ?? "");
+    if (certificate.ownerType === "person") return !assigned.includes(certificate.ownerRosterPersonProjectSiteId ?? "");
+    return true;
   }
   if (user.roles.length === 1 && user.roles[0] === "procurement") {
     return certificate.ownerType !== "supplier" && certificate.ownerType !== "company";
@@ -919,60 +938,60 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
-  app.get("/api/external-project-manager-accounts", async (request, reply) => {
-    if (!options.externalProjectManagerAccountRepository) {
-      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+  app.get("/api/external-project-site-accounts", async (request, reply) => {
+    if (!options.externalProjectSiteAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
     }
 
     try {
-      const filters = normalizeExternalProjectManagerAccountFilters(request.query as Record<string, unknown>);
-      const externalProjectManagerAccounts = await options.externalProjectManagerAccountRepository.list(filters);
-      return { externalProjectManagerAccounts };
+      const filters = normalizeExternalProjectSiteAccountFilters(request.query as Record<string, unknown>);
+      const externalProjectSiteAccounts = await options.externalProjectSiteAccountRepository.list(filters);
+      return { externalProjectSiteAccounts };
     } catch (error) {
-      if (error instanceof ExternalProjectManagerAccountValidationError) {
-        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      if (error instanceof ExternalProjectSiteAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
       }
       throw error;
     }
   });
 
-  app.post("/api/external-project-manager-accounts", async (request, reply) => {
-    if (!options.externalProjectManagerAccountRepository) {
-      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+  app.post("/api/external-project-site-accounts", async (request, reply) => {
+    if (!options.externalProjectSiteAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
     }
 
     try {
-      const input = normalizeExternalProjectManagerAccountInput(request.body, "create");
-      const externalProjectManagerAccount = await options.externalProjectManagerAccountRepository.create(input);
-      return reply.status(201).send({ externalProjectManagerAccount });
+      const input = normalizeExternalProjectSiteAccountInput(request.body, "create");
+      const externalProjectSiteAccount = await options.externalProjectSiteAccountRepository.create(input);
+      return reply.status(201).send({ externalProjectSiteAccount });
     } catch (error) {
-      if (error instanceof ExternalProjectManagerAccountValidationError) {
-        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      if (error instanceof ExternalProjectSiteAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
       }
-      if (error instanceof ExternalProjectManagerAccountConflictError) {
-        return reply.status(409).send({ error: "EXTERNAL_PROJECT_MANAGER_CONFLICT", field: error.field });
+      if (error instanceof ExternalProjectSiteAccountConflictError) {
+        return reply.status(409).send({ error: "EXTERNAL_PROJECT_SITE_CONFLICT", field: error.field });
       }
       throw error;
     }
   });
 
-  app.patch("/api/external-project-manager-accounts/:id", async (request, reply) => {
-    if (!options.externalProjectManagerAccountRepository) {
-      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+  app.patch("/api/external-project-site-accounts/:id", async (request, reply) => {
+    if (!options.externalProjectSiteAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
     }
 
     const { id } = request.params as { id: string };
     try {
-      const input = normalizeExternalProjectManagerAccountInput(request.body, "update");
-      const externalProjectManagerAccount = await options.externalProjectManagerAccountRepository.update(id, input);
-      if (!externalProjectManagerAccount) return reply.status(404).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_NOT_FOUND" });
-      return { externalProjectManagerAccount };
+      const input = normalizeExternalProjectSiteAccountInput(request.body, "update");
+      const externalProjectSiteAccount = await options.externalProjectSiteAccountRepository.update(id, input);
+      if (!externalProjectSiteAccount) return reply.status(404).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_NOT_FOUND" });
+      return { externalProjectSiteAccount };
     } catch (error) {
-      if (error instanceof ExternalProjectManagerAccountValidationError) {
-        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      if (error instanceof ExternalProjectSiteAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
       }
-      if (error instanceof ExternalProjectManagerAccountConflictError) {
-        return reply.status(409).send({ error: "EXTERNAL_PROJECT_MANAGER_CONFLICT", field: error.field });
+      if (error instanceof ExternalProjectSiteAccountConflictError) {
+        return reply.status(409).send({ error: "EXTERNAL_PROJECT_SITE_CONFLICT", field: error.field });
       }
       throw error;
     }
@@ -1393,6 +1412,144 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
+  app.get("/api/project-site-roster-persons", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const scope = scopedProjectSiteIds(request);
+      if (scope?.length === 0) return { rosterPeople: [] };
+      const filters = {
+        ...normalizeRosterPersonFilters(request.query as Record<string, unknown>),
+        ...(scope ? { projectSiteIds: scope } : {}),
+      };
+      if (isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { rosterPeople: [] };
+      const rosterPeople = await options.projectSiteComplianceRepository.listRosterPeople(filters);
+      return { rosterPeople };
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_COMPLIANCE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-site-roster-persons", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const input = normalizeRosterPersonInput(request.body);
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const rosterPerson = await options.projectSiteComplianceRepository.createRosterPerson(input);
+      return reply.status(201).send({ rosterPerson });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_COMPLIANCE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/employer-liability-insurance-policies", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    const scope = scopedProjectSiteIds(request);
+    if (scope?.length === 0) return { insurancePolicies: [] };
+    const filters = {
+      ...normalizeInsurancePolicyFilters(request.query as Record<string, unknown>),
+      ...(scope ? { projectSiteIds: scope } : {}),
+    };
+    if (isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { insurancePolicies: [] };
+    const insurancePolicies = await options.projectSiteComplianceRepository.listInsurancePolicies(filters);
+    return { insurancePolicies };
+  });
+
+  app.post("/api/employer-liability-insurance-policies", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const input = normalizeInsurancePolicyInput(request.body);
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const insurancePolicy = await options.projectSiteComplianceRepository.createInsurancePolicy(input);
+      return reply.status(201).send({ insurancePolicy });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_COMPLIANCE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/employer-liability-insurance-covered-persons", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const input = normalizeCoveredPersonInput(request.body);
+      const coveredPerson = await options.projectSiteComplianceRepository.createCoveredPerson(input);
+      return reply.status(201).send({ coveredPerson });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_COMPLIANCE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-site-payroll-submissions", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    const scope = scopedProjectSiteIds(request);
+    if (scope?.length === 0) return { payrollSubmissions: [] };
+    const filters = {
+      ...normalizePayrollSubmissionFilters(request.query as Record<string, unknown>),
+      ...(scope ? { projectSiteIds: scope } : {}),
+    };
+    if (isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { payrollSubmissions: [] };
+    const payrollSubmissions = await options.projectSiteComplianceRepository.listPayrollSubmissions(filters);
+    return { payrollSubmissions };
+  });
+
+  app.post("/api/project-site-payroll-submissions", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    try {
+      const input = normalizePayrollSubmissionInput(request.body);
+      if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
+        return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      }
+      const payrollSubmission = await options.projectSiteComplianceRepository.createPayrollSubmission(input);
+      return reply.status(201).send({ payrollSubmission });
+    } catch (error) {
+      if (error instanceof ProjectSiteValidationError) {
+        return reply.status(400).send({ error: "PROJECT_SITE_COMPLIANCE_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/project-sites/:id/compliance-summary", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    const { id } = request.params as { id: string };
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), id)) {
+      return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    }
+    const complianceSummary = await options.projectSiteComplianceRepository.getComplianceSummary(id);
+    if (!complianceSummary) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    return { complianceSummary };
+  });
+
   app.get("/api/project-usage-options", async (_request, reply) => {
     if (!options.materialRepository || !options.warehouseRepository) {
       return reply.status(503).send({ error: "PROJECT_USAGE_OPTIONS_REPOSITORY_NOT_CONFIGURED" });
@@ -1471,7 +1628,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const externalScope = externalProjectManagerSiteIds(request);
+      const externalScope = externalProjectSiteAccountSiteIds(request);
       const user = (request as AuthenticatedRequest).currentUser;
       if (externalScope !== null) {
         if (externalScope.length === 0) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
@@ -1494,8 +1651,8 @@ export function buildApp(options: BuildAppOptions = {}) {
           projectSiteId: externalScope[0],
           status: "pending",
           submittedByAccountId: user?.id ?? null,
-          submittedByNameSnapshot: user?.externalProjectManagerName ?? user?.employeeName ?? null,
-          submittedByPhoneSnapshot: user?.externalProjectManagerPhone ?? null,
+          submittedByNameSnapshot: user?.externalProjectSiteContactName ?? user?.employeeName ?? null,
+          submittedByPhoneSnapshot: user?.externalProjectSiteContactPhone ?? null,
         };
       }
       const scope = scopedProjectSiteIds(request);
@@ -1525,7 +1682,7 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     try {
-      if (externalProjectManagerSiteIds(request) !== null) {
+      if (externalProjectSiteAccountSiteIds(request) !== null) {
         return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectUsageRequest", requiredLevel: "manage" });
       }
       const input = normalizeProjectUsageRequestInput(request.body, "update");

@@ -4,19 +4,19 @@ import {
   type CreateDepartmentInput,
   type CreateEmployeeInput,
   type CreateEmployeeProjectSiteAssignmentInput,
-  type CreateExternalProjectManagerAccountInput,
+  type CreateExternalProjectSiteAccountInput,
   type CreateUserAccountInput,
   type DepartmentDto,
   type EmployeeDto,
   type EmployeeProjectSiteAssignmentDto,
   type EmployeeProjectSiteRelationTypeCode,
   type EmployeeStatusCode,
-  type ExternalProjectManagerAccountDto,
+  type ExternalProjectSiteAccountDto,
   type MvpRoleCode,
   type UpdateDepartmentInput,
   type UpdateEmployeeInput,
   type UpdateEmployeeProjectSiteAssignmentInput,
-  type UpdateExternalProjectManagerAccountInput,
+  type UpdateExternalProjectSiteAccountInput,
   type UpdateUserAccountInput,
   type UserAccountDto,
   type UserAccountStatusCode,
@@ -47,7 +47,7 @@ export type EmployeeProjectSiteAssignmentListFilters = {
   q?: string;
 };
 
-export type ExternalProjectManagerAccountListFilters = {
+export type ExternalProjectSiteAccountListFilters = {
   projectSiteId?: string;
   status?: UserAccountStatusCode;
   q?: string;
@@ -81,11 +81,11 @@ export type EmployeeProjectSiteAssignmentRepository = {
   update(id: string, input: UpdateEmployeeProjectSiteAssignmentInput): Promise<EmployeeProjectSiteAssignmentDto | null>;
 };
 
-export type ExternalProjectManagerAccountRepository = {
-  list(filters: ExternalProjectManagerAccountListFilters): Promise<ExternalProjectManagerAccountDto[]>;
-  getById(id: string): Promise<ExternalProjectManagerAccountDto | null>;
-  create(input: CreateExternalProjectManagerAccountInput): Promise<ExternalProjectManagerAccountDto>;
-  update(id: string, input: UpdateExternalProjectManagerAccountInput): Promise<ExternalProjectManagerAccountDto | null>;
+export type ExternalProjectSiteAccountRepository = {
+  list(filters: ExternalProjectSiteAccountListFilters): Promise<ExternalProjectSiteAccountDto[]>;
+  getById(id: string): Promise<ExternalProjectSiteAccountDto | null>;
+  create(input: CreateExternalProjectSiteAccountInput): Promise<ExternalProjectSiteAccountDto>;
+  update(id: string, input: UpdateExternalProjectSiteAccountInput): Promise<ExternalProjectSiteAccountDto | null>;
 };
 
 export class DepartmentConflictError extends Error {
@@ -109,10 +109,10 @@ export class UserAccountConflictError extends Error {
   }
 }
 
-export class ExternalProjectManagerAccountConflictError extends Error {
-  constructor(public readonly field: "username" | "activeProjectSiteManager") {
-    super(`External project manager account conflict on ${field}`);
-    this.name = "ExternalProjectManagerAccountConflictError";
+export class ExternalProjectSiteAccountConflictError extends Error {
+  constructor(public readonly field: "username" | "activeProjectSiteAccount") {
+    super(`External project-site account conflict on ${field}`);
+    this.name = "ExternalProjectSiteAccountConflictError";
   }
 }
 
@@ -144,10 +144,10 @@ export class UserAccountValidationError extends Error {
   }
 }
 
-export class ExternalProjectManagerAccountValidationError extends Error {
+export class ExternalProjectSiteAccountValidationError extends Error {
   constructor(public readonly issues: string[]) {
-    super("External project manager account validation failed");
-    this.name = "ExternalProjectManagerAccountValidationError";
+    super("External project-site account validation failed");
+    this.name = "ExternalProjectSiteAccountValidationError";
   }
 }
 
@@ -351,26 +351,26 @@ export function normalizeUserAccountInput(
   return normalized;
 }
 
-export function normalizeExternalProjectManagerAccountInput(
+export function normalizeExternalProjectSiteAccountInput(
   input: unknown,
   mode: "create",
-): CreateExternalProjectManagerAccountInput;
-export function normalizeExternalProjectManagerAccountInput(
+): CreateExternalProjectSiteAccountInput;
+export function normalizeExternalProjectSiteAccountInput(
   input: unknown,
   mode: "update",
-): UpdateExternalProjectManagerAccountInput;
-export function normalizeExternalProjectManagerAccountInput(
+): UpdateExternalProjectSiteAccountInput;
+export function normalizeExternalProjectSiteAccountInput(
   input: unknown,
   mode: "create" | "update",
-): CreateExternalProjectManagerAccountInput | UpdateExternalProjectManagerAccountInput {
+): CreateExternalProjectSiteAccountInput | UpdateExternalProjectSiteAccountInput {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new ExternalProjectManagerAccountValidationError(["Payload must be an object"]);
+    throw new ExternalProjectSiteAccountValidationError(["Payload must be an object"]);
   }
   const payload = input as Record<string, unknown>;
   const issues: string[] = [];
-  const normalized: UpdateExternalProjectManagerAccountInput = {};
+  const normalized: UpdateExternalProjectSiteAccountInput = {};
 
-  for (const field of ["projectSiteId", "managerName", "managerPhone", "username"] as const) {
+  for (const field of ["projectSiteId", "currentContactName", "currentContactPhone", "username"] as const) {
     const value = normalizeRequiredString(payload[field]);
     if (value !== undefined) normalized[field] = value;
   }
@@ -398,28 +398,40 @@ export function normalizeExternalProjectManagerAccountInput(
   if (mode === "create") {
     const initialPassword = normalizeRequiredString(payload.initialPassword);
     if (!normalized.projectSiteId) issues.push("projectSiteId is required");
-    if (!normalized.managerName) issues.push("managerName is required");
-    if (!normalized.managerPhone) issues.push("managerPhone is required");
+    if (!normalized.currentContactName) issues.push("currentContactName is required");
+    if (!normalized.currentContactPhone) issues.push("currentContactPhone is required");
     if (!normalized.username) issues.push("username is required");
     if (!initialPassword) issues.push("initialPassword is required");
-    if (initialPassword) (normalized as CreateExternalProjectManagerAccountInput).initialPassword = initialPassword;
+    if (initialPassword) (normalized as CreateExternalProjectSiteAccountInput).initialPassword = initialPassword;
   } else {
-    const resetPassword = normalizeRequiredString(payload.resetPassword);
-    if (resetPassword !== undefined) normalized.resetPassword = resetPassword;
+    const resetPassword =
+      payload.resetPassword === undefined
+        ? undefined
+        : typeof payload.resetPassword === "string" && payload.resetPassword.trim()
+          ? payload.resetPassword.trim()
+          : "";
+    if (resetPassword) normalized.resetPassword = resetPassword;
+    if (payload.resetPassword !== undefined && !resetPassword) issues.push("resetPassword is required");
+    const changingContact = payload.currentContactName !== undefined || payload.currentContactPhone !== undefined;
+    if (changingContact) {
+      if (!normalized.currentContactName) issues.push("currentContactName is required when changing contact");
+      if (!normalized.currentContactPhone) issues.push("currentContactPhone is required when changing contact");
+      if (!normalized.resetPassword) issues.push("resetPassword is required when changing contact");
+    }
   }
 
-  if (issues.length > 0) throw new ExternalProjectManagerAccountValidationError(issues);
+  if (issues.length > 0) throw new ExternalProjectSiteAccountValidationError(issues);
 
   if (mode === "create") {
     return {
       ...normalized,
       projectSiteId: normalized.projectSiteId!,
-      managerName: normalized.managerName!,
-      managerPhone: normalized.managerPhone!,
+      currentContactName: normalized.currentContactName!,
+      currentContactPhone: normalized.currentContactPhone!,
       username: normalized.username!,
-      initialPassword: (normalized as CreateExternalProjectManagerAccountInput).initialPassword,
+      initialPassword: (normalized as CreateExternalProjectSiteAccountInput).initialPassword,
       status: normalized.status ?? "active",
-    } as CreateExternalProjectManagerAccountInput;
+    } as CreateExternalProjectSiteAccountInput;
   }
   return normalized;
 }
@@ -545,17 +557,17 @@ export function normalizeUserAccountFilters(query: Record<string, unknown>): Use
   return filters;
 }
 
-export function normalizeExternalProjectManagerAccountFilters(
+export function normalizeExternalProjectSiteAccountFilters(
   query: Record<string, unknown>,
-): ExternalProjectManagerAccountListFilters {
-  const filters: ExternalProjectManagerAccountListFilters = {};
+): ExternalProjectSiteAccountListFilters {
+  const filters: ExternalProjectSiteAccountListFilters = {};
   for (const field of ["projectSiteId", "q"] as const) {
     const value = normalizeNullableString(query[field]);
     if (typeof value === "string") filters[field] = value;
   }
   if (query.status !== undefined) {
     if (typeof query.status !== "string" || !userAccountStatusCodes.has(query.status as UserAccountStatusCode)) {
-      throw new ExternalProjectManagerAccountValidationError(["status filter is unsupported"]);
+      throw new ExternalProjectSiteAccountValidationError(["status filter is unsupported"]);
     }
     filters.status = query.status as UserAccountStatusCode;
   }
