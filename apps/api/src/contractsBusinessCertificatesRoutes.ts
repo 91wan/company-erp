@@ -2,7 +2,13 @@ import type { FastifyInstance } from "fastify";
 import type { BuildAppOptions } from "./appRouteContext.js";
 import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "./businessProjects.js";
-import { CertificateConflictError, CertificateValidationError, normalizeCertificateFilters, normalizeCertificateInput } from "./certificates.js";
+import {
+  CertificateConflictError,
+  CertificateValidationError,
+  normalizeCertificateFilters,
+  normalizeCertificateInput,
+  validateCertificateOwnerState,
+} from "./certificates.js";
 import { ContractConflictError, ContractValidationError, normalizeContractAttachmentInput, normalizeContractFilters, normalizeContractInput } from "./contracts.js";
 
 export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance, options: BuildAppOptions) {
@@ -288,6 +294,14 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
       }
       const input = normalizeCertificateInput(request.body, "update");
+      const ownerIssues = validateCertificateOwnerState({
+        ownerType: input.ownerType ?? current?.ownerType,
+        ownerEmployeeId: input.ownerEmployeeId !== undefined ? input.ownerEmployeeId : current?.ownerEmployeeId,
+        ownerRosterPersonId: input.ownerRosterPersonId !== undefined ? input.ownerRosterPersonId : current?.ownerRosterPersonId,
+        ownerProjectSiteId: input.ownerProjectSiteId !== undefined ? input.ownerProjectSiteId : current?.ownerProjectSiteId,
+        ownerPartyId: input.ownerPartyId !== undefined ? input.ownerPartyId : current?.ownerPartyId,
+      });
+      if (ownerIssues.length > 0) throw new CertificateValidationError(ownerIssues);
       const certificate = await options.certificateRepository.update(id, input);
       if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
       return { certificate };

@@ -294,6 +294,59 @@ describe("certificates API", () => {
     });
   });
 
+  it("accepts supplier, company, and project site certificates with their required owner links", async () => {
+    const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
+
+    const supplier = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "CERT-SUP-001",
+        certificateName: "供应商资质",
+        certificateType: "supplier_qualification",
+        ownerType: "supplier",
+        ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        ownerNameSnapshot: "供应商有限公司",
+        validityType: "long_term",
+      },
+    });
+    const company = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "CERT-COMPANY-001",
+        certificateName: "公司营业执照",
+        certificateType: "business_license",
+        ownerType: "company",
+        ownerPartyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        ownerNameSnapshot: "我方公司主体",
+        validityType: "long_term",
+      },
+    });
+    const projectSite = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "CERT-SITE-001",
+        certificateName: "项目点食品许可证",
+        certificateType: "food_operation_license",
+        ownerType: "project_site",
+        ownerProjectSiteId: assignedProjectSiteId,
+        ownerNameSnapshot: "科技园一期项目点",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+      },
+    });
+    await app.close();
+
+    expect(supplier.statusCode).toBe(201);
+    expect(supplier.json()).toMatchObject({ certificate: { ownerType: "supplier", ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" } });
+    expect(company.statusCode).toBe(201);
+    expect(company.json()).toMatchObject({ certificate: { ownerType: "company", ownerPartyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" } });
+    expect(projectSite.statusCode).toBe(201);
+    expect(projectSite.json()).toMatchObject({ certificate: { ownerType: "project_site", ownerProjectSiteId: assignedProjectSiteId } });
+  });
+
   it("rejects invalid date and owner combinations", async () => {
     const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
 
@@ -337,6 +390,18 @@ describe("certificates API", () => {
         validityType: "long_term",
       },
     });
+    const missingOwner = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "CERT-BAD4",
+        certificateName: "无归属错误",
+        certificateType: "business_license",
+        ownerType: "company",
+        ownerNameSnapshot: "公司主体",
+        validityType: "long_term",
+      },
+    });
     await app.close();
 
     expect(fixedWithoutExpiry.statusCode).toBe(400);
@@ -346,6 +411,48 @@ describe("certificates API", () => {
     expect(multiOwner.json().issues).toContain("reminderDays must be a non-negative integer");
     expect(mismatchedOwner.statusCode).toBe(400);
     expect(mismatchedOwner.json().issues).toContain("supplier and company certificates can only link a party owner");
+    expect(missingOwner.statusCode).toBe(400);
+    expect(missingOwner.json().issues).toContain("company certificates must link a party owner");
+  });
+
+  it("rejects certificate updates that would leave an invalid final owner state", async () => {
+    const repository = createFakeCertificateRepository([makeCertificate()]);
+    const app = await buildApp({ certificateRepository: repository });
+
+    const clearOnlyOwner = await app.inject({
+      method: "PATCH",
+      url: `/api/certificates/${certificateId}`,
+      payload: { ownerProjectSiteId: null },
+    });
+    const changeTypeWithoutOwner = await app.inject({
+      method: "PATCH",
+      url: `/api/certificates/${certificateId}`,
+      payload: { ownerType: "supplier" },
+    });
+    const validOwnerMove = await app.inject({
+      method: "PATCH",
+      url: `/api/certificates/${certificateId}`,
+      payload: {
+        ownerType: "supplier",
+        ownerProjectSiteId: null,
+        ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        ownerNameSnapshot: "供应商有限公司",
+      },
+    });
+    await app.close();
+
+    expect(clearOnlyOwner.statusCode).toBe(400);
+    expect(clearOnlyOwner.json().issues).toContain("project_site certificates must link a project site owner");
+    expect(changeTypeWithoutOwner.statusCode).toBe(400);
+    expect(changeTypeWithoutOwner.json().issues).toContain("supplier certificates must link a party owner");
+    expect(validOwnerMove.statusCode).toBe(200);
+    expect(validOwnerMove.json()).toMatchObject({
+      certificate: {
+        ownerType: "supplier",
+        ownerProjectSiteId: null,
+        ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    });
   });
 
   it("returns duplicate certificate codes as conflict", async () => {
@@ -359,6 +466,7 @@ describe("certificates API", () => {
         certificateName: "重复证照",
         certificateType: "business_license",
         ownerType: "company",
+        ownerPartyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         ownerNameSnapshot: "公司主体",
         validityType: "long_term",
       },
