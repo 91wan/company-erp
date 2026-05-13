@@ -16,6 +16,7 @@ Completed:
 - `apps/api/src/prismaInventoryRepository.ts` was hardened in the Inventory Prisma type-debt slice. It no longer relies on a broad `AnyPrisma` client or `as any` casts for movement mapping, purchase receiving rollup, and inventory balance aggregation behavior.
 - `apps/api/src/prismaImportJobRepository.ts` was hardened in the Import Job Prisma type-debt slice. It no longer relies on a broad `AnyPrisma` client or `as any` casts for preview context loading, row/job DTO mapping, confirmation transactions, and JSON row persistence.
 - `apps/api/src/prismaBusinessProjectsRepository.ts` was hardened in the Business Projects Prisma type-debt slice. It now uses a narrow Prisma contract and typed normalizers for project mapping and investment summary aggregation behavior.
+- `apps/api/src/prismaPeoplePermissionsRepository.ts` project-site assignment duplicate checks were hardened in the Project Site Assignment type-debt slice. The relation type filter no longer needs a broad cast.
 
 ## Maintenance Constraints
 
