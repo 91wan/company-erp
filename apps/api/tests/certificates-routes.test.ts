@@ -347,6 +347,40 @@ describe("certificates API", () => {
     expect(projectSite.json()).toMatchObject({ certificate: { ownerType: "project_site", ownerProjectSiteId: assignedProjectSiteId } });
   });
 
+  it("accepts no-expiry-visible certificates without forcing a fake expiry date", async () => {
+    const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "CERT-NO-EXPIRY-001",
+        certificateName: "未见明确到期日证照",
+        certificateType: "honor_cert",
+        ownerType: "company",
+        ownerPartyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        ownerNameSnapshot: "我方公司主体",
+        validityType: "no_expiry_visible",
+        attachmentPath: "/volume1/company-erp/attachments/certificates/CERT-NO-EXPIRY-001.pdf",
+        sourceFilePath: "/volume1/company-erp/attachments/certificates/source-pack.pdf",
+        sourcePageNo: 2,
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      certificate: {
+        certificateCode: "CERT-NO-EXPIRY-001",
+        validityType: "no_expiry_visible",
+        expiryDate: null,
+        attachmentPath: "/volume1/company-erp/attachments/certificates/CERT-NO-EXPIRY-001.pdf",
+        sourceFilePath: "/volume1/company-erp/attachments/certificates/source-pack.pdf",
+        sourcePageNo: 2,
+      },
+    });
+  });
+
   it("rejects invalid date and owner combinations", async () => {
     const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
 
