@@ -90,6 +90,16 @@ export const defaultAppVersion: AppVersionDto = {
   environment: "nas",
 };
 
+type MockShellData = {
+  purchaseRequests?: PurchaseRequestDto[];
+  purchaseRecords?: PurchaseRecordDto[];
+  inventoryMovements?: InventoryMovementDto[];
+  inventoryBalances?: InventoryBalanceDto[];
+  projectUsageRequests?: ProjectUsageRequestDto[];
+  contracts?: ContractDto[];
+  failures?: string[];
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -106,10 +116,16 @@ export function mockShellFetch(
   user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectSiteUser | null = adminUser,
   appConfig = defaultAppConfig,
   appVersion: AppVersionDto | "error" = defaultAppVersion,
+  data: MockShellData = {},
 ) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    const pathname = new URL(url, "http://localhost").pathname;
+
+    if (data.failures?.includes(pathname)) {
+      return Promise.resolve(jsonResponse({ error: "MOCK_FAILURE" }, false, 500));
+    }
 
     if (url.endsWith("/api/app-config") && method === "GET") return Promise.resolve(jsonResponse({ appConfig }));
     if (url.endsWith("/api/app-version") && method === "GET") {
@@ -135,10 +151,18 @@ export function mockShellFetch(
     }
     if (url.includes("/api/user-accounts")) return Promise.resolve(jsonResponse({ userAccounts: [] }));
     if (url.includes("/api/project-site-assignments")) return Promise.resolve(jsonResponse({ projectSiteAssignments: [] }));
-    if (url.includes("/api/purchase-requests")) return Promise.resolve(jsonResponse({ purchaseRequests: [] }));
-    if (url.includes("/api/purchase-records")) return Promise.resolve(jsonResponse({ purchaseRecords: [] }));
-    if (url.includes("/api/inventory-movements")) return Promise.resolve(jsonResponse({ inventoryMovements: [] }));
-    if (url.includes("/api/inventory-balances")) return Promise.resolve(jsonResponse({ inventoryBalances: [] }));
+    if (url.includes("/api/purchase-requests")) {
+      return Promise.resolve(jsonResponse({ purchaseRequests: data.purchaseRequests ?? [purchaseRequest] }));
+    }
+    if (url.includes("/api/purchase-records")) {
+      return Promise.resolve(jsonResponse({ purchaseRecords: data.purchaseRecords ?? [purchaseRecord] }));
+    }
+    if (url.includes("/api/inventory-movements")) {
+      return Promise.resolve(jsonResponse({ inventoryMovements: data.inventoryMovements ?? [inventoryMovement] }));
+    }
+    if (url.includes("/api/inventory-balances")) {
+      return Promise.resolve(jsonResponse({ inventoryBalances: data.inventoryBalances ?? [inventoryBalance] }));
+    }
     if (url.includes("/api/replenishment-suggestions")) return Promise.resolve(jsonResponse({ replenishmentSuggestions: [] }));
     if (url.includes("/api/project-usage-options")) {
       return Promise.resolve(jsonResponse({
@@ -162,12 +186,14 @@ export function mockShellFetch(
       return Promise.resolve(jsonResponse({ investmentSummary: { ...projectSiteInvestmentSummary, contractCount: 0, totalAmount: 0, categories: [] } }));
     }
     if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
-    if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
+    if (url.includes("/api/project-usage-requests")) {
+      return Promise.resolve(jsonResponse({ projectUsageRequests: data.projectUsageRequests ?? [projectUsageRequest] }));
+    }
     if (user?.roles.length === 1 && user.roles[0] === "project_site" && url.includes("/api/business-projects")) {
       return Promise.resolve(jsonResponse({ error: "FORBIDDEN" }, false, 403));
     }
     if (url.includes("/api/business-projects")) return Promise.resolve(jsonResponse({ businessProjects: [] }));
-    if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
+    if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: data.contracts ?? [contract] }));
     if (url.includes("/api/certificates")) return Promise.resolve(jsonResponse({ certificates: [] }));
     if (url.includes("/api/import-jobs/")) return Promise.resolve(jsonResponse({ importJob }));
     if (url.includes("/api/import-jobs")) return Promise.resolve(jsonResponse({ importJobs: [] }));
