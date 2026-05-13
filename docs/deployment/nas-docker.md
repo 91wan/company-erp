@@ -77,6 +77,7 @@ POSTGRES_PORT=5432
 AUTH_SESSION_SECRET=<long-random-secret>
 IDENTITY_ENCRYPTION_SECRET=<long-random-secret-distinct-from-session-secret>
 AUTH_COOKIE_SECURE=false
+LOG_LEVEL=info
 
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=<temporary-strong-admin-password>
@@ -91,6 +92,12 @@ APP_DEPLOYED_AT=<utc-deploy-time>
 APP_PACKAGE_VERSION=0.1.0
 APP_ENVIRONMENT=nas
 ```
+
+In NAS/production mode, the API enables Fastify request logging. Password fields,
+password hashes, and session cookies are redacted from request logs. The Compose
+file keeps API container logs on the default `json-file` driver with rotation
+(`10m` × `5` files); adjust `LOG_LEVEL`, `max-size`, or `max-file` if the NAS has
+stricter storage limits.
 
 `DATABASE_URL` in `.env.example` is for local development. In Docker Compose,
 the API container uses the internal `postgres` service name automatically.

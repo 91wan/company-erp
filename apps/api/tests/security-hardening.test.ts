@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app";
+import { buildApp, buildLoggerOptions, redactLogPayload } from "../src/app";
 import { hashPassword } from "../src/password";
 import { parseCookieHeader, type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import { validateIdentityEncryptionSecret } from "../src/identityCrypto";
@@ -293,5 +293,36 @@ describe("CORS allowlist", () => {
 
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://allowed.example.com");
     expect(blocked.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+});
+
+describe("production request logging", () => {
+  it("keeps request logging disabled for local development", () => {
+    expect(buildLoggerOptions({ APP_ENVIRONMENT: "local" })).toBe(false);
+  });
+
+  it("enables request logging outside local environments with a configurable level", () => {
+    expect(buildLoggerOptions({ APP_ENVIRONMENT: "nas", LOG_LEVEL: "debug" })).toMatchObject({
+      level: "debug",
+    });
+    expect(buildLoggerOptions({ NODE_ENV: "production" })).toMatchObject({
+      level: "info",
+    });
+  });
+
+  it("redacts auth secrets from request log payloads", () => {
+    expect(
+      redactLogPayload({
+        password: "raw-password",
+        passwordHash: "scrypt$salt$hash",
+        nested: { password: "nested-password", unchanged: "visible" },
+        items: [{ passwordHash: "nested-hash" }],
+      }),
+    ).toEqual({
+      password: "[redacted]",
+      passwordHash: "[redacted]",
+      nested: { password: "[redacted]", unchanged: "visible" },
+      items: [{ passwordHash: "[redacted]" }],
+    });
   });
 });
