@@ -5,6 +5,7 @@ import {
   App,
   adminUser,
   contract,
+  expiredCertificate,
   externalProjectSiteUser,
   inventoryBalance,
   inventoryMovement,
@@ -262,6 +263,16 @@ describe("Company ERP app shell", () => {
           updatedAt: "2026-05-13T09:40:00.000Z",
         },
       ],
+      certificates: [
+        {
+          ...expiredCertificate,
+          id: "live-certificate",
+          certificateCode: "CERT-LIVE-EXPIRED",
+          certificateName: "实时过期健康证",
+          computedStatus: "expired",
+          updatedAt: "2026-05-13T09:50:00.000Z",
+        },
+      ],
     });
 
     render(<App />);
@@ -281,6 +292,8 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("实时低库存物料")).toBeInTheDocument();
     expect(screen.getByText("实时项目点")).toBeInTheDocument();
     expect(screen.getByText(/HT-LIVE-EXPIRED/)).toBeInTheDocument();
+    expect(screen.getByText(/CERT-LIVE-EXPIRED/)).toBeInTheDocument();
+    expect(screen.getAllByText(/实时过期健康证/).length).toBeGreaterThan(0);
   });
 
   it("keeps the dashboard usable when one live summary source fails", async () => {

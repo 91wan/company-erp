@@ -319,6 +319,46 @@ const demoContract = {
   updatedAt: "2026-05-11T09:00:00.000Z",
 };
 
+const demoCertificate = {
+  id: "77777777-7777-4777-8777-777777777777",
+  certificateCode: "DEMO-CERT-001",
+  certificateName: "DEMO 即将到期证照",
+  certificateType: "health_certificate",
+  ownerType: "project_site",
+  ownerEmployeeId: null,
+  ownerEmployeeName: null,
+  ownerRosterPersonId: null,
+  ownerRosterPersonName: null,
+  ownerRosterPersonProjectSiteId: null,
+  ownerProjectSiteId: demoProjectSite.id,
+  ownerProjectSiteName: demoProjectSite.siteName,
+  ownerPartyId: null,
+  ownerPartyName: null,
+  ownerNameSnapshot: demoProjectSite.siteName,
+  certificateNumber: "DEMO-CERT-NO-001",
+  issuingAuthority: "DEMO 发证机关",
+  certificateScope: "DEMO 范围",
+  issueDate: "2026-01-01",
+  validityType: "fixed_expiry",
+  expiryDate: "2026-05-30",
+  nextReviewDate: null,
+  reminderDays: 30,
+  computedStatus: "expiring_soon",
+  isComplianceCritical: true,
+  attachmentPath: "DEMO/certificate.pdf",
+  sourceFilePath: null,
+  sourcePageNo: null,
+  responsibleEmployeeId: null,
+  responsibleEmployeeName: null,
+  confirmedByEmployeeId: null,
+  confirmedByEmployeeName: null,
+  confirmedAt: null,
+  isDisabled: false,
+  remark: "DEMO",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
 export async function mockCompanyErpApi(page: Page, options: MockApiOptions = {}) {
   await createMockCompanyErpApi(page, options);
 }
@@ -357,6 +397,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     projectSites: [{ ...demoProjectSite }],
     projectUsageRequests: [{ ...demoUsageRequest }],
     contracts: [{ ...demoContract }],
+    certificates: [{ ...demoCertificate }],
     contractAttachments: [] as Record<string, unknown>[],
     importJobs: [] as Record<string, unknown>[],
   };
@@ -757,7 +798,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname === "/api/project-usage-requests") return { projectUsageRequests: state.projectUsageRequests };
   if (pathname.startsWith("/api/business-projects")) return { businessProjects: [] };
   if (pathname === "/api/contracts") return { contracts: state.contracts };
-  if (pathname.startsWith("/api/certificates")) return { certificates: [] };
+  if (pathname.startsWith("/api/certificates")) return { certificates: state.certificates };
   if (pathname === "/api/import-jobs") return { importJobs: state.importJobs };
   if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPersons: [] };
   if (pathname.startsWith("/api/employer-liability-insurance-policies")) return { insurancePolicies: [] };
