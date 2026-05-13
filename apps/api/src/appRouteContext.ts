@@ -16,7 +16,12 @@ import type {
   ExternalProjectSiteAccountRepository,
   UserAccountRepository,
 } from "./peoplePermissions.js";
-import type { ProjectSiteComplianceRepository, ProjectSiteRepository, ProjectUsageRequestRepository } from "./projectSites.js";
+import type {
+  ProjectSiteComplianceRepository,
+  ProjectSiteKitchenEquipmentRepository,
+  ProjectSiteRepository,
+  ProjectUsageRequestRepository,
+} from "./projectSites.js";
 import type { PurchaseRecordRepository, PurchaseRequestRepository } from "./purchases.js";
 import type { ReplenishmentSuggestionRepository } from "./replenishment.js";
 
@@ -38,6 +43,7 @@ export type BuildAppOptions = {
   replenishmentSuggestionRepository?: ReplenishmentSuggestionRepository;
   projectSiteRepository?: ProjectSiteRepository;
   projectSiteComplianceRepository?: ProjectSiteComplianceRepository;
+  projectSiteKitchenEquipmentRepository?: ProjectSiteKitchenEquipmentRepository;
   projectUsageRequestRepository?: ProjectUsageRequestRepository;
   contractRepository?: ContractRepository;
   businessProjectRepository?: BusinessProjectRepository;

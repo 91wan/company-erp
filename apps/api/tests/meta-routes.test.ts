@@ -132,8 +132,23 @@ describe("metadata API", () => {
       dictionaries: {
         baseStatus: { values: ["启用", "停用"] },
         employeeStatus: { values: ["在职", "离职", "停用"] },
-        contractStatus: { values: ["履行中", "已终止"] },
-        contractDirection: { values: ["采购合同", "客户服务合同", "外包合同", "框架合同", "其他"] },
+        contractStatus: { values: ["草稿", "履行中", "已完成", "已终止", "已取消"] },
+        contractDirection: { values: ["采购合同", "客户服务合同", "外包合同", "其他"] },
+        contractForm: { values: ["一次性合同", "固定期限合同", "框架合同", "工程/建设合同"] },
+        contractSubjectCategory: {
+          values: [
+            "食材",
+            "餐具用品",
+            "厨房设备",
+            "广告标识/广告制作",
+            "装修/改造",
+            "土建/厂房/土地建设",
+            "电梯",
+            "团餐/食堂运营服务",
+            "分包/外包服务",
+            "其他",
+          ],
+        },
         contractExpiryState: { values: ["正常", "即将到期", "已到期", "已终止"] },
         wechatProcessingStatus: {
           values: ["待整理", "已转采购申请", "已转入库", "已转出库", "已归档", "无效"],

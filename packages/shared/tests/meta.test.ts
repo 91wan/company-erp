@@ -13,8 +13,10 @@ import {
   BUSINESS_PROJECT_TYPES,
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_FORMS,
   CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
+  CONTRACT_SUBJECT_CATEGORIES,
   getPermissionLevel,
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
@@ -31,6 +33,8 @@ import {
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
   PROJECT_SITE_PAYROLL_REQUIREMENT_STATUSES,
   PROJECT_SITE_ROSTER_STATUSES,
   PROJECT_SITE_ROSTER_WORKER_TYPES,
@@ -270,6 +274,8 @@ describe("MVP permission constants", () => {
   it("limits external project-site accounts to project usage request work", () => {
     expect(canRead(["external_project_site"], "projectUsage")).toBe(true);
     expect(canManage(["external_project_site"], "projectUsageRequest")).toBe(true);
+    expect(canRead(["external_project_site"], "projectSiteKitchenEquipment")).toBe(true);
+    expect(canManage(["external_project_site"], "projectSiteKitchenEquipment")).toBe(true);
     expect(canRead(["external_project_site"], "projectSites")).toBe(false);
     expect(canRead(["external_project_site"], "contracts")).toBe(false);
     expect(canRead(["external_project_site"], "inventoryQuantity")).toBe(false);
@@ -305,6 +311,48 @@ describe("MVP permission constants", () => {
     expect(canManage(["procurement"], "businessProjects")).toBe(true);
     expect(canRead(["project_site"], "businessProjects")).toBe(false);
     expect(canRead(["external_project_site"], "businessProjects")).toBe(false);
+  });
+});
+
+describe("project-site kitchen equipment dictionaries", () => {
+  it("defines equipment status and change request dictionaries", () => {
+    expect(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => status.code)).toEqual([
+      "in_use",
+      "damaged",
+      "repair_needed",
+      "returned",
+      "retired",
+    ]);
+    expect(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((status) => status.code)).toEqual([
+      "add",
+      "quantity_change",
+      "location_change",
+      "status_change",
+      "photo_or_note",
+    ]);
+    expect(MVP_DICTIONARIES.projectSiteKitchenEquipmentStatus.values).toEqual([
+      "使用中",
+      "损坏",
+      "待维修",
+      "已退回",
+      "已报废",
+    ]);
+    expect(MVP_PERMISSION_MATRIX.projectSiteKitchenEquipment.read).toEqual([
+      "admin",
+      "hr",
+      "procurement",
+      "warehouse",
+      "project_site",
+      "operations",
+      "external_project_site",
+      "viewer",
+    ]);
+    expect(MVP_PERMISSION_MATRIX.projectSiteKitchenEquipment.manage).toEqual([
+      "admin",
+      "hr",
+      "operations",
+      "external_project_site",
+    ]);
   });
 });
 
@@ -372,17 +420,43 @@ describe("MVP dictionary constants", () => {
     expect(MVP_DICTIONARIES.baseStatus.values).toEqual(["启用", "停用"]);
     expect(MVP_DICTIONARIES.employeeStatus.values).toEqual(["在职", "离职", "停用"]);
     expect(MVP_DICTIONARIES.contractStatus.values).toEqual([
+      "草稿",
       "履行中",
+      "已完成",
       "已终止",
+      "已取消",
     ]);
     expect(CONTRACT_DIRECTIONS.map((direction) => direction.code)).toEqual([
       "purchase_contract",
       "client_service_contract",
       "subcontract_contract",
-      "framework_contract",
       "other",
     ]);
-    expect(CONTRACT_STATUSES.map((status) => status.code)).toEqual(["active", "terminated"]);
+    expect(CONTRACT_FORMS.map((form) => form.code)).toEqual([
+      "one_time",
+      "fixed_term",
+      "framework",
+      "project_construction",
+    ]);
+    expect(CONTRACT_SUBJECT_CATEGORIES.map((category) => category.code)).toEqual([
+      "food_ingredients",
+      "tableware_supplies",
+      "kitchen_equipment",
+      "advertising_signage",
+      "renovation",
+      "civil_construction",
+      "elevator",
+      "service_operation",
+      "labor_subcontract",
+      "other",
+    ]);
+    expect(CONTRACT_STATUSES.map((status) => status.code)).toEqual([
+      "draft",
+      "active",
+      "completed",
+      "terminated",
+      "cancelled",
+    ]);
     expect(CONTRACT_EXPIRY_STATES.map((state) => state.code)).toEqual([
       "normal",
       "expiring_soon",
@@ -400,7 +474,24 @@ describe("MVP dictionary constants", () => {
       "采购合同",
       "客户服务合同",
       "外包合同",
+      "其他",
+    ]);
+    expect(MVP_DICTIONARIES.contractForm.values).toEqual([
+      "一次性合同",
+      "固定期限合同",
       "框架合同",
+      "工程/建设合同",
+    ]);
+    expect(MVP_DICTIONARIES.contractSubjectCategory.values).toEqual([
+      "食材",
+      "餐具用品",
+      "厨房设备",
+      "广告标识/广告制作",
+      "装修/改造",
+      "土建/厂房/土地建设",
+      "电梯",
+      "团餐/食堂运营服务",
+      "分包/外包服务",
       "其他",
     ]);
     expect(MVP_DICTIONARIES.contractInvestmentCategory.values).toEqual([

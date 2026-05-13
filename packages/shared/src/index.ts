@@ -35,6 +35,7 @@ export type MvpPermissionMatrix = {
   certificates: MvpPermissionRule;
   businessProjects: MvpPermissionRule;
   projectSites: MvpPermissionRule;
+  projectSiteKitchenEquipment: MvpPermissionRule;
   projectUsage: MvpPermissionRule;
   projectUsageRequest: MvpPermissionRule;
   marketOperationsHandoffs: MvpPermissionRule;
@@ -110,7 +111,20 @@ export type ContractDirectionCode =
   | "purchase_contract"
   | "client_service_contract"
   | "subcontract_contract"
-  | "framework_contract"
+  | "other";
+
+export type ContractFormCode = "one_time" | "fixed_term" | "framework" | "project_construction";
+
+export type ContractSubjectCategoryCode =
+  | "food_ingredients"
+  | "tableware_supplies"
+  | "kitchen_equipment"
+  | "advertising_signage"
+  | "renovation"
+  | "civil_construction"
+  | "elevator"
+  | "service_operation"
+  | "labor_subcontract"
   | "other";
 
 export type ContractInvestmentCategoryCode =
@@ -120,7 +134,7 @@ export type ContractInvestmentCategoryCode =
   | "tableware_supplies"
   | "other";
 
-export type ContractStatusCode = "active" | "terminated";
+export type ContractStatusCode = "draft" | "active" | "completed" | "terminated" | "cancelled";
 
 export type ContractExpiryStateCode = "normal" | "expiring_soon" | "expired" | "terminated";
 
@@ -194,6 +208,20 @@ export type ProjectSiteRosterStatusCode = "active" | "left";
 export type ProjectSitePayrollRequirementStatusCode = "not_required" | "required";
 
 export type ProjectSiteComplianceReviewStatusCode = "pending" | "approved" | "rejected";
+
+export type ProjectSiteKitchenEquipmentStatusCode =
+  | "in_use"
+  | "damaged"
+  | "repair_needed"
+  | "returned"
+  | "retired";
+
+export type ProjectSiteKitchenEquipmentChangeTypeCode =
+  | "add"
+  | "quantity_change"
+  | "location_change"
+  | "status_change"
+  | "photo_or_note";
 
 export type ProjectUsageStatusCode = "pending" | "issued" | "partially_issued" | "rejected";
 
@@ -704,6 +732,8 @@ export type ContractDto = {
   counterpartyPartyName?: string | null;
   counterpartyNameSnapshot: string;
   direction: ContractDirectionCode;
+  contractForm: ContractFormCode;
+  subjectCategory: ContractSubjectCategoryCode;
   investmentCategory?: ContractInvestmentCategoryCode | null;
   businessProjectId?: string | null;
   businessProjectName?: string | null;
@@ -729,6 +759,8 @@ export type CreateContractInput = {
   counterpartyPartyId: string;
   counterpartyNameSnapshot?: string | null;
   direction: ContractDirectionCode;
+  contractForm: ContractFormCode;
+  subjectCategory: ContractSubjectCategoryCode;
   investmentCategory?: ContractInvestmentCategoryCode | null;
   businessProjectId?: string | null;
   projectSiteId?: string | null;
@@ -1099,6 +1131,92 @@ export type ProjectSiteComplianceSummaryDto = {
   generatedAt: string;
 };
 
+export type ProjectSiteKitchenEquipmentDto = {
+  id: string;
+  projectSiteId: string;
+  projectSiteName?: string | null;
+  equipmentName: string;
+  equipmentCategory?: string | null;
+  specification?: string | null;
+  quantity: number;
+  unit: string;
+  location?: string | null;
+  status: ProjectSiteKitchenEquipmentStatusCode;
+  companyAssetTag?: string | null;
+  sourceContractId?: string | null;
+  sourceContractNo?: string | null;
+  sourceContractName?: string | null;
+  lastCheckedDate?: string | null;
+  attachmentPath?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectSiteKitchenEquipmentInput = {
+  projectSiteId: string;
+  equipmentName: string;
+  equipmentCategory?: string | null;
+  specification?: string | null;
+  quantity: number;
+  unit: string;
+  location?: string | null;
+  status?: ProjectSiteKitchenEquipmentStatusCode;
+  companyAssetTag?: string | null;
+  sourceContractId?: string | null;
+  lastCheckedDate?: string | null;
+  attachmentPath?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateProjectSiteKitchenEquipmentInput = Partial<CreateProjectSiteKitchenEquipmentInput>;
+
+export type ProjectSiteKitchenEquipmentChangeRequestDto = {
+  id: string;
+  projectSiteId: string;
+  projectSiteName?: string | null;
+  equipmentId?: string | null;
+  equipmentName: string;
+  changeType: ProjectSiteKitchenEquipmentChangeTypeCode;
+  proposedQuantity?: number | null;
+  proposedLocation?: string | null;
+  proposedStatus?: ProjectSiteKitchenEquipmentStatusCode | null;
+  attachmentPath?: string | null;
+  description?: string | null;
+  submittedByAccountId?: string | null;
+  submittedByNameSnapshot?: string | null;
+  submittedByPhoneSnapshot?: string | null;
+  reviewStatus: ProjectSiteComplianceReviewStatusCode;
+  reviewedByEmployeeId?: string | null;
+  reviewedByEmployeeName?: string | null;
+  reviewedAt?: string | null;
+  reviewRemark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateProjectSiteKitchenEquipmentChangeRequestInput = {
+  projectSiteId: string;
+  equipmentId?: string | null;
+  equipmentName: string;
+  changeType: ProjectSiteKitchenEquipmentChangeTypeCode;
+  proposedQuantity?: number | null;
+  proposedLocation?: string | null;
+  proposedStatus?: ProjectSiteKitchenEquipmentStatusCode | null;
+  attachmentPath?: string | null;
+  description?: string | null;
+  submittedByAccountId?: string | null;
+  submittedByNameSnapshot?: string | null;
+  submittedByPhoneSnapshot?: string | null;
+};
+
+export type ReviewProjectSiteKitchenEquipmentChangeRequestInput = {
+  reviewStatus: Extract<ProjectSiteComplianceReviewStatusCode, "approved" | "rejected">;
+  reviewRemark?: string | null;
+  reviewedByEmployeeId?: string | null;
+  reviewedByEmployeeName?: string | null;
+};
+
 export type ProjectUsageRequestDto = {
   id: string;
   requestNo: string;
@@ -1368,9 +1486,28 @@ export const CONTRACT_DIRECTIONS = [
   { code: "purchase_contract", label: "采购合同" },
   { code: "client_service_contract", label: "客户服务合同" },
   { code: "subcontract_contract", label: "外包合同" },
-  { code: "framework_contract", label: "框架合同" },
   { code: "other", label: "其他" },
 ] as const satisfies readonly StatusMeta<ContractDirectionCode>[];
+
+export const CONTRACT_FORMS = [
+  { code: "one_time", label: "一次性合同" },
+  { code: "fixed_term", label: "固定期限合同" },
+  { code: "framework", label: "框架合同" },
+  { code: "project_construction", label: "工程/建设合同" },
+] as const satisfies readonly StatusMeta<ContractFormCode>[];
+
+export const CONTRACT_SUBJECT_CATEGORIES = [
+  { code: "food_ingredients", label: "食材" },
+  { code: "tableware_supplies", label: "餐具用品" },
+  { code: "kitchen_equipment", label: "厨房设备" },
+  { code: "advertising_signage", label: "广告标识/广告制作" },
+  { code: "renovation", label: "装修/改造" },
+  { code: "civil_construction", label: "土建/厂房/土地建设" },
+  { code: "elevator", label: "电梯" },
+  { code: "service_operation", label: "团餐/食堂运营服务" },
+  { code: "labor_subcontract", label: "分包/外包服务" },
+  { code: "other", label: "其他" },
+] as const satisfies readonly StatusMeta<ContractSubjectCategoryCode>[];
 
 export const CONTRACT_INVESTMENT_CATEGORIES = [
   { code: "renovation", label: "装修/改造" },
@@ -1381,8 +1518,11 @@ export const CONTRACT_INVESTMENT_CATEGORIES = [
 ] as const satisfies readonly StatusMeta<ContractInvestmentCategoryCode>[];
 
 export const CONTRACT_STATUSES = [
+  { code: "draft", label: "草稿" },
   { code: "active", label: "履行中" },
+  { code: "completed", label: "已完成" },
   { code: "terminated", label: "已终止" },
+  { code: "cancelled", label: "已取消" },
 ] as const satisfies readonly StatusMeta<ContractStatusCode>[];
 
 export const CONTRACT_EXPIRY_STATES = [
@@ -1511,6 +1651,22 @@ export const PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES = [
   { code: "rejected", label: "已驳回" },
 ] as const satisfies readonly StatusMeta<ProjectSiteComplianceReviewStatusCode>[];
 
+export const PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES = [
+  { code: "in_use", label: "使用中" },
+  { code: "damaged", label: "损坏" },
+  { code: "repair_needed", label: "待维修" },
+  { code: "returned", label: "已退回" },
+  { code: "retired", label: "已报废" },
+] as const satisfies readonly StatusMeta<ProjectSiteKitchenEquipmentStatusCode>[];
+
+export const PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES = [
+  { code: "add", label: "新增设备" },
+  { code: "quantity_change", label: "数量变化" },
+  { code: "location_change", label: "位置变化" },
+  { code: "status_change", label: "状态变化" },
+  { code: "photo_or_note", label: "照片/备注" },
+] as const satisfies readonly StatusMeta<ProjectSiteKitchenEquipmentChangeTypeCode>[];
+
 export const PROJECT_USAGE_STATUSES = [
   { code: "pending", label: "待处理" },
   { code: "issued", label: "已出库" },
@@ -1629,6 +1785,10 @@ export const MVP_PERMISSION_MATRIX = {
     read: ALL_ROLES,
     manage: ["admin", "hr"],
   },
+  projectSiteKitchenEquipment: {
+    read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_site", "viewer"],
+    manage: ["admin", "hr", "operations", "external_project_site"],
+  },
   projectUsage: {
     read: ["admin", "hr", "procurement", "warehouse", "project_site", "operations", "external_project_site", "viewer"],
     manage: ["admin", "project_site"],
@@ -1680,11 +1840,19 @@ export const MVP_DICTIONARIES = {
   },
   contractStatus: {
     label: "合同状态",
-    values: ["履行中", "已终止"],
+    values: CONTRACT_STATUSES.map((item) => item.label),
   },
   contractDirection: {
     label: "合同方向",
-    values: ["采购合同", "客户服务合同", "外包合同", "框架合同", "其他"],
+    values: CONTRACT_DIRECTIONS.map((item) => item.label),
+  },
+  contractForm: {
+    label: "合同形态",
+    values: CONTRACT_FORMS.map((item) => item.label),
+  },
+  contractSubjectCategory: {
+    label: "合同标的分类",
+    values: CONTRACT_SUBJECT_CATEGORIES.map((item) => item.label),
   },
   contractInvestmentCategory: {
     label: "合同投入分类",
@@ -1793,6 +1961,14 @@ export const MVP_DICTIONARIES = {
   projectSiteStatus: {
     label: "项目点状态",
     values: ["筹备中", "服务中", "暂停", "已结束"],
+  },
+  projectSiteKitchenEquipmentStatus: {
+    label: "厨房设备状态",
+    values: PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((item) => item.label),
+  },
+  projectSiteKitchenEquipmentChangeType: {
+    label: "厨房设备变更类型",
+    values: PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((item) => item.label),
   },
   employeeProjectSiteRelationType: {
     label: "项目点人员关系",

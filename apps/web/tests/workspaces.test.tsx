@@ -33,6 +33,8 @@ import {
   projectSiteAssignment,
   projectSiteComplianceSummary,
   projectSiteInvestmentSummary,
+  projectSiteKitchenEquipment,
+  projectSiteKitchenEquipmentChangeRequest,
   projectUsageRequest,
   purchaseRecord,
   purchaseRequest,
@@ -450,6 +452,53 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("待审核")).toBeInTheDocument();
   });
 
+  it("renders project-site kitchen equipment and lets site users report changes", async () => {
+    const createChangeRequest = vi.fn().mockResolvedValue({
+      ...projectSiteKitchenEquipmentChangeRequest,
+      id: "96969696-9696-4969-8969-969696969696",
+      description: "门封条损坏",
+    });
+
+    render(
+      <ProjectSitesWorkspace
+        usageOnly
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        loadUsageOptions={() =>
+          Promise.resolve({
+            defaultWarehouse: { id: warehouse.id, warehouseCode: warehouse.warehouseCode, warehouseName: warehouse.warehouseName },
+            materials: [{ id: material.id, materialCode: material.materialCode, materialName: material.materialName, unit: "套" }],
+          })
+        }
+        loadKitchenEquipment={() => Promise.resolve([projectSiteKitchenEquipment])}
+        loadKitchenEquipmentChangeRequests={() => Promise.resolve([projectSiteKitchenEquipmentChangeRequest])}
+        createKitchenEquipmentChangeRequest={createChangeRequest}
+      />,
+    );
+
+    expect((await screen.findAllByText("厨房设备")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("六门冰柜").length).toBeGreaterThan(0);
+    expect(screen.getByText("冷藏设备")).toBeInTheDocument();
+    expect(screen.getByText("2 台")).toBeInTheDocument();
+    expect(screen.getByText("WX-ZC-ICE-001")).toBeInTheDocument();
+    expect(screen.getByText("压缩机异响，需要维修")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("关联设备"), { target: { value: projectSiteKitchenEquipment.id } });
+    fireEvent.change(screen.getByLabelText("变更状态"), { target: { value: "damaged" } });
+    fireEvent.change(screen.getByLabelText("说明"), { target: { value: "门封条损坏" } });
+    fireEvent.click(screen.getByRole("button", { name: "提交上报" }));
+
+    expect(await screen.findByText("门封条损坏")).toBeInTheDocument();
+    expect(createChangeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectSiteId: "",
+        equipmentId: projectSiteKitchenEquipment.id,
+        equipmentName: "六门冰柜",
+        proposedStatus: "damaged",
+        description: "门封条损坏",
+      }),
+    );
+  });
+
   it("renders project site empty and error states", async () => {
     const { rerender } = render(
       <ProjectSitesWorkspace
@@ -611,7 +660,11 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("投入分类").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("合同形态").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("合同标的").length).toBeGreaterThan(0);
     expect(screen.getAllByText("业务项目").length).toBeGreaterThan(0);
+    const directionSelect = screen.getByLabelText("合同方向") as HTMLSelectElement;
+    expect(Array.from(directionSelect.options).map((option) => option.textContent)).not.toContain("框架合同");
     expect(await screen.findByText("HT20260511001.pdf")).toBeInTheDocument();
   });
 
@@ -657,6 +710,8 @@ describe("Company ERP workspace components", () => {
         createContract={(input) =>
           Promise.resolve({
             ...createdContract,
+            contractForm: input.contractForm,
+            subjectCategory: input.subjectCategory,
             investmentCategory: input.investmentCategory ?? null,
             businessProjectId: input.businessProjectId ?? null,
             businessProjectName: input.businessProjectId ? businessProject.projectName : null,
@@ -671,6 +726,8 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("合同名称"), { target: { value: "采购框架合同" } });
     fireEvent.change(screen.getByLabelText("相对方"), { target: { value: party.id } });
     fireEvent.change(screen.getByLabelText("合同方向"), { target: { value: "purchase_contract" } });
+    fireEvent.change(screen.getByLabelText("合同形态"), { target: { value: "framework" } });
+    fireEvent.change(screen.getByLabelText("合同标的"), { target: { value: "food_ingredients" } });
     fireEvent.change(screen.getByLabelText("投入分类"), { target: { value: "equipment" } });
     fireEvent.change(screen.getByLabelText("业务项目"), { target: { value: businessProject.id } });
     const projectSiteAssignmentSelect = screen
@@ -683,6 +740,8 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
 
     expect(await screen.findByText("HT20260511002")).toBeInTheDocument();
+    expect(screen.getAllByText("框架合同").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("食材").length).toBeGreaterThan(0);
     expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
     expect(screen.getByText("扬中中央厨房")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });

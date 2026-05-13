@@ -3,15 +3,19 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import {
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_FORMS,
   CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
+  CONTRACT_SUBJECT_CATEGORIES,
   type BusinessProjectDto,
   type ContractAttachmentDto,
   type ContractDirectionCode,
   type ContractDto,
   type ContractExpiryStateCode,
+  type ContractFormCode,
   type ContractInvestmentCategoryCode,
   type ContractStatusCode,
+  type ContractSubjectCategoryCode,
   type CreateContractAttachmentInput,
   type CreateContractInput,
   type PartyDto,
@@ -38,7 +42,10 @@ type ContractFormState = {
   contractName: string;
   counterpartyPartyId: string;
   direction: ContractDirectionCode;
+  contractForm: ContractFormCode;
+  subjectCategory: ContractSubjectCategoryCode;
   investmentCategory: "" | ContractInvestmentCategoryCode;
+  status: ContractStatusCode;
   businessProjectId: string;
   projectSiteId: string;
   signedDate: string;
@@ -60,6 +67,8 @@ type AttachmentFormState = {
 };
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
+const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
+const subjectCategoryLabel = new Map(CONTRACT_SUBJECT_CATEGORIES.map((category) => [category.code, category.label]));
 const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
 const expiryLabel = new Map(CONTRACT_EXPIRY_STATES.map((state) => [state.code, state.label]));
 
@@ -140,7 +149,10 @@ export function ContractsWorkspace({
     contractName: "",
     counterpartyPartyId: "",
     direction: "purchase_contract",
+    contractForm: "one_time",
+    subjectCategory: "other",
     investmentCategory: "",
+    status: "active",
     businessProjectId: "",
     projectSiteId: "",
     signedDate: "",
@@ -247,6 +259,8 @@ export function ContractsWorkspace({
           contract.counterpartyNameSnapshot,
           contract.projectSiteName,
           contract.businessProjectName,
+          contractFormLabel.get(contract.contractForm),
+          subjectCategoryLabel.get(contract.subjectCategory),
           contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : null,
           contract.attachmentRef,
         ]
@@ -266,6 +280,8 @@ export function ContractsWorkspace({
         contractName: contractForm.contractName,
         counterpartyPartyId: contractForm.counterpartyPartyId,
         direction: contractForm.direction,
+        contractForm: contractForm.contractForm,
+        subjectCategory: contractForm.subjectCategory,
         investmentCategory: contractForm.investmentCategory || null,
         businessProjectId: contractForm.businessProjectId || null,
         projectSiteId: contractForm.projectSiteId || null,
@@ -275,7 +291,7 @@ export function ContractsWorkspace({
         amount: contractForm.amount ? Number(contractForm.amount) : null,
         budgetAmount: contractForm.budgetAmount ? Number(contractForm.budgetAmount) : null,
         attachmentRef: contractForm.attachmentRef || null,
-        status: "active",
+        status: contractForm.status,
         remark: contractForm.remark || null,
       });
       setContracts((current) => [created, ...current.filter((contract) => contract.id !== created.id)]);
@@ -285,7 +301,10 @@ export function ContractsWorkspace({
         contractName: "",
         counterpartyPartyId: parties[0]?.id ?? "",
         direction: "purchase_contract",
+        contractForm: "one_time",
+        subjectCategory: "other",
         investmentCategory: "",
+        status: "active",
         businessProjectId: "",
         projectSiteId: "",
         signedDate: "",
@@ -410,6 +429,36 @@ export function ContractsWorkspace({
               {CONTRACT_DIRECTIONS.map((direction) => (
                 <option key={direction.code} value={direction.code}>
                   {direction.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>合同形态</span>
+            <select value={contractForm.contractForm} onChange={(event) => setContractForm((current) => ({ ...current, contractForm: event.target.value as ContractFormCode }))}>
+              {CONTRACT_FORMS.map((form) => (
+                <option key={form.code} value={form.code}>
+                  {form.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>合同标的</span>
+            <select value={contractForm.subjectCategory} onChange={(event) => setContractForm((current) => ({ ...current, subjectCategory: event.target.value as ContractSubjectCategoryCode }))}>
+              {CONTRACT_SUBJECT_CATEGORIES.map((category) => (
+                <option key={category.code} value={category.code}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>合同状态</span>
+            <select value={contractForm.status} onChange={(event) => setContractForm((current) => ({ ...current, status: event.target.value as ContractStatusCode }))}>
+              {CONTRACT_STATUSES.map((status) => (
+                <option key={status.code} value={status.code}>
+                  {status.label}
                 </option>
               ))}
             </select>
@@ -607,6 +656,8 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
             <th>名称</th>
             <th>相对方</th>
             <th>方向</th>
+            <th>合同形态</th>
+            <th>合同标的</th>
             <th>投入分类</th>
             <th>业务项目</th>
             <th>项目点</th>
@@ -623,6 +674,8 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
               <td>{contract.contractName}</td>
               <td>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</td>
               <td>{directionLabel.get(contract.direction)}</td>
+              <td>{contractFormLabel.get(contract.contractForm)}</td>
+              <td>{subjectCategoryLabel.get(contract.subjectCategory)}</td>
               <td>{contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : "-"}</td>
               <td>{contract.businessProjectName ?? "-"}</td>
               <td>{contract.projectSiteName ?? "-"}</td>

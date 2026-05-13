@@ -1,14 +1,18 @@
 import {
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_FORMS,
   CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
+  CONTRACT_SUBJECT_CATEGORIES,
   type ContractAttachmentDto,
   type ContractDirectionCode,
   type ContractDto,
   type ContractExpiryStateCode,
+  type ContractFormCode,
   type ContractInvestmentCategoryCode,
   type ContractStatusCode,
+  type ContractSubjectCategoryCode,
   type CreateContractAttachmentInput,
   type CreateContractInput,
   type UpdateContractAttachmentInput,
@@ -18,6 +22,8 @@ import {
 export type ContractListFilters = {
   status?: ContractStatusCode;
   direction?: ContractDirectionCode;
+  contractForm?: ContractFormCode;
+  subjectCategory?: ContractSubjectCategoryCode;
   investmentCategory?: ContractInvestmentCategoryCode;
   counterpartyPartyId?: string;
   businessProjectId?: string;
@@ -52,8 +58,10 @@ export class ContractValidationError extends Error {
 }
 
 const directions = new Set(CONTRACT_DIRECTIONS.map((direction) => direction.code));
+const contractForms = new Set(CONTRACT_FORMS.map((form) => form.code));
 const investmentCategories = new Set(CONTRACT_INVESTMENT_CATEGORIES.map((category) => category.code));
 const statuses = new Set(CONTRACT_STATUSES.map((status) => status.code));
+const subjectCategories = new Set(CONTRACT_SUBJECT_CATEGORIES.map((category) => category.code));
 const expiryStates = new Set(CONTRACT_EXPIRY_STATES.map((state) => state.code));
 
 function normalizeNullableString(value: unknown): string | null | undefined {
@@ -124,6 +132,25 @@ export function normalizeContractFilters(query: Record<string, unknown>): Contra
       filters.direction = query.direction as ContractDirectionCode;
     } else {
       issues.push("direction filter is unsupported");
+    }
+  }
+
+  if (query.contractForm !== undefined) {
+    if (typeof query.contractForm === "string" && contractForms.has(query.contractForm as ContractFormCode)) {
+      filters.contractForm = query.contractForm as ContractFormCode;
+    } else {
+      issues.push("contractForm filter is unsupported");
+    }
+  }
+
+  if (query.subjectCategory !== undefined) {
+    if (
+      typeof query.subjectCategory === "string" &&
+      subjectCategories.has(query.subjectCategory as ContractSubjectCategoryCode)
+    ) {
+      filters.subjectCategory = query.subjectCategory as ContractSubjectCategoryCode;
+    } else {
+      issues.push("subjectCategory filter is unsupported");
     }
   }
 
@@ -205,6 +232,25 @@ export function normalizeContractInput(
     }
   }
 
+  if (payload.contractForm !== undefined) {
+    if (typeof payload.contractForm === "string" && contractForms.has(payload.contractForm as ContractFormCode)) {
+      normalized.contractForm = payload.contractForm as ContractFormCode;
+    } else {
+      issues.push("contractForm is unsupported");
+    }
+  }
+
+  if (payload.subjectCategory !== undefined) {
+    if (
+      typeof payload.subjectCategory === "string" &&
+      subjectCategories.has(payload.subjectCategory as ContractSubjectCategoryCode)
+    ) {
+      normalized.subjectCategory = payload.subjectCategory as ContractSubjectCategoryCode;
+    } else {
+      issues.push("subjectCategory is unsupported");
+    }
+  }
+
   if (payload.investmentCategory !== undefined) {
     if (payload.investmentCategory === null) {
       normalized.investmentCategory = null;
@@ -235,6 +281,8 @@ export function normalizeContractInput(
     if (!normalized.contractName) issues.push("contractName is required");
     if (!normalized.counterpartyPartyId) issues.push("counterpartyPartyId is required");
     if (!normalized.direction) issues.push("direction is required");
+    if (!normalized.contractForm) issues.push("contractForm is required");
+    if (!normalized.subjectCategory) issues.push("subjectCategory is required");
     if (!normalized.startDate) issues.push("startDate is required");
     if (!normalized.endDate) issues.push("endDate is required");
   }

@@ -107,7 +107,26 @@ enum ContractDirection {
   purchase_contract
   client_service_contract
   subcontract_contract
-  framework_contract
+  other
+}
+
+enum ContractForm {
+  one_time
+  fixed_term
+  framework
+  project_construction
+}
+
+enum ContractSubjectCategory {
+  food_ingredients
+  tableware_supplies
+  kitchen_equipment
+  advertising_signage
+  renovation
+  civil_construction
+  elevator
+  service_operation
+  labor_subcontract
   other
 }
 
@@ -120,8 +139,11 @@ enum ContractInvestmentCategory {
 }
 
 enum ContractStatus {
+  draft
   active
+  completed
   terminated
+  cancelled
 }
 
 enum BusinessProjectType {
@@ -475,6 +497,22 @@ enum ProjectSiteComplianceReviewStatus {
   rejected
 }
 
+enum ProjectSiteKitchenEquipmentStatus {
+  in_use
+  damaged
+  repair_needed
+  returned
+  retired
+}
+
+enum ProjectSiteKitchenEquipmentChangeType {
+  add
+  quantity_change
+  location_change
+  status_change
+  photo_or_note
+}
+
 enum EmployeeProjectSiteRelationType {
   assigned
   manager
@@ -532,6 +570,7 @@ model Employee {
   confirmedCertificates  CertificateRecord[]             @relation("CertificateConfirmedByEmployee")
   reviewedInsurancePolicies ProjectSiteEmployerLiabilityInsurancePolicy[] @relation("InsuranceReviewedByEmployee")
   reviewedPayrollSubmissions ProjectSitePayrollSubmission[] @relation("PayrollReviewedByEmployee")
+  reviewedKitchenEquipmentChangeRequests ProjectSiteKitchenEquipmentChangeRequest[] @relation("KitchenEquipmentChangeReviewedByEmployee")
   marketOwnedHandoffs    MarketOperationsHandoff[]       @relation("MarketOperationsHandoffMarketOwner")
   operationsOwnedHandoffs MarketOperationsHandoff[]       @relation("MarketOperationsHandoffOperationsOwner")
   managedBusinessProjects BusinessProject[]               @relation("BusinessProjectManager")
@@ -643,6 +682,8 @@ model ProjectSite {
   rosterPeople     ProjectSiteRosterPerson[]
   employerLiabilityInsurancePolicies ProjectSiteEmployerLiabilityInsurancePolicy[]
   payrollSubmissions ProjectSitePayrollSubmission[]
+  kitchenEquipment ProjectSiteKitchenEquipment[]
+  kitchenEquipmentChangeRequests ProjectSiteKitchenEquipmentChangeRequest[]
 
   @@index([status])
   @@index([businessProjectId])
@@ -742,6 +783,65 @@ model ProjectSitePayrollSubmission {
   @@unique([projectSiteId, payrollMonth])
   @@index([reviewStatus])
   @@map("project_site_payroll_submissions")
+}
+
+model ProjectSiteKitchenEquipment {
+  id                 String                            @id @default(uuid()) @db.Uuid
+  projectSiteId      String                            @map("project_site_id") @db.Uuid
+  equipmentName      String                            @map("equipment_name")
+  equipmentCategory  String?                           @map("equipment_category")
+  specification      String?
+  quantity           Decimal                           @db.Decimal(14, 4)
+  unit               String
+  location           String?
+  status             ProjectSiteKitchenEquipmentStatus @default(in_use)
+  companyAssetTag    String?                           @map("company_asset_tag")
+  sourceContractId   String?                           @map("source_contract_id") @db.Uuid
+  lastCheckedDate    DateTime?                         @map("last_checked_date") @db.Date
+  attachmentPath     String?                           @map("attachment_path")
+  remark             String?
+  createdAt          DateTime                          @default(now()) @map("created_at")
+  updatedAt          DateTime                          @updatedAt @map("updated_at")
+
+  projectSite    ProjectSite @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  sourceContract Contract?   @relation(fields: [sourceContractId], references: [id], onDelete: SetNull)
+  changeRequests ProjectSiteKitchenEquipmentChangeRequest[]
+
+  @@index([projectSiteId])
+  @@index([status])
+  @@index([sourceContractId])
+  @@map("project_site_kitchen_equipment")
+}
+
+model ProjectSiteKitchenEquipmentChangeRequest {
+  id                       String                                @id @default(uuid()) @db.Uuid
+  projectSiteId            String                                @map("project_site_id") @db.Uuid
+  equipmentId              String?                               @map("equipment_id") @db.Uuid
+  equipmentName            String                                @map("equipment_name")
+  changeType               ProjectSiteKitchenEquipmentChangeType @map("change_type")
+  proposedQuantity         Decimal?                              @map("proposed_quantity") @db.Decimal(14, 4)
+  proposedLocation         String?                               @map("proposed_location")
+  proposedStatus           ProjectSiteKitchenEquipmentStatus?    @map("proposed_status")
+  attachmentPath           String?                               @map("attachment_path")
+  description              String?
+  submittedByAccountId     String?                               @map("submitted_by_account_id") @db.Uuid
+  submittedByNameSnapshot  String?                               @map("submitted_by_name_snapshot")
+  submittedByPhoneSnapshot String?                               @map("submitted_by_phone_snapshot")
+  reviewStatus             ProjectSiteComplianceReviewStatus     @default(pending) @map("review_status")
+  reviewedByEmployeeId     String?                               @map("reviewed_by_employee_id") @db.Uuid
+  reviewedAt               DateTime?                             @map("reviewed_at")
+  reviewRemark             String?                               @map("review_remark")
+  createdAt                DateTime                              @default(now()) @map("created_at")
+  updatedAt                DateTime                              @updatedAt @map("updated_at")
+
+  projectSite        ProjectSite                  @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  equipment          ProjectSiteKitchenEquipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  reviewedByEmployee Employee?                    @relation("KitchenEquipmentChangeReviewedByEmployee", fields: [reviewedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([projectSiteId])
+  @@index([equipmentId])
+  @@index([reviewStatus])
+  @@map("project_site_kitchen_equipment_change_requests")
 }
 
 model ExternalProjectSiteAccount {
@@ -912,6 +1012,8 @@ model Contract {
   counterpartyPartyId      String             @map("counterparty_party_id") @db.Uuid
   counterpartyNameSnapshot String             @map("counterparty_name_snapshot")
   direction                ContractDirection
+  contractForm             ContractForm       @default(fixed_term) @map("contract_form")
+  subjectCategory          ContractSubjectCategory @default(other) @map("subject_category")
   investmentCategory       ContractInvestmentCategory? @map("investment_category")
   businessProjectId        String?            @map("business_project_id") @db.Uuid
   projectSiteId            String?            @map("project_site_id") @db.Uuid
@@ -932,11 +1034,14 @@ model Contract {
   projectSite       ProjectSite?         @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
   attachments       ContractAttachment[]
   purchaseRecords   PurchaseRecord[]
+  kitchenEquipment  ProjectSiteKitchenEquipment[]
 
   @@index([counterpartyPartyId])
   @@index([businessProjectId])
   @@index([projectSiteId])
   @@index([direction])
+  @@index([contractForm])
+  @@index([subjectCategory])
   @@index([investmentCategory])
   @@index([status])
   @@index([endDate])

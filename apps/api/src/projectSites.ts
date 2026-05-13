@@ -1,11 +1,15 @@
 import {
   PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
+  PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
   PROJECT_SITE_ROSTER_STATUSES,
   PROJECT_SITE_ROSTER_WORKER_TYPES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
   type CreateProjectSiteInput,
+  type CreateProjectSiteKitchenEquipmentChangeRequestInput,
+  type CreateProjectSiteKitchenEquipmentInput,
   type CreateProjectUsageRequestInput,
   type IssueProjectUsageRequestInput,
   type ProjectSiteComplianceReviewStatusCode,
@@ -14,6 +18,10 @@ import {
   type ProjectSiteEmployerLiabilityInsurancePolicyDto,
   type ProjectSiteDto,
   type ProjectSiteInvestmentSummaryDto,
+  type ProjectSiteKitchenEquipmentChangeRequestDto,
+  type ProjectSiteKitchenEquipmentChangeTypeCode,
+  type ProjectSiteKitchenEquipmentDto,
+  type ProjectSiteKitchenEquipmentStatusCode,
   type ProjectSitePayrollSubmissionDto,
   type ProjectSiteRosterPersonDto,
   type ProjectSiteRosterStatusCode,
@@ -22,7 +30,9 @@ import {
   type ProjectSiteStatusCode,
   type ProjectUsageRequestDto,
   type ProjectUsageStatusCode,
+  type ReviewProjectSiteKitchenEquipmentChangeRequestInput,
   type UpdateProjectSiteInput,
+  type UpdateProjectSiteKitchenEquipmentInput,
   type UpdateProjectUsageRequestInput,
 } from "@company-erp/shared";
 
@@ -62,6 +72,18 @@ export type ProjectSitePayrollSubmissionListFilters = {
   projectSiteId?: string;
   projectSiteIds?: readonly string[];
   payrollMonth?: string;
+};
+
+export type ProjectSiteKitchenEquipmentListFilters = {
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+  status?: ProjectSiteKitchenEquipmentStatusCode;
+};
+
+export type ProjectSiteKitchenEquipmentChangeRequestListFilters = {
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+  reviewStatus?: ProjectSiteComplianceReviewStatusCode;
 };
 
 export type CreateProjectSiteRosterPersonInput = {
@@ -125,6 +147,22 @@ export type ProjectSiteComplianceRepository = {
   getComplianceSummary(projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null>;
 };
 
+export type ProjectSiteKitchenEquipmentRepository = {
+  listEquipment(filters: ProjectSiteKitchenEquipmentListFilters): Promise<ProjectSiteKitchenEquipmentDto[]>;
+  createEquipment(input: CreateProjectSiteKitchenEquipmentInput): Promise<ProjectSiteKitchenEquipmentDto>;
+  updateEquipment(id: string, input: UpdateProjectSiteKitchenEquipmentInput): Promise<ProjectSiteKitchenEquipmentDto | null>;
+  listChangeRequests(
+    filters: ProjectSiteKitchenEquipmentChangeRequestListFilters,
+  ): Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]>;
+  createChangeRequest(
+    input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
+  ): Promise<ProjectSiteKitchenEquipmentChangeRequestDto>;
+  reviewChangeRequest(
+    id: string,
+    input: ReviewProjectSiteKitchenEquipmentChangeRequestInput,
+  ): Promise<ProjectSiteKitchenEquipmentChangeRequestDto | null>;
+};
+
 export type ProjectUsageRequestRepository = {
   list(filters: ProjectUsageRequestListFilters): Promise<ProjectUsageRequestDto[]>;
   getById(id: string): Promise<ProjectUsageRequestDto | null>;
@@ -167,6 +205,8 @@ const usageStatuses = new Set(PROJECT_USAGE_STATUSES.map((status) => status.code
 const rosterStatuses = new Set(PROJECT_SITE_ROSTER_STATUSES.map((status) => status.code));
 const rosterWorkerTypes = new Set(PROJECT_SITE_ROSTER_WORKER_TYPES.map((type) => type.code));
 const complianceReviewStatuses = new Set(PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES.map((status) => status.code));
+const kitchenEquipmentStatuses = new Set(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => status.code));
+const kitchenEquipmentChangeTypes = new Set(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => type.code));
 
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -405,6 +445,174 @@ export function normalizeProjectSitePayrollSubmissionInput(input: unknown): Crea
     submittedBy: normalizeNullableString(payload.submittedBy),
     reviewStatus,
     remark: normalizeNullableString(payload.remark),
+  };
+}
+
+export function normalizeProjectSiteKitchenEquipmentFilters(
+  query: Record<string, unknown>,
+): ProjectSiteKitchenEquipmentListFilters {
+  const issues: string[] = [];
+  const filters: ProjectSiteKitchenEquipmentListFilters = {};
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  if (query.status !== undefined) {
+    if (
+      typeof query.status === "string" &&
+      kitchenEquipmentStatuses.has(query.status as ProjectSiteKitchenEquipmentStatusCode)
+    ) {
+      filters.status = query.status as ProjectSiteKitchenEquipmentStatusCode;
+    } else {
+      issues.push("status filter is unsupported");
+    }
+  }
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return filters;
+}
+
+export function normalizeProjectSiteKitchenEquipmentInput(
+  input: unknown,
+  mode: "create",
+): CreateProjectSiteKitchenEquipmentInput;
+export function normalizeProjectSiteKitchenEquipmentInput(
+  input: unknown,
+  mode: "update",
+): UpdateProjectSiteKitchenEquipmentInput;
+export function normalizeProjectSiteKitchenEquipmentInput(
+  input: unknown,
+  mode: "create" | "update",
+): CreateProjectSiteKitchenEquipmentInput | UpdateProjectSiteKitchenEquipmentInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const normalized: UpdateProjectSiteKitchenEquipmentInput = {};
+  if (typeof payload.projectSiteId === "string") normalized.projectSiteId = payload.projectSiteId.trim();
+  if (typeof payload.equipmentName === "string") normalized.equipmentName = payload.equipmentName.trim();
+  if (payload.quantity !== undefined) normalized.quantity = normalizePositiveNumber(payload.quantity, "quantity", issues);
+  if (typeof payload.unit === "string") normalized.unit = payload.unit.trim();
+  for (const field of [
+    "equipmentCategory",
+    "specification",
+    "location",
+    "companyAssetTag",
+    "sourceContractId",
+    "attachmentPath",
+    "remark",
+  ] as const) {
+    const value = normalizeNullableString(payload[field]);
+    if (value !== undefined) normalized[field] = value;
+  }
+  const lastCheckedDate = normalizeOptionalDate(payload.lastCheckedDate, "lastCheckedDate", issues);
+  if (lastCheckedDate !== undefined) normalized.lastCheckedDate = lastCheckedDate;
+  if (payload.status !== undefined) {
+    if (
+      typeof payload.status === "string" &&
+      kitchenEquipmentStatuses.has(payload.status as ProjectSiteKitchenEquipmentStatusCode)
+    ) {
+      normalized.status = payload.status as ProjectSiteKitchenEquipmentStatusCode;
+    } else {
+      issues.push("status is unsupported");
+    }
+  }
+  if (mode === "create") {
+    if (!normalized.projectSiteId) issues.push("projectSiteId is required");
+    if (!normalized.equipmentName) issues.push("equipmentName is required");
+    if (!normalized.quantity) issues.push("quantity must be a positive number");
+    if (!normalized.unit) issues.push("unit is required");
+  }
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  if (mode === "create") {
+    return {
+      ...normalized,
+      projectSiteId: normalized.projectSiteId!,
+      equipmentName: normalized.equipmentName!,
+      quantity: normalized.quantity!,
+      unit: normalized.unit!,
+      status: normalized.status ?? "in_use",
+    };
+  }
+  return normalized;
+}
+
+export function normalizeProjectSiteKitchenEquipmentChangeRequestFilters(
+  query: Record<string, unknown>,
+): ProjectSiteKitchenEquipmentChangeRequestListFilters {
+  const issues: string[] = [];
+  const filters: ProjectSiteKitchenEquipmentChangeRequestListFilters = {};
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  if (query.reviewStatus !== undefined) {
+    if (
+      typeof query.reviewStatus === "string" &&
+      complianceReviewStatuses.has(query.reviewStatus as ProjectSiteComplianceReviewStatusCode)
+    ) {
+      filters.reviewStatus = query.reviewStatus as ProjectSiteComplianceReviewStatusCode;
+    } else {
+      issues.push("reviewStatus filter is unsupported");
+    }
+  }
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return filters;
+}
+
+export function normalizeProjectSiteKitchenEquipmentChangeRequestInput(
+  input: unknown,
+): CreateProjectSiteKitchenEquipmentChangeRequestInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+
+  const payload = input as Record<string, unknown>;
+  const issues: string[] = [];
+  const projectSiteId = normalizeRequiredString(payload.projectSiteId, "projectSiteId", issues);
+  const equipmentName = normalizeRequiredString(payload.equipmentName, "equipmentName", issues);
+  const changeType =
+    typeof payload.changeType === "string" &&
+    kitchenEquipmentChangeTypes.has(payload.changeType as ProjectSiteKitchenEquipmentChangeTypeCode)
+      ? (payload.changeType as ProjectSiteKitchenEquipmentChangeTypeCode)
+      : undefined;
+  if (!changeType) issues.push("changeType is unsupported");
+  const proposedQuantity = normalizeOptionalPositiveNumber(payload.proposedQuantity, "proposedQuantity", issues);
+  const proposedStatus =
+    payload.proposedStatus === undefined || payload.proposedStatus === null
+      ? (payload.proposedStatus as undefined | null)
+      : typeof payload.proposedStatus === "string" &&
+          kitchenEquipmentStatuses.has(payload.proposedStatus as ProjectSiteKitchenEquipmentStatusCode)
+        ? (payload.proposedStatus as ProjectSiteKitchenEquipmentStatusCode)
+        : undefined;
+  if (payload.proposedStatus !== undefined && proposedStatus === undefined) issues.push("proposedStatus is unsupported");
+  if (issues.length > 0) throw new ProjectSiteValidationError(issues);
+  return {
+    projectSiteId: projectSiteId!,
+    equipmentId: normalizeNullableString(payload.equipmentId),
+    equipmentName: equipmentName!,
+    changeType: changeType!,
+    proposedQuantity,
+    proposedLocation: normalizeNullableString(payload.proposedLocation),
+    proposedStatus,
+    attachmentPath: normalizeNullableString(payload.attachmentPath),
+    description: normalizeNullableString(payload.description),
+    submittedByAccountId: normalizeNullableString(payload.submittedByAccountId),
+    submittedByNameSnapshot: normalizeNullableString(payload.submittedByNameSnapshot),
+    submittedByPhoneSnapshot: normalizeNullableString(payload.submittedByPhoneSnapshot),
+  };
+}
+
+export function normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput(
+  input: unknown,
+): ReviewProjectSiteKitchenEquipmentChangeRequestInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ProjectSiteValidationError(["Payload must be an object"]);
+  }
+  const payload = input as Record<string, unknown>;
+  const reviewStatus =
+    payload.reviewStatus === "approved" || payload.reviewStatus === "rejected" ? payload.reviewStatus : undefined;
+  if (!reviewStatus) throw new ProjectSiteValidationError(["reviewStatus must be approved or rejected"]);
+  return {
+    reviewStatus,
+    reviewRemark: normalizeNullableString(payload.reviewRemark),
+    reviewedByEmployeeId: normalizeNullableString(payload.reviewedByEmployeeId),
+    reviewedByEmployeeName: normalizeNullableString(payload.reviewedByEmployeeName),
   };
 }
 

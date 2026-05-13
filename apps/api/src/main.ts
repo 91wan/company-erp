@@ -22,6 +22,7 @@ import { createPrismaReplenishmentSuggestionRepository } from "./prismaReplenish
 import { createPrismaInventoryRepository } from "./prismaInventoryRepository.js";
 import {
   createPrismaProjectSiteComplianceRepository,
+  createPrismaProjectSiteKitchenEquipmentRepository,
   createPrismaProjectSiteRepository,
   createPrismaProjectUsageRequestRepository,
 } from "./prismaProjectSitesRepository.js";
@@ -62,6 +63,7 @@ const app = buildApp({
   replenishmentSuggestionRepository: prisma ? createPrismaReplenishmentSuggestionRepository(prisma) : undefined,
   projectSiteRepository: prisma ? createPrismaProjectSiteRepository(prisma) : undefined,
   projectSiteComplianceRepository: prisma ? createPrismaProjectSiteComplianceRepository(prisma) : undefined,
+  projectSiteKitchenEquipmentRepository: prisma ? createPrismaProjectSiteKitchenEquipmentRepository(prisma) : undefined,
   projectUsageRequestRepository: prisma ? createPrismaProjectUsageRequestRepository(prisma) : undefined,
   contractRepository: prisma ? createPrismaContractRepository(prisma) : undefined,
   businessProjectRepository: prisma ? createPrismaBusinessProjectRepository(prisma) : undefined,

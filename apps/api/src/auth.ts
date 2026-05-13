@@ -214,6 +214,12 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/project-sites")) {
     return { area: "projectSites", requiredLevel };
   }
+  if (
+    pathname.startsWith("/api/project-site-kitchen-equipment") ||
+    pathname.startsWith("/api/project-site-kitchen-equipment-change-requests")
+  ) {
+    return { area: "projectSiteKitchenEquipment", requiredLevel };
+  }
   if (pathname.startsWith("/api/project-usage-options")) {
     return { area: "projectUsageRequest", requiredLevel: "read" };
   }
