@@ -1,15 +1,20 @@
 import { ClipboardList, Filter, MapPin, PackageMinus, RefreshCw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
+  CONTRACT_INVESTMENT_CATEGORIES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
+  type BusinessProjectDto,
   type CreateProjectSiteInput,
   type CreateProjectUsageRequestInput,
   type IssueProjectUsageRequestInput,
   type MaterialDto,
   type PartyDto,
   type ProjectSiteDto,
+  type ProjectSiteInvestmentSummaryDto,
+  type ProjectUsageOptionMaterialDto,
+  type ProjectUsageOptionsDto,
   type ProjectUsageRequestDto,
   type ProjectUsageStatusCode,
   type WarehouseDto,
@@ -25,10 +30,20 @@ type ProjectSitesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
+  loadUsageOptions?: () => Promise<ProjectUsageOptionsDto>;
+  loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
+  loadInvestmentSummary?: (projectSiteId: string) => Promise<ProjectSiteInvestmentSummaryDto>;
   canManage?: boolean;
   canManageSites?: boolean;
   canManageUsage?: boolean;
   canIssue?: boolean;
+  usageOnly?: boolean;
+};
+
+type UsageWarehouseOption = {
+  id: string;
+  warehouseCode: string;
+  warehouseName: string;
 };
 
 type SiteFormState = {
@@ -41,6 +56,7 @@ type SiteFormState = {
   region: string;
   siteAddress: string;
   serviceType: string;
+  businessProjectId: string;
   primaryManagerEmployeeId: string;
   clientContactName: string;
   clientContactPhone: string;
@@ -72,6 +88,7 @@ type IssueFormState = {
 const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
+const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
 
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
   const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
@@ -98,6 +115,22 @@ async function defaultLoadMaterials(): Promise<MaterialDto[]> {
 async function defaultLoadWarehouses(): Promise<WarehouseDto[]> {
   const payload = await requestJson<{ warehouses: WarehouseDto[] }>(`${apiBaseUrl}/api/warehouses`);
   return payload.warehouses;
+}
+
+async function defaultLoadUsageOptions(): Promise<ProjectUsageOptionsDto> {
+  return requestJson<ProjectUsageOptionsDto>(`${apiBaseUrl}/api/project-usage-options`);
+}
+
+async function defaultLoadBusinessProjects(): Promise<BusinessProjectDto[]> {
+  const payload = await requestJson<{ businessProjects: BusinessProjectDto[] }>(`${apiBaseUrl}/api/business-projects`);
+  return payload.businessProjects;
+}
+
+async function defaultLoadInvestmentSummary(projectSiteId: string): Promise<ProjectSiteInvestmentSummaryDto> {
+  const payload = await requestJson<{ investmentSummary: ProjectSiteInvestmentSummaryDto }>(
+    `${apiBaseUrl}/api/project-sites/${projectSiteId}/investment-summary`,
+  );
+  return payload.investmentSummary;
 }
 
 async function defaultCreateProjectSite(input: CreateProjectSiteInput): Promise<ProjectSiteDto> {
@@ -142,10 +175,14 @@ export function ProjectSitesWorkspace({
   loadParties = defaultLoadParties,
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
+  loadUsageOptions = defaultLoadUsageOptions,
+  loadBusinessProjects = defaultLoadBusinessProjects,
+  loadInvestmentSummary = defaultLoadInvestmentSummary,
   canManage = true,
   canManageSites,
   canManageUsage,
   canIssue,
+  usageOnly = false,
 }: ProjectSitesWorkspaceProps) {
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
@@ -153,8 +190,12 @@ export function ProjectSitesWorkspace({
   const [sites, setSites] = useState<ProjectSiteDto[]>([]);
   const [usageRequests, setUsageRequests] = useState<ProjectUsageRequestDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
-  const [materials, setMaterials] = useState<MaterialDto[]>([]);
-  const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
+  const [materials, setMaterials] = useState<ProjectUsageOptionMaterialDto[]>([]);
+  const [warehouses, setWarehouses] = useState<UsageWarehouseOption[]>([]);
+  const [businessProjects, setBusinessProjects] = useState<BusinessProjectDto[]>([]);
+  const [selectedInvestmentSiteId, setSelectedInvestmentSiteId] = useState("");
+  const [investmentSummary, setInvestmentSummary] = useState<ProjectSiteInvestmentSummaryDto | null>(null);
+  const [investmentSummaryStatus, setInvestmentSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [siteStatus, setSiteStatus] = useState<"loading" | "ready" | "error">("loading");
   const [usageStatus, setUsageStatus] = useState<"loading" | "ready" | "error">("loading");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -173,6 +214,7 @@ export function ProjectSitesWorkspace({
     region: "",
     siteAddress: "",
     serviceType: "",
+    businessProjectId: "",
     primaryManagerEmployeeId: "",
     clientContactName: "",
     clientContactPhone: "",
@@ -200,6 +242,12 @@ export function ProjectSitesWorkspace({
   });
 
   useEffect(() => {
+    if (usageOnly) {
+      setSites([]);
+      setSiteStatus("ready");
+      setSelectedInvestmentSiteId("");
+      return;
+    }
     let mounted = true;
     setSiteStatus("loading");
     loadProjectSites()
@@ -208,6 +256,7 @@ export function ProjectSitesWorkspace({
         setSites(nextSites);
         setSiteStatus("ready");
         setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+        setSelectedInvestmentSiteId((current) => current || nextSites[0]?.id || "");
       })
       .catch(() => {
         if (!mounted) return;
@@ -216,7 +265,7 @@ export function ProjectSitesWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadProjectSites]);
+  }, [loadProjectSites, usageOnly]);
 
   useEffect(() => {
     let mounted = true;
@@ -240,18 +289,54 @@ export function ProjectSitesWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
-    Promise.all([loadParties(), loadMaterials(), loadWarehouses()])
-      .then(([nextParties, nextMaterials, nextWarehouses]) => {
+    if (usageOnly) {
+      loadUsageOptions()
+        .then((options) => {
+          if (!mounted) return;
+          setParties([]);
+          setBusinessProjects([]);
+          setWarehouses(options.defaultWarehouse ? [options.defaultWarehouse] : []);
+          setMaterials([...options.materials]);
+          setMasterStatus("ready");
+          setUsageForm((current) => ({
+            ...current,
+            warehouseId: current.warehouseId || options.defaultWarehouse?.id || "",
+            materialId: current.materialId || options.materials[0]?.id || "",
+            unit: current.unit || options.materials[0]?.unit || "",
+          }));
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setMasterStatus("error");
+        });
+      return () => {
+        mounted = false;
+      };
+    }
+
+    Promise.all([loadParties(), loadMaterials(), loadWarehouses(), loadBusinessProjects()])
+      .then(([nextParties, nextMaterials, nextWarehouses, nextBusinessProjects]) => {
         if (!mounted) return;
         setParties(nextParties);
-        setMaterials(nextMaterials);
-        setWarehouses(nextWarehouses);
+        setMaterials(nextMaterials.map((material) => ({
+          id: material.id,
+          materialCode: material.materialCode,
+          materialName: material.materialName,
+          specification: material.specification,
+          unit: material.projectSiteSaleUnit || material.baseUnit,
+        })));
+        setWarehouses(nextWarehouses.map((warehouse) => ({
+          id: warehouse.id,
+          warehouseCode: warehouse.warehouseCode,
+          warehouseName: warehouse.warehouseName,
+        })));
+        setBusinessProjects(nextBusinessProjects);
         setMasterStatus("ready");
         setUsageForm((current) => ({
           ...current,
           warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
           materialId: current.materialId || nextMaterials[0]?.id || "",
-          unit: current.unit || nextMaterials[0]?.baseUnit || "",
+          unit: current.unit || nextMaterials[0]?.projectSiteSaleUnit || nextMaterials[0]?.baseUnit || "",
         }));
       })
       .catch(() => {
@@ -261,7 +346,37 @@ export function ProjectSitesWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadMaterials, loadParties, loadWarehouses]);
+  }, [loadBusinessProjects, loadMaterials, loadParties, loadUsageOptions, loadWarehouses, usageOnly]);
+
+  useEffect(() => {
+    if (usageOnly) {
+      setInvestmentSummary(null);
+      setInvestmentSummaryStatus("idle");
+      return;
+    }
+    if (!selectedInvestmentSiteId) {
+      setInvestmentSummary(null);
+      setInvestmentSummaryStatus("idle");
+      return;
+    }
+
+    let mounted = true;
+    setInvestmentSummaryStatus("loading");
+    loadInvestmentSummary(selectedInvestmentSiteId)
+      .then((summary) => {
+        if (!mounted) return;
+        setInvestmentSummary(summary);
+        setInvestmentSummaryStatus("ready");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setInvestmentSummary(null);
+        setInvestmentSummaryStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadInvestmentSummary, selectedInvestmentSiteId, usageOnly]);
 
   const filteredSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -273,6 +388,7 @@ export function ProjectSitesWorkspace({
         site.clientPartyName,
         site.subcontractorPartyName,
         site.region,
+        site.businessProjectName,
         site.primaryManagerEmployeeName,
       ]
         .filter(Boolean)
@@ -307,7 +423,7 @@ export function ProjectSitesWorkspace({
     setUsageForm((current) => ({
       ...current,
       materialId,
-      unit: material?.baseUnit || current.unit,
+      unit: material?.unit || current.unit,
     }));
   }
 
@@ -326,6 +442,7 @@ export function ProjectSitesWorkspace({
         region: siteForm.region || null,
         siteAddress: siteForm.siteAddress || null,
         serviceType: siteForm.serviceType || null,
+        businessProjectId: siteForm.businessProjectId || null,
         primaryManagerEmployeeId: siteForm.primaryManagerEmployeeId || null,
         clientContactName: siteForm.clientContactName || null,
         clientContactPhone: siteForm.clientContactPhone || null,
@@ -333,6 +450,7 @@ export function ProjectSitesWorkspace({
       });
       setSites((current) => [created, ...current.filter((site) => site.id !== created.id)]);
       setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || created.id }));
+      setSelectedInvestmentSiteId((current) => current || created.id);
       setSiteForm({
         siteCode: "",
         siteName: "",
@@ -343,6 +461,7 @@ export function ProjectSitesWorkspace({
         region: "",
         siteAddress: "",
         serviceType: "",
+        businessProjectId: "",
         primaryManagerEmployeeId: "",
         clientContactName: "",
         clientContactPhone: "",
@@ -362,13 +481,13 @@ export function ProjectSitesWorkspace({
       const created = await createUsageRequest({
         requestNo: usageForm.requestNo,
         requestDate: usageForm.requestDate,
-        projectSiteId: usageForm.projectSiteId,
+        projectSiteId: usageOnly ? "" : usageForm.projectSiteId,
         warehouseId: usageForm.warehouseId,
         materialId: usageForm.materialId,
         requestedQuantity: Number(usageForm.requestedQuantity),
         unit: usageForm.unit,
         purpose: usageForm.purpose || null,
-        requestedBy: usageForm.requestedBy || null,
+        requestedBy: usageOnly ? null : usageForm.requestedBy || null,
         expectedDate: usageForm.expectedDate || null,
       });
       setUsageRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
@@ -428,7 +547,7 @@ export function ProjectSitesWorkspace({
         </div>
         <span className="parties-total">
           <MapPin aria-hidden="true" size={18} />
-          {sites.length} 个项目点
+          {usageOnly ? `${new Set(usageRequests.map((request) => request.projectSiteId)).size} 个项目点` : `${sites.length} 个项目点`}
         </span>
       </div>
 
@@ -438,21 +557,22 @@ export function ProjectSitesWorkspace({
       </div>
 
       <div className="inventory-tabs" aria-label="项目点模块功能">
-        <button type="button" aria-current="page">项目点台账</button>
-        <button type="button">领用申请</button>
-        <button type="button" disabled={!canIssueUsage}>出库登记</button>
-        <button type="button" disabled>现场库存 后续开放</button>
+        {!usageOnly ? <button type="button" aria-current="page">项目点台账</button> : null}
+        <button type="button" aria-current={usageOnly ? "page" : undefined}>领用申请</button>
+        {!usageOnly ? <button type="button" disabled={!canIssueUsage}>出库登记</button> : null}
+        <button type="button" disabled>月度经营报表 后续开放</button>
+        {!usageOnly ? <button type="button" disabled>现场库存 后续开放</button> : null}
       </div>
 
       <div className="party-summary people-summary" aria-label="项目点指标摘要">
         <article>
-          <span>项目点总数</span>
-          <strong>{sites.length}</strong>
+          <span>{usageOnly ? "可见项目点" : "项目点总数"}</span>
+          <strong>{usageOnly ? new Set(usageRequests.map((request) => request.projectSiteId)).size : sites.length}</strong>
         </article>
-        <article>
+        {!usageOnly ? <article>
           <span>服务中</span>
           <strong>{activeSiteCount}</strong>
-        </article>
+        </article> : null}
         <article>
           <span>待处理领用</span>
           <strong>{pendingUsageCount}</strong>
@@ -491,7 +611,7 @@ export function ProjectSitesWorkspace({
         </label>
       </div>
 
-      <div className="people-section-grid">
+      {!usageOnly ? <div className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<MapPin size={16} />} title="项目点台账" />
           {siteStatus === "loading" ? (
@@ -502,13 +622,14 @@ export function ProjectSitesWorkspace({
             <StateMessage icon={<MapPin size={16} />} text="暂无项目点资料" />
           ) : (
             <ResponsiveTable
-              headers={["编码", "名称", "客户/服务单位", "模式", "外包方", "负责人", "状态", "更新时间"]}
+              headers={["编码", "名称", "客户/服务单位", "模式", "外包方", "业务项目", "负责人", "状态", "更新时间"]}
               rows={filteredSites.map((site) => [
                 site.siteCode,
                 site.siteName,
                 site.clientPartyName ?? "-",
                 serviceModeLabel.get(site.serviceMode) ?? site.serviceMode,
                 site.subcontractorPartyName ?? "-",
+                site.businessProjectName ?? "-",
                 site.primaryManagerEmployeeName ?? "-",
                 <StatusBadge key={`${site.id}-status`} tone={site.status === "active" ? "green" : "gray"}>
                   {siteStatusLabel.get(site.status) ?? site.status}
@@ -609,16 +730,69 @@ export function ProjectSitesWorkspace({
             <input value={siteForm.siteAddress} onChange={(event) => setSiteForm({ ...siteForm, siteAddress: event.target.value })} />
           </label>
           <label>
+            <span>业务项目</span>
+            <select
+              value={siteForm.businessProjectId}
+              onChange={(event) => setSiteForm({ ...siteForm, businessProjectId: event.target.value })}
+            >
+              <option value="">不关联业务项目</option>
+              {businessProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.projectCode} {project.projectName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             <span>客户联系人</span>
             <input
               value={siteForm.clientContactName}
               onChange={(event) => setSiteForm({ ...siteForm, clientContactName: event.target.value })}
             />
           </label>
-          {masterStatus === "error" ? <p className="form-error">基础资料接口暂不可用，项目点可先保存文本字段。</p> : null}
+          {masterStatus === "error" ? <p className="form-error">基础资料或业务项目接口暂不可用，项目点可先保存文本字段。</p> : null}
           {siteSubmitState === "error" ? <p className="form-error">项目点保存失败，请检查编码是否重复或服务模式规则。</p> : null}
         </form> : null}
-      </div>
+      </div> : null}
+
+      {!usageOnly ? <section className="dashboard-panel table-panel">
+        <div className="panel-header people-panel-title">
+          <h3>
+            <ClipboardList aria-hidden="true" size={16} />
+            投入合同
+          </h3>
+          <label className="inline-filter">
+            <span>项目点</span>
+            <select value={selectedInvestmentSiteId} onChange={(event) => setSelectedInvestmentSiteId(event.target.value)}>
+              <option value="">选择项目点</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.siteCode} {site.siteName}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {investmentSummaryStatus === "loading" ? (
+          <StateMessage icon={<RefreshCw size={16} />} text="投入合同汇总加载中" />
+        ) : investmentSummaryStatus === "error" ? (
+          <StateMessage icon={<ClipboardList size={16} />} text="投入合同汇总加载失败" />
+        ) : !investmentSummary || investmentSummary.contractCount === 0 ? (
+          <StateMessage icon={<ClipboardList size={16} />} text="暂无投入合同" />
+        ) : (
+          <ResponsiveTable
+            headers={["投入分类", "合同数量", "金额合计"]}
+            rows={[
+              ...investmentSummary.categories.map((category) => [
+                investmentCategoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
+                category.contractCount,
+                formatMoney(category.totalAmount),
+              ]),
+              ["合计", investmentSummary.contractCount, formatMoney(investmentSummary.totalAmount)],
+            ]}
+          />
+        )}
+      </section> : null}
 
       <div className="people-section-grid">
         <section className="dashboard-panel table-panel">
@@ -633,11 +807,11 @@ export function ProjectSitesWorkspace({
             <ResponsiveTable
               headers={[
                 "申请单号",
-                "项目点",
+                ...(usageOnly ? [] : ["项目点"]),
                 "物料",
                 "申请数量",
                 "已出库",
-                "领用金额",
+                ...(usageOnly ? [] : ["领用金额"]),
                 "领用人",
                 "领用时间",
                 "仓库",
@@ -646,11 +820,11 @@ export function ProjectSitesWorkspace({
               ]}
               rows={filteredUsageRequests.map((request) => [
                 request.requestNo,
-                request.projectSiteName,
+                ...(usageOnly ? [] : [request.projectSiteName]),
                 `${request.materialCode} ${request.materialName}`,
                 `${request.requestedQuantity} ${request.unit}`,
                 `${request.issuedQuantity} ${request.unit}`,
-                formatMoney(request.chargeAmount),
+                ...(usageOnly ? [] : [formatMoney(request.chargeAmount)]),
                 request.lastReceivedByName ?? "-",
                 request.lastIssuedAt ?? "-",
                 request.warehouseCode,
@@ -669,7 +843,10 @@ export function ProjectSitesWorkspace({
               <ClipboardList aria-hidden="true" size={16} />
               新增领用申请
             </h3>
-            <button type="submit" disabled={usageSubmitState === "saving" || masterStatus !== "ready" || sites.length === 0}>
+            <button
+              type="submit"
+              disabled={usageSubmitState === "saving" || masterStatus !== "ready" || (!usageOnly && sites.length === 0)}
+            >
               <Save aria-hidden="true" size={15} />
               保存领用申请
             </button>
@@ -686,7 +863,7 @@ export function ProjectSitesWorkspace({
               onChange={(event) => setUsageForm({ ...usageForm, requestDate: event.target.value })}
             />
           </label>
-          <label>
+          {!usageOnly ? <label>
             <span>项目点</span>
             <select
               value={usageForm.projectSiteId}
@@ -699,7 +876,7 @@ export function ProjectSitesWorkspace({
                 </option>
               ))}
             </select>
-          </label>
+          </label> : null}
           <label>
             <span>仓库</span>
             <select value={usageForm.warehouseId} onChange={(event) => setUsageForm({ ...usageForm, warehouseId: event.target.value })}>
@@ -744,15 +921,19 @@ export function ProjectSitesWorkspace({
               onChange={(event) => setUsageForm({ ...usageForm, expectedDate: event.target.value })}
             />
           </label>
-          <label>
+          {!usageOnly ? <label>
             <span>申请人</span>
             <input value={usageForm.requestedBy} onChange={(event) => setUsageForm({ ...usageForm, requestedBy: event.target.value })} />
-          </label>
+          </label> : null}
           <label>
             <span>用途</span>
             <input value={usageForm.purpose} onChange={(event) => setUsageForm({ ...usageForm, purpose: event.target.value })} />
           </label>
-          {masterStatus === "error" ? <p className="form-error">项目点、物料或仓库接口暂不可用，暂不能登记领用。</p> : null}
+          {masterStatus === "error" ? (
+            <p className="form-error">
+              {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
+            </p>
+          ) : null}
           {usageSubmitState === "error" ? <p className="form-error">领用申请保存失败，请检查必填项或单号是否重复。</p> : null}
         </form> : null}
       </div>

@@ -175,11 +175,11 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>) {
+async function loginCookie(app: ReturnType<typeof buildApp>, username = "site-user") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
-    payload: { username: "site-user", password: "ChangeMe123!" },
+    payload: { username, password: "ChangeMe123!" },
   });
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
@@ -404,5 +404,56 @@ describe("inventory balances API", () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "read" });
+  });
+
+  it("allows operations to read quantity balances without price fields while blocking marketing", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-for-ops-inventory" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ id: "10000000-0000-4000-8000-000000000001", username: "ops", passwordHash, roles: ["operations"] }),
+        makeAuthAccount({ id: "10000000-0000-4000-8000-000000000002", username: "marketing", passwordHash, roles: ["marketing"] }),
+      ]),
+      inventoryRepository: createFakeInventoryRepository(),
+    });
+    const opsCookie = await loginCookie(app, "ops");
+    const marketingCookie = await loginCookie(app, "marketing");
+
+    const opsBalances = await app.inject({
+      method: "GET",
+      url: "/api/inventory-balances?lowStockOnly=true",
+      cookies: { company_erp_session: opsCookie },
+    });
+    const opsMovementCreate = await app.inject({
+      method: "POST",
+      url: "/api/inventory-movements",
+      cookies: { company_erp_session: opsCookie },
+      payload: {
+        movementNo: "RK20260511099",
+        movementDate: "2026-05-11",
+        movementType: "inbound",
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        quantity: 1,
+        unit: "套",
+      },
+    });
+    const marketingBalances = await app.inject({
+      method: "GET",
+      url: "/api/inventory-balances",
+      cookies: { company_erp_session: marketingCookie },
+    });
+    await app.close();
+
+    expect(opsBalances.statusCode).toBe(200);
+    expect(opsBalances.json()).toMatchObject({
+      inventoryBalances: [{ materialCode: "MAT0001", currentQuantity: 12, isLowStock: true }],
+    });
+    expect(JSON.stringify(opsBalances.json())).not.toContain("unitPrice");
+    expect(JSON.stringify(opsBalances.json())).not.toContain("chargeAmount");
+    expect(opsMovementCreate.statusCode).toBe(403);
+    expect(opsMovementCreate.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "inventory" });
+    expect(marketingBalances.statusCode).toBe(403);
+    expect(marketingBalances.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "inventoryQuantity" });
   });
 });

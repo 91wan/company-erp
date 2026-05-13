@@ -3,10 +3,13 @@ import type {
   CreateProjectSiteInput,
   CreateProjectUsageRequestInput,
   IssueProjectUsageRequestInput,
+  MaterialDto,
   ProjectSiteDto,
+  ProjectSiteInvestmentSummaryDto,
   ProjectUsageRequestDto,
   UpdateProjectSiteInput,
   UpdateProjectUsageRequestInput,
+  WarehouseDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
@@ -18,8 +21,11 @@ import {
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
 } from "../src/projectSites";
+import type { MaterialRepository, WarehouseRepository } from "../src/materialsWarehouses";
 
 const now = "2026-05-11T13:00:00.000Z";
+const warehouseId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const materialId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDto {
   return {
@@ -59,10 +65,10 @@ function makeUsageRequest(overrides: Partial<ProjectUsageRequestDto> = {}): Proj
     requestDate: "2026-05-11",
     projectSiteId: "11111111-1111-4111-8111-111111111111",
     projectSiteName: "科技园一期项目点",
-    warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    warehouseId,
     warehouseCode: "WH-WX-HQ",
     warehouseName: "无锡总部仓库",
-    materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    materialId,
     materialCode: "MAT0001",
     materialName: "定制员工工服",
     specification: "夏装 L 码",
@@ -72,6 +78,9 @@ function makeUsageRequest(overrides: Partial<ProjectUsageRequestDto> = {}): Proj
     unit: "套",
     purpose: "项目点新员工补领",
     requestedBy: "项目点负责人",
+    submittedByAccountId: null,
+    submittedByNameSnapshot: null,
+    submittedByPhoneSnapshot: null,
     expectedDate: "2026-05-15",
     status: "pending",
     outboundNo: null,
@@ -88,8 +97,62 @@ function makeUsageRequest(overrides: Partial<ProjectUsageRequestDto> = {}): Proj
   };
 }
 
+function makeMaterial(overrides: Partial<MaterialDto> = {}): MaterialDto {
+  return {
+    id: materialId,
+    materialCode: "MAT0001",
+    materialName: "定制员工工服",
+    specification: "夏装 L 码",
+    materialCategory: "定制物料",
+    baseUnit: "套",
+    defaultWarehouseId: warehouseId,
+    defaultWarehouseName: "无锡总部仓库",
+    defaultSupplierPartyId: null,
+    defaultSupplierPartyName: null,
+    safeStock: 20,
+    isProjectSiteSaleEnabled: true,
+    purchaseReferencePrice: 80,
+    projectSiteSalePrice: 98,
+    projectSiteSaleUnit: "套",
+    projectSiteSaleRemark: "项目点领用核算价",
+    isConsumable: true,
+    status: "enabled",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeWarehouse(overrides: Partial<WarehouseDto> = {}): WarehouseDto {
+  return {
+    id: warehouseId,
+    warehouseCode: "WH-WX-HQ",
+    warehouseName: "无锡总部仓库",
+    warehouseType: "headquarters",
+    projectSiteId: null,
+    managerName: "王仓管",
+    managerPhone: "13900000000",
+    status: "enabled",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSiteRepository {
   const sites = [...seed];
+  const investmentSummary: ProjectSiteInvestmentSummaryDto = {
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    contractCount: 4,
+    totalAmount: 260000,
+    categories: [
+      { investmentCategory: "renovation", contractCount: 1, totalAmount: 90000 },
+      { investmentCategory: "equipment", contractCount: 2, totalAmount: 150000 },
+      { investmentCategory: "advertising_signage", contractCount: 1, totalAmount: 20000 },
+    ],
+  };
 
   return {
     async list(filters) {
@@ -110,6 +173,10 @@ function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSi
     },
     async getById(id) {
       return sites.find((site) => site.id === id) ?? null;
+    },
+    async getInvestmentSummary(id) {
+      if (!sites.some((site) => site.id === id)) return null;
+      return { ...investmentSummary, projectSiteId: id };
     },
     async create(input: CreateProjectSiteInput) {
       if (sites.some((site) => site.siteCode === input.siteCode)) throw new ProjectSiteConflictError("siteCode");
@@ -132,6 +199,50 @@ function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSi
       }
       sites[index] = { ...sites[index], ...input, updatedAt: now };
       return sites[index];
+    },
+  };
+}
+
+function createFakeMaterialRepository(seed: MaterialDto[] = []): MaterialRepository {
+  const materials = [...seed];
+  return {
+    async list(filters) {
+      return materials.filter((material) => {
+        const matchesStatus = filters.status ? material.status === filters.status : true;
+        const matchesQuery = filters.q
+          ? [material.materialCode, material.materialName].some((value) =>
+              value.toLowerCase().includes(filters.q!.toLowerCase()),
+            )
+          : true;
+        return matchesStatus && matchesQuery;
+      });
+    },
+    async getById(id) {
+      return materials.find((material) => material.id === id) ?? null;
+    },
+    async create() {
+      throw new Error("not needed");
+    },
+    async update() {
+      throw new Error("not needed");
+    },
+  };
+}
+
+function createFakeWarehouseRepository(seed: WarehouseDto[] = []): WarehouseRepository {
+  const warehouses = [...seed];
+  return {
+    async list(filters) {
+      return warehouses.filter((warehouse) => (filters.status ? warehouse.status === filters.status : true));
+    },
+    async getById(id) {
+      return warehouses.find((warehouse) => warehouse.id === id) ?? null;
+    },
+    async create() {
+      throw new Error("not needed");
+    },
+    async update() {
+      throw new Error("not needed");
     },
   };
 }
@@ -233,6 +344,22 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
   };
 }
 
+function makeExternalProjectManagerAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return makeAuthAccount({
+    id: "abababab-abab-4bab-8bab-abababababab",
+    username: "site-manager",
+    employeeId: null,
+    employeeNo: null,
+    employeeName: null,
+    employeeStatus: null,
+    roles: ["external_project_manager"],
+    assignedProjectSiteIds: ["11111111-1111-4111-8111-111111111111"],
+    externalProjectManagerName: "王项目",
+    externalProjectManagerPhone: "13900000000",
+    ...overrides,
+  });
+}
+
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
@@ -273,6 +400,10 @@ describe("project site API", () => {
       method: "GET",
       url: "/api/project-sites/11111111-1111-4111-8111-111111111111",
     });
+    const investmentSummary = await app.inject({
+      method: "GET",
+      url: "/api/project-sites/11111111-1111-4111-8111-111111111111/investment-summary",
+    });
     const missing = await app.inject({ method: "GET", url: "/api/project-sites/missing" });
     await app.close();
 
@@ -280,6 +411,15 @@ describe("project site API", () => {
     expect(list.json()).toMatchObject({ projectSites: [{ siteCode: "SITE-WX-001", siteName: "科技园一期项目点" }] });
     expect(detail.statusCode).toBe(200);
     expect(detail.json()).toMatchObject({ projectSite: { clientPartyName: "无锡科技园服务单位" } });
+    expect(investmentSummary.statusCode).toBe(200);
+    expect(investmentSummary.json()).toMatchObject({
+      investmentSummary: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        contractCount: 4,
+        totalAmount: 260000,
+        categories: expect.arrayContaining([{ investmentCategory: "renovation", contractCount: 1, totalAmount: 90000 }]),
+      },
+    });
     expect(missing.statusCode).toBe(404);
   });
 
@@ -655,5 +795,123 @@ describe("project usage request API", () => {
 
     expect(siteList.statusCode).toBe(200);
     expect(siteList.json().projectSites).toHaveLength(2);
+  });
+
+  it("allows operations to submit usage requests but blocks warehouse issue execution", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const usageRequest = makeUsageRequest();
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-operations-usage" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ passwordHash, roles: ["operations"], assignedProjectSiteIds: [] }),
+      ]),
+      projectUsageRequestRepository: createFakeUsageRepository([usageRequest], {
+        unitChargePrice: 35.5,
+        chargeRemark: "项目点领用收费价",
+      }),
+    });
+    const cookie = await loginCookie(app);
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        requestNo: "USE20260511006",
+        requestDate: "2026-05-11",
+        projectSiteId: usageRequest.projectSiteId,
+        warehouseId: usageRequest.warehouseId,
+        materialId: usageRequest.materialId,
+        requestedQuantity: 2,
+        unit: "套",
+      },
+    });
+    const issue = await app.inject({
+      method: "POST",
+      url: `/api/project-usage-requests/${usageRequest.id}/issue`,
+      cookies: { company_erp_session: cookie },
+      payload: { outboundNo: "OUT20260511099", movementDate: "2026-05-11", quantity: 1 },
+    });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(create.json()).toMatchObject({
+      projectUsageRequest: { requestNo: "USE20260511006", status: "pending" },
+    });
+    expect(JSON.stringify(create.json())).not.toContain("unitChargePrice");
+    expect(JSON.stringify(create.json())).not.toContain("chargeAmount");
+    expect(issue.statusCode).toBe(403);
+    expect(issue.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "manage" });
+  });
+
+  it("lets external project managers create only assigned-site usage requests with submitter snapshots", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const assignedSite = makeProjectSite();
+    const unassignedSite = makeProjectSite({
+      id: "22222222-2222-4222-8222-222222222222",
+      siteCode: "SITE-WX-002",
+      siteName: "滨江项目点",
+    });
+    const app = buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-external-manager" },
+      authRepository: createFakeAuthRepository([makeExternalProjectManagerAuthAccount({ passwordHash })]),
+      projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
+      projectUsageRequestRepository: createFakeUsageRepository([]),
+      materialRepository: createFakeMaterialRepository([makeMaterial()]),
+      warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]),
+    });
+    const cookie = await loginCookie(app, "site-manager");
+
+    const me = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: cookie } });
+    const options = await app.inject({ method: "GET", url: "/api/project-usage-options", cookies: { company_erp_session: cookie } });
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/project-usage-requests",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        requestNo: "USE20260511007",
+        requestDate: "2026-05-11",
+        projectSiteId: unassignedSite.id,
+        warehouseId,
+        materialId,
+        requestedQuantity: 2,
+        unit: "套",
+        status: "issued",
+      },
+    });
+    const partyAccess = await app.inject({ method: "GET", url: "/api/parties", cookies: { company_erp_session: cookie } });
+    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: cookie } });
+    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: cookie } });
+    const projectSiteAccess = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    await app.close();
+
+    expect(me.json()).toMatchObject({
+      user: {
+        roles: ["external_project_manager"],
+        assignedProjectSiteIds: [assignedSite.id],
+        externalProjectManagerName: "王项目",
+      },
+    });
+    expect(options.statusCode).toBe(200);
+    expect(options.json()).toMatchObject({
+      defaultWarehouse: { id: warehouseId, warehouseCode: "WH-WX-HQ" },
+      materials: [{ id: materialId, materialCode: "MAT0001", unit: "套" }],
+    });
+    expect(JSON.stringify(options.json())).not.toContain("currentQuantity");
+    expect(create.statusCode).toBe(201);
+    expect(create.json()).toMatchObject({
+      projectUsageRequest: {
+        requestNo: "USE20260511007",
+        projectSiteId: assignedSite.id,
+        status: "pending",
+        submittedByAccountId: "abababab-abab-4bab-8bab-abababababab",
+        submittedByNameSnapshot: "王项目",
+        submittedByPhoneSnapshot: "13900000000",
+      },
+    });
+    expect(partyAccess.statusCode).toBe(403);
+    expect(contractAccess.statusCode).toBe(403);
+    expect(inventoryAccess.statusCode).toBe(403);
+    expect(projectSiteAccess.statusCode).toBe(403);
   });
 });

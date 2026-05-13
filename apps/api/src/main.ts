@@ -10,6 +10,7 @@ import {
   createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
+  createPrismaExternalProjectManagerAccountRepository,
   createPrismaProjectSiteAssignmentRepository,
   createPrismaUserAccountRepository,
 } from "./prismaPeoplePermissionsRepository.js";
@@ -24,8 +25,10 @@ import {
   createPrismaProjectUsageRequestRepository,
 } from "./prismaProjectSitesRepository.js";
 import { createPrismaContractRepository } from "./prismaContractsRepository.js";
+import { createPrismaBusinessProjectRepository } from "./prismaBusinessProjectsRepository.js";
 import { createPrismaCertificateRepository } from "./prismaCertificatesRepository.js";
 import { createPrismaImportJobRepository } from "./prismaImportJobRepository.js";
+import { createPrismaMarketOperationsHandoffRepository } from "./prismaMarketOperationsHandoffsRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -46,6 +49,9 @@ const app = buildApp({
   departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
   employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
   userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
+  externalProjectManagerAccountRepository: prisma
+    ? createPrismaExternalProjectManagerAccountRepository(prisma)
+    : undefined,
   projectSiteAssignmentRepository: prisma ? createPrismaProjectSiteAssignmentRepository(prisma) : undefined,
   purchaseRequestRepository: prisma ? createPrismaPurchaseRequestRepository(prisma) : undefined,
   purchaseRecordRepository: prisma ? createPrismaPurchaseRecordRepository(prisma) : undefined,
@@ -54,8 +60,10 @@ const app = buildApp({
   projectSiteRepository: prisma ? createPrismaProjectSiteRepository(prisma) : undefined,
   projectUsageRequestRepository: prisma ? createPrismaProjectUsageRequestRepository(prisma) : undefined,
   contractRepository: prisma ? createPrismaContractRepository(prisma) : undefined,
+  businessProjectRepository: prisma ? createPrismaBusinessProjectRepository(prisma) : undefined,
   certificateRepository: prisma ? createPrismaCertificateRepository(prisma) : undefined,
   importJobRepository: prisma ? createPrismaImportJobRepository(prisma) : undefined,
+  marketOperationsHandoffRepository: prisma ? createPrismaMarketOperationsHandoffRepository(prisma) : undefined,
 });
 
 if (prisma) {

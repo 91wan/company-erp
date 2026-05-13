@@ -23,12 +23,15 @@ describe("metadata API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       roles: [
-        { code: "admin", label: "Admin", description: "Full system administration" },
-        { code: "hr", label: "HR", description: "Staff, departments, and assignments" },
-        { code: "procurement", label: "Procurement", description: "Purchase and contract workflow" },
-        { code: "warehouse", label: "Warehouse", description: "Receiving, stock, and outbound records" },
-        { code: "project_site", label: "Project Site", description: "Assigned project-site records and usage" },
-        { code: "viewer", label: "Viewer", description: "Read-only internal access" },
+        { code: "admin", label: "系统管理员", description: "系统配置、账号和全部数据管理" },
+        { code: "hr", label: "人事", description: "员工、部门和项目点人员关系维护" },
+        { code: "procurement", label: "采购", description: "采购和合同业务处理" },
+        { code: "warehouse", label: "仓库", description: "入库、库存和出库记录处理" },
+        { code: "project_site", label: "项目点", description: "项目点相关记录和领用处理" },
+        { code: "marketing", label: "市场", description: "客户、商机和项目前期资料交接" },
+        { code: "operations", label: "运营", description: "项目执行、库存数量查看和领用申请" },
+        { code: "external_project_manager", label: "外部项目经理", description: "外包项目点领用申请提交与状态查看" },
+        { code: "viewer", label: "只读", description: "内部只读访问" },
       ],
     });
   });
@@ -50,6 +53,9 @@ describe("metadata API", () => {
       },
       permissionMatrix: {
         employees: { manage: ["admin", "hr"] },
+        businessProjects: { manage: ["admin", "procurement"] },
+        inventoryQuantity: { read: expect.arrayContaining(["operations"]) },
+        projectUsageRequest: { manage: ["admin", "operations", "project_site", "external_project_manager"] },
         userAccounts: { manage: ["admin"] },
         roleAssignment: { manage: ["admin"] },
       },
@@ -80,7 +86,7 @@ describe("metadata API", () => {
         purchaseRecordStatus: { values: ["待采购", "已下单", "部分到货", "已到货", "已取消"] },
         purchaseSupplierPolicy: { values: ["供应商可选"] },
         inventoryMovementType: { values: ["入库", "出库", "盘盈", "盘亏", "期初"] },
-        issueTargetType: { values: ["internal_office", "project_site", "subcontractor"] },
+        issueTargetType: { values: ["项目点", "外包方", "公司部门", "公司个人"] },
         projectUsageStatus: { values: ["待处理", "已出库", "部分出库", "已驳回"] },
       },
     });

@@ -18,6 +18,9 @@ function makeParty(overrides: Partial<PartyDto> = {}): PartyDto {
     commonMaterials: "复印纸、工服",
     address: "无锡市",
     settlementNotes: "月结",
+    entityType: "company",
+    identityNoMasked: null,
+    identityNoLast4: null,
     status: "enabled",
     remark: "常用供应商",
     createdAt: now,
@@ -51,9 +54,12 @@ function createFakeRepository(seed: PartyDto[] = []): PartyRepository {
         throw new PartyConflictError("partyCode");
       }
 
+      const identityNoLast4 = input.identityNo ? input.identityNo.slice(-4) : null;
       const party = makeParty({
         id: "22222222-2222-4222-8222-222222222222",
         ...input,
+        identityNoMasked: identityNoLast4 ? `**************${identityNoLast4}` : null,
+        identityNoLast4,
         status: input.status ?? "enabled",
         createdAt: now,
         updatedAt: now,
@@ -155,6 +161,57 @@ describe("parties API", () => {
         status: "enabled",
       },
     });
+  });
+
+  it("creates individual subcontractors without exposing the full identity number", async () => {
+    const app = buildApp({ partyRepository: createFakeRepository() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/parties",
+      payload: {
+        partyCode: "SUB-P-0001",
+        partyName: "王承包",
+        partyTypes: ["subcontractor"],
+        entityType: "individual",
+        primaryContactName: "王承包",
+        primaryContactPhone: "13900000000",
+        identityNo: "320205199001011234",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      party: {
+        partyCode: "SUB-P-0001",
+        partyTypes: ["subcontractor"],
+        entityType: "individual",
+        identityNoMasked: "**************1234",
+        identityNoLast4: "1234",
+      },
+    });
+    expect(JSON.stringify(response.json())).not.toContain("320205199001011234");
+  });
+
+  it("requires identity details for individual subcontractors", async () => {
+    const app = buildApp({ partyRepository: createFakeRepository() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/parties",
+      payload: {
+        partyCode: "SUB-P-0002",
+        partyName: "李承包",
+        partyTypes: ["subcontractor"],
+        entityType: "individual",
+        primaryContactPhone: "13900000001",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues).toEqual(expect.arrayContaining(["identityNo is required for individual parties"]));
   });
 
   it("updates party fields and status", async () => {

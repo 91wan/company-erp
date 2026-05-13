@@ -77,8 +77,14 @@ function createFakeContractRepository(
       return contracts.filter((contract) => {
         const matchesStatus = filters.status ? contract.status === filters.status : true;
         const matchesDirection = filters.direction ? contract.direction === filters.direction : true;
+        const matchesInvestmentCategory = filters.investmentCategory
+          ? contract.investmentCategory === filters.investmentCategory
+          : true;
         const matchesCounterparty = filters.counterpartyPartyId
           ? contract.counterpartyPartyId === filters.counterpartyPartyId
+          : true;
+        const matchesBusinessProject = filters.businessProjectId
+          ? contract.businessProjectId === filters.businessProjectId
           : true;
         const matchesSite = filters.projectSiteId ? contract.projectSiteId === filters.projectSiteId : true;
         const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(contract.projectSiteId ?? "") : true;
@@ -97,7 +103,9 @@ function createFakeContractRepository(
         return (
           matchesStatus &&
           matchesDirection &&
+          matchesInvestmentCategory &&
           matchesCounterparty &&
+          matchesBusinessProject &&
           matchesSite &&
           matchesScopedSites &&
           matchesExpiry &&
@@ -259,6 +267,8 @@ describe("contracts API", () => {
         contractName: "采购框架合同",
         counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
         direction: "purchase_contract",
+        investmentCategory: "equipment",
+        businessProjectId: "77777777-7777-4777-8777-777777777777",
         signedDate: "2026-05-11",
         startDate: "2026-05-11",
         endDate: "2027-05-10",
@@ -276,7 +286,13 @@ describe("contracts API", () => {
     expect(detailResponse.json()).toEqual({ contract: makeContract() });
     expect(createResponse.statusCode).toBe(201);
     expect(createResponse.json()).toMatchObject({
-      contract: { contractNo: "HT20260511002", contractName: "采购框架合同", status: "active" },
+      contract: {
+        contractNo: "HT20260511002",
+        contractName: "采购框架合同",
+        status: "active",
+        investmentCategory: "equipment",
+        businessProjectId: "77777777-7777-4777-8777-777777777777",
+      },
     });
     expect(updateResponse.json()).toMatchObject({ contract: { status: "terminated" } });
   });
@@ -292,6 +308,7 @@ describe("contracts API", () => {
         contractName: "日期错误合同",
         counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
         direction: "purchase_contract",
+        investmentCategory: "free-text-category",
         startDate: "2026-06-01",
         endDate: "2026-05-01",
         amount: -1,
@@ -316,7 +333,10 @@ describe("contracts API", () => {
     await app.close();
 
     expect(invalidResponse.statusCode).toBe(400);
-    expect(invalidResponse.json()).toMatchObject({ error: "CONTRACT_VALIDATION_FAILED" });
+    expect(invalidResponse.json()).toMatchObject({
+      error: "CONTRACT_VALIDATION_FAILED",
+      issues: expect.arrayContaining(["investmentCategory is unsupported"]),
+    });
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "CONTRACT_CONFLICT", field: "contractNo" });
     expect(missingResponse.statusCode).toBe(404);

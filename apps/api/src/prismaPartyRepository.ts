@@ -2,10 +2,12 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   CreatePartyInput,
   PartyDto,
+  PartyEntityTypeCode,
   PartyTypeCode,
   UpdatePartyInput,
 } from "@company-erp/shared";
 import { PartyConflictError, type PartyListFilters, type PartyRepository } from "./parties.js";
+import { encryptIdentityNo, identityNoLast4, maskIdentityNoFromLast4 } from "./identityCrypto.js";
 
 type PrismaParty = Awaited<ReturnType<PrismaClient["party"]["findFirstOrThrow"]>>;
 
@@ -15,7 +17,10 @@ function toDto(party: PrismaParty): PartyDto {
     partyCode: party.partyCode,
     partyName: party.partyName,
     partyTypes: party.partyTypes as PartyTypeCode[],
+    entityType: party.entityType as PartyEntityTypeCode,
     unifiedSocialCreditCode: party.unifiedSocialCreditCode,
+    identityNoMasked: maskIdentityNoFromLast4(party.identityNoLast4),
+    identityNoLast4: party.identityNoLast4,
     primaryContactName: party.primaryContactName,
     primaryContactPhone: party.primaryContactPhone,
     supplyCategory: party.supplyCategory,
@@ -34,7 +39,10 @@ function toCreateData(input: CreatePartyInput): Prisma.PartyCreateInput {
     partyCode: input.partyCode,
     partyName: input.partyName,
     partyTypes: [...input.partyTypes],
+    entityType: input.entityType ?? "company",
     unifiedSocialCreditCode: input.unifiedSocialCreditCode,
+    identityNoEncrypted: input.identityNo ? encryptIdentityNo(input.identityNo) : undefined,
+    identityNoLast4: input.identityNo ? identityNoLast4(input.identityNo) : undefined,
     primaryContactName: input.primaryContactName,
     primaryContactPhone: input.primaryContactPhone,
     supplyCategory: input.supplyCategory,
@@ -51,8 +59,15 @@ function toUpdateData(input: UpdatePartyInput): Prisma.PartyUpdateInput {
     ...(input.partyCode !== undefined ? { partyCode: input.partyCode } : {}),
     ...(input.partyName !== undefined ? { partyName: input.partyName } : {}),
     ...(input.partyTypes !== undefined ? { partyTypes: [...input.partyTypes] } : {}),
+    ...(input.entityType !== undefined ? { entityType: input.entityType } : {}),
     ...(input.unifiedSocialCreditCode !== undefined
       ? { unifiedSocialCreditCode: input.unifiedSocialCreditCode }
+      : {}),
+    ...(input.identityNo !== undefined
+      ? {
+          identityNoEncrypted: input.identityNo ? encryptIdentityNo(input.identityNo) : null,
+          identityNoLast4: input.identityNo ? identityNoLast4(input.identityNo) : null,
+        }
       : {}),
     ...(input.primaryContactName !== undefined ? { primaryContactName: input.primaryContactName } : {}),
     ...(input.primaryContactPhone !== undefined ? { primaryContactPhone: input.primaryContactPhone } : {}),
@@ -95,6 +110,7 @@ export function createPrismaPartyRepository(prisma: PrismaClient): PartyReposito
                   { partyName: { contains: filters.q, mode: "insensitive" } },
                   { primaryContactName: { contains: filters.q, mode: "insensitive" } },
                   { primaryContactPhone: { contains: filters.q, mode: "insensitive" } },
+                  { identityNoLast4: { contains: filters.q, mode: "insensitive" } },
                 ],
               }
             : {}),

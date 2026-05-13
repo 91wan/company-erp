@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { canManage, canRead, type AuthenticatedUserDto } from "@company-erp/shared";
+import { canManage, canRead, MVP_ROLES, type AuthenticatedUserDto } from "@company-erp/shared";
 import {
   SettingsIcon,
   approvals,
@@ -24,6 +24,8 @@ import {
   type MetricCard as MetricCardType,
   type MetricTone,
 } from "../dashboardData";
+
+const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 import { ApiStatus } from "./ApiStatus";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
@@ -33,6 +35,7 @@ import { InventoryWorkspace } from "./InventoryWorkspace";
 import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWorkspace";
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
 import { ContractsWorkspace } from "./ContractsWorkspace";
+import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 
@@ -44,14 +47,23 @@ type DashboardShellProps = {
 type WorkspaceKey = (typeof navigationItems)[number]["label"];
 
 export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("Dashboard");
-  const isProjectSiteOnly = currentUser.roles.length === 1 && currentUser.roles[0] === "project_site";
+  const isExternalProjectManagerOnly =
+    currentUser.roles.length === 1 && currentUser.roles[0] === "external_project_manager";
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
+    isExternalProjectManagerOnly ? "项目点" : "Dashboard",
+  );
+  const isProjectSiteOnly =
+    currentUser.roles.length === 1 &&
+    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_manager");
+  const visibleNavigationItems = isExternalProjectManagerOnly
+    ? navigationItems.filter((item) => item.label === "项目点")
+    : navigationItems;
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
     canManage(currentUser.roles, "procurement") ||
     canManage(currentUser.roles, "inventory") ||
     canManage(currentUser.roles, "projectSites") ||
-    canManage(currentUser.roles, "projectUsage") ||
+    canManage(currentUser.roles, "projectUsageRequest") ||
     canManage(currentUser.roles, "contracts") ||
     canManage(currentUser.roles, "certificates") ||
     canManage(currentUser.roles, "employees")
@@ -59,7 +71,11 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
 
   return (
     <main className={isReadOnly ? "erp-shell read-only-shell" : "erp-shell"}>
-      <Sidebar activeWorkspace={activeWorkspace} onSelectWorkspace={setActiveWorkspace} />
+      <Sidebar
+        activeWorkspace={activeWorkspace}
+        items={visibleNavigationItems}
+        onSelectWorkspace={setActiveWorkspace}
+      />
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
@@ -81,12 +97,16 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
             </>
           ) : null}
           {activeWorkspace === "合同" ? <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} /> : null}
+          {activeWorkspace === "业务项目" ? (
+            <BusinessProjectsWorkspace canManage={canManage(currentUser.roles, "businessProjects")} />
+          ) : null}
           {activeWorkspace === "证照资质" ? <CertificatesWorkspace canManage={canManage(currentUser.roles, "certificates")} /> : null}
           {activeWorkspace === "项目点" ? (
             <ProjectSitesWorkspace
               canManageSites={canManage(currentUser.roles, "projectSites")}
-              canManageUsage={canManage(currentUser.roles, "projectUsage")}
+              canManageUsage={canManage(currentUser.roles, "projectUsageRequest")}
               canIssue={canManage(currentUser.roles, "inventory")}
+              usageOnly={isExternalProjectManagerOnly}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
@@ -101,9 +121,11 @@ export function DashboardShell({ currentUser, onLogout }: DashboardShellProps) {
 
 function Sidebar({
   activeWorkspace,
+  items,
   onSelectWorkspace,
 }: {
   activeWorkspace: WorkspaceKey;
+  items: typeof navigationItems;
   onSelectWorkspace: (workspace: WorkspaceKey) => void;
 }) {
   return (
@@ -117,7 +139,7 @@ function Sidebar({
       </div>
 
       <nav className="sidebar-nav">
-        {navigationItems.map((item) => (
+        {items.map((item) => (
           <button
             key={item.label}
             type="button"
@@ -186,7 +208,7 @@ function TopBar({ currentUser, onLogout }: DashboardShellProps) {
           <div className="avatar">{currentUser.username.slice(0, 1).toUpperCase()}</div>
           <div>
             <strong>{currentUser.username}</strong>
-            <small>{currentUser.roles.join(" / ")}</small>
+            <small>{currentUser.roles.map((role) => roleLabel.get(role) ?? role).join(" / ")}</small>
             {currentUser.assignedProjectSiteIds?.length ? (
               <small>{currentUser.assignedProjectSiteIds.length} 个项目点</small>
             ) : null}

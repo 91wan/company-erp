@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   FileText,
   Home,
+  Landmark,
   MapPin,
   PackageCheck,
   Settings,
@@ -39,6 +40,7 @@ export const navigationItems: NavigationItem[] = [
   { label: "采购", icon: ShoppingCart },
   { label: "库存", icon: Warehouse },
   { label: "合同", icon: FileText },
+  { label: "业务项目", icon: Landmark },
   { label: "证照资质", icon: ShieldCheck },
   { label: "项目点", icon: MapPin },
   { label: "人员权限", icon: Users },
@@ -170,7 +172,7 @@ export const inventoryInboundRecords = [
 
 export const inventoryOutboundRecords = [
   { id: "OUT20260511001", date: "2026-05-11", target: "project_site", material: "定制员工工服", quantity: "32 套" },
-  { id: "OUT20260510001", date: "2026-05-10", target: "internal_office", material: "办公复印纸", quantity: "6 箱" },
+  { id: "OUT20260510001", date: "2026-05-10", target: "company_department", material: "办公复印纸", quantity: "6 箱" },
   { id: "OUT20260509001", date: "2026-05-09", target: "subcontractor", material: "定制纸杯", quantity: "12 箱" },
 ];
 

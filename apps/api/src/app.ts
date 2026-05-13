@@ -7,6 +7,8 @@ import {
   MVP_PERMISSION_MATRIX,
   MVP_ROLES,
   USER_ROLE_ASSIGNMENT_POLICY,
+  type MvpRoleCode,
+  type ProjectUsageRequestDto,
 } from "@company-erp/shared";
 import {
   PartyConflictError,
@@ -34,12 +36,16 @@ import {
   EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
   EmployeeValidationError,
+  ExternalProjectManagerAccountConflictError,
+  ExternalProjectManagerAccountValidationError,
   UserAccountConflictError,
   UserAccountValidationError,
   normalizeDepartmentFilters,
   normalizeDepartmentInput,
   normalizeEmployeeFilters,
   normalizeEmployeeInput,
+  normalizeExternalProjectManagerAccountFilters,
+  normalizeExternalProjectManagerAccountInput,
   normalizeProjectSiteAssignmentFilters,
   normalizeProjectSiteAssignmentInput,
   normalizeUserAccountFilters,
@@ -47,6 +53,7 @@ import {
   type DepartmentRepository,
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
+  type ExternalProjectManagerAccountRepository,
   type UserAccountRepository,
 } from "./peoplePermissions.js";
 import {
@@ -99,6 +106,13 @@ import {
   type ContractRepository,
 } from "./contracts.js";
 import {
+  BusinessProjectConflictError,
+  BusinessProjectValidationError,
+  normalizeBusinessProjectFilters,
+  normalizeBusinessProjectInput,
+  type BusinessProjectRepository,
+} from "./businessProjects.js";
+import {
   CertificateConflictError,
   CertificateValidationError,
   normalizeCertificateFilters,
@@ -111,6 +125,13 @@ import {
   normalizeImportTemplateType,
   type ImportJobRepository,
 } from "./importJobs.js";
+import {
+  MarketOperationsHandoffConflictError,
+  MarketOperationsHandoffValidationError,
+  normalizeMarketOperationsHandoffFilters,
+  normalizeMarketOperationsHandoffInput,
+  type MarketOperationsHandoffRepository,
+} from "./marketOperationsHandoffs.js";
 import { registerAuth, type AuthenticatedRequest, type AuthOptions, type AuthRepository } from "./auth.js";
 
 type BuildAppOptions = {
@@ -122,6 +143,7 @@ type BuildAppOptions = {
   departmentRepository?: DepartmentRepository;
   employeeRepository?: EmployeeRepository;
   userAccountRepository?: UserAccountRepository;
+  externalProjectManagerAccountRepository?: ExternalProjectManagerAccountRepository;
   projectSiteAssignmentRepository?: EmployeeProjectSiteAssignmentRepository;
   purchaseRequestRepository?: PurchaseRequestRepository;
   purchaseRecordRepository?: PurchaseRecordRepository;
@@ -130,20 +152,60 @@ type BuildAppOptions = {
   projectSiteRepository?: ProjectSiteRepository;
   projectUsageRequestRepository?: ProjectUsageRequestRepository;
   contractRepository?: ContractRepository;
+  businessProjectRepository?: BusinessProjectRepository;
   certificateRepository?: CertificateRepository;
   importJobRepository?: ImportJobRepository;
+  marketOperationsHandoffRepository?: MarketOperationsHandoffRepository;
 };
 
 function scopedProjectSiteIds(request: unknown): readonly string[] | null {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return null;
-  return user.roles.length === 1 && user.roles[0] === "project_site"
+  return user.roles.length === 1 && (user.roles[0] === "project_site" || user.roles[0] === "external_project_manager")
+    ? [...(user.assignedProjectSiteIds ?? [])]
+    : null;
+}
+
+function externalProjectManagerSiteIds(request: unknown): readonly string[] | null {
+  const user = (request as AuthenticatedRequest).currentUser;
+  if (!user) return null;
+  return user.roles.length === 1 && user.roles[0] === "external_project_manager"
     ? [...(user.assignedProjectSiteIds ?? [])]
     : null;
 }
 
 function isOutsideProjectSiteScope(scope: readonly string[] | null, projectSiteId?: string | null): boolean {
   return scope !== null && (!projectSiteId || !scope.includes(projectSiteId));
+}
+
+const FINANCIAL_PROJECT_USAGE_ROLES = new Set<MvpRoleCode>(["admin", "hr", "procurement", "warehouse"]);
+
+function shouldHideProjectUsageFinancialFields(request: unknown): boolean {
+  const roles = ((request as AuthenticatedRequest).currentUser?.roles ?? []) as readonly MvpRoleCode[];
+  return (
+    (roles.includes("operations") || roles.includes("external_project_manager")) &&
+    !roles.some((role) => FINANCIAL_PROJECT_USAGE_ROLES.has(role))
+  );
+}
+
+function redactProjectUsageRequestForResponse(
+  request: unknown,
+  projectUsageRequest: ProjectUsageRequestDto,
+): ProjectUsageRequestDto | Omit<ProjectUsageRequestDto, "unitChargePrice" | "chargeAmount" | "chargePriceSource" | "chargeRemark"> {
+  if (!shouldHideProjectUsageFinancialFields(request)) return projectUsageRequest;
+  const {
+    unitChargePrice: _unitChargePrice,
+    chargeAmount: _chargeAmount,
+    chargePriceSource: _chargePriceSource,
+    chargeRemark: _chargeRemark,
+    ...redacted
+  } = projectUsageRequest;
+  return redacted;
+}
+
+function redactPartyForResponse<T extends Record<string, unknown>>(party: T): Omit<T, "identityNo"> {
+  const { identityNo: _identityNo, ...redacted } = party;
+  return redacted;
 }
 
 function certificateFiltersForRequest(request: unknown) {
@@ -312,7 +374,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     try {
       const filters = normalizePartyFilters(request.query as Record<string, unknown>);
       const parties = await options.partyRepository.list(filters);
-      return { parties };
+      return { parties: parties.map((party) => redactPartyForResponse(party as unknown as Record<string, unknown>)) };
     } catch (error) {
       if (error instanceof PartyValidationError) {
         return reply.status(400).send({
@@ -336,7 +398,7 @@ export function buildApp(options: BuildAppOptions = {}) {
       return reply.status(404).send({ error: "PARTY_NOT_FOUND" });
     }
 
-    return { party };
+    return { party: redactPartyForResponse(party as unknown as Record<string, unknown>) };
   });
 
   app.post("/api/parties", async (request, reply) => {
@@ -347,7 +409,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     try {
       const input = normalizePartyInput(request.body, "create");
       const party = await options.partyRepository.create(input);
-      return reply.status(201).send({ party });
+      return reply.status(201).send({ party: redactPartyForResponse(party as unknown as Record<string, unknown>) });
     } catch (error) {
       if (error instanceof PartyValidationError) {
         return reply.status(400).send({
@@ -382,7 +444,7 @@ export function buildApp(options: BuildAppOptions = {}) {
         return reply.status(404).send({ error: "PARTY_NOT_FOUND" });
       }
 
-      return { party };
+      return { party: redactPartyForResponse(party as unknown as Record<string, unknown>) };
     } catch (error) {
       if (error instanceof PartyValidationError) {
         return reply.status(400).send({
@@ -857,6 +919,65 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
+  app.get("/api/external-project-manager-accounts", async (request, reply) => {
+    if (!options.externalProjectManagerAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeExternalProjectManagerAccountFilters(request.query as Record<string, unknown>);
+      const externalProjectManagerAccounts = await options.externalProjectManagerAccountRepository.list(filters);
+      return { externalProjectManagerAccounts };
+    } catch (error) {
+      if (error instanceof ExternalProjectManagerAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/external-project-manager-accounts", async (request, reply) => {
+    if (!options.externalProjectManagerAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeExternalProjectManagerAccountInput(request.body, "create");
+      const externalProjectManagerAccount = await options.externalProjectManagerAccountRepository.create(input);
+      return reply.status(201).send({ externalProjectManagerAccount });
+    } catch (error) {
+      if (error instanceof ExternalProjectManagerAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ExternalProjectManagerAccountConflictError) {
+        return reply.status(409).send({ error: "EXTERNAL_PROJECT_MANAGER_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/external-project-manager-accounts/:id", async (request, reply) => {
+    if (!options.externalProjectManagerAccountRepository) {
+      return reply.status(503).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeExternalProjectManagerAccountInput(request.body, "update");
+      const externalProjectManagerAccount = await options.externalProjectManagerAccountRepository.update(id, input);
+      if (!externalProjectManagerAccount) return reply.status(404).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_NOT_FOUND" });
+      return { externalProjectManagerAccount };
+    } catch (error) {
+      if (error instanceof ExternalProjectManagerAccountValidationError) {
+        return reply.status(400).send({ error: "EXTERNAL_PROJECT_MANAGER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof ExternalProjectManagerAccountConflictError) {
+        return reply.status(409).send({ error: "EXTERNAL_PROJECT_MANAGER_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/purchase-requests", async (request, reply) => {
     if (!options.purchaseRequestRepository) {
       return reply.status(503).send({ error: "PURCHASE_REQUEST_REPOSITORY_NOT_CONFIGURED" });
@@ -1195,6 +1316,21 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
+  app.get("/api/project-sites/:id/investment-summary", async (request, reply) => {
+    if (!options.projectSiteRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), id)) {
+      return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    }
+
+    const investmentSummary = await options.projectSiteRepository.getInvestmentSummary(id);
+    if (!investmentSummary) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+    return { investmentSummary };
+  });
+
   app.get("/api/project-sites/:id", async (request, reply) => {
     if (!options.projectSiteRepository) {
       return reply.status(503).send({ error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" });
@@ -1257,6 +1393,38 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
+  app.get("/api/project-usage-options", async (_request, reply) => {
+    if (!options.materialRepository || !options.warehouseRepository) {
+      return reply.status(503).send({ error: "PROJECT_USAGE_OPTIONS_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const [warehouses, materials] = await Promise.all([
+      options.warehouseRepository.list({ status: "enabled" }),
+      options.materialRepository.list({ status: "enabled" }),
+    ]);
+    const defaultWarehouse =
+      warehouses.find((warehouse) => warehouse.warehouseCode === "WH-WX-HQ") ?? warehouses.find((warehouse) => warehouse.status === "enabled") ?? null;
+
+    return {
+      defaultWarehouse: defaultWarehouse
+        ? {
+            id: defaultWarehouse.id,
+            warehouseCode: defaultWarehouse.warehouseCode,
+            warehouseName: defaultWarehouse.warehouseName,
+          }
+        : null,
+      materials: materials
+        .filter((material) => material.isProjectSiteSaleEnabled)
+        .map((material) => ({
+          id: material.id,
+          materialCode: material.materialCode,
+          materialName: material.materialName,
+          specification: material.specification,
+          unit: material.projectSiteSaleUnit || material.baseUnit,
+        })),
+    };
+  });
+
   app.get("/api/project-usage-requests", async (request, reply) => {
     if (!options.projectUsageRequestRepository) {
       return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
@@ -1270,7 +1438,11 @@ export function buildApp(options: BuildAppOptions = {}) {
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const projectUsageRequests = await options.projectUsageRequestRepository.list(filters);
-      return { projectUsageRequests };
+      return {
+        projectUsageRequests: projectUsageRequests.map((projectUsageRequest) =>
+          redactProjectUsageRequestForResponse(request, projectUsageRequest),
+        ),
+      };
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {
         return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
@@ -1290,7 +1462,7 @@ export function buildApp(options: BuildAppOptions = {}) {
       return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
     }
     if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
-    return { projectUsageRequest };
+    return { projectUsageRequest: redactProjectUsageRequestForResponse(request, projectUsageRequest) };
   });
 
   app.post("/api/project-usage-requests", async (request, reply) => {
@@ -1299,7 +1471,33 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     try {
-      const input = normalizeProjectUsageRequestInput(request.body, "create");
+      const externalScope = externalProjectManagerSiteIds(request);
+      const user = (request as AuthenticatedRequest).currentUser;
+      if (externalScope !== null) {
+        if (externalScope.length === 0) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      }
+      let input = normalizeProjectUsageRequestInput(
+        externalScope !== null
+          ? {
+              ...((request.body && typeof request.body === "object" && !Array.isArray(request.body)
+                ? request.body
+                : {}) as Record<string, unknown>),
+              projectSiteId: externalScope[0],
+              status: "pending",
+            }
+          : request.body,
+        "create",
+      );
+      if (externalScope !== null) {
+        input = {
+          ...input,
+          projectSiteId: externalScope[0],
+          status: "pending",
+          submittedByAccountId: user?.id ?? null,
+          submittedByNameSnapshot: user?.externalProjectManagerName ?? user?.employeeName ?? null,
+          submittedByPhoneSnapshot: user?.externalProjectManagerPhone ?? null,
+        };
+      }
       const scope = scopedProjectSiteIds(request);
       if (isOutsideProjectSiteScope(scope, input.projectSiteId)) {
         return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
@@ -1308,7 +1506,7 @@ export function buildApp(options: BuildAppOptions = {}) {
         return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: ["project-site users can only create pending usage requests"] });
       }
       const projectUsageRequest = await options.projectUsageRequestRepository.create(input);
-      return reply.status(201).send({ projectUsageRequest });
+      return reply.status(201).send({ projectUsageRequest: redactProjectUsageRequestForResponse(request, projectUsageRequest) });
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {
         return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
@@ -1327,6 +1525,9 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     const { id } = request.params as { id: string };
     try {
+      if (externalProjectManagerSiteIds(request) !== null) {
+        return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectUsageRequest", requiredLevel: "manage" });
+      }
       const input = normalizeProjectUsageRequestInput(request.body, "update");
       const scope = scopedProjectSiteIds(request);
       if (scope !== null) {
@@ -1343,7 +1544,7 @@ export function buildApp(options: BuildAppOptions = {}) {
       }
       const projectUsageRequest = await options.projectUsageRequestRepository.update(id, input);
       if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
-      return { projectUsageRequest };
+      return { projectUsageRequest: redactProjectUsageRequestForResponse(request, projectUsageRequest) };
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {
         return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: error.issues });
@@ -1377,6 +1578,76 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
   });
 
+  app.get("/api/market-operations-handoffs", async (request, reply) => {
+    if (!options.marketOperationsHandoffRepository) {
+      return reply.status(503).send({ error: "MARKET_OPERATIONS_HANDOFF_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeMarketOperationsHandoffFilters(request.query as Record<string, unknown>);
+      const marketOperationsHandoffs = await options.marketOperationsHandoffRepository.list(filters);
+      return { marketOperationsHandoffs };
+    } catch (error) {
+      if (error instanceof MarketOperationsHandoffValidationError) {
+        return reply.status(400).send({ error: "MARKET_OPERATIONS_HANDOFF_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/market-operations-handoffs/:id", async (request, reply) => {
+    if (!options.marketOperationsHandoffRepository) {
+      return reply.status(503).send({ error: "MARKET_OPERATIONS_HANDOFF_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const marketOperationsHandoff = await options.marketOperationsHandoffRepository.getById(id);
+    if (!marketOperationsHandoff) return reply.status(404).send({ error: "MARKET_OPERATIONS_HANDOFF_NOT_FOUND" });
+    return { marketOperationsHandoff };
+  });
+
+  app.post("/api/market-operations-handoffs", async (request, reply) => {
+    if (!options.marketOperationsHandoffRepository) {
+      return reply.status(503).send({ error: "MARKET_OPERATIONS_HANDOFF_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeMarketOperationsHandoffInput(request.body, "create");
+      const marketOperationsHandoff = await options.marketOperationsHandoffRepository.create(input);
+      return reply.status(201).send({ marketOperationsHandoff });
+    } catch (error) {
+      if (error instanceof MarketOperationsHandoffValidationError) {
+        return reply.status(400).send({ error: "MARKET_OPERATIONS_HANDOFF_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof MarketOperationsHandoffConflictError) {
+        return reply.status(409).send({ error: "MARKET_OPERATIONS_HANDOFF_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/market-operations-handoffs/:id", async (request, reply) => {
+    if (!options.marketOperationsHandoffRepository) {
+      return reply.status(503).send({ error: "MARKET_OPERATIONS_HANDOFF_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeMarketOperationsHandoffInput(request.body, "update");
+      const marketOperationsHandoff = await options.marketOperationsHandoffRepository.update(id, input);
+      if (!marketOperationsHandoff) return reply.status(404).send({ error: "MARKET_OPERATIONS_HANDOFF_NOT_FOUND" });
+      return { marketOperationsHandoff };
+    } catch (error) {
+      if (error instanceof MarketOperationsHandoffValidationError) {
+        return reply.status(400).send({ error: "MARKET_OPERATIONS_HANDOFF_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof MarketOperationsHandoffConflictError) {
+        return reply.status(409).send({ error: "MARKET_OPERATIONS_HANDOFF_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/contracts", async (request, reply) => {
     if (!options.contractRepository) {
       return reply.status(503).send({ error: "CONTRACT_REPOSITORY_NOT_CONFIGURED" });
@@ -1397,6 +1668,87 @@ export function buildApp(options: BuildAppOptions = {}) {
       }
       throw error;
     }
+  });
+
+  app.get("/api/business-projects", async (request, reply) => {
+    if (!options.businessProjectRepository) {
+      return reply.status(503).send({ error: "BUSINESS_PROJECT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const filters = normalizeBusinessProjectFilters(request.query as Record<string, unknown>);
+      const businessProjects = await options.businessProjectRepository.list(filters);
+      return { businessProjects };
+    } catch (error) {
+      if (error instanceof BusinessProjectValidationError) {
+        return reply.status(400).send({ error: "BUSINESS_PROJECT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/business-projects/:id", async (request, reply) => {
+    if (!options.businessProjectRepository) {
+      return reply.status(503).send({ error: "BUSINESS_PROJECT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const businessProject = await options.businessProjectRepository.getById(id);
+    if (!businessProject) return reply.status(404).send({ error: "BUSINESS_PROJECT_NOT_FOUND" });
+    return { businessProject };
+  });
+
+  app.post("/api/business-projects", async (request, reply) => {
+    if (!options.businessProjectRepository) {
+      return reply.status(503).send({ error: "BUSINESS_PROJECT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const input = normalizeBusinessProjectInput(request.body, "create");
+      const businessProject = await options.businessProjectRepository.create(input);
+      return reply.status(201).send({ businessProject });
+    } catch (error) {
+      if (error instanceof BusinessProjectValidationError) {
+        return reply.status(400).send({ error: "BUSINESS_PROJECT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof BusinessProjectConflictError) {
+        return reply.status(409).send({ error: "BUSINESS_PROJECT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/business-projects/:id", async (request, reply) => {
+    if (!options.businessProjectRepository) {
+      return reply.status(503).send({ error: "BUSINESS_PROJECT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    try {
+      const input = normalizeBusinessProjectInput(request.body, "update");
+      const businessProject = await options.businessProjectRepository.update(id, input);
+      if (!businessProject) return reply.status(404).send({ error: "BUSINESS_PROJECT_NOT_FOUND" });
+      return { businessProject };
+    } catch (error) {
+      if (error instanceof BusinessProjectValidationError) {
+        return reply.status(400).send({ error: "BUSINESS_PROJECT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof BusinessProjectConflictError) {
+        return reply.status(409).send({ error: "BUSINESS_PROJECT_CONFLICT", field: error.field });
+      }
+      throw error;
+    }
+  });
+
+  app.get("/api/business-projects/:id/investment-summary", async (request, reply) => {
+    if (!options.businessProjectRepository) {
+      return reply.status(503).send({ error: "BUSINESS_PROJECT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const investmentSummary = await options.businessProjectRepository.getInvestmentSummary(id);
+    if (!investmentSummary) return reply.status(404).send({ error: "BUSINESS_PROJECT_NOT_FOUND" });
+    return { investmentSummary };
   });
 
   app.get("/api/contracts/:id", async (request, reply) => {

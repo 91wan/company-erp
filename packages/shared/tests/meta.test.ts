@@ -9,8 +9,11 @@ import {
   CERTIFICATE_OWNER_TYPES,
   CERTIFICATE_TYPES,
   CERTIFICATE_VALIDITY_TYPES,
+  BUSINESS_PROJECT_STATUSES,
+  BUSINESS_PROJECT_TYPES,
   CONTRACT_DIRECTIONS,
   CONTRACT_EXPIRY_STATES,
+  CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
   getPermissionLevel,
   INVENTORY_MOVEMENT_TYPES,
@@ -48,6 +51,9 @@ describe("MVP role constants", () => {
       "procurement",
       "warehouse",
       "project_site",
+      "marketing",
+      "operations",
+      "external_project_manager",
       "viewer",
     ]);
   });
@@ -138,9 +144,10 @@ describe("MVP inventory dictionaries", () => {
       "other",
     ]);
     expect(ISSUE_TARGET_TYPES.map((targetType) => targetType.code)).toEqual([
-      "internal_office",
       "project_site",
       "subcontractor",
+      "company_department",
+      "company_person",
     ]);
     expect(CHARGE_PRICE_SOURCES.map((source) => source.code)).toEqual(["project_site_price"]);
     expect(MVP_DICTIONARIES.warehouseType.values).toEqual(["总部仓", "项目点仓", "临时仓"]);
@@ -160,9 +167,10 @@ describe("MVP inventory dictionaries", () => {
       "其他",
     ]);
     expect(MVP_DICTIONARIES.issueTargetType.values).toEqual([
-      "internal_office",
-      "project_site",
-      "subcontractor",
+      "项目点",
+      "外包方",
+      "公司部门",
+      "公司个人",
     ]);
     expect(MVP_DICTIONARIES.chargePriceSource.values).toEqual(["项目点收费价"]);
     expect(MVP_DICTIONARIES.projectUsageStatus.values).toEqual([
@@ -187,7 +195,7 @@ describe("MVP inventory dictionaries", () => {
       "partially_issued",
       "rejected",
     ]);
-    expect(MVP_DICTIONARIES.projectSiteServiceMode.values).toEqual(["直营服务", "外包服务"]);
+    expect(MVP_DICTIONARIES.projectSiteServiceMode.values).toEqual(["直营", "外包"]);
     expect(MVP_DICTIONARIES.projectSiteStatus.values).toEqual(["筹备中", "服务中", "暂停", "已结束"]);
     expect(EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => relation.code)).toEqual([
       "assigned",
@@ -217,6 +225,8 @@ describe("MVP permission constants", () => {
       "procurement",
       "warehouse",
       "project_site",
+      "marketing",
+      "operations",
       "viewer",
     ]);
     expect(MVP_PERMISSION_MATRIX.masterData.manage).toEqual(["admin", "procurement", "warehouse"]);
@@ -234,6 +244,15 @@ describe("MVP permission constants", () => {
     expect(canManage(["admin"], "systemSettings")).toBe(true);
   });
 
+  it("gives operations quantity-only inventory access and usage request creation without warehouse mutation", () => {
+    expect(canRead(["operations"], "inventoryQuantity")).toBe(true);
+    expect(canRead(["marketing"], "inventoryQuantity")).toBe(false);
+    expect(canManage(["operations"], "inventory")).toBe(false);
+    expect(canManage(["operations"], "projectUsageRequest")).toBe(true);
+    expect(canManage(["warehouse"], "projectUsageRequest")).toBe(false);
+    expect(canManage(["operations", "warehouse"], "inventory")).toBe(true);
+  });
+
   it("separates project-site master data from project usage permissions", () => {
     expect(canRead(["project_site"], "projectSites")).toBe(true);
     expect(canManage(["project_site"], "projectSites")).toBe(false);
@@ -244,18 +263,44 @@ describe("MVP permission constants", () => {
     expect(canManage(["admin"], "projectUsage")).toBe(true);
   });
 
+  it("limits external project managers to project usage request work", () => {
+    expect(canRead(["external_project_manager"], "projectUsage")).toBe(true);
+    expect(canManage(["external_project_manager"], "projectUsageRequest")).toBe(true);
+    expect(canRead(["external_project_manager"], "projectSites")).toBe(false);
+    expect(canRead(["external_project_manager"], "contracts")).toBe(false);
+    expect(canRead(["external_project_manager"], "inventoryQuantity")).toBe(false);
+    expect(canRead(["external_project_manager"], "masterData")).toBe(false);
+  });
+
   it("defines certificates as an HR/admin managed risk ledger", () => {
     expect(MVP_PERMISSION_MATRIX.certificates.read).toEqual([
       "admin",
       "hr",
       "procurement",
       "project_site",
+      "operations",
       "viewer",
     ]);
     expect(MVP_PERMISSION_MATRIX.certificates.manage).toEqual(["admin", "hr"]);
     expect(canManage(["hr"], "certificates")).toBe(true);
     expect(canManage(["procurement"], "certificates")).toBe(false);
     expect(canRead(["project_site"], "certificates")).toBe(true);
+  });
+
+  it("keeps business projects readable for management roles but not project-site scoped users", () => {
+    expect(MVP_PERMISSION_MATRIX.businessProjects.read).toEqual([
+      "admin",
+      "hr",
+      "procurement",
+      "marketing",
+      "operations",
+      "viewer",
+    ]);
+    expect(MVP_PERMISSION_MATRIX.businessProjects.manage).toEqual(["admin", "procurement"]);
+    expect(canRead(["operations"], "businessProjects")).toBe(true);
+    expect(canManage(["procurement"], "businessProjects")).toBe(true);
+    expect(canRead(["project_site"], "businessProjects")).toBe(false);
+    expect(canRead(["external_project_manager"], "businessProjects")).toBe(false);
   });
 });
 
@@ -320,11 +365,25 @@ describe("MVP dictionary constants", () => {
       "expired",
       "terminated",
     ]);
+    expect(CONTRACT_INVESTMENT_CATEGORIES.map((category) => category.code)).toEqual([
+      "renovation",
+      "equipment",
+      "advertising_signage",
+      "tableware_supplies",
+      "other",
+    ]);
     expect(MVP_DICTIONARIES.contractDirection.values).toEqual([
       "采购合同",
       "客户服务合同",
       "外包合同",
       "框架合同",
+      "其他",
+    ]);
+    expect(MVP_DICTIONARIES.contractInvestmentCategory.values).toEqual([
+      "装修/改造",
+      "设备",
+      "广告标识",
+      "餐具用品",
       "其他",
     ]);
     expect(MVP_DICTIONARIES.contractExpiryState.values).toEqual([
@@ -416,6 +475,27 @@ describe("MVP dictionary constants", () => {
       "设备",
       "服务",
       "其他",
+    ]);
+  });
+
+  it("defines business project dictionaries for self-operated construction aggregation", () => {
+    expect(BUSINESS_PROJECT_TYPES.map((type) => type.code)).toEqual(["self_operated_construction"]);
+    expect(BUSINESS_PROJECT_STATUSES.map((status) => status.code)).toEqual([
+      "preparing",
+      "in_progress",
+      "active",
+      "paused",
+      "ended",
+      "cancelled",
+    ]);
+    expect(MVP_DICTIONARIES.businessProjectType.values).toEqual(["自营建设/资产投入"]);
+    expect(MVP_DICTIONARIES.businessProjectStatus.values).toEqual([
+      "筹备中",
+      "建设中",
+      "已投运",
+      "暂停",
+      "已结束",
+      "已取消",
     ]);
   });
 

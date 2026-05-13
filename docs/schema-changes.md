@@ -5,7 +5,7 @@ This file records every database schema decision and migration.
 ## Pending
 
 - Confirm import tables.
-- Confirm whether project-site data-level filtering ships with the first project-site CRUD milestone or after the ledger exists.
+- Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
 ## 2026-05-11 Phase 1 Foundation
 
@@ -30,14 +30,13 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed the MVP inventory location is the Wuxi headquarters warehouse.
 - Confirmed headquarters inventory covers customized materials such as employee uniforms, paper cups, printed materials, and office internal-use materials.
 - Confirmed the MVP excludes ingredient inventory, project-site on-site warehouses, site-level stock balances, and multi-warehouse transfers.
-- Confirmed material issue records should support target types: `internal_office`, `project_site`, and `subcontractor`.
+- Confirmed material issue records should support target types: project site, subcontractor, company department, and company person.
 - Confirmed subcontractor material issues should encourage but not require `project_site_id`, because bulk issue to a subcontractor may happen before allocation to a specific site.
 - Confirmed contracts should distinguish `client_service_contract` and `subcontract_contract` when linked to project sites.
 
 ## 2026-05-11 People and Permissions Foundation
 
-- Confirmed MVP roles: `admin`, `hr`, `procurement`, `warehouse`, `project_site`, and `viewer`.
-- Replaced the earlier `Manager` placeholder role with `viewer` for read-only internal access.
+- Confirmed MVP roles: system admin, HR, procurement, warehouse, project site, marketing, operations, and read-only viewer.
 - Confirmed user accounts may hold multiple roles.
 - Confirmed effective permissions are the union of all assigned roles.
 - Confirmed only `admin` can manage user accounts and role assignments.
@@ -46,6 +45,32 @@ Before creating migrations, confirm the MVP data model for:
 - Added fixed enums for base status, employee status, account status, role codes, project-site status, and employee-project-site relation type.
 - Added migration `20260511162000_people_permissions_foundation` for the personnel and permission foundation.
 - Kept permissions as shared-code constants, not editable database rows.
+
+## 2026-05-13 Market, Operations, and Inventory Permission Boundary
+
+- Confirmed market and operations remain separate departments; inventory lookup is a permission concern, not a reason to merge departments.
+- Added fixed roles `marketing` and `operations`; removed the earlier manager role from the shared MVP role set.
+- Added shared permission areas `inventoryQuantity`, `projectUsageRequest`, and `marketOperationsHandoffs`.
+- Confirmed operations may view inventory quantity/availability and create usage requests, but cannot create inventory inbound, outbound, or stocktake movements unless also assigned `warehouse`.
+- Confirmed operations-only responses must hide price, cost, contract price, charge amount, and related financial fields.
+- Added `MarketOperationsHandoffStatus` and `market_operations_handoffs` for lightweight market-to-operations handoff records.
+- Added migration `20260513100000_market_operations_permissions`.
+
+## 2026-05-13 External Project Manager And Individual Subcontractor Boundary
+
+- Confirmed subcontractors can be company or individual Parties under the same `parties` master data.
+- Added `PartyEntityType` with `company` and `individual`.
+- Added encrypted identity-number storage for individual Parties: encrypted full value plus `identity_no_last4`; APIs expose only masked/last-four fields.
+- Confirmed `PartyType.subcontractor` remains the subcontractor identity flag for both companies and individuals, and one Party may still have multiple types such as supplier plus subcontractor.
+- Added fixed role `external_project_manager`.
+- Added `external_project_manager_accounts` as a login identity bound to one `project_site_id`, with optional `subcontractor_party_id` context.
+- Confirmed one project site can have only one active external project manager account; replacement is disabling the old account then creating a new one.
+- Confirmed external project manager accounts do not require or create internal employee records.
+- Added submitter audit snapshots to `project_usage_requests`: submitted account id, submitter name snapshot, and submitter phone snapshot.
+- Confirmed external project manager usage-request creation forces `project_site_id` from the authenticated account and does not trust the frontend project-site value.
+- Confirmed `/api/project-usage-options` exposes requestable material options and the Wuxi headquarters default warehouse without stock balance quantities.
+- Confirmed monthly operating reports are only reserved as permission/menu wording in this phase; no report table or fields were added.
+- Added migration `20260513143000_external_project_managers`.
 
 ## 2026-05-11 Purchase Source and Optional Supplier Rule
 
@@ -139,6 +164,19 @@ Before creating migrations, confirm the MVP data model for:
 - Added optional `purchase_records.contract_id` so purchase execution can reference a contract without making contracts mandatory.
 - Confirmed expiry display state remains derived from `contracts.end_date` and manual `terminated` status; no reminder or renewal workflow is added.
 - Added migration `20260511223000_contracts_foundation`.
+
+## 2026-05-13 Business Project And Contract Investment Aggregation
+
+- Confirmed contract investment tracking uses a two-level aggregation model.
+- Confirmed ordinary customer canteen project-site investments, such as renovation, equipment, advertising signage, and tableware supplies, link directly to `project_sites`.
+- Confirmed self-operated construction or asset investment projects, such as a central kitchen build, use `business_projects`.
+- Added `BusinessProjectType`, `BusinessProjectStatus`, and `ContractInvestmentCategory` enums.
+- Added `business_projects` for self-operated construction or asset investment project ledgers.
+- Added optional `project_sites.business_project_id` so operating project sites can be traced back to a larger business project after commissioning.
+- Added optional `contracts.business_project_id` and `contracts.investment_category` for investment contract aggregation and amount summaries.
+- Confirmed no unique constraint is added on `project_site_id`, `business_project_id`, or `investment_category`; multiple contracts in the same category remain valid.
+- Confirmed procurement records do not get separate investment statistics fields in this slice; optional `purchase_records.contract_id` remains the trace-back path.
+- Added migration `20260513110000_business_project_contract_investments`.
 
 ## 2026-05-11 Login and Permission Guard Foundation
 

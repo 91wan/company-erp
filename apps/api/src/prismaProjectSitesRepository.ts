@@ -2,8 +2,10 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   CreateProjectSiteInput,
   CreateProjectUsageRequestInput,
+  ContractInvestmentCategoryCode,
   IssueProjectUsageRequestInput,
   ProjectSiteDto,
+  ProjectSiteInvestmentSummaryDto,
   ProjectUsageRequestDto,
   UpdateProjectSiteInput,
   UpdateProjectUsageRequestInput,
@@ -52,6 +54,7 @@ function nullableDate(value: string | null | undefined): Date | null | undefined
 }
 
 const siteInclude = {
+  businessProject: true,
   clientParty: true,
   operatorParty: true,
   subcontractorParty: true,
@@ -69,6 +72,8 @@ function toProjectSiteDto(site: any): ProjectSiteDto {
     id: site.id,
     siteCode: site.siteCode,
     siteName: site.siteName,
+    businessProjectId: site.businessProjectId,
+    businessProjectName: site.businessProject?.projectName ?? null,
     clientPartyId: site.clientPartyId,
     clientPartyName: site.clientParty?.partyName ?? null,
     operatorPartyId: site.operatorPartyId,
@@ -114,6 +119,9 @@ function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
     unit: request.unit,
     purpose: request.purpose,
     requestedBy: request.requestedBy,
+    submittedByAccountId: request.submittedByAccountId,
+    submittedByNameSnapshot: request.submittedByNameSnapshot,
+    submittedByPhoneSnapshot: request.submittedByPhoneSnapshot,
     expectedDate: dateToString(request.expectedDate),
     status: request.status,
     outboundNo: request.outboundNo,
@@ -142,6 +150,7 @@ function toSiteCreateData(input: CreateProjectSiteInput): Record<string, unknown
   return {
     siteCode: input.siteCode,
     siteName: input.siteName,
+    businessProject: optionalCreateRelation(input.businessProjectId),
     clientParty: optionalCreateRelation(input.clientPartyId),
     operatorParty: optionalCreateRelation(input.operatorPartyId),
     serviceMode: input.serviceMode ?? "direct",
@@ -165,6 +174,7 @@ function toSiteUpdateData(input: UpdateProjectSiteInput): Record<string, unknown
   return {
     ...(input.siteCode !== undefined ? { siteCode: input.siteCode } : {}),
     ...(input.siteName !== undefined ? { siteName: input.siteName } : {}),
+    ...(input.businessProjectId !== undefined ? { businessProject: optionalRelation(input.businessProjectId) } : {}),
     ...(input.clientPartyId !== undefined ? { clientParty: optionalRelation(input.clientPartyId) } : {}),
     ...(input.operatorPartyId !== undefined ? { operatorParty: optionalRelation(input.operatorPartyId) } : {}),
     ...(input.serviceMode !== undefined ? { serviceMode: input.serviceMode } : {}),
@@ -207,6 +217,9 @@ function toUsageCreateData(input: CreateProjectUsageRequestInput): Record<string
     unit: input.unit,
     purpose: input.purpose,
     requestedBy: input.requestedBy,
+    submittedByAccountId: input.submittedByAccountId,
+    submittedByNameSnapshot: input.submittedByNameSnapshot,
+    submittedByPhoneSnapshot: input.submittedByPhoneSnapshot,
     expectedDate: nullableDate(input.expectedDate),
     status: input.status ?? "pending",
     remark: input.remark,
@@ -225,6 +238,9 @@ function toUsageUpdateData(input: UpdateProjectUsageRequestInput): Record<string
     ...(input.unit !== undefined ? { unit: input.unit } : {}),
     ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
     ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
+    ...(input.submittedByAccountId !== undefined ? { submittedByAccountId: input.submittedByAccountId } : {}),
+    ...(input.submittedByNameSnapshot !== undefined ? { submittedByNameSnapshot: input.submittedByNameSnapshot } : {}),
+    ...(input.submittedByPhoneSnapshot !== undefined ? { submittedByPhoneSnapshot: input.submittedByPhoneSnapshot } : {}),
     ...(input.expectedDate !== undefined ? { expectedDate: nullableDate(input.expectedDate) } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
     ...(input.remark !== undefined ? { remark: input.remark } : {}),
@@ -235,6 +251,7 @@ function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.serviceMode ? { serviceMode: filters.serviceMode } : {}),
+    ...(filters.businessProjectId ? { businessProjectId: filters.businessProjectId } : {}),
     ...(filters.clientPartyId ? { clientPartyId: filters.clientPartyId } : {}),
     ...(filters.subcontractorPartyId ? { subcontractorPartyId: filters.subcontractorPartyId } : {}),
     ...(filters.projectSiteIds ? { id: { in: [...filters.projectSiteIds] } } : {}),
@@ -245,6 +262,7 @@ function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
             { siteName: { contains: filters.q, mode: "insensitive" } },
             { region: { contains: filters.q, mode: "insensitive" } },
             { siteAddress: { contains: filters.q, mode: "insensitive" } },
+            { businessProject: { projectName: { contains: filters.q, mode: "insensitive" } } },
             { clientParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
             { subcontractorParty: { partyName: { contains: filters.q, mode: "insensitive" } } },
             { primaryManager: { name: { contains: filters.q, mode: "insensitive" } } },
@@ -291,7 +309,7 @@ function mapSiteError(error: unknown): never {
       if (targets.includes("site_code")) throw new ProjectSiteConflictError("siteCode");
     }
     if (error.code === "P2003" || error.code === "P2025") {
-      throw new ProjectSiteValidationError(["Referenced party or employee was not found"]);
+      throw new ProjectSiteValidationError(["Referenced business project, party, or employee was not found"]);
     }
   }
   throw error;
@@ -353,6 +371,36 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
     async getById(id: string) {
       const site = await client.projectSite.findUnique({ where: { id }, include: siteInclude });
       return site ? toProjectSiteDto(site) : null;
+    },
+    async getInvestmentSummary(id: string): Promise<ProjectSiteInvestmentSummaryDto | null> {
+      const existing = await client.projectSite.findUnique({ where: { id }, select: { id: true } });
+      if (!existing) return null;
+
+      const [all, grouped] = await Promise.all([
+        client.contract.aggregate({
+          where: { projectSiteId: id },
+          _count: { _all: true },
+          _sum: { amount: true },
+        }),
+        client.contract.groupBy({
+          by: ["investmentCategory"],
+          where: { projectSiteId: id, investmentCategory: { not: null } },
+          _count: { _all: true },
+          _sum: { amount: true },
+          orderBy: { investmentCategory: "asc" },
+        }),
+      ]);
+
+      return {
+        projectSiteId: id,
+        contractCount: all._count._all,
+        totalAmount: decimalToNumber(all._sum.amount),
+        categories: grouped.map((row) => ({
+          investmentCategory: row.investmentCategory as ContractInvestmentCategoryCode,
+          contractCount: row._count._all,
+          totalAmount: decimalToNumber(row._sum.amount),
+        })),
+      };
     },
     async create(input: CreateProjectSiteInput) {
       try {

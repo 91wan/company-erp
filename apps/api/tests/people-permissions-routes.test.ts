@@ -7,12 +7,21 @@ import {
   EmployeeProjectSiteAssignmentConflictError,
   EmployeeConflictError,
   UserAccountConflictError,
+  ExternalProjectManagerAccountConflictError,
   type DepartmentRepository,
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
+  type ExternalProjectManagerAccountRepository,
   type UserAccountRepository,
 } from "../src/peoplePermissions";
-import type { DepartmentDto, EmployeeDto, EmployeeProjectSiteAssignmentDto, MvpRoleCode, UserAccountDto } from "@company-erp/shared";
+import type {
+  DepartmentDto,
+  EmployeeDto,
+  EmployeeProjectSiteAssignmentDto,
+  ExternalProjectManagerAccountDto,
+  MvpRoleCode,
+  UserAccountDto,
+} from "@company-erp/shared";
 
 const now = "2026-05-11T10:00:00.000Z";
 const departmentId = "11111111-1111-4111-8111-111111111111";
@@ -73,6 +82,31 @@ function makeUserAccount(overrides: Partial<UserAccountDto> = {}): UserAccountDt
     roles: ["hr", "viewer"],
     lastLoginAt: null,
     passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeExternalProjectManagerAccount(
+  overrides: Partial<ExternalProjectManagerAccountDto> = {},
+): ExternalProjectManagerAccountDto {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    userAccountId: "abababab-abab-4bab-8bab-abababababab",
+    username: "site-manager",
+    accountStatus: "active",
+    projectSiteId,
+    siteCode: "SITE-WX-001",
+    siteName: "科技园一期项目点",
+    subcontractorPartyId: "12121212-1212-4121-8121-121212121212",
+    subcontractorPartyName: "王承包",
+    managerName: "王项目",
+    managerPhone: "13900000000",
+    status: "active",
+    startDate: "2026-05-11",
+    endDate: null,
+    remark: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -270,6 +304,45 @@ function createFakeUserAccountRepository(seed: UserAccountDto[] = []): UserAccou
         input.roles !== undefined ? (input.roles.length ? input.roles : ["viewer"]) : userAccounts[index].roles;
       userAccounts[index] = { ...userAccounts[index], ...input, roles, passwordChangedAt: input.resetPassword ? now : userAccounts[index].passwordChangedAt, updatedAt: now };
       return userAccounts[index];
+    },
+  };
+}
+
+function createFakeExternalProjectManagerAccountRepository(
+  seed: ExternalProjectManagerAccountDto[] = [],
+): ExternalProjectManagerAccountRepository {
+  const accounts = [...seed];
+  return {
+    async list(filters) {
+      return accounts.filter((account) => {
+        const matchesSite = filters.projectSiteId ? account.projectSiteId === filters.projectSiteId : true;
+        const matchesStatus = filters.status ? account.status === filters.status : true;
+        return matchesSite && matchesStatus;
+      });
+    },
+    async getById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async create(input) {
+      if (accounts.some((account) => account.projectSiteId === input.projectSiteId && account.status === "active")) {
+        throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+      }
+      const account = makeExternalProjectManagerAccount({
+        ...input,
+        id: "10101010-1010-4010-8010-101010101010",
+        userAccountId: "11111111-2222-4333-8444-555555555555",
+        username: input.username,
+        accountStatus: input.status ?? "active",
+        status: input.status ?? "active",
+      });
+      accounts.unshift(account);
+      return account;
+    },
+    async update(id, input) {
+      const index = accounts.findIndex((account) => account.id === id);
+      if (index === -1) return null;
+      accounts[index] = { ...accounts[index], ...input, updatedAt: now };
+      return accounts[index];
     },
   };
 }
@@ -560,5 +633,78 @@ describe("user accounts API", () => {
     expect(duplicateResponse.statusCode).toBe(409);
     expect(duplicateResponse.json()).toMatchObject({ error: "USER_ACCOUNT_CONFLICT", field: "username" });
     expect(missingResponse.statusCode).toBe(404);
+  });
+});
+
+describe("external project manager accounts API", () => {
+  it("creates, lists, and disables project-bound external manager accounts", async () => {
+    const existing = makeExternalProjectManagerAccount({ status: "disabled", accountStatus: "disabled" });
+    const app = buildApp({
+      externalProjectManagerAccountRepository: createFakeExternalProjectManagerAccountRepository([existing]),
+    });
+
+    const list = await app.inject({ method: "GET", url: `/api/external-project-manager-accounts?projectSiteId=${projectSiteId}` });
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/external-project-manager-accounts",
+      payload: {
+        projectSiteId,
+        subcontractorPartyId: "12121212-1212-4121-8121-121212121212",
+        managerName: "王项目",
+        managerPhone: "13900000000",
+        username: "site-manager-2",
+        initialPassword: "ChangeMe123!",
+        startDate: "2026-05-13",
+      },
+    });
+    const disabled = await app.inject({
+      method: "PATCH",
+      url: "/api/external-project-manager-accounts/10101010-1010-4010-8010-101010101010",
+      payload: { status: "disabled", endDate: "2026-06-01" },
+    });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({ externalProjectManagerAccounts: [{ username: "site-manager" }] });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      externalProjectManagerAccount: {
+        username: "site-manager-2",
+        projectSiteId,
+        managerName: "王项目",
+        status: "active",
+      },
+    });
+    expect(disabled.statusCode).toBe(200);
+    expect(disabled.json()).toMatchObject({
+      externalProjectManagerAccount: { status: "disabled", endDate: "2026-06-01" },
+    });
+  });
+
+  it("rejects a second active external manager for the same project site", async () => {
+    const app = buildApp({
+      externalProjectManagerAccountRepository: createFakeExternalProjectManagerAccountRepository([
+        makeExternalProjectManagerAccount(),
+      ]),
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/external-project-manager-accounts",
+      payload: {
+        projectSiteId,
+        managerName: "李项目",
+        managerPhone: "13900000001",
+        username: "site-manager-3",
+        initialPassword: "ChangeMe123!",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: "EXTERNAL_PROJECT_MANAGER_CONFLICT",
+      field: "activeProjectSiteManager",
+    });
   });
 });

@@ -15,6 +15,8 @@ Included in MVP:
 - Counterparty
 - Contract direction
 - Related project site
+- Related business project
+- Investment category
 - Start date and end date
 - Contract amount or budget amount
 - Attachment reference
@@ -41,6 +43,8 @@ Not included in MVP:
 | `counterparty_name_snapshot` | text | Optional | Stores the counterparty name at signing time so historical records do not change if the master data name changes later. |
 | `contract_direction` | text | Yes | Suggested values: `purchase_contract`, `client_service_contract`, `subcontract_contract`, `framework_contract`, `other`. |
 | `project_site_id` | foreign key | Optional | Links to the related project site. Empty means a headquarters-level or general framework contract. |
+| `business_project_id` | foreign key | Optional | Links to a self-operated construction or asset investment project, such as a central kitchen build. |
+| `investment_category` | text | Optional | Fixed dictionary for investment contracts: `renovation`, `equipment`, `advertising_signage`, `tableware_supplies`, `other`. Empty for ordinary service or framework contracts. |
 | `start_date` | date | Yes | Contract start date. |
 | `end_date` | date | Yes | Contract end date. |
 | `amount` | decimal(14,2) | Optional | Fixed contract amount when known. |
@@ -89,6 +93,8 @@ Rules:
 - Do not add a unique constraint on `project_site_id` or on `(project_site_id, contract_direction)`.
 - Do not add `is_primary_for_site` to the current schema. If the UI later needs one contract to appear as the main summary contract for a project site, add it through a separate future migration.
 - If a contract applies company-wide or to headquarters purchasing, `project_site_id` may be empty.
+- Ordinary project-site investment contracts, such as renovation, equipment, advertising signage, and tableware supplies, should fill `project_site_id` and `investment_category`.
+- The project-site detail page should show an "investment contracts" area grouped by `investment_category`, with contract count and amount total.
 - A direct project site may have a `client_service_contract`.
 - A subcontracted project site may have both a `client_service_contract` and a `subcontract_contract`.
 - The contract module stores these as contract records with `project_site_id` and `contract_direction`; the project-site module displays them as references.
@@ -101,6 +107,42 @@ contract_project_sites
 ```
 
 For the first version, avoid this join table unless multi-site contracts become a common daily operation.
+
+## Business Project Relationship
+
+Business projects are used for self-operated construction or asset investment projects that are larger than a single ordinary customer canteen site.
+
+Example:
+
+```text
+business_projects 1 -> N contracts
+business_projects 1 -> N project_sites
+```
+
+Rules:
+
+- Use `business_projects` for projects such as "Yangzhong Central Kitchen", where contracts cover land, civil construction, factory building, renovation, kitchen equipment, elevators, and other asset investment.
+- A business project can link to zero or many project sites. During construction it may have no operating site yet; after commissioning, one or more project sites can be associated with it.
+- A self-operated construction contract should fill `business_project_id` and `investment_category`.
+- If a contract clearly belongs to both a business project and a specific project site, both `business_project_id` and `project_site_id` may be filled.
+- Do not merge contracts by project site, counterparty, direction, or investment category. The unique business basis remains the contract number or original contract document.
+- The business-project detail page should show the related contract list and grouped amount summary by `investment_category`.
+- Do not add budget control, payment milestones, engineering progress, acceptance workflow, or asset capitalization rules to the contract MVP.
+
+Recommended business-project fields:
+
+| Field | Type | Required | Notes |
+|---|---|---:|---|
+| `id` | UUID or bigint | Yes | Internal primary key. |
+| `project_code` | text | Yes | Stable business project code. Must be unique. |
+| `project_name` | text | Yes | Business project name, for example `扬中中央厨房`. |
+| `project_type` | text | Yes | MVP value: `self_operated_construction`. |
+| `status` | text | Yes | Suggested values: `preparing`, `in_progress`, `active`, `paused`, `ended`, `cancelled`. |
+| `location` | text | Optional | Project location or address. |
+| `manager_employee_id` | foreign key | Optional | Internal project owner. |
+| `start_date` | date | Optional | Project start date. |
+| `end_date` | date | Optional | Project end or commissioning date. |
+| `remark` | text | Optional | Notes. |
 
 ## Purchase Record Relationship
 
@@ -176,6 +218,8 @@ The manual Excel import template for contracts should include:
 | Counterparty Name | Yes | Used to match or create supplier, client, or subcontractor reference depending on import policy. |
 | Contract Direction | Yes | Purchase contract, client service contract, subcontract contract, framework contract, or other. |
 | Project Site Name | Optional | Empty means headquarters-level or general contract. |
+| Business Project Code | Optional | Fill for self-operated construction or asset investment contracts. |
+| Investment Category | Optional | Fixed values: renovation, equipment, advertising signage, tableware supplies, or other. Required for project-site investment and business-project construction contracts. |
 | Primary Site Contract | Future optional | Yes/No. Do not include in current import until `is_primary_for_site` is implemented. |
 | Start Date | Yes | Contract start date. |
 | End Date | Yes | Contract end date. |
@@ -193,7 +237,10 @@ Minimum validation:
 - `contract_name` must not be empty.
 - `counterparty_party_id` must be present after import or manual entry.
 - `contract_direction` must use a fixed dictionary value.
+- `investment_category` must be empty or use the fixed dictionary value.
+- Project-site investment contracts and business-project construction contracts should fill `investment_category`.
 - Multiple contracts may share the same `project_site_id`, `counterparty_party_id`, and `contract_direction`.
+- Multiple contracts may share the same `project_site_id`, `business_project_id`, and `investment_category`.
 - If a future `is_primary_for_site` field is added and several contracts are marked primary for the same project site and direction, the UI or import review should ask the user to choose one main display contract, but the records themselves remain valid.
 - `start_date` must not be later than `end_date`.
 - At least one of `amount` or `budget_amount` may be present, but neither is mandatory.
@@ -211,6 +258,8 @@ contracts
 - counterparty_name_snapshot
 - contract_direction
 - project_site_id
+- business_project_id
+- investment_category
 - start_date
 - end_date
 - amount

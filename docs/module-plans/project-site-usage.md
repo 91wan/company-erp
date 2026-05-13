@@ -8,6 +8,8 @@ The MVP records which customer service site a business record belongs to, who is
 
 The project site must not become a daily canteen operation system in the first version.
 
+For investment tracking, ordinary customer canteen project-site investments stay directly on `project_sites`. Self-operated construction or asset projects, such as a central kitchen build, use `business_projects` and may later link one or more project sites.
+
 ## Confirmed Business Model
 
 Company group meal service has two operating modes.
@@ -25,7 +27,8 @@ MVP rules:
 - One project site maps to one client or service unit.
 - Our company is the fixed operator in the middle of the service relationship.
 - A direct site has no subcontractor.
-- A subcontracted site has exactly one subcontractor operating the whole site.
+- A subcontracted site has exactly one subcontractor operating the whole site. The subcontractor can be a company or an individual contractor.
+- The subcontractor Party is the contract/project counterparty; the external project manager account is only a login identity for usage requests.
 - The MVP does not support multiple subcontractors, windows, stalls, service lines, subcontractor internal teams, subcontractor settlement, or subcontractor performance evaluation.
 
 ## MVP Scope
@@ -37,8 +40,12 @@ Included in MVP:
 - Project-site staff assignment
 - Project-site related HQ material issue records
 - Project-site contract references
+- Lightweight market-to-operations handoff records
+- Project-site investment contract references and grouped amount summary
 - Direct and subcontracted operating modes
 - One subcontractor per subcontracted site
+- Company and individual subcontractors under the unified Party master data
+- One active external project manager account per project site, for usage request submission only
 
 Not included in MVP:
 
@@ -51,6 +58,29 @@ Not included in MVP:
 - Project-site on-site warehouse
 - Project-site stock balance
 - Multi-subcontractor project-site operation
+- Full opportunity CRM or complex project initiation workflow
+- Monthly operating report tables or submission workflow; only permission/menu naming is reserved
+
+## Market-to-Operations Handoff
+
+Market and operations stay as separate departments. The MVP handoff record only captures the minimum execution transfer:
+
+| Field | Required | Notes |
+| --- | ---: | --- |
+| `handoff_no` | Yes | Stable handoff document number. |
+| `project_name` | Yes | Customer/project name at handoff time. |
+| `client_party_id` | Optional | Linked client/service unit when already in party master data. |
+| `client_name` | Yes | Customer/service-unit text snapshot. |
+| `project_site_id` | Optional | Linked once a project-site ledger record exists. |
+| `market_owner_employee_id` | Yes | Market owner responsible for the handoff. |
+| `operations_owner_employee_id` | Yes | Operations owner receiving the handoff. |
+| `status` | Yes | `pending`, `handed_over`, `accepted`, or `cancelled`. |
+| `expected_start_date` | Optional | Expected service/project start date. |
+| `handoff_date` | Optional | Handoff date. |
+| `project_summary` | Optional | Key background and execution notes. |
+| `remark` | Optional | Free-form note. |
+
+This is not a CRM pipeline. Customer, opportunity, quotation, and full project initiation logic can be added later if the business process becomes stable.
 
 ## Project Site Ledger Fields
 
@@ -65,6 +95,7 @@ Not included in MVP:
 | `subcontractor_party_id` | foreign key | Conditional | Required only when `service_mode = subcontracted`; must be empty when direct. |
 | `site_address` | text | Optional | Site address or service location. |
 | `service_type` | text | Optional | Suggested values: canteen, group meal, logistics support, other. |
+| `business_project_id` | foreign key | Optional | Links the site to a self-operated construction or asset investment project when applicable. Ordinary customer sites can leave it empty. |
 | `status` | text | Yes | Suggested values: `preparing`, `active`, `paused`, `ended`. |
 | `start_date` | date | Optional | Service start date. |
 | `end_date` | date | Optional | Service end date. |
@@ -108,6 +139,34 @@ Rules:
 - The primary manager remains a single field on the project site for clear responsibility.
 - Subcontractor staff are not system users in MVP. Store only contact name and phone on the project site or issue record.
 
+## External Project Manager Account
+
+Subcontracted sites can have one external project manager login account. This account is not an employee, does not bind to `employees.id`, and is not the contract counterparty master record.
+
+Rules:
+
+- One project site can have at most one active external project manager account at the same time.
+- The account binds to `project_site_id`; `subcontractor_party_id` is optional context.
+- The project manager may be the individual subcontractor himself/herself or another person arranged by the subcontractor.
+- When the person changes, disable the old account and create a new account. Historical usage requests keep the old submitter snapshot.
+- The first version only allows creating and viewing this project site's usage requests and status.
+- Monthly operating reports are reserved as a future menu/permission name only; no report schema is created in this phase.
+
+Minimum fields:
+
+| Field | Type | Required | Notes |
+|---|---|---:|---|
+| `id` | UUID | Yes | External project manager account id. |
+| `user_account_id` | foreign key | Yes | Login account with fixed role `external_project_manager`. |
+| `project_site_id` | foreign key | Yes | The only project site this account can access. |
+| `subcontractor_party_id` | foreign key | Optional | The subcontractor source when known. |
+| `manager_name` | text | Yes | Display name and submitter snapshot source. |
+| `manager_phone` | text | Yes | Contact phone and submitter snapshot source. |
+| `status` | enum | Yes | `active`, `disabled`, `locked`. |
+| `start_date` | date | Optional | Effective start date. |
+| `end_date` | date | Optional | Effective end date after replacement or disablement. |
+| `remark` | text | Optional | Free-form note. |
+
 ## Wuxi Headquarters Warehouse Boundary
 
 The MVP has one real inventory location:
@@ -147,7 +206,7 @@ Recommended fields on outbound or issue records:
 | `quantity` | decimal | Yes | Issued quantity in base unit. |
 | `unit` | text | Yes | Material base unit snapshot. |
 | `issue_date` | date | Yes | Outbound date. |
-| `issue_target_type` | text | Yes | Suggested values: `internal_office`, `project_site`, `subcontractor`. |
+| `issue_target_type` | text | Yes | Internal values: `project_site`, `subcontractor`, `company_department`, `company_person`. User-facing values: 项目点、外包方、公司部门、公司个人. |
 | `project_site_id` | foreign key | Optional | Filled when the issue is related to a project site. |
 | `subcontractor_party_id` | foreign key | Optional | Filled when the issue target is a subcontractor. |
 | `department_id` | foreign key | Optional | Filled for office internal use when useful. |
@@ -159,9 +218,10 @@ Recommended fields on outbound or issue records:
 
 Issue target rules:
 
-- `internal_office`: used by company office; `department_id` may be filled; `project_site_id` and `subcontractor_party_id` are normally empty.
 - `project_site`: used by our direct or internal site team; `project_site_id` should be filled.
 - `subcontractor`: issued to a subcontractor; `subcontractor_party_id` should be filled; `project_site_id` is recommended but not mandatory.
+- `company_department`: used by an internal department; `department_id` or department name should be filled.
+- `company_person`: used by a specific internal person; requester or employee reference should be filled.
 
 Business rule:
 
@@ -193,6 +253,15 @@ MVP contract rules:
 - Contract references may be empty while old contracts are still being collected or scanned.
 - Contract amount visibility can be hidden from project-site users if permission scope requires it.
 
+Investment contract rules:
+
+- Ordinary project-site investment contracts, such as renovation, equipment, advertising signage, tableware supplies, and other launch inputs, fill `contracts.project_site_id`.
+- A single project site can have multiple investment contracts in the same investment category.
+- Do not add a unique constraint on project site plus investment category.
+- Project-site detail should show an "investment contracts" section grouped by the fixed investment categories: renovation, equipment, advertising signage, tableware supplies, and other.
+- If a site is created from a self-operated business project, fill `project_sites.business_project_id` so users can trace the larger construction or asset project.
+- The site remains the operating dimension; the business project remains the construction or asset investment dimension.
+
 ## Project Site User Visibility
 
 Project-site users can only see data for their assigned sites.
@@ -214,7 +283,19 @@ Not allowed:
 - Company-wide staff data
 - Purchase, warehouse, or contract records unrelated to assigned sites
 
-Subcontractor users are not included in MVP. If future external accounts are added, they should only see their own issue requests and confirmations for the subcontractor and project site they are assigned to.
+External project manager users have a narrower scope than internal project-site users.
+
+Allowed for `external_project_manager`:
+
+- Create usage requests for the bound project site. The backend injects the account's `project_site_id`; the frontend must not decide it.
+- View usage requests and processing status for the bound project site.
+- Load a narrow usage-options API containing requestable materials, unit, and default Wuxi headquarters warehouse.
+
+Not allowed for `external_project_manager`:
+
+- Project-site ledger management or other project sites.
+- Contracts, procurement, inventory balance, supplier/subcontractor master data, employees, departments, and user-account administration.
+- Full inventory availability or stock balance numbers.
 
 ## Recommended First Data Model
 
@@ -229,6 +310,7 @@ project_sites
 - subcontractor_party_id
 - site_address
 - service_type
+- business_project_id
 - status
 - start_date
 - end_date
@@ -271,6 +353,8 @@ inventory_issue_records
 
 contracts
 - project_site_id
+- business_project_id
+- investment_category
 - contract_direction
 ```
 
@@ -324,7 +408,7 @@ HQ material issue import:
 | Material Code | Yes | Must match material master data. |
 | Quantity | Yes | Positive number. |
 | Unit | Yes | Base unit. |
-| Issue Target Type | Yes | `internal_office`, `project_site`, or `subcontractor`. |
+| Issue Target Type | Yes | 项目点、外包方、公司部门、公司个人. |
 | Project Site Code | Optional | Recommended for site-related and subcontractor issues. |
 | Subcontractor Name | Optional | Required when target type is `subcontractor`. |
 | Department | Optional | Used for office internal issues. |

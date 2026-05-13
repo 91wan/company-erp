@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { ApiStatus } from "../src/components/ApiStatus";
+import { BusinessProjectsWorkspace } from "../src/components/BusinessProjectsWorkspace";
 import { CertificatesWorkspace } from "../src/components/CertificatesWorkspace";
 import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
 import { ExcelImportWorkspace } from "../src/components/ExcelImportWorkspace";
@@ -15,6 +16,8 @@ import { ReplenishmentSuggestionsWorkspace } from "../src/components/Replenishme
 import type {
   DepartmentDto,
   EmployeeDto,
+  BusinessProjectDto,
+  BusinessProjectInvestmentSummaryDto,
   CertificateRecordDto,
   GenerateReplenishmentSuggestionsResult,
   ContractAttachmentDto,
@@ -26,7 +29,9 @@ import type {
   MaterialDto,
   PartyDto,
   EmployeeProjectSiteAssignmentDto,
+  ExternalProjectManagerAccountDto,
   ProjectSiteDto,
+  ProjectSiteInvestmentSummaryDto,
   ProjectUsageRequestDto,
   PurchaseRecordDto,
   PurchaseRequestDto,
@@ -60,6 +65,19 @@ const projectSiteUser = {
   assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
 };
 
+const externalProjectManagerUser = {
+  ...adminUser,
+  id: "dededede-dede-4ded-8ded-dededededede",
+  username: "site-manager",
+  employeeId: null,
+  employeeNo: null,
+  employeeName: null,
+  externalProjectManagerName: "王项目",
+  externalProjectManagerPhone: "13900000000",
+  roles: ["external_project_manager"] as const,
+  assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -72,8 +90,10 @@ function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Res
   } as Response;
 }
 
-function mockShellFetch(user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | null = adminUser) {
-  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+function mockShellFetch(
+  user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectManagerUser | null = adminUser,
+) {
+  return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
 
@@ -86,6 +106,9 @@ function mockShellFetch(user: typeof adminUser | typeof viewerUser | typeof proj
     if (url.includes("/api/warehouses")) return Promise.resolve(jsonResponse({ warehouses: [] }));
     if (url.includes("/api/departments")) return Promise.resolve(jsonResponse({ departments: [] }));
     if (url.includes("/api/employees")) return Promise.resolve(jsonResponse({ employees: [] }));
+    if (url.includes("/api/external-project-manager-accounts")) {
+      return Promise.resolve(jsonResponse({ externalProjectManagerAccounts: [] }));
+    }
     if (url.includes("/api/user-accounts")) return Promise.resolve(jsonResponse({ userAccounts: [] }));
     if (url.includes("/api/project-site-assignments")) return Promise.resolve(jsonResponse({ projectSiteAssignments: [] }));
     if (url.includes("/api/purchase-requests")) return Promise.resolve(jsonResponse({ purchaseRequests: [] }));
@@ -93,8 +116,30 @@ function mockShellFetch(user: typeof adminUser | typeof viewerUser | typeof proj
     if (url.includes("/api/inventory-movements")) return Promise.resolve(jsonResponse({ inventoryMovements: [] }));
     if (url.includes("/api/inventory-balances")) return Promise.resolve(jsonResponse({ inventoryBalances: [] }));
     if (url.includes("/api/replenishment-suggestions")) return Promise.resolve(jsonResponse({ replenishmentSuggestions: [] }));
+    if (url.includes("/api/project-usage-options")) {
+      return Promise.resolve(jsonResponse({
+        defaultWarehouse: {
+          id: warehouse.id,
+          warehouseCode: warehouse.warehouseCode,
+          warehouseName: warehouse.warehouseName,
+        },
+        materials: [
+          {
+            id: material.id,
+            materialCode: material.materialCode,
+            materialName: material.materialName,
+            specification: material.specification,
+            unit: material.projectSiteSaleUnit,
+          },
+        ],
+      }));
+    }
+    if (url.includes("/investment-summary")) {
+      return Promise.resolve(jsonResponse({ investmentSummary: { ...projectSiteInvestmentSummary, contractCount: 0, totalAmount: 0, categories: [] } }));
+    }
     if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
     if (url.includes("/api/project-usage-requests")) return Promise.resolve(jsonResponse({ projectUsageRequests: [] }));
+    if (url.includes("/api/business-projects")) return Promise.resolve(jsonResponse({ businessProjects: [] }));
     if (url.includes("/api/contracts")) return Promise.resolve(jsonResponse({ contracts: [] }));
     if (url.includes("/api/certificates")) return Promise.resolve(jsonResponse({ certificates: [] }));
     if (url.includes("/api/import-jobs/")) return Promise.resolve(jsonResponse({ importJob }));
@@ -109,6 +154,7 @@ const party: PartyDto = {
   partyCode: "SUP0001",
   partyName: "晨光贸易有限公司",
   partyTypes: ["supplier"],
+  entityType: "company",
   unifiedSocialCreditCode: "91320200MA00000001",
   primaryContactName: "张三",
   primaryContactPhone: "13800000000",
@@ -206,6 +252,26 @@ const userAccount: UserAccountDto = {
   roles: ["hr", "viewer"],
   lastLoginAt: null,
   passwordChangedAt: "2026-05-11T10:00:00.000Z",
+  createdAt: "2026-05-11T10:00:00.000Z",
+  updatedAt: "2026-05-11T10:00:00.000Z",
+};
+
+const externalProjectManagerAccount: ExternalProjectManagerAccountDto = {
+  id: "56565656-5656-4656-8656-565656565656",
+  userAccountId: "57575757-5757-4757-8757-575757575757",
+  username: "site-manager",
+  accountStatus: "active",
+  projectSiteId: "12121212-1212-4121-8121-121212121212",
+  siteCode: "SITE-WX-001",
+  siteName: "科技园一期项目点",
+  subcontractorPartyId: null,
+  subcontractorPartyName: null,
+  managerName: "王项目",
+  managerPhone: "13900000000",
+  status: "active",
+  startDate: "2026-05-11",
+  endDate: null,
+  remark: null,
   createdAt: "2026-05-11T10:00:00.000Z",
   updatedAt: "2026-05-11T10:00:00.000Z",
 };
@@ -448,6 +514,8 @@ const projectSite: ProjectSiteDto = {
   id: "12121212-1212-4121-8121-121212121212",
   siteCode: "SITE-WX-001",
   siteName: "科技园一期项目点",
+  businessProjectId: null,
+  businessProjectName: null,
   clientPartyId: party.id,
   clientPartyName: "无锡科技园服务单位",
   operatorPartyId: null,
@@ -470,6 +538,43 @@ const projectSite: ProjectSiteDto = {
   remark: null,
   createdAt: "2026-05-11T13:00:00.000Z",
   updatedAt: "2026-05-11T13:00:00.000Z",
+};
+
+const businessProject: BusinessProjectDto = {
+  id: "77777777-7777-4777-8777-777777777777",
+  projectCode: "BP-YZ-CK-001",
+  projectName: "扬中中央厨房",
+  projectType: "self_operated_construction",
+  status: "in_progress",
+  location: "扬中",
+  managerEmployeeId: employee.id,
+  managerEmployeeName: employee.name,
+  startDate: "2026-05-01",
+  endDate: null,
+  remark: "自营中央厨房建设项目",
+  createdAt: "2026-05-13T09:00:00.000Z",
+  updatedAt: "2026-05-13T09:00:00.000Z",
+};
+
+const businessProjectSummary: BusinessProjectInvestmentSummaryDto = {
+  businessProjectId: businessProject.id,
+  contractCount: 4,
+  totalAmount: 1680000,
+  categories: [
+    { investmentCategory: "renovation", contractCount: 2, totalAmount: 600000 },
+    { investmentCategory: "equipment", contractCount: 2, totalAmount: 1080000 },
+  ],
+};
+
+const projectSiteInvestmentSummary: ProjectSiteInvestmentSummaryDto = {
+  projectSiteId: projectSite.id,
+  contractCount: 4,
+  totalAmount: 260000,
+  categories: [
+    { investmentCategory: "renovation", contractCount: 1, totalAmount: 90000 },
+    { investmentCategory: "equipment", contractCount: 2, totalAmount: 150000 },
+    { investmentCategory: "advertising_signage", contractCount: 1, totalAmount: 20000 },
+  ],
 };
 
 const projectSiteAssignment: EmployeeProjectSiteAssignmentDto = {
@@ -497,6 +602,9 @@ const contract: ContractDto = {
   counterpartyPartyName: party.partyName,
   counterpartyNameSnapshot: party.partyName,
   direction: "client_service_contract",
+  investmentCategory: null,
+  businessProjectId: null,
+  businessProjectName: null,
   projectSiteId: projectSite.id,
   projectSiteName: projectSite.siteName,
   signedDate: "2026-05-01",
@@ -621,7 +729,7 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("数据库已连接")).toBeInTheDocument();
     expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
 
-    for (const label of ["基础资料", "采购", "库存", "合同", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
+    for (const label of ["基础资料", "采购", "库存", "合同", "业务项目", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
   });
@@ -694,7 +802,7 @@ describe("Company ERP app shell", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(screen.getAllByText("viewer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("只读").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /^基础资料$/ }));
     expect(screen.queryByRole("button", { name: "保存往来方" })).not.toBeInTheDocument();
@@ -726,6 +834,31 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^库存$/ }));
     expect(screen.queryByRole("button", { name: "当前库存查询" })).not.toBeInTheDocument();
+  });
+
+  it("shows external project managers only the usage request workspace", async () => {
+    const fetchMock = mockShellFetch(externalProjectManagerUser);
+
+    render(<App />);
+
+    expect(await screen.findByText("site-manager")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^项目点$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Dashboard$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^基础资料$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^库存$/ })).not.toBeInTheDocument();
+
+    expect(await screen.findByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
+    expect(screen.queryByText("项目点台账")).not.toBeInTheDocument();
+    expect(screen.queryByText("投入合同")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "项目点" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.some((url) => url.includes("/api/project-usage-options"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/api/project-usage-requests"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/api/project-sites"))).toBe(false);
+    expect(calledUrls.some((url) => url.includes("/api/parties"))).toBe(false);
+    expect(calledUrls.some((url) => url.includes("/api/inventory-balances"))).toBe(false);
   });
 
   it("renders the Excel import workspace in the app shell", async () => {
@@ -913,6 +1046,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([userAccount])}
+        loadExternalProjectManagerAccounts={() => Promise.resolve([externalProjectManagerAccount])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([projectSiteAssignment])}
       />,
@@ -922,13 +1056,15 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("部门管理")).toBeInTheDocument();
     expect(screen.getByText("员工台账")).toBeInTheDocument();
     expect(screen.getByText("账号角色")).toBeInTheDocument();
+    expect(screen.getByText("项目点外部项目经理账号")).toBeInTheDocument();
     expect(screen.getByText("项目点分配")).toBeInTheDocument();
     expect(screen.getByText("权限矩阵")).toBeInTheDocument();
     expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
     expect(screen.getByText("EMP0001")).toBeInTheDocument();
     expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
+    expect(await screen.findByText("王项目")).toBeInTheDocument();
     expect(screen.getAllByText("SITE-WX-001 科技园一期项目点").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("HR").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("人事").length).toBeGreaterThan(0);
   });
 
   it("renders purchase request and purchase record workspace data", async () => {
@@ -1116,6 +1252,8 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.resolve([party])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
       />,
     );
 
@@ -1127,6 +1265,9 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("新增领用申请")).toBeInTheDocument();
     expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
     expect(screen.getAllByText("科技园一期项目点").length).toBeGreaterThan(0);
+    expect(screen.getByText("投入合同")).toBeInTheDocument();
+    expect(await screen.findByText("装修/改造")).toBeInTheDocument();
+    expect(screen.getByText("¥260,000.00")).toBeInTheDocument();
     expect(screen.getByText("USE20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
   });
@@ -1139,6 +1280,8 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.resolve([])}
         loadMaterials={() => Promise.resolve([])}
         loadWarehouses={() => Promise.resolve([])}
+        loadBusinessProjects={() => Promise.resolve([])}
+        loadInvestmentSummary={() => Promise.resolve({ ...projectSiteInvestmentSummary, contractCount: 0, totalAmount: 0, categories: [] })}
       />,
     );
 
@@ -1152,17 +1295,26 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.reject(new Error("offline"))}
         loadMaterials={() => Promise.reject(new Error("offline"))}
         loadWarehouses={() => Promise.reject(new Error("offline"))}
+        loadBusinessProjects={() => Promise.reject(new Error("offline"))}
+        loadInvestmentSummary={() => Promise.reject(new Error("offline"))}
       />,
     );
 
     expect(await screen.findByText("项目点资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("领用申请加载失败")).toBeInTheDocument();
-    expect(await screen.findByText("项目点、物料或仓库接口暂不可用，暂不能登记领用。")).toBeInTheDocument();
+    expect(await screen.findByText("项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。")).toBeInTheDocument();
   });
 
   it("creates a project site and usage request", async () => {
-    const createdSite = { ...projectSite, siteCode: "SITE-WX-002", siteName: "滨江项目点" };
+    const createdSite = {
+      ...projectSite,
+      siteCode: "SITE-WX-002",
+      siteName: "滨江项目点",
+      businessProjectId: businessProject.id,
+      businessProjectName: businessProject.projectName,
+    };
     const createdRequest = { ...projectUsageRequest, requestNo: "USE20260511002", projectSiteName: "滨江项目点" };
+    const createProjectSite = vi.fn(() => Promise.resolve(createdSite));
 
     render(
       <ProjectSitesWorkspace
@@ -1171,7 +1323,9 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.resolve([party])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
-        createProjectSite={() => Promise.resolve(createdSite)}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        createProjectSite={createProjectSite}
         createUsageRequest={() => Promise.resolve(createdRequest)}
       />,
     );
@@ -1179,9 +1333,12 @@ describe("Company ERP app shell", () => {
     await screen.findByText("暂无项目点资料");
     fireEvent.change(screen.getByLabelText("项目点编码"), { target: { value: "SITE-WX-002" } });
     fireEvent.change(screen.getByLabelText("项目点名称"), { target: { value: "滨江项目点" } });
+    fireEvent.change(screen.getByLabelText("业务项目"), { target: { value: businessProject.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存项目点" }));
 
     expect(await screen.findByText("SITE-WX-002")).toBeInTheDocument();
+    expect(createProjectSite).toHaveBeenCalledWith(expect.objectContaining({ businessProjectId: businessProject.id }));
+    expect(screen.getAllByText("扬中中央厨房").length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText("领用申请单号"), { target: { value: "USE20260511002" } });
     fireEvent.change(screen.getByLabelText("申请日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getAllByLabelText("项目点").find((element) => element.tagName === "SELECT")!, {
@@ -1215,6 +1372,8 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.resolve([party])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
         issueUsageRequest={() => Promise.resolve(issuedRequest)}
       />,
     );
@@ -1240,6 +1399,8 @@ describe("Company ERP app shell", () => {
         loadParties={() => Promise.resolve([party])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
         issueUsageRequest={() => Promise.reject(new Error("insufficient stock"))}
       />,
     );
@@ -1260,6 +1421,7 @@ describe("Company ERP app shell", () => {
         loadContractAttachments={() => Promise.resolve([contractAttachment])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
       />,
     );
 
@@ -1270,6 +1432,8 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("无锡项目点服务合同")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已到期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("投入分类").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("业务项目").length).toBeGreaterThan(0);
     expect(await screen.findByText("HT20260511001.pdf")).toBeInTheDocument();
   });
 
@@ -1280,6 +1444,7 @@ describe("Company ERP app shell", () => {
         loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([])}
+        loadBusinessProjects={() => Promise.resolve([])}
       />,
     );
 
@@ -1292,11 +1457,12 @@ describe("Company ERP app shell", () => {
         loadContractAttachments={() => Promise.reject(new Error("offline"))}
         loadParties={() => Promise.reject(new Error("offline"))}
         loadProjectSites={() => Promise.reject(new Error("offline"))}
+        loadBusinessProjects={() => Promise.reject(new Error("offline"))}
       />,
     );
 
     expect(await screen.findByText("合同台账加载失败")).toBeInTheDocument();
-    expect(await screen.findByText("往来方或项目点接口暂不可用，暂不能新增合同。")).toBeInTheDocument();
+    expect(await screen.findByText("往来方、业务项目或项目点接口暂不可用，暂不能新增合同。")).toBeInTheDocument();
   });
 
   it("creates contract and attachment metadata", async () => {
@@ -1309,7 +1475,15 @@ describe("Company ERP app shell", () => {
         loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
-        createContract={() => Promise.resolve(createdContract)}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        createContract={(input) =>
+          Promise.resolve({
+            ...createdContract,
+            investmentCategory: input.investmentCategory ?? null,
+            businessProjectId: input.businessProjectId ?? null,
+            businessProjectName: input.businessProjectId ? businessProject.projectName : null,
+          })
+        }
         createContractAttachment={() => Promise.resolve(createdAttachment)}
       />,
     );
@@ -1319,12 +1493,20 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("合同名称"), { target: { value: "采购框架合同" } });
     fireEvent.change(screen.getByLabelText("相对方"), { target: { value: party.id } });
     fireEvent.change(screen.getByLabelText("合同方向"), { target: { value: "purchase_contract" } });
-    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    fireEvent.change(screen.getByLabelText("投入分类"), { target: { value: "equipment" } });
+    fireEvent.change(screen.getByLabelText("业务项目"), { target: { value: businessProject.id } });
+    const projectSiteAssignmentSelect = screen
+      .getAllByLabelText("项目点")
+      .find((element) => element.tagName === "SELECT");
+    expect(projectSiteAssignmentSelect).toBeDefined();
+    fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.change(screen.getByLabelText("开始日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("结束日期"), { target: { value: "2027-05-10" } });
     fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
 
     expect(await screen.findByText("HT20260511002")).toBeInTheDocument();
+    expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
+    expect(screen.getByText("扬中中央厨房")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
     fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "/volume1/company-erp/attachments/contracts/supplement.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
@@ -1339,6 +1521,7 @@ describe("Company ERP app shell", () => {
         loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
         createContract={() => Promise.reject(new Error("duplicate contract"))}
         createContractAttachment={() => Promise.reject(new Error("bad path"))}
       />,
@@ -1357,6 +1540,37 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
     expect(await screen.findByText("附件路径保存失败，请检查合同和路径。")).toBeInTheDocument();
+  });
+
+  it("renders and creates business projects with investment summary", async () => {
+    const createdBusinessProject = {
+      ...businessProject,
+      id: "88888888-8888-4888-8888-888888888888",
+      projectCode: "BP-YZ-CK-002",
+      projectName: "扬中中央厨房二期",
+      status: "preparing" as const,
+    };
+
+    render(
+      <BusinessProjectsWorkspace
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadInvestmentSummary={() => Promise.resolve(businessProjectSummary)}
+        createBusinessProject={() => Promise.resolve(createdBusinessProject)}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "业务项目" })).toBeInTheDocument();
+    expect((await screen.findAllByText("扬中中央厨房")).length).toBeGreaterThan(0);
+    expect(screen.getByText("CNY 1,680,000")).toBeInTheDocument();
+    expect(screen.getAllByText("装修/改造").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("项目编码"), { target: { value: "BP-YZ-CK-002" } });
+    fireEvent.change(screen.getByLabelText("项目名称"), { target: { value: "扬中中央厨房二期" } });
+    fireEvent.change(screen.getByLabelText("地点"), { target: { value: "扬中" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存业务项目" }));
+
+    expect((await screen.findAllByText("扬中中央厨房二期")).length).toBeGreaterThan(0);
   });
 
   it("renders certificate risk ledger and read-only states", async () => {
@@ -1630,6 +1844,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([])}
         loadEmployees={() => Promise.resolve([])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
       />,
@@ -1638,6 +1853,7 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无员工资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无账号资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无外部项目经理账号")).toBeInTheDocument();
     expect(await screen.findByText("暂无项目点分配")).toBeInTheDocument();
 
     rerender(
@@ -1645,6 +1861,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.reject(new Error("offline"))}
         loadEmployees={() => Promise.reject(new Error("offline"))}
         loadUserAccounts={() => Promise.reject(new Error("offline"))}
+        loadExternalProjectManagerAccounts={() => Promise.reject(new Error("offline"))}
         loadProjectSites={() => Promise.reject(new Error("offline"))}
         loadProjectSiteAssignments={() => Promise.reject(new Error("offline"))}
       />,
@@ -1653,6 +1870,7 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("员工资料加载失败")).toBeInTheDocument();
     expect(await screen.findByText("账号资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("外部项目经理账号加载失败")).toBeInTheDocument();
     expect(await screen.findByText("项目点分配加载失败")).toBeInTheDocument();
   });
 
@@ -1660,6 +1878,13 @@ describe("Company ERP app shell", () => {
     const createdDepartment = { ...department, departmentCode: "DEP-WH", name: "仓储部" };
     const createdEmployee = { ...employee, employeeNo: "EMP0002", name: "李四", username: null, accountStatus: null };
     const createdAccount = { ...userAccount, username: "lisi", employeeNo: "EMP0002", employeeName: "李四", roles: ["viewer"] as const };
+    const createdExternalAccount = {
+      ...externalProjectManagerAccount,
+      id: "58585858-5858-4858-8858-585858585858",
+      username: "site-new",
+      managerName: "赵项目",
+      managerPhone: "13811112222",
+    };
     const createdAssignment = { ...projectSiteAssignment, id: "24242424-2424-4242-8242-242424242424" };
 
     render(
@@ -1667,11 +1892,13 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.resolve(createdDepartment)}
         createEmployee={() => Promise.resolve(createdEmployee)}
         createUserAccount={() => Promise.resolve(createdAccount)}
+        createExternalProjectManagerAccount={() => Promise.resolve(createdExternalAccount)}
         createProjectSiteAssignment={() => Promise.resolve(createdAssignment)}
       />,
     );
@@ -1688,13 +1915,25 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+
+    fireEvent.change(screen.getByLabelText("项目经理姓名"), { target: { value: "赵项目" } });
+    fireEvent.change(screen.getByLabelText("手机号"), { target: { value: "13811112222" } });
+    fireEvent.change(screen.getByLabelText("外部登录账号"), { target: { value: "site-new" } });
+    fireEvent.change(screen.getByLabelText("外部初始密码"), { target: { value: "ChangeMe123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存外部账号" }));
+
     fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
-    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    const projectSiteAssignmentSelect = screen
+      .getAllByLabelText("项目点")
+      .find((element) => element.tagName === "SELECT");
+    expect(projectSiteAssignmentSelect).toBeDefined();
+    fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
     expect(await screen.findAllByText("仓储部")).not.toHaveLength(0);
     expect(await screen.findByText("EMP0002")).toBeInTheDocument();
     expect(await screen.findByText("lisi")).toBeInTheDocument();
+    expect(await screen.findByText("赵项目")).toBeInTheDocument();
     expect(await screen.findAllByText("SITE-WX-001 科技园一期项目点")).not.toHaveLength(0);
   });
 
@@ -1704,6 +1943,7 @@ describe("Company ERP app shell", () => {
         loadDepartments={() => Promise.resolve([department])}
         loadEmployees={() => Promise.resolve([employee])}
         loadUserAccounts={() => Promise.resolve([])}
+        loadExternalProjectManagerAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
         createDepartment={() => Promise.reject(new Error("duplicate department"))}
@@ -1726,7 +1966,11 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
     fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
-    fireEvent.change(screen.getByLabelText("项目点"), { target: { value: projectSite.id } });
+    const projectSiteAssignmentSelect = screen
+      .getAllByLabelText("项目点")
+      .find((element) => element.tagName === "SELECT");
+    expect(projectSiteAssignmentSelect).toBeDefined();
+    fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
     expect(await screen.findAllByText("保存失败，请检查唯一编码或稍后重试。")).toHaveLength(3);
