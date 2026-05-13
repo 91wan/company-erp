@@ -8,6 +8,7 @@ import type {
   DepartmentDto,
   EmployeeDto,
   EmployeeProjectSiteAssignmentDto,
+  EmployeeProjectSiteRelationTypeCode,
   ExternalProjectSiteAccountDto,
   MvpRoleCode,
   UpdateDepartmentInput,
@@ -727,7 +728,13 @@ export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient
   }
 
   async function assertNoDuplicateActive(
-    input: { employeeId?: string; projectSiteId?: string; relationType?: string; startDate?: string | null; endDate?: string | null },
+    input: {
+      employeeId?: string;
+      projectSiteId?: string;
+      relationType?: EmployeeProjectSiteRelationTypeCode;
+      startDate?: string | null;
+      endDate?: string | null;
+    },
     excludeId?: string,
   ) {
     if (!input.employeeId || !input.projectSiteId) return;
@@ -736,7 +743,7 @@ export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient
       where: {
         employeeId: input.employeeId,
         projectSiteId: input.projectSiteId,
-        relationType: relationType as any,
+        relationType,
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
     });
