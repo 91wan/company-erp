@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app";
 
 describe("metadata API", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns health without requiring a database connection", async () => {
     const app = buildApp();
     const response = await app.inject({ method: "GET", url: "/health" });
@@ -12,6 +16,59 @@ describe("metadata API", () => {
       status: "ok",
       service: "company-erp-api",
       database: { configured: expect.any(Boolean) },
+      version: { shortCommitSha: expect.any(String) },
+    });
+  });
+
+  it("returns safe unknown app version values when deployment metadata is not configured", async () => {
+    vi.stubEnv("APP_COMMIT_SHA", "");
+    vi.stubEnv("APP_BUILD_TIME", "");
+    vi.stubEnv("APP_DEPLOYED_AT", "");
+    vi.stubEnv("APP_PACKAGE_VERSION", "");
+    vi.stubEnv("APP_ENVIRONMENT", "");
+    const app = buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/api/app-version" });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      appVersion: {
+        packageVersion: "unknown",
+        commitSha: "unknown",
+        shortCommitSha: "unknown",
+        buildTime: "unknown",
+        deployedAt: "unknown",
+        environment: "unknown",
+      },
+    });
+  });
+
+  it("returns app version values from deployment environment metadata", async () => {
+    vi.stubEnv("APP_COMMIT_SHA", "9ac5cb74a9eb36136c2634399e9812def3be26d6");
+    vi.stubEnv("APP_BUILD_TIME", "2026-05-13T07:00:00.000Z");
+    vi.stubEnv("APP_DEPLOYED_AT", "2026-05-13T07:30:00.000Z");
+    vi.stubEnv("APP_PACKAGE_VERSION", "0.1.0");
+    vi.stubEnv("APP_ENVIRONMENT", "nas");
+    const app = buildApp();
+
+    const versionResponse = await app.inject({ method: "GET", url: "/api/app-version" });
+    const healthResponse = await app.inject({ method: "GET", url: "/health" });
+    await app.close();
+
+    expect(versionResponse.statusCode).toBe(200);
+    expect(versionResponse.json()).toEqual({
+      appVersion: {
+        packageVersion: "0.1.0",
+        commitSha: "9ac5cb74a9eb36136c2634399e9812def3be26d6",
+        shortCommitSha: "9ac5cb7",
+        buildTime: "2026-05-13T07:00:00.000Z",
+        deployedAt: "2026-05-13T07:30:00.000Z",
+        environment: "nas",
+      },
+    });
+    expect(healthResponse.json()).toMatchObject({
+      version: { shortCommitSha: "9ac5cb7" },
     });
   });
 

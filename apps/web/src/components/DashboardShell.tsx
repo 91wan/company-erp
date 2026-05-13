@@ -7,13 +7,14 @@ import {
   Search,
   Server,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   canManage,
   canRead,
   MVP_ROLES,
   type AppConfigDto,
+  type AppVersionDto,
   type AuthenticatedUserDto,
 } from "@company-erp/shared";
 import {
@@ -44,7 +45,7 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
-import { updateAppConfig } from "../apiClient";
+import { getAppVersion, updateAppConfig } from "../apiClient";
 
 type DashboardShellProps = {
   currentUser: AuthenticatedUserDto;
@@ -499,6 +500,28 @@ function SystemSettingsWorkspace({
 }) {
   const [nextCompanyName, setNextCompanyName] = useState(companyName);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [appVersion, setAppVersion] = useState<AppVersionDto | null>(null);
+  const [versionStatus, setVersionStatus] = useState<"loading" | "success" | "error">("loading");
+
+  useEffect(() => {
+    let isMounted = true;
+    setVersionStatus("loading");
+    getAppVersion()
+      .then((version) => {
+        if (!isMounted) return;
+        setAppVersion(version);
+        setVersionStatus("success");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setAppVersion(null);
+        setVersionStatus("error");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -551,6 +574,42 @@ function SystemSettingsWorkspace({
         {status === "error" ? <p className="form-error">保存失败，请检查权限或公司名称。</p> : null}
         {!canManage ? <p className="form-hint">当前账号没有 systemSettings.manage 权限，不能修改公司名称。</p> : null}
       </form>
+
+      <section className="dashboard-panel settings-version-panel" aria-label="当前版本">
+        <div className="form-header">
+          <div>
+            <h3>当前版本</h3>
+            <p>部署元数据只读显示，用于确认 NAS 当前运行版本。</p>
+          </div>
+        </div>
+
+        {versionStatus === "loading" ? <p className="form-hint">版本信息加载中。</p> : null}
+        {versionStatus === "error" ? <p className="form-error">版本信息不可用</p> : null}
+        {versionStatus === "success" && appVersion ? (
+          <dl className="version-grid">
+            <div>
+              <dt>短 commit</dt>
+              <dd>{appVersion.shortCommitSha}</dd>
+            </div>
+            <div>
+              <dt>包版本</dt>
+              <dd>{appVersion.packageVersion}</dd>
+            </div>
+            <div>
+              <dt>环境</dt>
+              <dd>{appVersion.environment}</dd>
+            </div>
+            <div>
+              <dt>构建时间</dt>
+              <dd>{appVersion.buildTime}</dd>
+            </div>
+            <div>
+              <dt>部署时间</dt>
+              <dd>{appVersion.deployedAt}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </section>
     </section>
   );
 }

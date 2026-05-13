@@ -69,6 +69,15 @@ export type UpdateAppConfigInput = {
   companyName?: string;
 };
 
+export type AppVersionDto = {
+  packageVersion: string;
+  commitSha: string;
+  shortCommitSha: string;
+  buildTime: string;
+  deployedAt: string;
+  environment: string;
+};
+
 export type MvpDictionary = {
   label: string;
   values: readonly string[];

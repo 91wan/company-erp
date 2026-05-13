@@ -17,7 +17,7 @@ const routeSource = [
   .join("\n");
 const authSource = readFileSync(new URL("../src/auth.ts", import.meta.url), "utf8");
 
-const explicitPublicRoutes = new Set(["GET /api/app-config"]);
+const explicitPublicRoutes = new Set(["GET /api/app-config", "GET /api/app-version"]);
 const publicPrefixes = ["/api/meta/", "/api/auth/"];
 
 function apiRoutes() {

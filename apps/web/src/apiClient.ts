@@ -1,4 +1,10 @@
-import type { AppConfigDto, AuthenticatedUserDto, LoginInput, UpdateAppConfigInput } from "@company-erp/shared";
+import type {
+  AppConfigDto,
+  AppVersionDto,
+  AuthenticatedUserDto,
+  LoginInput,
+  UpdateAppConfigInput,
+} from "@company-erp/shared";
 
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
@@ -28,6 +34,11 @@ export async function getCurrentUser(): Promise<AuthenticatedUserDto | null> {
 export async function getAppConfig(): Promise<AppConfigDto> {
   const payload = await requestJson<{ appConfig: AppConfigDto }>(`${apiBaseUrl}/api/app-config`);
   return payload.appConfig;
+}
+
+export async function getAppVersion(): Promise<AppVersionDto> {
+  const payload = await requestJson<{ appVersion: AppVersionDto }>(`${apiBaseUrl}/api/app-version`);
+  return payload.appVersion;
 }
 
 export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppConfigDto> {

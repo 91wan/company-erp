@@ -91,6 +91,31 @@ describe("Company ERP app shell", () => {
     expect(screen.getByRole("heading", { name: "无锡餐服 ERP" })).toBeInTheDocument();
   });
 
+  it("shows read-only deployment version metadata in system settings", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "当前版本" })).toBeInTheDocument();
+    expect(screen.getByText("9ac5cb7")).toBeInTheDocument();
+    expect(screen.getByText("0.1.0")).toBeInTheDocument();
+    expect(screen.getByText("nas")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-13T07:30:00.000Z")).toBeInTheDocument();
+  });
+
+  it("shows version unavailable when deployment metadata cannot be loaded", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" }, "error");
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "当前版本" })).toBeInTheDocument();
+    expect(screen.getByText("版本信息不可用")).toBeInTheDocument();
+  });
+
   it("keeps system settings read-only for viewer sessions", async () => {
     mockShellFetch(viewerUser, { companyName: "无锡餐服 ERP" });
 
