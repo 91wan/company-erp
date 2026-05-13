@@ -13,7 +13,7 @@ Included in MVP:
 - Employee ledger
 - Department management
 - User accounts
-- Project-site external project manager accounts
+- Project-site external accounts
 - Fixed role permissions
 - Basic login permission foundation
 - Employee-to-project-site assignment
@@ -40,7 +40,7 @@ The approved MVP roles are:
 | Project site | Assigned project-site records and usage. |
 | Marketing | Customer, opportunity, and early project handoff records. |
 | Operations | Project execution, quantity-only inventory lookup, and usage request creation. |
-| External project manager | External project-site manager usage request submission and status lookup for one bound site. |
+| Project-site external account | External project-site manager usage request submission and status lookup for one bound site. |
 | Read-only | Read-only internal access. |
 
 Rules:
@@ -121,11 +121,11 @@ Business rules:
 - `admin` can create, disable, and lock user accounts.
 - `hr` can view accounts for people operations but cannot assign roles or create admins.
 - Password reset and lockout policy can be simple in MVP and hardened later.
-- External project manager accounts are created through `external_project_manager_accounts` and use a user account with no `employee_id`.
+- Project-site external accounts are created through `project_site_external_accounts` and use a user account with no `employee_id`.
 
-## External Project Manager Account Fields
+## Project-Site External Account Fields
 
-This model is only for a project-site external project manager login. It does not represent the subcontractor contract counterparty. The counterparty remains `Party` with `partyTypes` containing `subcontractor`.
+This model is only for a project-site external login. It does not represent the subcontractor contract counterparty. The counterparty remains `Party` with `partyTypes` containing `subcontractor`.
 
 | Field | Type | Required | Notes |
 |---|---|---:|---|
@@ -133,21 +133,21 @@ This model is only for a project-site external project manager login. It does no
 | `user_account_id` | foreign key | Yes | Login account. `employee_id` remains empty. |
 | `project_site_id` | foreign key | Yes | The single project site this account can access. |
 | `subcontractor_party_id` | foreign key | Optional | Source subcontractor when known. |
-| `manager_name` | text | Yes | Project manager display name. |
-| `manager_phone` | text | Yes | Contact phone. |
+| `current_contact_name` | text | Yes | Current contact display name. |
+| `current_contact_phone` | text | Yes | Current contact phone. |
 | `status` | enum | Yes | `active`, `disabled`, or `locked`; mirrored with the login account. |
-| `start_date` | date | Optional | Start date for the manager. |
-| `end_date` | date | Optional | End date when replaced or disabled. |
+| `start_date` | date | Optional | Effective start date. |
+| `end_date` | date | Optional | End date when disabled. |
 | `remark` | text | Optional | Free-form notes. |
 | `created_at` | timestamp | Yes | Created time. |
 | `updated_at` | timestamp | Yes | Last updated time. |
 
 Business rules:
 
-- One project site can have only one active external project manager account.
-- Disabling the old account then creating a new account is the replacement path.
-- The account can represent the subcontractor personally or a manager arranged by the subcontractor.
-- Usage requests store submitter account id, name snapshot, and phone snapshot so history does not change after replacement.
+- One project site can have only one active project-site external account.
+- Contact replacement keeps the same account but requires the new current contact name, new current contact phone, and password reset.
+- The current contact can be the subcontractor personally or a person arranged by the subcontractor.
+- Usage requests store submitter account id, name snapshot, and phone snapshot so history does not change after contact replacement.
 - This role cannot read contracts, procurement, inventory balances, master data, project-site management, or personnel permissions.
 
 ## Role Assignment Fields
@@ -204,9 +204,9 @@ Rules:
 | Inventory quantity | `admin`, `hr`, `procurement`, `warehouse`, `project_site`, `operations`, `viewer` | `admin`, `warehouse` |
 | Contracts | `admin`, `hr`, `procurement`, `project_site`, `marketing`, `operations`, `viewer` | `admin`, `procurement` |
 | Business projects | `admin`, `hr`, `procurement`, `marketing`, `operations`, `viewer` | `admin`, `procurement` |
-| Project sites | all internal roles except external project manager | `admin`, `hr` |
-| Project usage | `admin`, `hr`, `procurement`, `warehouse`, `project_site`, `operations`, `external_project_manager`, `viewer` | `admin`, `project_site` |
-| Usage requests | `admin`, `hr`, `procurement`, `warehouse`, `project_site`, `operations`, `external_project_manager`, `viewer` | `admin`, `operations`, `project_site`, `external_project_manager` |
+| Project sites | all internal roles except project-site external account | `admin`, `hr` |
+| Project usage | `admin`, `hr`, `procurement`, `warehouse`, `project_site`, `operations`, `external_project_site`, `viewer` | `admin`, `project_site` |
+| Usage requests | `admin`, `hr`, `procurement`, `warehouse`, `project_site`, `operations`, `external_project_site`, `viewer` | `admin`, `operations`, `project_site`, `external_project_site` |
 | Market operations handoffs | `admin`, `marketing`, `operations` | `admin`, `marketing`, `operations` |
 | System settings | `admin` | `admin` |
 
@@ -266,13 +266,13 @@ user_role_assignments
 - assigned_by_user_id
 - assigned_at
 
-external_project_manager_accounts
+project_site_external_accounts
 - id
 - user_account_id
 - project_site_id
 - subcontractor_party_id
-- manager_name
-- manager_phone
+- current_contact_name
+- current_contact_phone
 - status
 - start_date
 - end_date

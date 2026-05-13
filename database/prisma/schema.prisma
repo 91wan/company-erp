@@ -130,6 +130,7 @@ enum BusinessProjectStatus {
 
 enum CertificateType {
   person_health_cert
+  employer_liability_insurance
   business_license
   food_operation_license
   project_site_license
@@ -206,7 +207,7 @@ model Party {
   contracts                 Contract[]
   certificates              CertificateRecord[]
   marketOperationsHandoffs  MarketOperationsHandoff[]
-  externalProjectManagers   ExternalProjectManagerAccount[]
+  externalProjectSiteAccounts ExternalProjectSiteAccount[]
 
   @@index([status])
   @@index([partyName])
@@ -341,7 +342,7 @@ model ProjectUsageRequest {
   projectSite       ProjectSite          @relation(fields: [projectSiteId], references: [id], onDelete: Restrict)
   warehouse         Warehouse            @relation(fields: [warehouseId], references: [id])
   material          Material             @relation(fields: [materialId], references: [id])
-  submittedByExternalManager ExternalProjectManagerAccount? @relation(fields: [submittedByAccountId], references: [userAccountId], onDelete: SetNull)
+  submittedByExternalSiteAccount ExternalProjectSiteAccount? @relation(fields: [submittedByAccountId], references: [userAccountId], onDelete: SetNull)
   movements         InventoryMovement[]
 
   @@index([projectSiteId, requestDate])
@@ -431,7 +432,7 @@ enum RoleCode {
   project_site
   marketing
   operations
-  external_project_manager
+  external_project_site
   viewer
 }
 
@@ -447,6 +448,22 @@ enum ProjectSiteStatus {
   active
   paused
   ended
+}
+
+enum ProjectSiteRosterWorkerType {
+  direct_site_staff
+  subcontractor_site_staff
+}
+
+enum ProjectSiteRosterStatus {
+  active
+  left
+}
+
+enum ProjectSiteComplianceReviewStatus {
+  pending
+  approved
+  rejected
 }
 
 enum EmployeeProjectSiteRelationType {
@@ -504,6 +521,8 @@ model Employee {
   ownedCertificates      CertificateRecord[]             @relation("CertificateOwnerEmployee")
   responsibleCertificates CertificateRecord[]             @relation("CertificateResponsibleEmployee")
   confirmedCertificates  CertificateRecord[]             @relation("CertificateConfirmedByEmployee")
+  reviewedInsurancePolicies ProjectSiteEmployerLiabilityInsurancePolicy[] @relation("InsuranceReviewedByEmployee")
+  reviewedPayrollSubmissions ProjectSitePayrollSubmission[] @relation("PayrollReviewedByEmployee")
   marketOwnedHandoffs    MarketOperationsHandoff[]       @relation("MarketOperationsHandoffMarketOwner")
   operationsOwnedHandoffs MarketOperationsHandoff[]       @relation("MarketOperationsHandoffOperationsOwner")
   managedBusinessProjects BusinessProject[]               @relation("BusinessProjectManager")
@@ -551,7 +570,7 @@ model UserAccount {
   employee            Employee?             @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   roles               UserRoleAssignment[]  @relation("UserAccountRoles")
   assignedRoleChanges UserRoleAssignment[]  @relation("AssignedUserRoles")
-  externalProjectManagerAccount ExternalProjectManagerAccount?
+  externalProjectSiteAccount ExternalProjectSiteAccount?
 
   @@index([status])
   @@map("user_accounts")
@@ -586,6 +605,7 @@ model ProjectSite {
   siteAddress              String?           @map("site_address")
   serviceType              String?           @map("service_type")
   status                   ProjectSiteStatus @default(active)
+  payrollAgencyRequired    Boolean           @default(false) @map("payroll_agency_required")
   startDate                DateTime?         @map("start_date") @db.Date
   endDate                  DateTime?         @map("end_date") @db.Date
   primaryManagerEmployeeId String?           @map("primary_manager_employee_id") @db.Uuid
@@ -610,7 +630,10 @@ model ProjectSite {
   purchaseRequests PurchaseRequest[]
   contracts        Contract[]
   certificates     CertificateRecord[]
-  externalProjectManagerAccounts ExternalProjectManagerAccount[]
+  externalProjectSiteAccounts ExternalProjectSiteAccount[]
+  rosterPeople     ProjectSiteRosterPerson[]
+  employerLiabilityInsurancePolicies ProjectSiteEmployerLiabilityInsurancePolicy[]
+  payrollSubmissions ProjectSitePayrollSubmission[]
 
   @@index([status])
   @@index([businessProjectId])
@@ -621,13 +644,104 @@ model ProjectSite {
   @@map("project_sites")
 }
 
-model ExternalProjectManagerAccount {
+model ProjectSiteRosterPerson {
+  id                   String                      @id @default(uuid()) @db.Uuid
+  projectSiteId        String                      @map("project_site_id") @db.Uuid
+  personName           String                      @map("person_name")
+  phone                String?
+  identityNoLast4      String?                     @map("identity_no_last4")
+  workerType           ProjectSiteRosterWorkerType @map("worker_type")
+  jobRole              String?                     @map("job_role")
+  startDate            DateTime?                   @map("start_date") @db.Date
+  endDate              DateTime?                   @map("end_date") @db.Date
+  status               ProjectSiteRosterStatus     @default(active)
+  sourceAttachmentPath String?                     @map("source_attachment_path")
+  remark               String?
+  createdAt            DateTime                    @default(now()) @map("created_at")
+  updatedAt            DateTime                    @updatedAt @map("updated_at")
+
+  projectSite        ProjectSite @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  healthCertificates CertificateRecord[]
+  insuranceCoverages ProjectSiteEmployerLiabilityInsuranceCoveredPerson[]
+
+  @@index([projectSiteId])
+  @@index([status])
+  @@index([workerType])
+  @@map("project_site_roster_people")
+}
+
+model ProjectSiteEmployerLiabilityInsurancePolicy {
+  id                   String                            @id @default(uuid()) @db.Uuid
+  projectSiteId        String                            @map("project_site_id") @db.Uuid
+  policyNo             String                            @unique @map("policy_no")
+  insurerName          String                            @map("insurer_name")
+  startDate            DateTime                          @map("start_date") @db.Date
+  endDate              DateTime                          @map("end_date") @db.Date
+  attachmentPath       String?                           @map("attachment_path")
+  reviewStatus         ProjectSiteComplianceReviewStatus @default(pending) @map("review_status")
+  reviewedByEmployeeId String?                           @map("reviewed_by_employee_id") @db.Uuid
+  reviewedAt           DateTime?                         @map("reviewed_at")
+  remark               String?
+  createdAt            DateTime                          @default(now()) @map("created_at")
+  updatedAt            DateTime                          @updatedAt @map("updated_at")
+
+  projectSite        ProjectSite @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  reviewedByEmployee Employee?   @relation("InsuranceReviewedByEmployee", fields: [reviewedByEmployeeId], references: [id], onDelete: SetNull)
+  coveredPeople      ProjectSiteEmployerLiabilityInsuranceCoveredPerson[]
+
+  @@index([projectSiteId])
+  @@index([endDate])
+  @@index([reviewStatus])
+  @@map("project_site_employer_liability_insurance_policies")
+}
+
+model ProjectSiteEmployerLiabilityInsuranceCoveredPerson {
+  id                      String   @id @default(uuid()) @db.Uuid
+  policyId                String   @map("policy_id") @db.Uuid
+  rosterPersonId          String?  @map("roster_person_id") @db.Uuid
+  coveredNameSnapshot     String   @map("covered_name_snapshot")
+  identityNoLast4Snapshot String?  @map("identity_no_last4_snapshot")
+  remark                  String?
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  policy       ProjectSiteEmployerLiabilityInsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  rosterPerson ProjectSiteRosterPerson?                    @relation(fields: [rosterPersonId], references: [id], onDelete: SetNull)
+
+  @@index([policyId])
+  @@index([rosterPersonId])
+  @@map("project_site_employer_liability_insurance_covered_people")
+}
+
+model ProjectSitePayrollSubmission {
+  id                   String                            @id @default(uuid()) @db.Uuid
+  projectSiteId        String                            @map("project_site_id") @db.Uuid
+  payrollMonth         String                            @map("payroll_month")
+  attachmentPath       String                            @map("attachment_path")
+  submittedBy          String?                           @map("submitted_by")
+  submittedAt          DateTime                          @default(now()) @map("submitted_at")
+  reviewStatus         ProjectSiteComplianceReviewStatus @default(pending) @map("review_status")
+  reviewedByEmployeeId String?                           @map("reviewed_by_employee_id") @db.Uuid
+  reviewedAt           DateTime?                         @map("reviewed_at")
+  remark               String?
+  createdAt            DateTime                          @default(now()) @map("created_at")
+  updatedAt            DateTime                          @updatedAt @map("updated_at")
+
+  projectSite        ProjectSite @relation(fields: [projectSiteId], references: [id], onDelete: Cascade)
+  reviewedByEmployee Employee?   @relation("PayrollReviewedByEmployee", fields: [reviewedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@unique([projectSiteId, payrollMonth])
+  @@index([reviewStatus])
+  @@map("project_site_payroll_submissions")
+}
+
+model ExternalProjectSiteAccount {
   id                   String            @id @default(uuid()) @db.Uuid
   userAccountId        String            @unique @map("user_account_id") @db.Uuid
   projectSiteId        String            @map("project_site_id") @db.Uuid
   subcontractorPartyId String?           @map("subcontractor_party_id") @db.Uuid
-  managerName          String            @map("manager_name")
-  managerPhone         String            @map("manager_phone")
+  currentContactName   String            @map("current_contact_name")
+  currentContactPhone  String            @map("current_contact_phone")
   status               UserAccountStatus @default(active)
   startDate            DateTime?         @map("start_date") @db.Date
   endDate              DateTime?         @map("end_date") @db.Date
@@ -643,7 +757,7 @@ model ExternalProjectManagerAccount {
   @@index([projectSiteId])
   @@index([subcontractorPartyId])
   @@index([status])
-  @@map("external_project_manager_accounts")
+  @@map("project_site_external_accounts")
 }
 
 model EmployeeProjectSiteAssignment {
@@ -844,6 +958,7 @@ model CertificateRecord {
   certificateType       CertificateType           @map("certificate_type")
   ownerType             CertificateOwnerType      @map("owner_type")
   ownerEmployeeId       String?                   @map("owner_employee_id") @db.Uuid
+  ownerRosterPersonId   String?                   @map("owner_roster_person_id") @db.Uuid
   ownerProjectSiteId    String?                   @map("owner_project_site_id") @db.Uuid
   ownerPartyId          String?                   @map("owner_party_id") @db.Uuid
   ownerNameSnapshot     String                    @map("owner_name_snapshot")
@@ -868,6 +983,7 @@ model CertificateRecord {
   updatedAt             DateTime                  @updatedAt @map("updated_at")
 
   ownerEmployee       Employee?    @relation("CertificateOwnerEmployee", fields: [ownerEmployeeId], references: [id], onDelete: SetNull)
+  ownerRosterPerson   ProjectSiteRosterPerson? @relation(fields: [ownerRosterPersonId], references: [id], onDelete: SetNull)
   ownerProjectSite    ProjectSite? @relation(fields: [ownerProjectSiteId], references: [id], onDelete: SetNull)
   ownerParty          Party?       @relation(fields: [ownerPartyId], references: [id], onDelete: SetNull)
   responsibleEmployee Employee?    @relation("CertificateResponsibleEmployee", fields: [responsibleEmployeeId], references: [id], onDelete: SetNull)
@@ -876,6 +992,7 @@ model CertificateRecord {
   @@index([certificateType])
   @@index([ownerType])
   @@index([ownerEmployeeId])
+  @@index([ownerRosterPersonId])
   @@index([ownerProjectSiteId])
   @@index([ownerPartyId])
   @@index([responsibleEmployeeId])

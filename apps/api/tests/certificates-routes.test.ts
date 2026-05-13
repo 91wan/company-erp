@@ -28,6 +28,9 @@ function makeCertificate(overrides: Partial<CertificateRecordDto> = {}): Certifi
     ownerType: "project_site",
     ownerEmployeeId: null,
     ownerEmployeeName: null,
+    ownerRosterPersonId: null,
+    ownerRosterPersonName: null,
+    ownerRosterPersonProjectSiteId: null,
     ownerProjectSiteId: assignedProjectSiteId,
     ownerProjectSiteName: "科技园一期项目点",
     ownerPartyId: null,
@@ -76,7 +79,8 @@ function createFakeCertificateRepository(seed: CertificateRecordDto[] = []): Cer
             ? true
             : record.isComplianceCritical === filters.isComplianceCritical;
         const matchesProjectSites = filters.projectSiteIds
-          ? filters.projectSiteIds.includes(record.ownerProjectSiteId ?? "")
+          ? filters.projectSiteIds.includes(record.ownerProjectSiteId ?? "") ||
+            filters.projectSiteIds.includes(record.ownerRosterPersonProjectSiteId ?? "")
           : true;
         const matchesOwnerTypes = filters.ownerTypes ? filters.ownerTypes.includes(record.ownerType) : true;
         const matchesQuery = filters.q
@@ -113,6 +117,8 @@ function createFakeCertificateRepository(seed: CertificateRecordDto[] = []): Cer
         id: "44444444-4444-4444-8444-444444444444",
         ...input,
         ownerEmployeeName: null,
+        ownerRosterPersonName: input.ownerRosterPersonId ? "王现场" : null,
+        ownerRosterPersonProjectSiteId: input.ownerRosterPersonId ? assignedProjectSiteId : null,
         ownerProjectSiteName: input.ownerProjectSiteId ? "科技园一期项目点" : null,
         ownerPartyName: input.ownerPartyId ? "供应商有限公司" : null,
         computedStatus: "valid",
@@ -254,6 +260,40 @@ describe("certificates API", () => {
     expect(updateResponse.json().certificate.remark).toBe("已人工复核");
   });
 
+  it("creates a health certificate linked to a project-site roster person", async () => {
+    const app = buildApp({ certificateRepository: createFakeCertificateRepository() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      payload: {
+        certificateCode: "HC-ROSTER-001",
+        certificateName: "现场人员健康证",
+        certificateType: "person_health_cert",
+        ownerType: "person",
+        ownerRosterPersonId: "55555555-5555-4555-8555-555555555555",
+        ownerNameSnapshot: "王现场",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+        reminderDays: 30,
+        isComplianceCritical: true,
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      certificate: {
+        certificateCode: "HC-ROSTER-001",
+        ownerType: "person",
+        ownerEmployeeId: null,
+        ownerRosterPersonId: "55555555-5555-4555-8555-555555555555",
+        ownerRosterPersonName: "王现场",
+        ownerRosterPersonProjectSiteId: assignedProjectSiteId,
+      },
+    });
+  });
+
   it("rejects invalid date and owner combinations", async () => {
     const app = buildApp({ certificateRepository: createFakeCertificateRepository() });
 
@@ -334,6 +374,15 @@ describe("certificates API", () => {
     const repository = createFakeCertificateRepository([
       makeCertificate({ id: "site-assigned", ownerProjectSiteId: assignedProjectSiteId, ownerNameSnapshot: "已分配项目点" }),
       makeCertificate({ id: "site-unassigned", ownerProjectSiteId: unassignedProjectSiteId, ownerNameSnapshot: "未分配项目点" }),
+      makeCertificate({
+        id: "roster-health",
+        certificateType: "person_health_cert",
+        ownerType: "person",
+        ownerProjectSiteId: null,
+        ownerRosterPersonId: "55555555-5555-4555-8555-555555555555",
+        ownerRosterPersonProjectSiteId: assignedProjectSiteId,
+        ownerNameSnapshot: "王现场",
+      }),
       makeCertificate({ id: "supplier-cert", ownerType: "supplier", ownerProjectSiteId: null, ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ownerNameSnapshot: "供应商" }),
     ]);
     const authRepository = createFakeAuthRepository([
@@ -371,7 +420,10 @@ describe("certificates API", () => {
     });
     await app.close();
 
-    expect(projectSiteList.json().certificates.map((item: CertificateRecordDto) => item.id)).toEqual(["site-assigned"]);
+    expect(projectSiteList.json().certificates.map((item: CertificateRecordDto) => item.id)).toEqual([
+      "site-assigned",
+      "roster-health",
+    ]);
     expect(hiddenDetail.statusCode).toBe(404);
     expect(projectSiteCreate.statusCode).toBe(403);
     expect(buyerList.json().certificates.map((item: CertificateRecordDto) => item.id)).toEqual(["supplier-cert"]);

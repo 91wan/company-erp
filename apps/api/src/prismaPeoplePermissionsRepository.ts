@@ -3,17 +3,17 @@ import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
   CreateEmployeeProjectSiteAssignmentInput,
-  CreateExternalProjectManagerAccountInput,
+  CreateExternalProjectSiteAccountInput,
   CreateUserAccountInput,
   DepartmentDto,
   EmployeeDto,
   EmployeeProjectSiteAssignmentDto,
-  ExternalProjectManagerAccountDto,
+  ExternalProjectSiteAccountDto,
   MvpRoleCode,
   UpdateDepartmentInput,
   UpdateEmployeeInput,
   UpdateEmployeeProjectSiteAssignmentInput,
-  UpdateExternalProjectManagerAccountInput,
+  UpdateExternalProjectSiteAccountInput,
   UpdateUserAccountInput,
   UserAccountDto,
 } from "@company-erp/shared";
@@ -22,8 +22,8 @@ import {
   EmployeeProjectSiteAssignmentConflictError,
   EmployeeProjectSiteAssignmentValidationError,
   EmployeeConflictError,
-  ExternalProjectManagerAccountConflictError,
-  ExternalProjectManagerAccountValidationError,
+  ExternalProjectSiteAccountConflictError,
+  ExternalProjectSiteAccountValidationError,
   UserAccountConflictError,
   type DepartmentListFilters,
   type DepartmentRepository,
@@ -31,8 +31,8 @@ import {
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeListFilters,
   type EmployeeRepository,
-  type ExternalProjectManagerAccountListFilters,
-  type ExternalProjectManagerAccountRepository,
+  type ExternalProjectSiteAccountListFilters,
+  type ExternalProjectSiteAccountRepository,
   type UserAccountListFilters,
   type UserAccountRepository,
 } from "./peoplePermissions.js";
@@ -57,7 +57,7 @@ type PrismaUserAccount = Prisma.UserAccountGetPayload<{
   include: {
     employee: true;
     roles: true;
-    externalProjectManagerAccount: {
+    externalProjectSiteAccount: {
       include: {
         projectSite: true;
         subcontractorParty: true;
@@ -74,7 +74,7 @@ type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
       };
     };
     roles: true;
-    externalProjectManagerAccount: {
+    externalProjectSiteAccount: {
       include: {
         projectSite: true;
       };
@@ -82,7 +82,7 @@ type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
   };
 }>;
 
-type PrismaExternalProjectManagerAccount = Prisma.ExternalProjectManagerAccountGetPayload<{
+type PrismaExternalProjectSiteAccount = Prisma.ExternalProjectSiteAccountGetPayload<{
   include: {
     userAccount: true;
     projectSite: true;
@@ -155,11 +155,11 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
     username: account.username,
     status: account.status,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
-    externalProjectManagerAccountId: account.externalProjectManagerAccount?.id ?? null,
-    externalProjectManagerName: account.externalProjectManagerAccount?.managerName ?? null,
-    externalProjectManagerPhone: account.externalProjectManagerAccount?.managerPhone ?? null,
-    externalProjectSiteId: account.externalProjectManagerAccount?.projectSiteId ?? null,
-    externalProjectSiteName: account.externalProjectManagerAccount?.projectSite.siteName ?? null,
+    externalProjectSiteAccountId: account.externalProjectSiteAccount?.id ?? null,
+    externalProjectSiteContactName: account.externalProjectSiteAccount?.currentContactName ?? null,
+    externalProjectSiteContactPhone: account.externalProjectSiteAccount?.currentContactPhone ?? null,
+    externalProjectSiteId: account.externalProjectSiteAccount?.projectSiteId ?? null,
+    externalProjectSiteName: account.externalProjectSiteAccount?.projectSite.siteName ?? null,
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
     createdAt: account.createdAt.toISOString(),
@@ -168,10 +168,10 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
 }
 
 function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
-  const externalManager = account.externalProjectManagerAccount;
+  const externalSiteAccount = account.externalProjectSiteAccount;
   const externalSiteIds =
-    externalManager && externalManager.status === "active" && isActiveAssignment(externalManager)
-      ? [externalManager.projectSiteId]
+    externalSiteAccount && externalSiteAccount.status === "active" && isActiveAssignment(externalSiteAccount)
+      ? [externalSiteAccount.projectSiteId]
       : [];
   const employeeSiteIds = (account.employee?.projectSiteAssignments ?? [])
     .filter(isActiveAssignment)
@@ -187,8 +187,8 @@ function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
     employeeName: account.employee?.name ?? null,
     employeeStatus: account.employee?.employmentStatus ?? null,
     roles: account.roles.map((role) => role.role as MvpRoleCode).sort(),
-    externalProjectManagerName: externalManager?.managerName ?? null,
-    externalProjectManagerPhone: externalManager?.managerPhone ?? null,
+    externalProjectSiteContactName: externalSiteAccount?.currentContactName ?? null,
+    externalProjectSiteContactPhone: externalSiteAccount?.currentContactPhone ?? null,
     assignedProjectSiteIds: Array.from(new Set([...employeeSiteIds, ...externalSiteIds])).sort(),
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
@@ -197,9 +197,9 @@ function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
   };
 }
 
-function toExternalProjectManagerAccountDto(
-  account: PrismaExternalProjectManagerAccount,
-): ExternalProjectManagerAccountDto {
+function toExternalProjectSiteAccountDto(
+  account: PrismaExternalProjectSiteAccount,
+): ExternalProjectSiteAccountDto {
   return {
     id: account.id,
     userAccountId: account.userAccountId,
@@ -210,8 +210,8 @@ function toExternalProjectManagerAccountDto(
     siteName: account.projectSite.siteName,
     subcontractorPartyId: account.subcontractorPartyId,
     subcontractorPartyName: account.subcontractorParty?.partyName ?? null,
-    managerName: account.managerName,
-    managerPhone: account.managerPhone,
+    currentContactName: account.currentContactName,
+    currentContactPhone: account.currentContactPhone,
     status: account.status,
     startDate: dateOnly(account.startDate),
     endDate: dateOnly(account.endDate),
@@ -283,12 +283,12 @@ function mapUserAccountConflict(error: unknown): never {
   throw error;
 }
 
-function mapExternalProjectManagerConflict(error: unknown): never {
+function mapExternalProjectSiteConflict(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
-    if (targets.includes("username")) throw new ExternalProjectManagerAccountConflictError("username");
+    if (targets.includes("username")) throw new ExternalProjectSiteAccountConflictError("username");
     if (targets.includes("project_site_id")) {
-      throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+      throw new ExternalProjectSiteAccountConflictError("activeProjectSiteAccount");
     }
   }
   throw error;
@@ -460,7 +460,7 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
   const include = {
     employee: true,
     roles: true,
-    externalProjectManagerAccount: { include: { projectSite: true, subcontractorParty: true } },
+    externalProjectSiteAccount: { include: { projectSite: true, subcontractorParty: true } },
   } satisfies Prisma.UserAccountInclude;
 
   return {
@@ -552,17 +552,17 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
   };
 }
 
-export function createPrismaExternalProjectManagerAccountRepository(
+export function createPrismaExternalProjectSiteAccountRepository(
   prisma: PrismaClient,
-): ExternalProjectManagerAccountRepository {
+): ExternalProjectSiteAccountRepository {
   const include = {
     userAccount: true,
     projectSite: true,
     subcontractorParty: true,
-  } satisfies Prisma.ExternalProjectManagerAccountInclude;
+  } satisfies Prisma.ExternalProjectSiteAccountInclude;
 
   async function assertNoActiveProjectManager(projectSiteId: string, excludeId?: string) {
-    const existing = await prisma.externalProjectManagerAccount.findFirst({
+    const existing = await prisma.externalProjectSiteAccount.findFirst({
       where: {
         projectSiteId,
         status: "active",
@@ -570,20 +570,20 @@ export function createPrismaExternalProjectManagerAccountRepository(
       },
       select: { id: true },
     });
-    if (existing) throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+    if (existing) throw new ExternalProjectSiteAccountConflictError("activeProjectSiteAccount");
   }
 
   return {
-    async list(filters: ExternalProjectManagerAccountListFilters) {
-      const accounts = await prisma.externalProjectManagerAccount.findMany({
+    async list(filters: ExternalProjectSiteAccountListFilters) {
+      const accounts = await prisma.externalProjectSiteAccount.findMany({
         where: {
           ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
           ...(filters.status ? { status: filters.status } : {}),
           ...(filters.q
             ? {
                 OR: [
-                  { managerName: { contains: filters.q, mode: "insensitive" } },
-                  { managerPhone: { contains: filters.q, mode: "insensitive" } },
+                  { currentContactName: { contains: filters.q, mode: "insensitive" } },
+                  { currentContactPhone: { contains: filters.q, mode: "insensitive" } },
                   { userAccount: { username: { contains: filters.q, mode: "insensitive" } } },
                   { projectSite: { siteCode: { contains: filters.q, mode: "insensitive" } } },
                   { projectSite: { siteName: { contains: filters.q, mode: "insensitive" } } },
@@ -595,13 +595,13 @@ export function createPrismaExternalProjectManagerAccountRepository(
         include,
         orderBy: [{ updatedAt: "desc" }],
       });
-      return accounts.map(toExternalProjectManagerAccountDto);
+      return accounts.map(toExternalProjectSiteAccountDto);
     },
     async getById(id: string) {
-      const account = await prisma.externalProjectManagerAccount.findUnique({ where: { id }, include });
-      return account ? toExternalProjectManagerAccountDto(account) : null;
+      const account = await prisma.externalProjectSiteAccount.findUnique({ where: { id }, include });
+      return account ? toExternalProjectSiteAccountDto(account) : null;
     },
-    async create(input: CreateExternalProjectManagerAccountInput) {
+    async create(input: CreateExternalProjectSiteAccountInput) {
       try {
         if ((input.status ?? "active") === "active") await assertNoActiveProjectManager(input.projectSiteId);
         const passwordHash = await hashPassword(input.initialPassword);
@@ -612,19 +612,19 @@ export function createPrismaExternalProjectManagerAccountRepository(
               passwordHash,
               status: input.status ?? "active",
               passwordChangedAt: new Date(),
-              roles: { create: [{ role: "external_project_manager" }] },
+              roles: { create: [{ role: "external_project_site" }] },
             },
           });
 
-          return tx.externalProjectManagerAccount.create({
+          return tx.externalProjectSiteAccount.create({
             data: {
               userAccount: { connect: { id: userAccount.id } },
               projectSite: { connect: { id: input.projectSiteId } },
               subcontractorParty: input.subcontractorPartyId
                 ? { connect: { id: input.subcontractorPartyId } }
                 : undefined,
-              managerName: input.managerName,
-              managerPhone: input.managerPhone,
+              currentContactName: input.currentContactName,
+              currentContactPhone: input.currentContactPhone,
               status: input.status ?? "active",
               startDate: parseDate(input.startDate),
               endDate: parseDate(input.endDate),
@@ -633,18 +633,18 @@ export function createPrismaExternalProjectManagerAccountRepository(
             include,
           });
         });
-        return toExternalProjectManagerAccountDto(account);
+        return toExternalProjectSiteAccountDto(account);
       } catch (error) {
-        if (error instanceof ExternalProjectManagerAccountConflictError) throw error;
+        if (error instanceof ExternalProjectSiteAccountConflictError) throw error;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-          throw new ExternalProjectManagerAccountValidationError(["Referenced project site or subcontractor was not found"]);
+          throw new ExternalProjectSiteAccountValidationError(["Referenced project site or subcontractor was not found"]);
         }
-        mapExternalProjectManagerConflict(error);
+        mapExternalProjectSiteConflict(error);
       }
     },
-    async update(id: string, input: UpdateExternalProjectManagerAccountInput) {
+    async update(id: string, input: UpdateExternalProjectSiteAccountInput) {
       try {
-        const current = await prisma.externalProjectManagerAccount.findUnique({ where: { id } });
+        const current = await prisma.externalProjectSiteAccount.findUnique({ where: { id } });
         if (!current) return null;
         const nextProjectSiteId = input.projectSiteId ?? current.projectSiteId;
         const nextStatus = input.status ?? current.status;
@@ -661,7 +661,7 @@ export function createPrismaExternalProjectManagerAccountRepository(
             },
           });
 
-          return tx.externalProjectManagerAccount.update({
+          return tx.externalProjectSiteAccount.update({
             where: { id },
             data: {
               ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
@@ -672,8 +672,8 @@ export function createPrismaExternalProjectManagerAccountRepository(
                       : { disconnect: true },
                   }
                 : {}),
-              ...(input.managerName !== undefined ? { managerName: input.managerName } : {}),
-              ...(input.managerPhone !== undefined ? { managerPhone: input.managerPhone } : {}),
+              ...(input.currentContactName !== undefined ? { currentContactName: input.currentContactName } : {}),
+              ...(input.currentContactPhone !== undefined ? { currentContactPhone: input.currentContactPhone } : {}),
               ...(input.status !== undefined ? { status: input.status } : {}),
               ...(input.startDate !== undefined ? { startDate: parseDate(input.startDate) } : {}),
               ...(input.endDate !== undefined ? { endDate: parseDate(input.endDate) } : {}),
@@ -682,14 +682,14 @@ export function createPrismaExternalProjectManagerAccountRepository(
             include,
           });
         });
-        return toExternalProjectManagerAccountDto(account);
+        return toExternalProjectSiteAccountDto(account);
       } catch (error) {
-        if (error instanceof ExternalProjectManagerAccountConflictError) throw error;
+        if (error instanceof ExternalProjectSiteAccountConflictError) throw error;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-          throw new ExternalProjectManagerAccountValidationError(["Referenced project site or subcontractor was not found"]);
+          throw new ExternalProjectSiteAccountValidationError(["Referenced project site or subcontractor was not found"]);
         }
-        mapExternalProjectManagerConflict(error);
+        mapExternalProjectSiteConflict(error);
       }
     },
   };
@@ -839,7 +839,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
   const include = {
     employee: { include: { projectSiteAssignments: true } },
     roles: true,
-    externalProjectManagerAccount: { include: { projectSite: true } },
+    externalProjectSiteAccount: { include: { projectSite: true } },
   } satisfies Prisma.UserAccountInclude;
 
   return {

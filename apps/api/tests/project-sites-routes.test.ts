@@ -4,8 +4,14 @@ import type {
   CreateProjectUsageRequestInput,
   IssueProjectUsageRequestInput,
   MaterialDto,
+  ProjectSiteComplianceReviewStatusCode,
+  ProjectSiteComplianceSummaryDto,
+  ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
   ProjectSiteDto,
   ProjectSiteInvestmentSummaryDto,
+  ProjectSitePayrollSubmissionDto,
+  ProjectSiteRosterPersonDto,
   ProjectUsageRequestDto,
   UpdateProjectSiteInput,
   UpdateProjectUsageRequestInput,
@@ -18,6 +24,7 @@ import {
   ProjectSiteConflictError,
   ProjectUsageRequestConflictError,
   ProjectUsageRequestValidationError,
+  type ProjectSiteComplianceRepository,
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
 } from "../src/projectSites";
@@ -26,6 +33,8 @@ import type { MaterialRepository, WarehouseRepository } from "../src/materialsWa
 const now = "2026-05-11T13:00:00.000Z";
 const warehouseId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const materialId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const rosterPersonId = "12121212-1212-4121-8121-121212121212";
+const insurancePolicyId = "13131313-1313-4131-8131-131313131313";
 
 function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDto {
   return {
@@ -43,6 +52,7 @@ function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDt
     siteAddress: "无锡市新吴区",
     serviceType: "园区综合服务",
     status: "active",
+    payrollAgencyRequired: false,
     startDate: "2026-05-01",
     endDate: null,
     primaryManagerEmployeeId: "44444444-4444-4444-8444-444444444444",
@@ -54,6 +64,108 @@ function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDt
     remark: null,
     createdAt: now,
     updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeRosterPerson(overrides: Partial<ProjectSiteRosterPersonDto> = {}): ProjectSiteRosterPersonDto {
+  return {
+    id: rosterPersonId,
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    personName: "王现场",
+    phone: "13800001111",
+    identityNoLast4: "1234",
+    workerType: "direct_site_staff",
+    jobRole: "厨师",
+    startDate: "2026-05-01",
+    endDate: null,
+    status: "active",
+    sourceAttachmentPath: "/volume1/company-erp/attachments/roster/site.xlsx",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeInsurancePolicy(
+  overrides: Partial<ProjectSiteEmployerLiabilityInsurancePolicyDto> = {},
+): ProjectSiteEmployerLiabilityInsurancePolicyDto {
+  return {
+    id: insurancePolicyId,
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    policyNo: "ELI202605001",
+    insurerName: "太平洋保险",
+    startDate: "2026-05-01",
+    endDate: "2026-06-08",
+    attachmentPath: "/volume1/company-erp/attachments/insurance/ELI202605001.pdf",
+    reviewStatus: "pending",
+    reviewedByEmployeeId: null,
+    reviewedByEmployeeName: null,
+    reviewedAt: null,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeCoveredPerson(
+  overrides: Partial<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto> = {},
+): ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto {
+  return {
+    id: "14141414-1414-4141-8141-141414141414",
+    policyId: insurancePolicyId,
+    rosterPersonId,
+    rosterPersonName: "王现场",
+    coveredNameSnapshot: "王现场",
+    identityNoLast4Snapshot: "1234",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makePayrollSubmission(overrides: Partial<ProjectSitePayrollSubmissionDto> = {}): ProjectSitePayrollSubmissionDto {
+  return {
+    id: "15151515-1515-4151-8151-151515151515",
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    payrollMonth: "2026-05",
+    attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+    submittedBy: "项目点负责人",
+    submittedAt: now,
+    reviewStatus: "pending",
+    reviewedByEmployeeId: null,
+    reviewedByEmployeeName: null,
+    reviewedAt: null,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeComplianceSummary(overrides: Partial<ProjectSiteComplianceSummaryDto> = {}): ProjectSiteComplianceSummaryDto {
+  return {
+    projectSiteId: "11111111-1111-4111-8111-111111111111",
+    projectSiteName: "科技园一期项目点",
+    payrollAgencyRequired: true,
+    activeRosterCount: 2,
+    missingHealthCertificateCount: 1,
+    expiringHealthCertificateCount: 1,
+    expiredHealthCertificateCount: 1,
+    insuranceUncoveredActiveRosterCount: 1,
+    insuranceExpiringSoonCount: 1,
+    insuranceExpiredCount: 0,
+    foodOperationLicenseStatus: "expiring_soon",
+    payrollCurrentMonthStatus: "pending",
+    blockingIssueCount: 3,
+    warningIssueCount: 2,
+    generatedAt: now,
     ...overrides,
   };
 }
@@ -203,6 +315,69 @@ function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = []): ProjectSi
   };
 }
 
+function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
+  const rosterPeople = [
+    makeRosterPerson(),
+    makeRosterPerson({ id: "16161616-1616-4161-8161-161616161616", personName: "李离场", status: "left" }),
+  ];
+  const policies = [makeInsurancePolicy()];
+  const coveredPeople = [makeCoveredPerson()];
+  const payrollSubmissions = [makePayrollSubmission()];
+
+  return {
+    async listRosterPeople(filters) {
+      return rosterPeople.filter((person) => {
+        const matchesSite = filters.projectSiteId ? person.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(person.projectSiteId) : true;
+        const matchesStatus = filters.status ? person.status === filters.status : true;
+        return matchesSite && matchesScopedSites && matchesStatus;
+      });
+    },
+    async createRosterPerson(input) {
+      const person = makeRosterPerson({ id: "17171717-1717-4171-8171-171717171717", ...input });
+      rosterPeople.unshift(person);
+      return person;
+    },
+    async listInsurancePolicies(filters) {
+      return policies.filter((policy) => {
+        const matchesSite = filters.projectSiteId ? policy.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(policy.projectSiteId) : true;
+        return matchesSite && matchesScopedSites;
+      });
+    },
+    async createInsurancePolicy(input) {
+      const policy = makeInsurancePolicy({ id: "18181818-1818-4181-8181-181818181818", ...input });
+      policies.unshift(policy);
+      return policy;
+    },
+    async createCoveredPerson(input) {
+      const covered = makeCoveredPerson({ id: "19191919-1919-4191-8191-191919191919", ...input });
+      coveredPeople.unshift(covered);
+      return covered;
+    },
+    async listPayrollSubmissions(filters) {
+      return payrollSubmissions.filter((submission) => {
+        const matchesSite = filters.projectSiteId ? submission.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(submission.projectSiteId) : true;
+        const matchesMonth = filters.payrollMonth ? submission.payrollMonth === filters.payrollMonth : true;
+        return matchesSite && matchesScopedSites && matchesMonth;
+      });
+    },
+    async createPayrollSubmission(input) {
+      const submission = makePayrollSubmission({
+        id: "20202020-2020-4202-8202-202020202020",
+        ...input,
+        reviewStatus: (input.reviewStatus ?? "pending") as ProjectSiteComplianceReviewStatusCode,
+      });
+      payrollSubmissions.unshift(submission);
+      return submission;
+    },
+    async getComplianceSummary(projectSiteId) {
+      return projectSiteId === "11111111-1111-4111-8111-111111111111" ? makeComplianceSummary({ projectSiteId }) : null;
+    },
+  };
+}
+
 function createFakeMaterialRepository(seed: MaterialDto[] = []): MaterialRepository {
   const materials = [...seed];
   return {
@@ -344,7 +519,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
   };
 }
 
-function makeExternalProjectManagerAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+function makeExternalProjectSiteAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
   return makeAuthAccount({
     id: "abababab-abab-4bab-8bab-abababababab",
     username: "site-manager",
@@ -352,10 +527,10 @@ function makeExternalProjectManagerAuthAccount(overrides: Partial<AuthAccountRec
     employeeNo: null,
     employeeName: null,
     employeeStatus: null,
-    roles: ["external_project_manager"],
+    roles: ["external_project_site"],
     assignedProjectSiteIds: ["11111111-1111-4111-8111-111111111111"],
-    externalProjectManagerName: "王项目",
-    externalProjectManagerPhone: "13900000000",
+    externalProjectSiteContactName: "王项目",
+    externalProjectSiteContactPhone: "13900000000",
     ...overrides,
   });
 }
@@ -462,6 +637,92 @@ describe("project site API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_SITE_CONFLICT", field: "siteCode" });
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toMatchObject({ projectSite: { status: "paused", remark: "暂停服务" } });
+  });
+
+  it("manages project-site compliance roster, insurance, payroll attachments, and summary", async () => {
+    const repository = createFakeComplianceRepository();
+    const app = buildApp({
+      projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite({ payrollAgencyRequired: true })]),
+      projectSiteComplianceRepository: repository,
+    });
+
+    const rosterList = await app.inject({
+      method: "GET",
+      url: "/api/project-site-roster-persons?projectSiteId=11111111-1111-4111-8111-111111111111&status=active",
+    });
+    const createdRosterPerson = await app.inject({
+      method: "POST",
+      url: "/api/project-site-roster-persons",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        personName: "赵新员工",
+        phone: "13800002222",
+        identityNoLast4: "5678",
+        workerType: "subcontractor_site_staff",
+        jobRole: "帮厨",
+        startDate: "2026-05-13",
+      },
+    });
+    const createdPolicy = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-policies",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        policyNo: "ELI202605002",
+        insurerName: "平安保险",
+        startDate: "2026-05-13",
+        endDate: "2027-05-12",
+        attachmentPath: "/volume1/company-erp/attachments/insurance/ELI202605002.pdf",
+      },
+    });
+    const createdCoverage = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-covered-persons",
+      payload: {
+        policyId: "18181818-1818-4181-8181-181818181818",
+        rosterPersonId: "17171717-1717-4171-8171-171717171717",
+        coveredNameSnapshot: "赵新员工",
+        identityNoLast4Snapshot: "5678",
+      },
+    });
+    const createdPayroll = await app.inject({
+      method: "POST",
+      url: "/api/project-site-payroll-submissions",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        payrollMonth: "2026-05",
+        attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+        submittedBy: "项目点负责人",
+      },
+    });
+    const summary = await app.inject({
+      method: "GET",
+      url: "/api/project-sites/11111111-1111-4111-8111-111111111111/compliance-summary",
+    });
+    await app.close();
+
+    expect(rosterList.statusCode).toBe(200);
+    expect(rosterList.json()).toMatchObject({ rosterPeople: [{ personName: "王现场", status: "active" }] });
+    expect(createdRosterPerson.statusCode).toBe(201);
+    expect(createdRosterPerson.json()).toMatchObject({
+      rosterPerson: { personName: "赵新员工", workerType: "subcontractor_site_staff", status: "active" },
+    });
+    expect(createdPolicy.statusCode).toBe(201);
+    expect(createdPolicy.json()).toMatchObject({ insurancePolicy: { policyNo: "ELI202605002" } });
+    expect(createdCoverage.statusCode).toBe(201);
+    expect(createdCoverage.json()).toMatchObject({ coveredPerson: { coveredNameSnapshot: "赵新员工" } });
+    expect(createdPayroll.statusCode).toBe(201);
+    expect(createdPayroll.json()).toMatchObject({ payrollSubmission: { payrollMonth: "2026-05", reviewStatus: "pending" } });
+    expect(summary.statusCode).toBe(200);
+    expect(summary.json()).toMatchObject({
+      complianceSummary: {
+        activeRosterCount: 2,
+        missingHealthCertificateCount: 1,
+        insuranceUncoveredActiveRosterCount: 1,
+        foodOperationLicenseStatus: "expiring_soon",
+        payrollCurrentMonthStatus: "pending",
+      },
+    });
   });
 });
 
@@ -844,7 +1105,7 @@ describe("project usage request API", () => {
     expect(issue.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "inventory", requiredLevel: "manage" });
   });
 
-  it("lets external project managers create only assigned-site usage requests with submitter snapshots", async () => {
+  it("lets external project-site accounts create only assigned-site usage requests with submitter snapshots", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const assignedSite = makeProjectSite();
     const unassignedSite = makeProjectSite({
@@ -854,7 +1115,7 @@ describe("project usage request API", () => {
     });
     const app = buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-external-manager" },
-      authRepository: createFakeAuthRepository([makeExternalProjectManagerAuthAccount({ passwordHash })]),
+      authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
       projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
       projectUsageRequestRepository: createFakeUsageRepository([]),
       materialRepository: createFakeMaterialRepository([makeMaterial()]),
@@ -887,9 +1148,9 @@ describe("project usage request API", () => {
 
     expect(me.json()).toMatchObject({
       user: {
-        roles: ["external_project_manager"],
+        roles: ["external_project_site"],
         assignedProjectSiteIds: [assignedSite.id],
-        externalProjectManagerName: "王项目",
+        externalProjectSiteContactName: "王项目",
       },
     });
     expect(options.statusCode).toBe(200);

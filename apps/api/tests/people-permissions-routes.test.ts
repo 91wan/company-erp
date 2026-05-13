@@ -7,18 +7,18 @@ import {
   EmployeeProjectSiteAssignmentConflictError,
   EmployeeConflictError,
   UserAccountConflictError,
-  ExternalProjectManagerAccountConflictError,
+  ExternalProjectSiteAccountConflictError,
   type DepartmentRepository,
   type EmployeeProjectSiteAssignmentRepository,
   type EmployeeRepository,
-  type ExternalProjectManagerAccountRepository,
+  type ExternalProjectSiteAccountRepository,
   type UserAccountRepository,
 } from "../src/peoplePermissions";
 import type {
   DepartmentDto,
   EmployeeDto,
   EmployeeProjectSiteAssignmentDto,
-  ExternalProjectManagerAccountDto,
+  ExternalProjectSiteAccountDto,
   MvpRoleCode,
   UserAccountDto,
 } from "@company-erp/shared";
@@ -88,9 +88,9 @@ function makeUserAccount(overrides: Partial<UserAccountDto> = {}): UserAccountDt
   };
 }
 
-function makeExternalProjectManagerAccount(
-  overrides: Partial<ExternalProjectManagerAccountDto> = {},
-): ExternalProjectManagerAccountDto {
+function makeExternalProjectSiteAccount(
+  overrides: Partial<ExternalProjectSiteAccountDto> = {},
+): ExternalProjectSiteAccountDto {
   return {
     id: "99999999-9999-4999-8999-999999999999",
     userAccountId: "abababab-abab-4bab-8bab-abababababab",
@@ -101,8 +101,8 @@ function makeExternalProjectManagerAccount(
     siteName: "科技园一期项目点",
     subcontractorPartyId: "12121212-1212-4121-8121-121212121212",
     subcontractorPartyName: "王承包",
-    managerName: "王项目",
-    managerPhone: "13900000000",
+    currentContactName: "王项目",
+    currentContactPhone: "13900000000",
     status: "active",
     startDate: "2026-05-11",
     endDate: null,
@@ -308,9 +308,9 @@ function createFakeUserAccountRepository(seed: UserAccountDto[] = []): UserAccou
   };
 }
 
-function createFakeExternalProjectManagerAccountRepository(
-  seed: ExternalProjectManagerAccountDto[] = [],
-): ExternalProjectManagerAccountRepository {
+function createFakeExternalProjectSiteAccountRepository(
+  seed: ExternalProjectSiteAccountDto[] = [],
+): ExternalProjectSiteAccountRepository {
   const accounts = [...seed];
   return {
     async list(filters) {
@@ -325,9 +325,9 @@ function createFakeExternalProjectManagerAccountRepository(
     },
     async create(input) {
       if (accounts.some((account) => account.projectSiteId === input.projectSiteId && account.status === "active")) {
-        throw new ExternalProjectManagerAccountConflictError("activeProjectSiteManager");
+        throw new ExternalProjectSiteAccountConflictError("activeProjectSiteAccount");
       }
-      const account = makeExternalProjectManagerAccount({
+      const account = makeExternalProjectSiteAccount({
         ...input,
         id: "10101010-1010-4010-8010-101010101010",
         userAccountId: "11111111-2222-4333-8444-555555555555",
@@ -636,22 +636,22 @@ describe("user accounts API", () => {
   });
 });
 
-describe("external project manager accounts API", () => {
-  it("creates, lists, and disables project-bound external manager accounts", async () => {
-    const existing = makeExternalProjectManagerAccount({ status: "disabled", accountStatus: "disabled" });
+describe("external project-site accounts API", () => {
+  it("creates, lists, and disables project-bound external accounts", async () => {
+    const existing = makeExternalProjectSiteAccount({ status: "disabled", accountStatus: "disabled" });
     const app = buildApp({
-      externalProjectManagerAccountRepository: createFakeExternalProjectManagerAccountRepository([existing]),
+      externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([existing]),
     });
 
-    const list = await app.inject({ method: "GET", url: `/api/external-project-manager-accounts?projectSiteId=${projectSiteId}` });
+    const list = await app.inject({ method: "GET", url: `/api/external-project-site-accounts?projectSiteId=${projectSiteId}` });
     const created = await app.inject({
       method: "POST",
-      url: "/api/external-project-manager-accounts",
+      url: "/api/external-project-site-accounts",
       payload: {
         projectSiteId,
         subcontractorPartyId: "12121212-1212-4121-8121-121212121212",
-        managerName: "王项目",
-        managerPhone: "13900000000",
+        currentContactName: "王项目",
+        currentContactPhone: "13900000000",
         username: "site-manager-2",
         initialPassword: "ChangeMe123!",
         startDate: "2026-05-13",
@@ -659,42 +659,82 @@ describe("external project manager accounts API", () => {
     });
     const disabled = await app.inject({
       method: "PATCH",
-      url: "/api/external-project-manager-accounts/10101010-1010-4010-8010-101010101010",
+      url: "/api/external-project-site-accounts/10101010-1010-4010-8010-101010101010",
       payload: { status: "disabled", endDate: "2026-06-01" },
     });
     await app.close();
 
     expect(list.statusCode).toBe(200);
-    expect(list.json()).toMatchObject({ externalProjectManagerAccounts: [{ username: "site-manager" }] });
+    expect(list.json()).toMatchObject({ externalProjectSiteAccounts: [{ username: "site-manager" }] });
     expect(created.statusCode).toBe(201);
     expect(created.json()).toMatchObject({
-      externalProjectManagerAccount: {
+      externalProjectSiteAccount: {
         username: "site-manager-2",
         projectSiteId,
-        managerName: "王项目",
+        currentContactName: "王项目",
         status: "active",
       },
     });
     expect(disabled.statusCode).toBe(200);
     expect(disabled.json()).toMatchObject({
-      externalProjectManagerAccount: { status: "disabled", endDate: "2026-06-01" },
+      externalProjectSiteAccount: { status: "disabled", endDate: "2026-06-01" },
     });
   });
 
-  it("rejects a second active external manager for the same project site", async () => {
+  it("requires a new current contact phone and password when changing account contact", async () => {
+    const existing = makeExternalProjectSiteAccount();
     const app = buildApp({
-      externalProjectManagerAccountRepository: createFakeExternalProjectManagerAccountRepository([
-        makeExternalProjectManagerAccount(),
+      externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([existing]),
+    });
+
+    const missingPhone = await app.inject({
+      method: "PATCH",
+      url: `/api/external-project-site-accounts/${existing.id}`,
+      payload: { currentContactName: "赵项目", resetPassword: "ResetMe123!" },
+    });
+    const missingPassword = await app.inject({
+      method: "PATCH",
+      url: `/api/external-project-site-accounts/${existing.id}`,
+      payload: { currentContactName: "赵项目", currentContactPhone: "13811112222" },
+    });
+    const changed = await app.inject({
+      method: "PATCH",
+      url: `/api/external-project-site-accounts/${existing.id}`,
+      payload: {
+        currentContactName: "赵项目",
+        currentContactPhone: "13811112222",
+        resetPassword: "ResetMe123!",
+      },
+    });
+    await app.close();
+
+    expect(missingPhone.statusCode).toBe(400);
+    expect(missingPhone.json().issues).toContain("currentContactPhone is required when changing contact");
+    expect(missingPassword.statusCode).toBe(400);
+    expect(missingPassword.json().issues).toContain("resetPassword is required when changing contact");
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json()).toMatchObject({
+      externalProjectSiteAccount: {
+        currentContactName: "赵项目",
+        currentContactPhone: "13811112222",
+      },
+    });
+  });
+
+  it("rejects a second active external account for the same project site", async () => {
+    const app = buildApp({
+      externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([
+        makeExternalProjectSiteAccount(),
       ]),
     });
 
     const response = await app.inject({
       method: "POST",
-      url: "/api/external-project-manager-accounts",
+      url: "/api/external-project-site-accounts",
       payload: {
         projectSiteId,
-        managerName: "李项目",
-        managerPhone: "13900000001",
+        currentContactName: "李项目",
+        currentContactPhone: "13900000001",
         username: "site-manager-3",
         initialPassword: "ChangeMe123!",
       },
@@ -703,8 +743,8 @@ describe("external project manager accounts API", () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({
-      error: "EXTERNAL_PROJECT_MANAGER_CONFLICT",
-      field: "activeProjectSiteManager",
+      error: "EXTERNAL_PROJECT_SITE_CONFLICT",
+      field: "activeProjectSiteAccount",
     });
   });
 });
