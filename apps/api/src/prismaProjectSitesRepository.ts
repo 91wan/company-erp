@@ -36,8 +36,6 @@ import {
   type ProjectUsageRequestRepository,
 } from "./projectSites.js";
 
-type AnyPrisma = PrismaClient & Record<string, any>;
-
 function decimalToNumber(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
@@ -68,39 +66,71 @@ function nullableDate(value: string | null | undefined): Date | null | undefined
   return new Date(`${value}T00:00:00.000Z`);
 }
 
+function requiredDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function optionalDate(value: string | undefined): Date | undefined {
+  return value === undefined ? undefined : requiredDate(value);
+}
+
 const siteInclude = {
   businessProject: true,
   clientParty: true,
   operatorParty: true,
   subcontractorParty: true,
   primaryManager: true,
-};
+} as const satisfies Prisma.ProjectSiteInclude;
 
 const usageInclude = {
   projectSite: { include: { subcontractorParty: true } },
   warehouse: true,
   material: true,
-};
+} as const satisfies Prisma.ProjectUsageRequestInclude;
 
 const rosterPersonInclude = {
   projectSite: true,
-};
+} as const satisfies Prisma.ProjectSiteRosterPersonInclude;
 
 const insurancePolicyInclude = {
   projectSite: true,
   reviewedByEmployee: true,
-};
+} as const satisfies Prisma.ProjectSiteEmployerLiabilityInsurancePolicyInclude;
 
 const coveredPersonInclude = {
   rosterPerson: true,
-};
+} as const satisfies Prisma.ProjectSiteEmployerLiabilityInsuranceCoveredPersonInclude;
 
 const payrollSubmissionInclude = {
   projectSite: true,
   reviewedByEmployee: true,
+} as const satisfies Prisma.ProjectSitePayrollSubmissionInclude;
+
+type ProjectSiteRecord = Prisma.ProjectSiteGetPayload<{ include: typeof siteInclude }>;
+type ProjectUsageRequestRecord = Prisma.ProjectUsageRequestGetPayload<{ include: typeof usageInclude }>;
+type ProjectSiteRosterPersonRecord = Prisma.ProjectSiteRosterPersonGetPayload<{ include: typeof rosterPersonInclude }>;
+type ProjectSiteEmployerLiabilityInsurancePolicyRecord = Prisma.ProjectSiteEmployerLiabilityInsurancePolicyGetPayload<{
+  include: typeof insurancePolicyInclude;
+}>;
+type ProjectSiteEmployerLiabilityInsuranceCoveredPersonRecord =
+  Prisma.ProjectSiteEmployerLiabilityInsuranceCoveredPersonGetPayload<{ include: typeof coveredPersonInclude }>;
+type ProjectSitePayrollSubmissionRecord = Prisma.ProjectSitePayrollSubmissionGetPayload<{
+  include: typeof payrollSubmissionInclude;
+}>;
+type CertificateStatusRecord = Pick<
+  Prisma.CertificateRecordGetPayload<Record<string, never>>,
+  "isDisabled" | "validityType" | "expiryDate" | "nextReviewDate" | "reminderDays"
+>;
+type InventoryMovementAggregateClient = {
+  inventoryMovement: {
+    aggregate(args: {
+      where: Prisma.InventoryMovementWhereInput;
+      _sum: { quantity: true };
+    }): Promise<{ _sum: { quantity: Prisma.Decimal | null } }>;
+  };
 };
 
-function toProjectSiteDto(site: any): ProjectSiteDto {
+function toProjectSiteDto(site: ProjectSiteRecord): ProjectSiteDto {
   return {
     id: site.id,
     siteCode: site.siteCode,
@@ -133,7 +163,7 @@ function toProjectSiteDto(site: any): ProjectSiteDto {
   };
 }
 
-function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
+function toProjectUsageRequestDto(request: ProjectUsageRequestRecord): ProjectUsageRequestDto {
   return {
     id: request.id,
     requestNo: request.requestNo,
@@ -171,7 +201,7 @@ function toProjectUsageRequestDto(request: any): ProjectUsageRequestDto {
   };
 }
 
-function toRosterPersonDto(person: any): ProjectSiteRosterPersonDto {
+function toRosterPersonDto(person: ProjectSiteRosterPersonRecord): ProjectSiteRosterPersonDto {
   return {
     id: person.id,
     projectSiteId: person.projectSiteId,
@@ -191,7 +221,9 @@ function toRosterPersonDto(person: any): ProjectSiteRosterPersonDto {
   };
 }
 
-function toInsurancePolicyDto(policy: any): ProjectSiteEmployerLiabilityInsurancePolicyDto {
+function toInsurancePolicyDto(
+  policy: ProjectSiteEmployerLiabilityInsurancePolicyRecord,
+): ProjectSiteEmployerLiabilityInsurancePolicyDto {
   return {
     id: policy.id,
     projectSiteId: policy.projectSiteId,
@@ -211,7 +243,9 @@ function toInsurancePolicyDto(policy: any): ProjectSiteEmployerLiabilityInsuranc
   };
 }
 
-function toCoveredPersonDto(person: any): ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto {
+function toCoveredPersonDto(
+  person: ProjectSiteEmployerLiabilityInsuranceCoveredPersonRecord,
+): ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto {
   return {
     id: person.id,
     policyId: person.policyId,
@@ -225,7 +259,7 @@ function toCoveredPersonDto(person: any): ProjectSiteEmployerLiabilityInsuranceC
   };
 }
 
-function toPayrollSubmissionDto(submission: any): ProjectSitePayrollSubmissionDto {
+function toPayrollSubmissionDto(submission: ProjectSitePayrollSubmissionRecord): ProjectSitePayrollSubmissionDto {
   return {
     id: submission.id,
     projectSiteId: submission.projectSiteId,
@@ -253,7 +287,7 @@ function optionalCreateRelation(id: string | null | undefined): Record<string, u
   return id ? { connect: { id } } : undefined;
 }
 
-function toSiteCreateData(input: CreateProjectSiteInput): Record<string, unknown> {
+function toSiteCreateData(input: CreateProjectSiteInput): Prisma.ProjectSiteCreateInput {
   return {
     siteCode: input.siteCode,
     siteName: input.siteName,
@@ -278,7 +312,7 @@ function toSiteCreateData(input: CreateProjectSiteInput): Record<string, unknown
   };
 }
 
-function toSiteUpdateData(input: UpdateProjectSiteInput): Record<string, unknown> {
+function toSiteUpdateData(input: UpdateProjectSiteInput): Prisma.ProjectSiteUpdateInput {
   return {
     ...(input.siteCode !== undefined ? { siteCode: input.siteCode } : {}),
     ...(input.siteName !== undefined ? { siteName: input.siteName } : {}),
@@ -314,13 +348,13 @@ function toSiteUpdateData(input: UpdateProjectSiteInput): Record<string, unknown
   };
 }
 
-function toUsageCreateData(input: CreateProjectUsageRequestInput): Record<string, unknown> {
+function toUsageCreateData(input: CreateProjectUsageRequestInput): Prisma.ProjectUsageRequestUncheckedCreateInput {
   return {
     requestNo: input.requestNo,
-    requestDate: new Date(`${input.requestDate}T00:00:00.000Z`),
-    projectSite: { connect: { id: input.projectSiteId } },
-    warehouse: { connect: { id: input.warehouseId } },
-    material: { connect: { id: input.materialId } },
+    requestDate: requiredDate(input.requestDate),
+    projectSiteId: input.projectSiteId,
+    warehouseId: input.warehouseId,
+    materialId: input.materialId,
     requestedQuantity: input.requestedQuantity,
     approvedQuantity: input.approvedQuantity,
     unit: input.unit,
@@ -335,13 +369,13 @@ function toUsageCreateData(input: CreateProjectUsageRequestInput): Record<string
   };
 }
 
-function toUsageUpdateData(input: UpdateProjectUsageRequestInput): Record<string, unknown> {
+function toUsageUpdateData(input: UpdateProjectUsageRequestInput): Prisma.ProjectUsageRequestUncheckedUpdateInput {
   return {
     ...(input.requestNo !== undefined ? { requestNo: input.requestNo } : {}),
-    ...(input.requestDate !== undefined ? { requestDate: nullableDate(input.requestDate) } : {}),
-    ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
-    ...(input.warehouseId !== undefined ? { warehouse: { connect: { id: input.warehouseId } } } : {}),
-    ...(input.materialId !== undefined ? { material: { connect: { id: input.materialId } } } : {}),
+    ...(input.requestDate !== undefined ? { requestDate: requiredDate(input.requestDate) } : {}),
+    ...(input.projectSiteId !== undefined ? { projectSiteId: input.projectSiteId } : {}),
+    ...(input.warehouseId !== undefined ? { warehouseId: input.warehouseId } : {}),
+    ...(input.materialId !== undefined ? { materialId: input.materialId } : {}),
     ...(input.requestedQuantity !== undefined ? { requestedQuantity: input.requestedQuantity } : {}),
     ...(input.approvedQuantity !== undefined ? { approvedQuantity: input.approvedQuantity } : {}),
     ...(input.unit !== undefined ? { unit: input.unit } : {}),
@@ -356,7 +390,7 @@ function toUsageUpdateData(input: UpdateProjectUsageRequestInput): Record<string
   };
 }
 
-function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
+function siteWhere(filters: ProjectSiteListFilters): Prisma.ProjectSiteWhereInput {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.serviceMode ? { serviceMode: filters.serviceMode } : {}),
@@ -381,7 +415,7 @@ function siteWhere(filters: ProjectSiteListFilters): Record<string, unknown> {
   };
 }
 
-function usageWhere(filters: ProjectUsageRequestListFilters): Record<string, unknown> {
+function usageWhere(filters: ProjectUsageRequestListFilters): Prisma.ProjectUsageRequestWhereInput {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
@@ -391,8 +425,8 @@ function usageWhere(filters: ProjectUsageRequestListFilters): Record<string, unk
     ...(filters.dateFrom || filters.dateTo
       ? {
           requestDate: {
-            ...(filters.dateFrom ? { gte: nullableDate(filters.dateFrom) } : {}),
-            ...(filters.dateTo ? { lte: nullableDate(filters.dateTo) } : {}),
+            ...(filters.dateFrom ? { gte: optionalDate(filters.dateFrom) } : {}),
+            ...(filters.dateTo ? { lte: optionalDate(filters.dateTo) } : {}),
           },
         }
       : {}),
@@ -438,7 +472,11 @@ function mapUsageError(error: unknown): never {
   throw error;
 }
 
-async function currentStock(client: AnyPrisma, warehouseId: string, materialId: string): Promise<number> {
+async function currentStock(
+  client: InventoryMovementAggregateClient,
+  warehouseId: string,
+  materialId: string,
+): Promise<number> {
   const grouped = await client.inventoryMovement.aggregate({
     where: { warehouseId, materialId },
     _sum: { quantity: true },
@@ -446,7 +484,7 @@ async function currentStock(client: AnyPrisma, warehouseId: string, materialId: 
   return decimalToNumber(grouped._sum.quantity);
 }
 
-function calculateChargeSnapshot(material: any, quantity: number) {
+function calculateChargeSnapshot(material: ProjectUsageRequestRecord["material"], quantity: number) {
   if (!material?.isProjectSiteSaleEnabled || material.projectSiteSalePrice === null || material.projectSiteSalePrice === undefined) {
     return {
       unitChargePrice: null,
@@ -465,7 +503,7 @@ function calculateChargeSnapshot(material: any, quantity: number) {
   };
 }
 
-function rosterWhere(filters: ProjectSiteRosterPersonListFilters): Record<string, unknown> {
+function rosterWhere(filters: ProjectSiteRosterPersonListFilters): Prisma.ProjectSiteRosterPersonWhereInput {
   return {
     ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
     ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
@@ -473,14 +511,18 @@ function rosterWhere(filters: ProjectSiteRosterPersonListFilters): Record<string
   };
 }
 
-function insurancePolicyWhere(filters: ProjectSiteInsurancePolicyListFilters): Record<string, unknown> {
+function insurancePolicyWhere(
+  filters: ProjectSiteInsurancePolicyListFilters,
+): Prisma.ProjectSiteEmployerLiabilityInsurancePolicyWhereInput {
   return {
     ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
     ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
   };
 }
 
-function payrollSubmissionWhere(filters: ProjectSitePayrollSubmissionListFilters): Record<string, unknown> {
+function payrollSubmissionWhere(
+  filters: ProjectSitePayrollSubmissionListFilters,
+): Prisma.ProjectSitePayrollSubmissionWhereInput {
   return {
     ...(filters.projectSiteId ? { projectSiteId: filters.projectSiteId } : {}),
     ...(filters.projectSiteIds ? { projectSiteId: { in: [...filters.projectSiteIds] } } : {}),
@@ -518,7 +560,7 @@ function daysFromToday(value: Date | string | null | undefined, now = new Date()
   return Math.floor((target - today) / 86_400_000);
 }
 
-function certificateDtoForStatus(record: any) {
+function certificateDtoForStatus(record: CertificateStatusRecord) {
   return {
     isDisabled: record.isDisabled,
     validityType: record.validityType,
@@ -528,7 +570,7 @@ function certificateDtoForStatus(record: any) {
   };
 }
 
-function summarizeFoodLicense(records: any[], now: Date): CertificateComputedStatusCode | "missing" {
+function summarizeFoodLicense(records: CertificateStatusRecord[], now: Date): CertificateComputedStatusCode | "missing" {
   const statuses = records
     .filter((record) => !record.isDisabled)
     .map((record) => getCertificateComputedStatus(certificateDtoForStatus(record), now));
@@ -544,7 +586,7 @@ function currentPayrollMonth(now = new Date()): string {
 }
 
 export function createPrismaProjectSiteRepository(prisma: PrismaClient): ProjectSiteRepository {
-  const client = prisma as AnyPrisma;
+  const client = prisma;
 
   return {
     async list(filters: ProjectSiteListFilters) {
@@ -591,7 +633,7 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
     },
     async create(input: CreateProjectSiteInput) {
       try {
-        const site = await client.projectSite.create({ data: toSiteCreateData(input) as any, include: siteInclude });
+        const site = await client.projectSite.create({ data: toSiteCreateData(input), include: siteInclude });
         return toProjectSiteDto(site);
       } catch (error) {
         mapSiteError(error);
@@ -632,7 +674,7 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
 }
 
 export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient): ProjectSiteComplianceRepository {
-  const client = prisma as AnyPrisma;
+  const client = prisma;
 
   return {
     async listRosterPeople(filters: ProjectSiteRosterPersonListFilters) {
@@ -776,7 +818,7 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
           : Promise.resolve(null),
       ]);
 
-      const healthByRoster = new Map<string, any[]>();
+      const healthByRoster = new Map<string, CertificateStatusRecord[]>();
       for (const certificate of healthCertificates) {
         if (!certificate.ownerRosterPersonId || certificate.isDisabled) continue;
         const existing = healthByRoster.get(certificate.ownerRosterPersonId) ?? [];
@@ -859,7 +901,7 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
 }
 
 export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient): ProjectUsageRequestRepository {
-  const client = prisma as AnyPrisma;
+  const client = prisma;
 
   return {
     async list(filters: ProjectUsageRequestListFilters) {
@@ -877,7 +919,7 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
     async create(input: CreateProjectUsageRequestInput) {
       try {
         const request = await client.projectUsageRequest.create({
-          data: toUsageCreateData(input) as any,
+          data: toUsageCreateData(input),
           include: usageInclude,
         });
         return toProjectUsageRequestDto(request);
@@ -900,7 +942,7 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
     },
     async issue(id: string, input: IssueProjectUsageRequestInput) {
       try {
-        const issued = await (client.$transaction as any)(async (tx: AnyPrisma) => {
+        const issued = await client.$transaction(async (tx) => {
           const request = await tx.projectUsageRequest.findUnique({
             where: { id },
             include: usageInclude,
