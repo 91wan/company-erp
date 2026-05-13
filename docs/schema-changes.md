@@ -7,6 +7,13 @@ This file records every database schema decision and migration.
 - Confirm import tables.
 - Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
+## 2026-05-13 Purchase Request Approval Foundation
+
+- Added `pending_approval` and `rejected` to `PurchaseRequestStatus`.
+- Added purchase request approval snapshot fields: `submitted_at`, `reviewed_at`, `reviewed_by_employee_id`, `reviewed_by_name`, and `review_remark`.
+- Added migration `20260513203000_purchase_request_approval`.
+- Confirmed this phase records a single approval snapshot only; it does not add a multi-step workflow engine, approval history table, or notification mechanism.
+
 ## 2026-05-11 Phase 1 Foundation
 
 - Confirmed PostgreSQL as the only first-version database target.

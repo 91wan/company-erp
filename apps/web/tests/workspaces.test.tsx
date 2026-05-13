@@ -1042,6 +1042,97 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("PO20260511002")).toBeInTheDocument();
   });
 
+  it("submits, approves, and rejects purchase requests from the approval panel", async () => {
+    const draftRequest = { ...purchaseRequest, id: "request-draft", requestNo: "PR-DRAFT", status: "draft" as const };
+    const pendingRequest = {
+      ...purchaseRequest,
+      id: "request-pending",
+      requestNo: "PR-PENDING",
+      status: "pending_approval" as const,
+      submittedAt: "2026-05-11T12:00:00.000Z",
+    };
+    const pendingRejectRequest = {
+      ...purchaseRequest,
+      id: "request-pending-reject",
+      requestNo: "PR-REJECT",
+      status: "pending_approval" as const,
+      submittedAt: "2026-05-11T12:05:00.000Z",
+    };
+    const submittedRequest = { ...draftRequest, status: "pending_approval" as const, submittedAt: "2026-05-11T12:30:00.000Z" };
+    const approvedRequest = {
+      ...pendingRequest,
+      status: "pending_purchase" as const,
+      reviewedAt: "2026-05-11T13:00:00.000Z",
+      reviewedByName: "采购主管",
+      reviewRemark: "同意采购",
+    };
+    const rejectedRequest = {
+      ...pendingRejectRequest,
+      status: "rejected" as const,
+      reviewedAt: "2026-05-11T13:10:00.000Z",
+      reviewedByName: "采购主管",
+      reviewRemark: "资料不完整",
+    };
+    const submitPurchaseRequest = vi.fn(() => Promise.resolve(submittedRequest));
+    const approvePurchaseRequest = vi.fn(() => Promise.resolve(approvedRequest));
+    const rejectPurchaseRequest = vi.fn(() => Promise.resolve(rejectedRequest));
+
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([draftRequest, pendingRequest, pendingRejectRequest])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([])}
+        submitPurchaseRequest={submitPurchaseRequest}
+        approvePurchaseRequest={approvePurchaseRequest}
+        rejectPurchaseRequest={rejectPurchaseRequest}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交 PR-DRAFT" }));
+    expect(await screen.findByText("PR-DRAFT")).toBeInTheDocument();
+    expect(submitPurchaseRequest).toHaveBeenCalledWith("request-draft");
+
+    fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "同意采购" } });
+    fireEvent.click(screen.getByRole("button", { name: "审批通过 PR-PENDING" }));
+    expect(await screen.findByText((content) => content.includes("同意采购"))).toBeInTheDocument();
+    expect(approvePurchaseRequest).toHaveBeenCalledWith("request-pending", { reviewedByName: "", reviewRemark: "同意采购" });
+
+    fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "资料不完整" } });
+    fireEvent.click(screen.getByRole("button", { name: "驳回 PR-REJECT" }));
+    expect(await screen.findByText("已驳回")).toBeInTheDocument();
+    expect(rejectPurchaseRequest).toHaveBeenCalledWith("request-pending-reject", { reviewedByName: "", reviewRemark: "资料不完整" });
+  });
+
+  it("hides purchase approval actions from read-only users and shows review failures", async () => {
+    const pendingRequest = { ...purchaseRequest, status: "pending_approval" as const };
+    const { rerender } = render(
+      <PurchaseWorkspace
+        canManage={false}
+        loadPurchaseRequests={() => Promise.resolve([pendingRequest])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /审批通过/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /驳回/ })).not.toBeInTheDocument();
+
+    rerender(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([pendingRequest])}
+        loadPurchaseRecords={() => Promise.resolve([])}
+        loadContracts={() => Promise.resolve([])}
+        approvePurchaseRequest={() => Promise.reject(new Error("approval failed"))}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: "审批通过 PR20260511001" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "审批通过 PR20260511001" }));
+    expect(await screen.findByText("审批操作失败")).toBeInTheDocument();
+  });
+
   it("shows purchase creation failures", async () => {
     render(
       <PurchaseWorkspace

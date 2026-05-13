@@ -82,10 +82,12 @@ enum ProjectSiteServiceMode {
 
 enum PurchaseRequestStatus {
   draft
+  pending_approval
   pending_purchase
   purchasing
   partially_received
   completed
+  rejected
   cancelled
 }
 
@@ -564,6 +566,7 @@ model Employee {
   managedProjectSites    ProjectSite[]                   @relation("ProjectSitePrimaryManager")
   projectSiteAssignments EmployeeProjectSiteAssignment[]
   requestedPurchases     PurchaseRequest[]               @relation("PurchaseRequestRequester")
+  reviewedPurchaseRequests PurchaseRequest[]              @relation("PurchaseRequestReviewer")
   handledPurchases       PurchaseRecord[]                @relation("PurchaseRecordPurchaser")
   ownedCertificates      CertificateRecord[]             @relation("CertificateOwnerEmployee")
   responsibleCertificates CertificateRecord[]             @relation("CertificateResponsibleEmployee")
@@ -900,11 +903,17 @@ model PurchaseRequest {
   expectedArrivalDate DateTime?             @map("expected_arrival_date") @db.Date
   purpose             String?
   status              PurchaseRequestStatus @default(draft)
+  submittedAt         DateTime?             @map("submitted_at")
+  reviewedAt          DateTime?             @map("reviewed_at")
+  reviewedByEmployeeId String?              @map("reviewed_by_employee_id") @db.Uuid
+  reviewedByName      String?               @map("reviewed_by_name")
+  reviewRemark        String?               @map("review_remark")
   remark              String?
   createdAt           DateTime              @default(now()) @map("created_at")
   updatedAt           DateTime              @updatedAt @map("updated_at")
 
   requester   Employee?              @relation("PurchaseRequestRequester", fields: [requesterEmployeeId], references: [id], onDelete: SetNull)
+  reviewedBy  Employee?              @relation("PurchaseRequestReviewer", fields: [reviewedByEmployeeId], references: [id], onDelete: SetNull)
   department  Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   projectSite ProjectSite?           @relation(fields: [projectSiteId], references: [id], onDelete: SetNull)
   lines       PurchaseRequestLine[]
@@ -913,6 +922,7 @@ model PurchaseRequest {
 
   @@index([status])
   @@index([requesterEmployeeId])
+  @@index([reviewedByEmployeeId])
   @@index([departmentId])
   @@index([projectSiteId])
   @@map("purchase_requests")

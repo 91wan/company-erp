@@ -92,10 +92,12 @@ export type UserAccountStatusCode = "active" | "disabled" | "locked";
 
 export type PurchaseRequestStatusCode =
   | "draft"
+  | "pending_approval"
   | "pending_purchase"
   | "purchasing"
   | "partially_received"
   | "completed"
+  | "rejected"
   | "cancelled";
 
 export type PurchaseRecordStatusCode =
@@ -609,6 +611,11 @@ export type PurchaseRequestDto = {
   expectedArrivalDate?: string | null;
   purpose?: string | null;
   status: PurchaseRequestStatusCode;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedByEmployeeId?: string | null;
+  reviewedByName?: string | null;
+  reviewRemark?: string | null;
   remark?: string | null;
   lines: readonly PurchaseRequestLineDto[];
   createdAt: string;
@@ -635,6 +642,11 @@ export type CreatePurchaseRequestInput = {
   expectedArrivalDate?: string | null;
   purpose?: string | null;
   status?: PurchaseRequestStatusCode;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedByEmployeeId?: string | null;
+  reviewedByName?: string | null;
+  reviewRemark?: string | null;
   remark?: string | null;
   lines: readonly CreatePurchaseRequestLineInput[];
 };
@@ -1467,10 +1479,12 @@ export const PURCHASE_SOURCE_TYPES = [
 
 export const PURCHASE_REQUEST_STATUSES = [
   { code: "draft", label: "草稿" },
+  { code: "pending_approval", label: "待审批" },
   { code: "pending_purchase", label: "待采购" },
   { code: "purchasing", label: "采购中" },
   { code: "partially_received", label: "部分到货" },
   { code: "completed", label: "已完成" },
+  { code: "rejected", label: "已驳回" },
   { code: "cancelled", label: "已取消" },
 ] as const satisfies readonly StatusMeta<PurchaseRequestStatusCode>[];
 
@@ -1900,7 +1914,7 @@ export const MVP_DICTIONARIES = {
   },
   purchaseRequestStatus: {
     label: "采购需求状态",
-    values: ["草稿", "待采购", "采购中", "部分到货", "已完成", "已取消"],
+    values: ["草稿", "待审批", "待采购", "采购中", "部分到货", "已完成", "已驳回", "已取消"],
   },
   purchaseRecordStatus: {
     label: "采购记录状态",

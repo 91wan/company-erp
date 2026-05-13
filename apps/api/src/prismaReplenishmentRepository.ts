@@ -192,7 +192,7 @@ async function openPurchaseByMaterialId(client: ReplenishmentReadClient): Promis
     client.purchaseRequestLine.findMany({
       where: {
         materialId: { not: null },
-        purchaseRequest: { status: { in: ["draft", "pending_purchase"] } },
+        purchaseRequest: { status: { in: ["draft", "pending_approval", "pending_purchase"] } },
       },
       select: { materialId: true, requestedQuantity: true },
     }),

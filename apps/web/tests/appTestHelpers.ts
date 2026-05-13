@@ -415,6 +415,11 @@ export const purchaseRequest: PurchaseRequestDto = {
   expectedArrivalDate: "2026-05-20",
   purpose: "项目点补充工服",
   status: "draft",
+  submittedAt: null,
+  reviewedAt: null,
+  reviewedByEmployeeId: null,
+  reviewedByName: null,
+  reviewRemark: null,
   remark: null,
   lines: [
     {

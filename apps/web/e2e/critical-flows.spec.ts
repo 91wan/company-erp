@@ -59,7 +59,7 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.getByLabel("需求数量").fill("3");
   await page.getByLabel("需求单位").fill("套");
   await page.getByRole("button", { name: "保存采购需求" }).click();
-  await expect(page.getByText("DEMO-E2E-PR")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "DEMO-E2E-PR", exact: true })).toBeVisible();
 
   await page.getByLabel("采购单号").fill("DEMO-E2E-PO");
   await page.getByLabel("采购人").fill("DEMO 采购人");

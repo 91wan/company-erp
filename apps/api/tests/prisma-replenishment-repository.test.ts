@@ -42,6 +42,7 @@ function makeSuggestion(overrides: Record<string, unknown> = {}) {
 describe("Prisma replenishment repository", () => {
   it("generates replenishment suggestions from stock, reserved usage, and open purchase quantities", async () => {
     const createdSuggestions: unknown[] = [];
+    const purchaseRequestLineFindManyCalls: unknown[] = [];
     const existingSuggestion = makeSuggestion({
       id: "22222222-2222-4222-8222-222222222222",
       materialId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -129,7 +130,8 @@ describe("Prisma replenishment repository", () => {
         },
       },
       purchaseRequestLine: {
-        async findMany() {
+        async findMany(args: unknown) {
+          purchaseRequestLineFindManyCalls.push(args);
           return [
             {
               materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -167,6 +169,13 @@ describe("Prisma replenishment repository", () => {
     expect(result.created).toMatchObject([{ materialCode: "MAT-REP-001", suggestedQuantity: 27 }]);
     expect(result.existingOpen).toMatchObject([{ materialCode: "MAT-REP-002", suggestedQuantity: 9 }]);
     expect(result.skipped).toBe(0);
+    expect(purchaseRequestLineFindManyCalls).toEqual([
+      expect.objectContaining({
+        where: expect.objectContaining({
+          purchaseRequest: { status: { in: ["draft", "pending_approval", "pending_purchase"] } },
+        }),
+      }),
+    ]);
   });
 
   it("converts an open suggestion into a purchase request inside one transaction", async () => {
