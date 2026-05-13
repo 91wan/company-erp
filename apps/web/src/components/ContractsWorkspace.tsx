@@ -182,6 +182,15 @@ export function ContractsWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
+    if (!canManage) {
+      setParties([]);
+      setProjectSites([]);
+      setBusinessProjects([]);
+      setMasterStatus("ready");
+      return () => {
+        mounted = false;
+      };
+    }
     Promise.all([loadParties(), loadProjectSites(), loadBusinessProjects()])
       .then(([nextParties, nextProjectSites, nextBusinessProjects]) => {
         if (!mounted) return;
@@ -198,7 +207,7 @@ export function ContractsWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadBusinessProjects, loadParties, loadProjectSites]);
+  }, [canManage, loadBusinessProjects, loadParties, loadProjectSites]);
 
   useEffect(() => {
     if (!attachmentForm.contractId) {
