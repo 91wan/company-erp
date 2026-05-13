@@ -1,15 +1,7 @@
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import Fastify from "fastify";
-import {
-  INVENTORY_MVP_METADATA,
-  MVP_DICTIONARIES,
-  MVP_PERMISSION_MATRIX,
-  MVP_ROLES,
-  USER_ROLE_ASSIGNMENT_POLICY,
-  type MvpRoleCode,
-  type ProjectUsageRequestDto,
-} from "@company-erp/shared";
+import { type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
 import {
   PartyConflictError,
   PartyValidationError,
@@ -140,12 +132,8 @@ import {
   normalizeMarketOperationsHandoffInput,
   type MarketOperationsHandoffRepository,
 } from "./marketOperationsHandoffs.js";
-import {
-  AppConfigValidationError,
-  createMemoryAppConfigRepository,
-  normalizeAppConfigInput,
-  type AppConfigRepository,
-} from "./appConfig.js";
+import type { AppConfigRepository } from "./appConfig.js";
+import { registerAppCoreRoutes } from "./appCoreRoutes.js";
 import { registerAuth, type AuthenticatedRequest, type AuthOptions, type AuthRepository } from "./auth.js";
 
 type BuildAppOptions = {
@@ -262,7 +250,6 @@ export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: false,
   });
-  const appConfigRepository = options.appConfigRepository ?? createMemoryAppConfigRepository();
 
   void app.register(cors, {
     origin: true,
@@ -276,47 +263,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
 
   registerAuth(app, options.authRepository, options.auth);
-
-  app.get("/health", async () => ({
-    status: "ok",
-    service: "company-erp-api",
-    database: {
-      configured: Boolean(process.env.DATABASE_URL),
-    },
-  }));
-
-  app.get("/api/meta/roles", async () => ({
-    roles: MVP_ROLES,
-  }));
-
-  app.get("/api/meta/dictionaries", async () => ({
-    dictionaries: MVP_DICTIONARIES,
-  }));
-
-  app.get("/api/meta/permissions", async () => ({
-    roles: MVP_ROLES,
-    permissionMatrix: MVP_PERMISSION_MATRIX,
-    assignmentPolicy: USER_ROLE_ASSIGNMENT_POLICY,
-  }));
-
-  app.get("/api/meta/inventory", async () => INVENTORY_MVP_METADATA);
-
-  app.get("/api/app-config", async () => ({
-    appConfig: await appConfigRepository.get(),
-  }));
-
-  app.patch("/api/app-config", async (request, reply) => {
-    try {
-      const input = normalizeAppConfigInput(request.body);
-      const appConfig = await appConfigRepository.update(input);
-      return { appConfig };
-    } catch (error) {
-      if (error instanceof AppConfigValidationError) {
-        return reply.status(400).send({ error: "APP_CONFIG_VALIDATION_FAILED", issues: error.issues });
-      }
-      throw error;
-    }
-  });
+  registerAppCoreRoutes(app, { appConfigRepository: options.appConfigRepository });
 
   app.get("/api/import-jobs", async (request, reply) => {
     if (!options.importJobRepository) {
