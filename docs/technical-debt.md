@@ -6,9 +6,7 @@ This document tracks engineering debt that should be handled in focused maintena
 
 Current priority for reducing `AnyPrisma` and `as any` usage:
 
-1. `apps/api/src/prismaImportJobRepository.ts`
-   - Medium priority because it parses external files and writes multiple business record types.
-2. `apps/api/src/prismaBusinessProjectsRepository.ts`
+1. `apps/api/src/prismaBusinessProjectsRepository.ts`
    - Lower priority, but still uses a broad Prisma client type for business project investment summaries.
 
 Completed:
@@ -17,6 +15,7 @@ Completed:
 - `apps/api/src/prismaReplenishmentRepository.ts` was hardened in the Replenishment Prisma type-debt slice. It no longer relies on a broad `AnyPrisma` client or `as any` casts for suggestion generation and replenishment-to-purchase conversion.
 - `apps/api/src/prismaMarketOperationsHandoffsRepository.ts` was hardened in the Market Operations Prisma type-debt slice. It now uses a narrow handoff delegate contract and typed include payloads for handoff list/detail/create/update behavior.
 - `apps/api/src/prismaInventoryRepository.ts` was hardened in the Inventory Prisma type-debt slice. It no longer relies on a broad `AnyPrisma` client or `as any` casts for movement mapping, purchase receiving rollup, and inventory balance aggregation behavior.
+- `apps/api/src/prismaImportJobRepository.ts` was hardened in the Import Job Prisma type-debt slice. It no longer relies on a broad `AnyPrisma` client or `as any` casts for preview context loading, row/job DTO mapping, confirmation transactions, and JSON row persistence.
 
 ## Maintenance Constraints
 

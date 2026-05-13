@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   BaseStatusCode,
   EmployeeStatusCode,
@@ -11,6 +11,7 @@ import type {
   ImportRowStatusCode,
   ImportTemplateTypeCode,
   MvpRoleCode,
+  PartyTypeCode,
   ProjectSiteServiceModeCode,
   ProjectSiteStatusCode,
 } from "@company-erp/shared";
@@ -21,15 +22,21 @@ import {
   type ImportJobRepository,
 } from "./importJobs.js";
 
-type AnyPrisma = PrismaClient & Record<string, any>;
 type RawRow = { rowNumber: number; rawData: Record<string, unknown> };
+
+type PartyLookup = { id: string; partyCode: string; partyName: string };
+type MaterialLookup = { id: string; materialCode: string; baseUnit?: string | null };
+type WarehouseLookup = { id: string; warehouseCode: string };
+type EmployeeLookup = { id: string; employeeNo: string };
+type ProjectSiteLookup = { id: string; siteCode: string };
+
 type PreviewContext = {
-  partiesByCode: Map<string, any>;
-  partiesByName: Map<string, any>;
-  materialsByCode: Map<string, any>;
-  warehousesByCode: Map<string, any>;
-  employeesByNo: Map<string, any>;
-  projectSitesByCode: Map<string, any>;
+  partiesByCode: Map<string, PartyLookup>;
+  partiesByName: Map<string, PartyLookup>;
+  materialsByCode: Map<string, MaterialLookup>;
+  warehousesByCode: Map<string, WarehouseLookup>;
+  employeesByNo: Map<string, EmployeeLookup>;
+  projectSitesByCode: Map<string, ProjectSiteLookup>;
 };
 type NormalizedRow = {
   rowNumber: number;
@@ -39,6 +46,124 @@ type NormalizedRow = {
   status: ImportRowStatusCode;
   targetRecordType?: string | null;
   targetRecordId?: string | null;
+};
+
+export type ImportJobRowRecord = {
+  id: string;
+  importJobId?: string;
+  rowNumber: number;
+  rawData: unknown;
+  normalizedData: unknown;
+  issues: unknown;
+  status: ImportRowStatusCode;
+  targetRecordType?: string | null;
+  targetRecordId?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
+export type ImportJobRecord = {
+  id: string;
+  templateType: ImportTemplateTypeCode;
+  originalFileName: string;
+  fileHash: string;
+  status: ImportJobStatusCode;
+  totalRows: number;
+  validRows: number;
+  warningRows: number;
+  errorRows: number;
+  skippedRows: number;
+  importedRows: number;
+  confirmedAt: Date | string | null;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
+  rows?: ImportJobRowRecord[];
+};
+
+type ImportJobRowCreateInput = {
+  rowNumber: number;
+  rawData: Prisma.InputJsonValue;
+  normalizedData?: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
+  issues: Prisma.InputJsonValue;
+  status: ImportRowStatusCode;
+  targetRecordType?: string | null;
+  targetRecordId?: string | null;
+};
+
+type ImportJobCreateInput = {
+  templateType: ImportTemplateTypeCode;
+  originalFileName: string;
+  fileHash: string;
+  status: ImportJobStatusCode;
+  totalRows: number;
+  validRows: number;
+  warningRows: number;
+  errorRows: number;
+  skippedRows: number;
+  importedRows: number;
+  rows?: { create: ImportJobRowCreateInput[] };
+};
+
+type ImportJobIncludeRows = { rows: { orderBy: { rowNumber: "asc" } } };
+type ImportJobCreateArgs = { data: ImportJobCreateInput; include?: ImportJobIncludeRows };
+type ImportJobFindUniqueArgs = { where: { id: string }; include?: ImportJobIncludeRows };
+
+type ImportTransactionClient = {
+  party: {
+    findFirst(args: Prisma.PartyFindFirstArgs): Promise<PartyLookup | null>;
+    create(args: Prisma.PartyCreateArgs): Promise<PartyLookup>;
+  };
+  material: {
+    create(args: Prisma.MaterialCreateArgs): Promise<{ id: string }>;
+  };
+  department: {
+    findFirst(args: Prisma.DepartmentFindFirstArgs): Promise<{ id: string } | null>;
+    create(args: Prisma.DepartmentCreateArgs): Promise<{ id: string }>;
+  };
+  employee: {
+    create(args: Prisma.EmployeeCreateArgs): Promise<{ id: string }>;
+  };
+  projectSite: {
+    create(args: Prisma.ProjectSiteCreateArgs): Promise<{ id: string }>;
+  };
+  inventoryMovement: {
+    create(args: Prisma.InventoryMovementCreateArgs): Promise<{ id: string }>;
+  };
+  importJob: {
+    findUnique(args: ImportJobFindUniqueArgs): Promise<ImportJobRecord | null>;
+    update(args: Prisma.ImportJobUpdateArgs): Promise<unknown>;
+  };
+  importJobRow: {
+    update(args: Prisma.ImportJobRowUpdateArgs): Promise<unknown>;
+  };
+};
+
+export type ImportJobPrismaClient = {
+  party: {
+    findMany(args?: Prisma.PartyFindManyArgs): Promise<PartyLookup[]>;
+  } & ImportTransactionClient["party"];
+  material: {
+    findMany(args?: Prisma.MaterialFindManyArgs): Promise<MaterialLookup[]>;
+  } & ImportTransactionClient["material"];
+  warehouse: {
+    findMany(args?: Prisma.WarehouseFindManyArgs): Promise<WarehouseLookup[]>;
+  };
+  employee: {
+    findMany(args?: Prisma.EmployeeFindManyArgs): Promise<EmployeeLookup[]>;
+  } & ImportTransactionClient["employee"];
+  department: ImportTransactionClient["department"];
+  projectSite: {
+    findMany(args?: Prisma.ProjectSiteFindManyArgs): Promise<ProjectSiteLookup[]>;
+  } & ImportTransactionClient["projectSite"];
+  inventoryMovement: ImportTransactionClient["inventoryMovement"];
+  importJob: {
+    findMany(args: Prisma.ImportJobFindManyArgs): Promise<ImportJobRecord[]>;
+    findUnique(args: ImportJobFindUniqueArgs): Promise<ImportJobRecord | null>;
+    create(args: ImportJobCreateArgs): Promise<ImportJobRecord>;
+    update(args: Prisma.ImportJobUpdateArgs): Promise<ImportJobRecord>;
+  };
+  importJobRow: ImportTransactionClient["importJobRow"];
+  $transaction<T>(callback: (tx: ImportTransactionClient) => Promise<T>): Promise<T>;
 };
 
 const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
@@ -51,6 +176,59 @@ const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
 
 function timestamp(value: Date | string): string {
   return typeof value === "string" ? value : value.toISOString();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function stringValue(data: Record<string, unknown>, field: string): string {
+  const value = data[field];
+  return typeof value === "string" ? value : value === null || value === undefined ? "" : String(value);
+}
+
+function nullableStringValue(data: Record<string, unknown>, field: string): string | null {
+  const value = data[field];
+  return typeof value === "string" ? value : null;
+}
+
+function numberOrNullValue(data: Record<string, unknown>, field: string): number | null {
+  const value = data[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringArrayValue(data: Record<string, unknown>, field: string): string[] {
+  const value = data[field];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function dateValue(data: Record<string, unknown>, field: string): Date | undefined {
+  const value = stringValue(data, field);
+  return value ? new Date(`${value}T00:00:00.000Z`) : undefined;
+}
+
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+}
+
+function rowIssues(value: unknown): ImportRowIssueDto[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!isRecord(item) || (item.level !== "error" && item.level !== "warning") || typeof item.message !== "string") {
+      return [];
+    }
+    return [
+      {
+        level: item.level,
+        field: typeof item.field === "string" ? item.field : undefined,
+        message: item.message,
+      },
+    ];
+  });
 }
 
 function cellToValue(value: ExcelJS.CellValue): unknown {
@@ -175,7 +353,11 @@ function statusFromIssues(issues: ImportRowIssueDto[], duplicateTarget?: { type:
 
 async function parseWorkbook(input: ImportJobPreviewInput): Promise<RawRow[]> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(input.fileBuffer as any);
+  const excelBuffer = input.fileBuffer.buffer.slice(
+    input.fileBuffer.byteOffset,
+    input.fileBuffer.byteOffset + input.fileBuffer.byteLength,
+  ) as unknown as Parameters<typeof workbook.xlsx.load>[0];
+  await workbook.xlsx.load(excelBuffer);
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new ImportJobValidationError(["Workbook must contain at least one sheet"]);
 
@@ -201,7 +383,7 @@ async function parseWorkbook(input: ImportJobPreviewInput): Promise<RawRow[]> {
   return rows;
 }
 
-async function loadContext(client: AnyPrisma): Promise<PreviewContext> {
+async function loadContext(client: ImportJobPrismaClient): Promise<PreviewContext> {
   const [parties, materials, warehouses, employees, projectSites] = await Promise.all([
     client.party.findMany(),
     client.material.findMany(),
@@ -210,12 +392,12 @@ async function loadContext(client: AnyPrisma): Promise<PreviewContext> {
     client.projectSite.findMany(),
   ]);
   return {
-    partiesByCode: new Map(parties.map((party: any) => [party.partyCode, party])),
-    partiesByName: new Map(parties.map((party: any) => [party.partyName, party])),
-    materialsByCode: new Map(materials.map((material: any) => [material.materialCode, material])),
-    warehousesByCode: new Map(warehouses.map((warehouse: any) => [warehouse.warehouseCode, warehouse])),
-    employeesByNo: new Map(employees.map((employee: any) => [employee.employeeNo, employee])),
-    projectSitesByCode: new Map(projectSites.map((site: any) => [site.siteCode, site])),
+    partiesByCode: new Map(parties.map((party) => [party.partyCode, party])),
+    partiesByName: new Map(parties.map((party) => [party.partyName, party])),
+    materialsByCode: new Map(materials.map((material) => [material.materialCode, material])),
+    warehousesByCode: new Map(warehouses.map((warehouse) => [warehouse.warehouseCode, warehouse])),
+    employeesByNo: new Map(employees.map((employee) => [employee.employeeNo, employee])),
+    projectSitesByCode: new Map(projectSites.map((site) => [site.siteCode, site])),
   };
 }
 
@@ -454,13 +636,13 @@ function summarize(rows: readonly NormalizedRow[]) {
   };
 }
 
-function toRowDto(row: any): ImportJobRowDto {
+function toRowDto(row: ImportJobRowRecord): ImportJobRowDto {
   return {
     id: row.id,
     rowNumber: row.rowNumber,
-    rawData: row.rawData,
-    normalizedData: row.normalizedData,
-    issues: row.issues,
+    rawData: recordValue(row.rawData),
+    normalizedData: row.normalizedData === null ? null : recordValue(row.normalizedData),
+    issues: rowIssues(row.issues),
     status: row.status,
     targetRecordType: row.targetRecordType,
     targetRecordId: row.targetRecordId,
@@ -469,7 +651,7 @@ function toRowDto(row: any): ImportJobRowDto {
   };
 }
 
-function toJobDto(job: any): ImportJobDto {
+function toJobDto(job: ImportJobRecord): ImportJobDto {
   return {
     id: job.id,
     templateType: job.templateType,
@@ -488,7 +670,7 @@ function toJobDto(job: any): ImportJobDto {
   };
 }
 
-async function ensureParty(tx: AnyPrisma, code: string, name: string, type: "client" | "subcontractor") {
+async function ensureParty(tx: ImportTransactionClient, code: string, name: string, type: "client" | "subcontractor") {
   const existing = await tx.party.findFirst({ where: { OR: [{ partyCode: code }, { partyName: name }] } });
   if (existing) return existing;
   return tx.party.create({
@@ -501,7 +683,7 @@ async function ensureParty(tx: AnyPrisma, code: string, name: string, type: "cli
   });
 }
 
-async function ensureDepartment(tx: AnyPrisma, name: string) {
+async function ensureDepartment(tx: ImportTransactionClient, name: string) {
   const existing = await tx.department.findFirst({ where: { name } });
   if (existing) return existing;
   return tx.department.create({
@@ -515,70 +697,98 @@ async function ensureDepartment(tx: AnyPrisma, name: string) {
   });
 }
 
-async function importRow(tx: AnyPrisma, job: any, row: any): Promise<{ targetRecordType: string; targetRecordId: string } | null> {
+async function importRow(
+  tx: ImportTransactionClient,
+  job: ImportJobRecord,
+  row: ImportJobRowRecord,
+): Promise<{ targetRecordType: string; targetRecordId: string } | null> {
   if (row.status !== "valid" && row.status !== "warning") return null;
-  const data = row.normalizedData ?? {};
+  const data = recordValue(row.normalizedData);
 
   if (job.templateType === "parties") {
-    const party = await tx.party.create({ data });
+    const party = await tx.party.create({
+      data: {
+        partyCode: stringValue(data, "partyCode"),
+        partyName: stringValue(data, "partyName"),
+        partyTypes: stringArrayValue(data, "partyTypes") as PartyTypeCode[],
+        unifiedSocialCreditCode: nullableStringValue(data, "unifiedSocialCreditCode"),
+        primaryContactName: nullableStringValue(data, "primaryContactName"),
+        primaryContactPhone: nullableStringValue(data, "primaryContactPhone"),
+        supplyCategory: nullableStringValue(data, "supplyCategory"),
+        commonMaterials: nullableStringValue(data, "commonMaterials"),
+        address: nullableStringValue(data, "address"),
+        settlementNotes: nullableStringValue(data, "settlementNotes"),
+        status: stringValue(data, "status") as BaseStatusCode,
+        remark: nullableStringValue(data, "remark"),
+      },
+    });
     return { targetRecordType: "party", targetRecordId: party.id };
   }
   if (job.templateType === "materials") {
     const material = await tx.material.create({
       data: {
-        materialCode: data.materialCode,
-        materialName: data.materialName,
-        specification: data.specification,
-        materialCategory: data.materialCategory,
-        baseUnit: data.baseUnit,
-        defaultSupplierParty: data.defaultSupplierPartyId ? { connect: { id: data.defaultSupplierPartyId } } : undefined,
-        safeStock: data.safeStock,
-        status: data.status,
-        remark: data.remark,
+        materialCode: stringValue(data, "materialCode"),
+        materialName: stringValue(data, "materialName"),
+        specification: nullableStringValue(data, "specification"),
+        materialCategory: stringValue(data, "materialCategory"),
+        baseUnit: stringValue(data, "baseUnit"),
+        defaultSupplierParty: stringValue(data, "defaultSupplierPartyId")
+          ? { connect: { id: stringValue(data, "defaultSupplierPartyId") } }
+          : undefined,
+        safeStock: numberOrNullValue(data, "safeStock"),
+        status: stringValue(data, "status") as BaseStatusCode,
+        remark: nullableStringValue(data, "remark"),
       },
     });
     return { targetRecordType: "material", targetRecordId: material.id };
   }
   if (job.templateType === "employees") {
-    const department = await ensureDepartment(tx, data.departmentName);
+    const department = await ensureDepartment(tx, stringValue(data, "departmentName"));
     const employee = await tx.employee.create({
       data: {
-        employeeNo: data.employeeNo,
-        name: data.name,
-        phone: data.phone,
+        employeeNo: stringValue(data, "employeeNo"),
+        name: stringValue(data, "name"),
+        phone: nullableStringValue(data, "phone"),
         department: { connect: { id: department.id } },
-        position: data.position,
-        employmentStatus: data.employmentStatus,
-        hireDate: data.hireDate ? new Date(`${data.hireDate}T00:00:00.000Z`) : undefined,
-        remark: data.remark,
+        position: nullableStringValue(data, "position"),
+        employmentStatus: stringValue(data, "employmentStatus") as EmployeeStatusCode,
+        hireDate: dateValue(data, "hireDate"),
+        remark: nullableStringValue(data, "remark"),
       },
     });
     return { targetRecordType: "employee", targetRecordId: employee.id };
   }
   if (job.templateType === "project_sites") {
-    const clientParty = data.clientPartyName
-      ? await ensureParty(tx, data.clientPartyCode, data.clientPartyName, "client")
+    const clientParty = stringValue(data, "clientPartyName")
+      ? await ensureParty(tx, stringValue(data, "clientPartyCode"), stringValue(data, "clientPartyName"), "client")
       : null;
-    const subcontractorParty = data.subcontractorPartyName
-      ? await ensureParty(tx, data.subcontractorPartyCode, data.subcontractorPartyName, "subcontractor")
+    const subcontractorParty = stringValue(data, "subcontractorPartyName")
+      ? await ensureParty(
+          tx,
+          stringValue(data, "subcontractorPartyCode"),
+          stringValue(data, "subcontractorPartyName"),
+          "subcontractor",
+        )
       : null;
     const site = await tx.projectSite.create({
       data: {
-        siteCode: data.siteCode,
-        siteName: data.siteName,
+        siteCode: stringValue(data, "siteCode"),
+        siteName: stringValue(data, "siteName"),
         clientParty: clientParty ? { connect: { id: clientParty.id } } : undefined,
-        serviceMode: data.serviceMode,
+        serviceMode: stringValue(data, "serviceMode") as ProjectSiteServiceModeCode,
         subcontractorParty: subcontractorParty ? { connect: { id: subcontractorParty.id } } : undefined,
-        region: data.region,
-        siteAddress: data.siteAddress,
-        serviceType: data.serviceType,
-        status: data.status,
-        primaryManager: data.primaryManagerEmployeeId ? { connect: { id: data.primaryManagerEmployeeId } } : undefined,
-        clientContactName: data.clientContactName,
-        clientContactPhone: data.clientContactPhone,
-        subcontractorContactName: data.subcontractorContactName,
-        subcontractorContactPhone: data.subcontractorContactPhone,
-        remark: data.remark,
+        region: nullableStringValue(data, "region"),
+        siteAddress: nullableStringValue(data, "siteAddress"),
+        serviceType: nullableStringValue(data, "serviceType"),
+        status: stringValue(data, "status") as ProjectSiteStatusCode,
+        primaryManager: stringValue(data, "primaryManagerEmployeeId")
+          ? { connect: { id: stringValue(data, "primaryManagerEmployeeId") } }
+          : undefined,
+        clientContactName: nullableStringValue(data, "clientContactName"),
+        clientContactPhone: nullableStringValue(data, "clientContactPhone"),
+        subcontractorContactName: nullableStringValue(data, "subcontractorContactName"),
+        subcontractorContactPhone: nullableStringValue(data, "subcontractorContactPhone"),
+        remark: nullableStringValue(data, "remark"),
       },
     });
     return { targetRecordType: "projectSite", targetRecordId: site.id };
@@ -586,25 +796,25 @@ async function importRow(tx: AnyPrisma, job: any, row: any): Promise<{ targetRec
 
   const movement = await tx.inventoryMovement.create({
     data: {
-      movementNo: `${data.movementNo}-${row.rowNumber}`,
-      movementDate: new Date(`${data.movementDate}T00:00:00.000Z`),
+      movementNo: `${stringValue(data, "movementNo")}-${row.rowNumber}`,
+      movementDate: new Date(`${stringValue(data, "movementDate")}T00:00:00.000Z`),
       movementType: "opening",
       sourceType: "opening",
-      warehouse: { connect: { id: data.warehouseId } },
-      material: { connect: { id: data.materialId } },
-      quantity: data.quantity,
-      unit: data.unit,
-      unitPrice: data.unitPrice,
-      purpose: data.purpose,
-      remark: data.remark,
+      warehouse: { connect: { id: stringValue(data, "warehouseId") } },
+      material: { connect: { id: stringValue(data, "materialId") } },
+      quantity: numberOrNullValue(data, "quantity") ?? 0,
+      unit: stringValue(data, "unit"),
+      unitPrice: numberOrNullValue(data, "unitPrice"),
+      purpose: nullableStringValue(data, "purpose"),
+      remark: nullableStringValue(data, "remark"),
     },
   });
   return { targetRecordType: "inventoryMovement", targetRecordId: movement.id };
 }
 
-export function createPrismaImportJobRepository(prisma: PrismaClient): ImportJobRepository {
-  const client = prisma as AnyPrisma;
-  const includeRows = { rows: { orderBy: { rowNumber: "asc" as const } } };
+export function createPrismaImportJobRepository(prisma: ImportJobPrismaClient): ImportJobRepository {
+  const client = prisma;
+  const includeRows: ImportJobIncludeRows = { rows: { orderBy: { rowNumber: "asc" } } };
 
   return {
     async list(filters: ImportJobListFilters) {
@@ -615,7 +825,7 @@ export function createPrismaImportJobRepository(prisma: PrismaClient): ImportJob
         },
         orderBy: { createdAt: "desc" },
       });
-      return jobs.map((job: any) => {
+      return jobs.map((job) => {
         const { rows: _rows, ...summary } = toJobDto({ ...job, rows: [] });
         return summary;
       });
@@ -640,9 +850,9 @@ export function createPrismaImportJobRepository(prisma: PrismaClient): ImportJob
           rows: {
             create: rows.map((row) => ({
               rowNumber: row.rowNumber,
-              rawData: row.rawData as any,
-              normalizedData: row.normalizedData as any,
-              issues: row.issues as any,
+              rawData: toJson(row.rawData),
+              normalizedData: row.normalizedData ? toJson(row.normalizedData) : Prisma.JsonNull,
+              issues: toJson(row.issues),
               status: row.status,
               targetRecordType: row.targetRecordType,
               targetRecordId: row.targetRecordId,
@@ -654,14 +864,14 @@ export function createPrismaImportJobRepository(prisma: PrismaClient): ImportJob
       return toJobDto(job);
     },
     async confirm(id: string) {
-      const confirmed = await (client.$transaction as any)(async (tx: AnyPrisma) => {
+      const confirmed = await client.$transaction(async (tx) => {
         const job = await tx.importJob.findUnique({ where: { id }, include: includeRows });
         if (!job) return null;
         if (job.status !== "previewed") throw new ImportJobValidationError(["Import job cannot be confirmed again"]);
         if (job.errorRows > 0) throw new ImportJobValidationError(["Import job has error rows"]);
 
         let importedRows = 0;
-        for (const row of job.rows) {
+        for (const row of job.rows ?? []) {
           const result = await importRow(tx, job, row);
           if (!result) continue;
           importedRows += 1;
