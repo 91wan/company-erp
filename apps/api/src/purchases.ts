@@ -35,9 +35,17 @@ export type PurchaseRequestRepository = {
   getById(id: string): Promise<PurchaseRequestDto | null>;
   create(input: CreatePurchaseRequestInput): Promise<PurchaseRequestDto>;
   update(id: string, input: UpdatePurchaseRequestInput): Promise<PurchaseRequestDto | null>;
-  submit(id: string): Promise<PurchaseRequestDto | null>;
-  approve(id: string, input: PurchaseRequestReviewInput): Promise<PurchaseRequestDto | null>;
-  reject(id: string, input: PurchaseRequestReviewInput): Promise<PurchaseRequestDto | null>;
+  submit(id: string, expectedStatus: PurchaseRequestStatusCode): Promise<PurchaseRequestDto | null>;
+  approve(
+    id: string,
+    expectedStatus: PurchaseRequestStatusCode,
+    input: PurchaseRequestReviewInput,
+  ): Promise<PurchaseRequestDto | null>;
+  reject(
+    id: string,
+    expectedStatus: PurchaseRequestStatusCode,
+    input: PurchaseRequestReviewInput,
+  ): Promise<PurchaseRequestDto | null>;
   markPurchasing(id: string): Promise<void>;
 };
 
@@ -58,6 +66,13 @@ export class PurchaseRequestConflictError extends Error {
   constructor(public readonly field: "requestNo") {
     super(`Purchase request conflict on ${field}`);
     this.name = "PurchaseRequestConflictError";
+  }
+}
+
+export class PurchaseRequestStateConflictError extends Error {
+  constructor() {
+    super("Purchase request state conflict");
+    this.name = "PurchaseRequestStateConflictError";
   }
 }
 
