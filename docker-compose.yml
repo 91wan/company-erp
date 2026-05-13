@@ -56,6 +56,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-company_erp}:${POSTGRES_PASSWORD:-change-me-in-nas}@postgres:5432/${POSTGRES_DB:-company_erp}?schema=public
       AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-change-me-long-random-local-secret}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      IDENTITY_ENCRYPTION_SECRET: ${IDENTITY_ENCRYPTION_SECRET:-change-me-long-random-identity-secret}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       APP_COMMIT_SHA: ${APP_COMMIT_SHA:-unknown}

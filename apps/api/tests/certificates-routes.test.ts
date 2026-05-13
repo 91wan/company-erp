@@ -187,7 +187,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "user") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "user") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -211,7 +211,7 @@ describe("certificate status helper", () => {
 
 describe("certificates API", () => {
   it("reports certificates API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/certificates" });
     await app.close();
@@ -222,7 +222,7 @@ describe("certificates API", () => {
 
   it("lists, reads, creates, and updates certificate records", async () => {
     const repository = createFakeCertificateRepository([makeCertificate()]);
-    const app = buildApp({ certificateRepository: repository });
+    const app = await buildApp({ certificateRepository: repository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -261,7 +261,7 @@ describe("certificates API", () => {
   });
 
   it("creates a health certificate linked to a project-site roster person", async () => {
-    const app = buildApp({ certificateRepository: createFakeCertificateRepository() });
+    const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -295,7 +295,7 @@ describe("certificates API", () => {
   });
 
   it("rejects invalid date and owner combinations", async () => {
-    const app = buildApp({ certificateRepository: createFakeCertificateRepository() });
+    const app = await buildApp({ certificateRepository: createFakeCertificateRepository() });
 
     const fixedWithoutExpiry = await app.inject({
       method: "POST",
@@ -349,7 +349,7 @@ describe("certificates API", () => {
   });
 
   it("returns duplicate certificate codes as conflict", async () => {
-    const app = buildApp({ certificateRepository: createFakeCertificateRepository([makeCertificate()]) });
+    const app = await buildApp({ certificateRepository: createFakeCertificateRepository([makeCertificate()]) });
 
     const response = await app.inject({
       method: "POST",
@@ -389,7 +389,7 @@ describe("certificates API", () => {
       makeAuthAccount({ username: "user", passwordHash, roles: ["project_site"], assignedProjectSiteIds: [assignedProjectSiteId] }),
       makeAuthAccount({ id: "88888888-8888-4888-8888-888888888888", username: "buyer", passwordHash, roles: ["procurement"], assignedProjectSiteIds: [] }),
     ]);
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository,
       certificateRepository: repository,

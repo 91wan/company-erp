@@ -75,7 +75,9 @@ function createFakeDepartmentRepository(): DepartmentRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin", password = "ChangeMe123!") {
+type BuiltApp = Awaited<ReturnType<typeof buildApp>>;
+
+async function loginCookie(app: BuiltApp, username = "admin", password = "ChangeMe123!") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -85,22 +87,22 @@ async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin",
 }
 
 describe("auth API", () => {
-  it("fails closed when auth is enabled without a real session secret", () => {
-    expect(() => buildApp({ auth: { enabled: true }, authRepository: createFakeAuthRepository([]) })).toThrow(
+  it("fails closed when auth is enabled without a real session secret", async () => {
+    await expect(buildApp({ auth: { enabled: true }, authRepository: createFakeAuthRepository([]) })).rejects.toThrow(
       /AUTH_SESSION_SECRET/,
     );
-    expect(() =>
+    await expect(
       buildApp({
         auth: { enabled: true, sessionSecret: "change-me-long-random-local-secret" },
         authRepository: createFakeAuthRepository([]),
       }),
-    ).toThrow(/AUTH_SESSION_SECRET/);
+    ).rejects.toThrow(/AUTH_SESSION_SECRET/);
   });
 
   it("logs in active accounts, sets an HttpOnly session cookie, and never leaks password hashes", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const account = makeAuthAccount({ passwordHash, roles: ["admin", "viewer"] });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([account]),
     });
@@ -121,7 +123,7 @@ describe("auth API", () => {
 
   it("rejects invalid payloads, wrong passwords, inactive accounts, and inactive linked employees", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "admin", passwordHash }),
@@ -148,7 +150,7 @@ describe("auth API", () => {
       passwordHash,
       assignedProjectSiteIds: ["77777777-7777-4777-8777-777777777777"],
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([account]),
     });
@@ -182,7 +184,7 @@ describe("auth API", () => {
       passwordHash,
       passwordChangedAt: "2026-05-11T10:00:00.000Z",
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([account]),
     });
@@ -201,7 +203,7 @@ describe("auth API", () => {
 
   it("guards business routes by fixed role permissions while keeping meta routes public", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),

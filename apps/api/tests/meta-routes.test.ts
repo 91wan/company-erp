@@ -7,7 +7,7 @@ describe("metadata API", () => {
   });
 
   it("returns health without requiring a database connection", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/health" });
     await app.close();
 
@@ -26,7 +26,7 @@ describe("metadata API", () => {
     vi.stubEnv("APP_DEPLOYED_AT", "");
     vi.stubEnv("APP_PACKAGE_VERSION", "");
     vi.stubEnv("APP_ENVIRONMENT", "");
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/app-version" });
     await app.close();
@@ -50,7 +50,7 @@ describe("metadata API", () => {
     vi.stubEnv("APP_DEPLOYED_AT", "2026-05-13T07:30:00.000Z");
     vi.stubEnv("APP_PACKAGE_VERSION", "0.1.0");
     vi.stubEnv("APP_ENVIRONMENT", "nas");
-    const app = buildApp();
+    const app = await buildApp();
 
     const versionResponse = await app.inject({ method: "GET", url: "/api/app-version" });
     const healthResponse = await app.inject({ method: "GET", url: "/health" });
@@ -73,7 +73,7 @@ describe("metadata API", () => {
   });
 
   it("returns the fixed MVP roles", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/api/meta/roles" });
     await app.close();
 
@@ -94,7 +94,7 @@ describe("metadata API", () => {
   });
 
   it("returns fixed MVP permission metadata", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: "GET",
       url: "/api/meta/permissions",
@@ -120,7 +120,7 @@ describe("metadata API", () => {
   });
 
   it("returns the MVP dictionaries used by import templates", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: "GET",
       url: "/api/meta/dictionaries",
@@ -165,7 +165,7 @@ describe("metadata API", () => {
   });
 
   it("returns inventory MVP field metadata", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: "GET",
       url: "/api/meta/inventory",

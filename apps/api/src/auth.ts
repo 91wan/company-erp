@@ -18,6 +18,11 @@ const INSECURE_SESSION_SECRET_PLACEHOLDERS = new Set([
   "change-me-long-random-local-secret",
 ]);
 
+function loginRateLimitWindowMs(): number {
+  const configured = Number(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS ?? 60 * 1000);
+  return Number.isFinite(configured) && configured > 0 ? configured : 60 * 1000;
+}
+
 export type AuthAccountRecord = AuthenticatedUserDto & {
   passwordHash: string;
   status: UserAccountStatusCode;
@@ -104,14 +109,18 @@ function verifySessionToken(token: string, secret: string): SessionPayload | nul
   }
 }
 
-function parseCookieHeader(header: string | undefined): Record<string, string> {
+export function parseCookieHeader(header: string | undefined): Record<string, string> {
   if (!header) return {};
   return Object.fromEntries(
     header
       .split(";")
-      .map((item) => item.trim().split("="))
-      .filter(([key, value]) => key && value)
-      .map(([key, value]) => [key, decodeURIComponent(value)]),
+      .flatMap((item) => {
+        const eqIdx = item.indexOf("=");
+        if (eqIdx === -1) return [];
+        const key = item.slice(0, eqIdx).trim();
+        if (!key) return [];
+        return [[key, decodeURIComponent(item.slice(eqIdx + 1).trim())]];
+      }),
   );
 }
 
@@ -287,13 +296,18 @@ export function registerAuth(
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     }
 
-    const permission = routePermission(pathname, request.method);
-    if (!permission) return;
-
+    // Require a valid session for ALL non-public paths (default-deny for unauthenticated)
     const user = await resolveSessionUser(request, authRepository, secret);
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
 
     (request as AuthenticatedRequest).currentUser = user;
+
+    // Unmapped routes are fail-closed: authenticated but unknown API paths are forbidden
+    const permission = routePermission(pathname, request.method);
+    if (!permission) {
+      return reply.status(403).send({ error: "PERMISSION_NOT_MAPPED" });
+    }
+
     const allowed =
       permission.requiredLevel === "manage"
         ? canManage(user.roles as readonly MvpRoleCode[], permission.area)
@@ -308,35 +322,47 @@ export function registerAuth(
     }
   });
 
-  app.post("/api/auth/login", async (request, reply) => {
-    if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+  app.post(
+    "/api/auth/login",
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: loginRateLimitWindowMs(),
+          keyGenerator: (request: FastifyRequest) => `login:${request.ip}`,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
 
-    const normalized = normalizeLoginPayload(request.body);
-    if ("issues" in normalized) {
-      return reply.status(400).send({ error: "LOGIN_VALIDATION_FAILED", issues: normalized.issues });
-    }
+      const normalized = normalizeLoginPayload(request.body);
+      if ("issues" in normalized) {
+        return reply.status(400).send({ error: "LOGIN_VALIDATION_FAILED", issues: normalized.issues });
+      }
 
-    const account = await authRepository.findByUsername(normalized.username);
-    const validPassword = account ? await verifyPassword(normalized.password, account.passwordHash) : false;
-    if (!account || !validPassword || !accountCanLogin(account)) {
-      return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
-    }
+      const account = await authRepository.findByUsername(normalized.username);
+      const validPassword = account ? await verifyPassword(normalized.password, account.passwordHash) : false;
+      if (!account || !validPassword || !accountCanLogin(account)) {
+        return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+      }
 
-    await authRepository.updateLastLogin(account.id, new Date());
-    const refreshed = await authRepository.findById(account.id);
-    const user = toAuthenticatedUser(refreshed ?? account);
-    const token = createSessionToken(account.id, secret, ttlSeconds, getSessionIssuedAtForAccount(refreshed ?? account));
-    reply.header(
-      "Set-Cookie",
-      serializeCookie(AUTH_COOKIE_NAME, token, {
-        maxAge: ttlSeconds,
-        httpOnly: true,
-        sameSite: "Lax",
-        secure,
-      }),
-    );
-    return { user };
-  });
+      await authRepository.updateLastLogin(account.id, new Date());
+      const refreshed = await authRepository.findById(account.id);
+      const user = toAuthenticatedUser(refreshed ?? account);
+      const token = createSessionToken(account.id, secret, ttlSeconds, getSessionIssuedAtForAccount(refreshed ?? account));
+      reply.header(
+        "Set-Cookie",
+        serializeCookie(AUTH_COOKIE_NAME, token, {
+          maxAge: ttlSeconds,
+          httpOnly: true,
+          sameSite: "Lax",
+          secure,
+        }),
+      );
+      return { user };
+    },
+  );
 
   app.get("/api/auth/me", async (request) => {
     if (!authRepository) return { user: null };

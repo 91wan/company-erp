@@ -42,7 +42,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -53,7 +53,7 @@ async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin")
 
 describe("app config API", () => {
   it("returns the default company name without requiring login", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/app-config" });
     await app.close();
@@ -64,7 +64,7 @@ describe("app config API", () => {
 
   it("allows admin users to update the company name", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
       appConfigRepository: createMemoryAppConfigRepository(),
@@ -87,7 +87,7 @@ describe("app config API", () => {
 
   it("rejects empty company names and viewer writes", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),

@@ -64,7 +64,9 @@ Start from the template, then replace every placeholder in the real `.env`:
 cp .env.example .env
 ```
 
-Required production values:
+Required production values. `IDENTITY_ENCRYPTION_SECRET` must be a separate
+random value from `AUTH_SESSION_SECRET`; the API refuses to start if it is
+missing or still set to a placeholder because it protects encrypted PII fields.
 
 ```env
 POSTGRES_USER=company_erp
@@ -73,6 +75,7 @@ POSTGRES_DB=company_erp
 POSTGRES_PORT=5432
 
 AUTH_SESSION_SECRET=<long-random-secret>
+IDENTITY_ENCRYPTION_SECRET=<long-random-secret-distinct-from-session-secret>
 AUTH_COOKIE_SECURE=false
 
 BOOTSTRAP_ADMIN_USERNAME=admin

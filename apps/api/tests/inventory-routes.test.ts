@@ -175,7 +175,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "site-user") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "site-user") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -186,7 +186,7 @@ async function loginCookie(app: ReturnType<typeof buildApp>, username = "site-us
 
 describe("inventory movements API", () => {
   it("reports inventory API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/inventory-movements" });
     await app.close();
@@ -196,7 +196,7 @@ describe("inventory movements API", () => {
   });
 
   it("lists and filters inventory movements", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
 
     const response = await app.inject({
       method: "GET",
@@ -211,7 +211,7 @@ describe("inventory movements API", () => {
   });
 
   it("returns movement detail and 404 for missing movement", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
 
     const found = await app.inject({
       method: "GET",
@@ -253,7 +253,7 @@ describe("inventory movements API", () => {
       projectSiteId: assignedProjectSiteId,
       projectSiteName: "已分配项目点",
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-inventory" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       inventoryRepository: createFakeInventoryRepository([assignedMovement, unassignedMovement, purchaseMovement]),
@@ -285,7 +285,7 @@ describe("inventory movements API", () => {
   });
 
   it("creates a positive inbound movement", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository() });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository() });
 
     const response = await app.inject({
       method: "POST",
@@ -316,7 +316,7 @@ describe("inventory movements API", () => {
   });
 
   it("rejects invalid movement create payloads and duplicate movement numbers", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
 
     const invalid = await app.inject({
       method: "POST",
@@ -362,7 +362,7 @@ describe("inventory movements API", () => {
 
 describe("inventory balances API", () => {
   it("returns current balances with low-stock filtering", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
 
     const response = await app.inject({ method: "GET", url: "/api/inventory-balances?lowStockOnly=true" });
     await app.close();
@@ -374,7 +374,7 @@ describe("inventory balances API", () => {
   });
 
   it("rejects invalid balance filters", async () => {
-    const app = buildApp({ inventoryRepository: createFakeInventoryRepository() });
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository() });
 
     const response = await app.inject({ method: "GET", url: "/api/inventory-balances?lowStockOnly=maybe" });
     await app.close();
@@ -388,7 +388,7 @@ describe("inventory balances API", () => {
 
   it("blocks project-site users from global inventory balances", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-balances" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       inventoryRepository: createFakeInventoryRepository(),
@@ -408,7 +408,7 @@ describe("inventory balances API", () => {
 
   it("allows operations to read quantity balances without price fields while blocking marketing", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-ops-inventory" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ id: "10000000-0000-4000-8000-000000000001", username: "ops", passwordHash, roles: ["operations"] }),

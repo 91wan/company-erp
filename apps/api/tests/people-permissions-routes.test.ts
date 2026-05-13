@@ -169,7 +169,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "admin", password = "ChangeMe123!") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin", password = "ChangeMe123!") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } });
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
@@ -412,7 +412,7 @@ function createFakeProjectSiteAssignmentRepository(seed: EmployeeProjectSiteAssi
 
 describe("departments API", () => {
   it("reports departments API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/api/departments" });
     await app.close();
     expect(response.statusCode).toBe(503);
@@ -420,7 +420,7 @@ describe("departments API", () => {
   });
 
   it("lists, reads, creates, and updates departments", async () => {
-    const app = buildApp({ departmentRepository: createFakeDepartmentRepository([makeDepartment()]) });
+    const app = await buildApp({ departmentRepository: createFakeDepartmentRepository([makeDepartment()]) });
     const listResponse = await app.inject({ method: "GET", url: "/api/departments?status=enabled&q=人事" });
     const detailResponse = await app.inject({ method: "GET", url: `/api/departments/${departmentId}` });
     const createResponse = await app.inject({
@@ -442,7 +442,7 @@ describe("departments API", () => {
   });
 
   it("rejects invalid and duplicate departments and returns 404 for missing records", async () => {
-    const app = buildApp({ departmentRepository: createFakeDepartmentRepository([makeDepartment()]) });
+    const app = await buildApp({ departmentRepository: createFakeDepartmentRepository([makeDepartment()]) });
     const invalidResponse = await app.inject({ method: "POST", url: "/api/departments", payload: { departmentCode: "", name: "" } });
     const duplicateResponse = await app.inject({ method: "POST", url: "/api/departments", payload: { departmentCode: "DEP-HR", name: "重复部门" } });
     const missingResponse = await app.inject({ method: "GET", url: "/api/departments/missing" });
@@ -456,7 +456,7 @@ describe("departments API", () => {
 
 describe("project-site assignments API", () => {
   it("reports assignment API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/project-site-assignments" });
     await app.close();
@@ -467,7 +467,7 @@ describe("project-site assignments API", () => {
 
   it("lists, reads, creates, and updates project-site assignments", async () => {
     const existing = makeProjectSiteAssignment();
-    const app = buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
+    const app = await buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
 
     const list = await app.inject({ method: "GET", url: "/api/project-site-assignments?activeOnly=true&q=科技园" });
     const detail = await app.inject({ method: "GET", url: `/api/project-site-assignments/${existing.id}` });
@@ -501,7 +501,7 @@ describe("project-site assignments API", () => {
 
   it("rejects invalid and duplicate project-site assignments", async () => {
     const existing = makeProjectSiteAssignment();
-    const app = buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
+    const app = await buildApp({ projectSiteAssignmentRepository: createFakeProjectSiteAssignmentRepository([existing]) });
 
     const invalid = await app.inject({
       method: "POST",
@@ -525,7 +525,7 @@ describe("project-site assignments API", () => {
 
   it("blocks project-site-only users from reading assignment records", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-assignment-guard" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ username: "site-user", passwordHash, roles: ["project_site"] }),
@@ -548,7 +548,7 @@ describe("project-site assignments API", () => {
 
 describe("employees API", () => {
   it("reports employees API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/api/employees" });
     await app.close();
     expect(response.statusCode).toBe(503);
@@ -556,7 +556,7 @@ describe("employees API", () => {
   });
 
   it("lists, reads, creates, and updates employees while disabling linked accounts on exit", async () => {
-    const app = buildApp({ employeeRepository: createFakeEmployeeRepository([makeEmployee()]) });
+    const app = await buildApp({ employeeRepository: createFakeEmployeeRepository([makeEmployee()]) });
     const listResponse = await app.inject({ method: "GET", url: `/api/employees?employmentStatus=active&departmentId=${departmentId}&q=张三` });
     const detailResponse = await app.inject({ method: "GET", url: `/api/employees/${employeeId}` });
     const createResponse = await app.inject({
@@ -578,7 +578,7 @@ describe("employees API", () => {
   });
 
   it("reports employee validation and conflict errors", async () => {
-    const app = buildApp({ employeeRepository: createFakeEmployeeRepository([makeEmployee()]) });
+    const app = await buildApp({ employeeRepository: createFakeEmployeeRepository([makeEmployee()]) });
     const invalidResponse = await app.inject({ method: "POST", url: "/api/employees", payload: { employeeNo: "", name: "", departmentId: "" } });
     const duplicateResponse = await app.inject({ method: "POST", url: "/api/employees", payload: { employeeNo: "EMP0001", name: "重复员工", departmentId } });
     const missingResponse = await app.inject({ method: "GET", url: "/api/employees/missing" });
@@ -592,7 +592,7 @@ describe("employees API", () => {
 
 describe("user accounts API", () => {
   it("reports user accounts API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/api/user-accounts" });
     await app.close();
     expect(response.statusCode).toBe(503);
@@ -600,7 +600,7 @@ describe("user accounts API", () => {
   });
 
   it("lists, reads, creates, and updates user accounts without leaking password hashes", async () => {
-    const app = buildApp({ userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]) });
+    const app = await buildApp({ userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]) });
     const listResponse = await app.inject({ method: "GET", url: "/api/user-accounts?status=active&role=hr&q=zhang" });
     const detailResponse = await app.inject({ method: "GET", url: `/api/user-accounts/${accountId}` });
     const createResponse = await app.inject({
@@ -624,7 +624,7 @@ describe("user accounts API", () => {
   });
 
   it("reports user account validation and conflict errors", async () => {
-    const app = buildApp({ userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]) });
+    const app = await buildApp({ userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]) });
     const invalidResponse = await app.inject({ method: "POST", url: "/api/user-accounts", payload: { username: "", initialPassword: "" } });
     const duplicateResponse = await app.inject({ method: "POST", url: "/api/user-accounts", payload: { username: "zhangsan", initialPassword: "ChangeMe123!" } });
     const missingResponse = await app.inject({ method: "GET", url: "/api/user-accounts/missing" });
@@ -639,7 +639,7 @@ describe("user accounts API", () => {
 describe("external project-site accounts API", () => {
   it("creates, lists, and disables project-bound external accounts", async () => {
     const existing = makeExternalProjectSiteAccount({ status: "disabled", accountStatus: "disabled" });
-    const app = buildApp({
+    const app = await buildApp({
       externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([existing]),
     });
 
@@ -683,7 +683,7 @@ describe("external project-site accounts API", () => {
 
   it("requires a new current contact phone and password when changing account contact", async () => {
     const existing = makeExternalProjectSiteAccount();
-    const app = buildApp({
+    const app = await buildApp({
       externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([existing]),
     });
 
@@ -722,7 +722,7 @@ describe("external project-site accounts API", () => {
   });
 
   it("rejects a second active external account for the same project site", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       externalProjectSiteAccountRepository: createFakeExternalProjectSiteAccountRepository([
         makeExternalProjectSiteAccount(),
       ]),

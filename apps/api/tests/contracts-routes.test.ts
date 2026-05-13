@@ -225,7 +225,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>) {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>) {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
@@ -247,7 +247,7 @@ describe("contract expiry helper", () => {
 
 describe("contracts API", () => {
   it("reports contracts API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/contracts" });
     await app.close();
@@ -258,7 +258,7 @@ describe("contracts API", () => {
 
   it("lists, reads, creates, and updates contracts", async () => {
     const repository = createFakeContractRepository([makeContract()]);
-    const app = buildApp({ contractRepository: repository });
+    const app = await buildApp({ contractRepository: repository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -308,7 +308,7 @@ describe("contracts API", () => {
   });
 
   it("rejects invalid contracts and duplicate contract numbers", async () => {
-    const app = buildApp({ contractRepository: createFakeContractRepository([makeContract()]) });
+    const app = await buildApp({ contractRepository: createFakeContractRepository([makeContract()]) });
 
     const invalidResponse = await app.inject({
       method: "POST",
@@ -364,7 +364,7 @@ describe("contracts API", () => {
   });
 
   it("allows one-time purchase contracts to be manually completed without changing expiry derivation", async () => {
-    const app = buildApp({ contractRepository: createFakeContractRepository([]) });
+    const app = await buildApp({ contractRepository: createFakeContractRepository([]) });
 
     const response = await app.inject({
       method: "POST",
@@ -418,7 +418,7 @@ describe("contracts API", () => {
       projectSiteId: null,
       projectSiteName: null,
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-for-project-site-contracts" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       contractRepository: createFakeContractRepository(
@@ -466,7 +466,7 @@ describe("contracts API", () => {
 
   it("manages contract attachment path metadata", async () => {
     const repository = createFakeContractRepository([makeContract()], [makeAttachment()]);
-    const app = buildApp({ contractRepository: repository });
+    const app = await buildApp({ contractRepository: repository });
 
     const listResponse = await app.inject({ method: "GET", url: `/api/contracts/${contractId}/attachments` });
     const createResponse = await app.inject({

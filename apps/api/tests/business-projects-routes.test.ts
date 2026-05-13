@@ -132,14 +132,14 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "viewer") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "viewer") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password: "ChangeMe123!" } });
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("business projects API", () => {
   it("reports business projects API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/business-projects" });
     await app.close();
@@ -150,7 +150,7 @@ describe("business projects API", () => {
 
   it("lists, reads, creates, updates, and summarizes self-operated construction projects", async () => {
     const repository = createFakeBusinessProjectRepository([makeBusinessProject()]);
-    const app = buildApp({ businessProjectRepository: repository });
+    const app = await buildApp({ businessProjectRepository: repository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -202,7 +202,7 @@ describe("business projects API", () => {
   });
 
   it("rejects invalid business projects and duplicate project codes", async () => {
-    const app = buildApp({ businessProjectRepository: createFakeBusinessProjectRepository([makeBusinessProject()]) });
+    const app = await buildApp({ businessProjectRepository: createFakeBusinessProjectRepository([makeBusinessProject()]) });
 
     const invalidResponse = await app.inject({
       method: "POST",
@@ -248,7 +248,7 @@ describe("business projects API", () => {
 
   it("requires business project permissions when auth is enabled", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-business-projects" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ passwordHash, roles: ["viewer"] }),

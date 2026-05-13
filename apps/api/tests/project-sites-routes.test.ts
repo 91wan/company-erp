@@ -713,14 +713,14 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: ReturnType<typeof buildApp>, username = "site-user", password = "ChangeMe123!") {
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "site-user", password = "ChangeMe123!") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } });
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
 describe("project site API", () => {
   it("reports project site API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/project-sites" });
     await app.close();
@@ -730,7 +730,7 @@ describe("project site API", () => {
   });
 
   it("lists, filters, and returns project site detail", async () => {
-    const app = buildApp({ projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]) });
+    const app = await buildApp({ projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]) });
 
     const list = await app.inject({ method: "GET", url: "/api/project-sites?status=active&q=科技园" });
     const detail = await app.inject({
@@ -761,7 +761,7 @@ describe("project site API", () => {
   });
 
   it("creates and updates project sites and rejects duplicates or invalid service modes", async () => {
-    const app = buildApp({ projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]) });
+    const app = await buildApp({ projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]) });
 
     const created = await app.inject({
       method: "POST",
@@ -803,7 +803,7 @@ describe("project site API", () => {
 
   it("manages project-site compliance roster, insurance, payroll attachments, and summary", async () => {
     const repository = createFakeComplianceRepository();
-    const app = buildApp({
+    const app = await buildApp({
       projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite({ payrollAgencyRequired: true })]),
       projectSiteComplianceRepository: repository,
     });
@@ -890,7 +890,7 @@ describe("project site API", () => {
 
 describe("project usage request API", () => {
   it("reports usage API as unavailable when no repository is configured", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/api/project-usage-requests" });
     await app.close();
@@ -900,7 +900,7 @@ describe("project usage request API", () => {
   });
 
   it("lists, filters, and returns usage request detail", async () => {
-    const app = buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
 
     const list = await app.inject({ method: "GET", url: "/api/project-usage-requests?status=pending&q=MAT0001" });
     const detail = await app.inject({
@@ -918,7 +918,7 @@ describe("project usage request API", () => {
   });
 
   it("creates and updates usage requests and rejects invalid quantities or duplicates", async () => {
-    const app = buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
 
     const created = await app.inject({
       method: "POST",
@@ -971,7 +971,7 @@ describe("project usage request API", () => {
   });
 
   it("issues usage requests and blocks insufficient stock or duplicate outbound numbers", async () => {
-    const app = buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
 
     const partial = await app.inject({
       method: "POST",
@@ -1001,7 +1001,7 @@ describe("project usage request API", () => {
   });
 
   it("records project usage charge snapshots when issuing requests", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()], {
         unitChargePrice: 35.5,
         chargeRemark: "项目点领用收费价",
@@ -1058,7 +1058,7 @@ describe("project usage request API", () => {
   });
 
   it("allows issuing non-charge usage requests without blocking outbound flow", async () => {
-    const app = buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
 
     const response = await app.inject({
       method: "POST",
@@ -1093,7 +1093,7 @@ describe("project usage request API", () => {
       projectSiteId: unassignedSite.id,
       projectSiteName: unassignedSite.siteName,
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
@@ -1174,7 +1174,7 @@ describe("project usage request API", () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const assignedSite = makeProjectSite();
     const assignedUsage = makeUsageRequest();
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-empty-scope" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash, assignedProjectSiteIds: [] })]),
       projectSiteRepository: createFakeProjectSiteRepository([assignedSite]),
@@ -1204,7 +1204,7 @@ describe("project usage request API", () => {
       siteCode: "SITE-WX-002",
       siteName: "滨江项目点",
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-mixed-role-scope" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ passwordHash, roles: ["project_site", "hr"], assignedProjectSiteIds: [] }),
@@ -1223,7 +1223,7 @@ describe("project usage request API", () => {
   it("allows operations to submit usage requests but blocks warehouse issue execution", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const usageRequest = makeUsageRequest();
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-operations-usage" },
       authRepository: createFakeAuthRepository([
         makeAuthAccount({ passwordHash, roles: ["operations"], assignedProjectSiteIds: [] }),
@@ -1275,7 +1275,7 @@ describe("project usage request API", () => {
       siteCode: "SITE-WX-002",
       siteName: "滨江项目点",
     });
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-external-manager" },
       authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
       projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
@@ -1341,7 +1341,7 @@ describe("project usage request API", () => {
 
 describe("project-site kitchen equipment API", () => {
   it("lets headquarters maintain project-site kitchen equipment without inventory movement", async () => {
-    const app = buildApp({
+    const app = await buildApp({
       projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
     });
 
@@ -1382,7 +1382,7 @@ describe("project-site kitchen equipment API", () => {
 
   it("scopes external project-site accounts to assigned-site equipment and pending change requests", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
-    const app = buildApp({
+    const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-external-equipment" },
       authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
       projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
@@ -1454,7 +1454,7 @@ describe("project-site kitchen equipment API", () => {
 
   it("applies approved equipment change requests and keeps rejected requests as history only", async () => {
     const repository = createFakeKitchenEquipmentRepository();
-    const app = buildApp({ projectSiteKitchenEquipmentRepository: repository });
+    const app = await buildApp({ projectSiteKitchenEquipmentRepository: repository });
 
     const approved = await app.inject({
       method: "POST",

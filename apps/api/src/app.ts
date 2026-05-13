@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { registerAppCoreRoutes } from "./appCoreRoutes.js";
 import { registerAuth } from "./auth.js";
@@ -13,16 +14,19 @@ import { registerProjectSiteRoutes } from "./projectSiteRoutes.js";
 import { registerPurchaseRoutes } from "./purchaseRoutes.js";
 import type { BuildAppOptions } from "./appRouteContext.js";
 
-export function buildApp(options: BuildAppOptions = {}) {
+export async function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: false,
+    trustProxy: ["127.0.0.1", "::1", "172.16.0.0/12"],
   });
 
-  void app.register(cors, {
-    origin: true,
+  const corsOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
+  await app.register(cors, {
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
   });
-  void app.register(multipart, {
+  await app.register(rateLimit, { global: false });
+  await app.register(multipart, {
     limits: {
       files: 1,
       fileSize: 10 * 1024 * 1024,
