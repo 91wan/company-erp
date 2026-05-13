@@ -105,6 +105,7 @@ export function getContractExpiryState(
   now: Date = new Date(),
 ): ContractExpiryStateCode {
   if (contract.status === "terminated") return "terminated";
+  if (!contract.endDate) return "normal";
 
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const endDate = new Date(`${contract.endDate}T00:00:00.000Z`).getTime();
@@ -113,6 +114,15 @@ export function getContractExpiryState(
   if (daysUntilEnd < 0) return "expired";
   if (daysUntilEnd <= 30) return "expiring_soon";
   return "normal";
+}
+
+export function validateContractEndDateState(
+  contract: Pick<CreateContractInput, "contractForm" | "endDate">,
+): string[] {
+  if (contract.contractForm !== "framework" && !contract.endDate) {
+    return ["endDate is required for non-framework contracts"];
+  }
+  return [];
 }
 
 export function normalizeContractFilters(query: Record<string, unknown>): ContractListFilters {
@@ -216,8 +226,7 @@ export function normalizeContractInput(
   if (signedDate !== undefined) normalized.signedDate = signedDate;
   if (startDate === null) issues.push("startDate is required");
   else if (startDate !== undefined) normalized.startDate = startDate;
-  if (endDate === null) issues.push("endDate is required");
-  else if (endDate !== undefined) normalized.endDate = endDate;
+  if (endDate !== undefined) normalized.endDate = endDate;
 
   const amount = normalizeNonNegativeNumber(payload.amount, "amount", issues);
   const budgetAmount = normalizeNonNegativeNumber(payload.budgetAmount, "budgetAmount", issues);
@@ -284,7 +293,7 @@ export function normalizeContractInput(
     if (!normalized.contractForm) issues.push("contractForm is required");
     if (!normalized.subjectCategory) issues.push("subjectCategory is required");
     if (!normalized.startDate) issues.push("startDate is required");
-    if (!normalized.endDate) issues.push("endDate is required");
+    issues.push(...validateContractEndDateState(normalized as CreateContractInput));
   }
 
   if (issues.length > 0) throw new ContractValidationError(issues);

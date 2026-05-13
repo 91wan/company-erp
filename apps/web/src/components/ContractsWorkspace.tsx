@@ -287,7 +287,7 @@ export function ContractsWorkspace({
         projectSiteId: contractForm.projectSiteId || null,
         signedDate: contractForm.signedDate || null,
         startDate: contractForm.startDate,
-        endDate: contractForm.endDate,
+        endDate: contractForm.endDate || null,
         amount: contractForm.amount ? Number(contractForm.amount) : null,
         budgetAmount: contractForm.budgetAmount ? Number(contractForm.budgetAmount) : null,
         attachmentRef: contractForm.attachmentRef || null,
@@ -505,8 +505,8 @@ export function ContractsWorkspace({
             <input required type="date" value={contractForm.startDate} onChange={(event) => setContractForm((current) => ({ ...current, startDate: event.target.value }))} />
           </label>
           <label>
-            <span>结束日期</span>
-            <input required type="date" value={contractForm.endDate} onChange={(event) => setContractForm((current) => ({ ...current, endDate: event.target.value }))} />
+            <span>结束日期（框架合同可空）</span>
+            <input aria-label="结束日期" required={contractForm.contractForm !== "framework"} type="date" value={contractForm.endDate} onChange={(event) => setContractForm((current) => ({ ...current, endDate: event.target.value }))} />
           </label>
           <label>
             <span>合同金额</span>
@@ -680,7 +680,7 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
               <td>{contract.businessProjectName ?? "-"}</td>
               <td>{contract.projectSiteName ?? "-"}</td>
               <td>
-                {contract.startDate} / {contract.endDate}
+                {contract.startDate} / {contract.endDate ?? "长期"}
               </td>
               <td>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</td>
               <td>

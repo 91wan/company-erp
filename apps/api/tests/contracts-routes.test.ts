@@ -133,6 +133,7 @@ function createFakeContractRepository(
         counterpartyNameSnapshot: input.counterpartyNameSnapshot ?? "无锡客户单位",
         projectSiteName: input.projectSiteId ? "科技园一期项目点" : null,
         signedDate: input.signedDate ?? null,
+        endDate: input.endDate ?? null,
         amount: input.amount ?? null,
         budgetAmount: input.budgetAmount ?? null,
         currency: input.currency ?? "CNY",
@@ -241,7 +242,9 @@ describe("contract expiry helper", () => {
     expect(getContractExpiryState({ status: "active", endDate: "2026-07-01" }, reference)).toBe("normal");
     expect(getContractExpiryState({ status: "active", endDate: "2026-06-05" }, reference)).toBe("expiring_soon");
     expect(getContractExpiryState({ status: "active", endDate: "2026-05-01" }, reference)).toBe("expired");
+    expect(getContractExpiryState({ status: "active", endDate: null }, reference)).toBe("normal");
     expect(getContractExpiryState({ status: "terminated", endDate: "2026-07-01" }, reference)).toBe("terminated");
+    expect(getContractExpiryState({ status: "terminated", endDate: null }, reference)).toBe("terminated");
   });
 });
 
@@ -305,6 +308,66 @@ describe("contracts API", () => {
       },
     });
     expect(updateResponse.json()).toMatchObject({ contract: { status: "terminated" } });
+  });
+
+  it("allows framework contracts without an end date but still requires end dates for non-framework contracts", async () => {
+    const app = await buildApp({ contractRepository: createFakeContractRepository() });
+
+    const framework = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT-FRAMEWORK-001",
+        contractName: "年度采购框架合同",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "purchase_contract",
+        contractForm: "framework",
+        subjectCategory: "food_ingredients",
+        startDate: "2026-05-11",
+      },
+    });
+    const fixedTerm = await app.inject({
+      method: "POST",
+      url: "/api/contracts",
+      payload: {
+        contractNo: "HT-FIXED-MISSING-END",
+        contractName: "固定期限缺少结束日期",
+        counterpartyPartyId: "33333333-3333-4333-8333-333333333333",
+        direction: "client_service_contract",
+        contractForm: "fixed_term",
+        subjectCategory: "service_operation",
+        startDate: "2026-05-11",
+      },
+    });
+    await app.close();
+
+    expect(framework.statusCode).toBe(201);
+    expect(framework.json()).toMatchObject({
+      contract: { contractNo: "HT-FRAMEWORK-001", contractForm: "framework", endDate: null, expiryState: "normal" },
+    });
+    expect(fixedTerm.statusCode).toBe(400);
+    expect(fixedTerm.json().issues).toContain("endDate is required for non-framework contracts");
+  });
+
+  it("validates contract end date final state on updates", async () => {
+    const app = await buildApp({ contractRepository: createFakeContractRepository([makeContract()]) });
+
+    const invalidClear = await app.inject({
+      method: "PATCH",
+      url: `/api/contracts/${contractId}`,
+      payload: { endDate: null },
+    });
+    const validFramework = await app.inject({
+      method: "PATCH",
+      url: `/api/contracts/${contractId}`,
+      payload: { contractForm: "framework", endDate: null },
+    });
+    await app.close();
+
+    expect(invalidClear.statusCode).toBe(400);
+    expect(invalidClear.json().issues).toContain("endDate is required for non-framework contracts");
+    expect(validFramework.statusCode).toBe(200);
+    expect(validFramework.json()).toMatchObject({ contract: { contractForm: "framework", endDate: null } });
   });
 
   it("rejects invalid contracts and duplicate contract numbers", async () => {
