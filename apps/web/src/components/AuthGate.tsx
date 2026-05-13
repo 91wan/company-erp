@@ -1,22 +1,38 @@
 import { LockKeyhole, LogIn, RefreshCw } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import type { AuthenticatedUserDto } from "@company-erp/shared";
-import { getCurrentUser, login } from "../apiClient";
+import type { AppConfigDto, AuthenticatedUserDto } from "@company-erp/shared";
+import { getAppConfig, getCurrentUser, login } from "../apiClient";
 
 type AuthGateProps = {
-  children: (user: AuthenticatedUserDto, onUserChange: (user: AuthenticatedUserDto | null) => void) => ReactNode;
+  children: (
+    user: AuthenticatedUserDto,
+    onUserChange: (user: AuthenticatedUserDto | null) => void,
+    appConfig: AppConfigDto,
+    onAppConfigChange: (appConfig: AppConfigDto) => void,
+  ) => ReactNode;
 };
+
+const defaultAppConfig: AppConfigDto = { companyName: "Company ERP" };
 
 export function AuthGate({ children }: AuthGateProps) {
   const [status, setStatus] = useState<"loading" | "anonymous" | "authenticated">("loading");
   const [user, setUser] = useState<AuthenticatedUserDto | null>(null);
+  const [appConfig, setAppConfig] = useState<AppConfigDto>(defaultAppConfig);
 
   useEffect(() => {
     let mounted = true;
 
-    getCurrentUser()
-      .then((currentUser) => {
+    Promise.allSettled([getAppConfig(), getCurrentUser()])
+      .then(([configResult, userResult]) => {
         if (!mounted) return;
+        if (
+          configResult.status === "fulfilled" &&
+          typeof configResult.value?.companyName === "string" &&
+          configResult.value.companyName.trim()
+        ) {
+          setAppConfig(configResult.value);
+        }
+        const currentUser = userResult.status === "fulfilled" ? userResult.value : null;
         setUser(currentUser);
         setStatus(currentUser ? "authenticated" : "anonymous");
       })
@@ -41,7 +57,7 @@ export function AuthGate({ children }: AuthGateProps) {
       <main className="auth-screen">
         <section className="auth-card">
           <RefreshCw aria-hidden="true" size={22} />
-          <h1>Company ERP</h1>
+          <h1>{appConfig.companyName}</h1>
           <p>正在检查内网登录状态...</p>
         </section>
       </main>
@@ -49,13 +65,13 @@ export function AuthGate({ children }: AuthGateProps) {
   }
 
   if (!user) {
-    return <LoginPanel onLogin={handleUserChange} />;
+    return <LoginPanel companyName={appConfig.companyName} onLogin={handleUserChange} />;
   }
 
-  return children(user, handleUserChange);
+  return children(user, handleUserChange, appConfig, setAppConfig);
 }
 
-function LoginPanel({ onLogin }: { onLogin: (user: AuthenticatedUserDto) => void }) {
+function LoginPanel({ companyName, onLogin }: { companyName: string; onLogin: (user: AuthenticatedUserDto) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
@@ -79,7 +95,7 @@ function LoginPanel({ onLogin }: { onLogin: (user: AuthenticatedUserDto) => void
           <LockKeyhole aria-hidden="true" size={24} />
         </span>
         <div>
-          <h1>Company ERP</h1>
+          <h1>{companyName}</h1>
           <p>内网 ERP 登录</p>
         </div>
 

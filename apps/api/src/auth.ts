@@ -191,6 +191,9 @@ async function resolveSessionUser(
 
 function routePermission(pathname: string, method: string): { area: PermissionAreaCode; requiredLevel: "read" | "manage" } | null {
   const requiredLevel = method === "GET" ? "read" : "manage";
+  if (pathname.startsWith("/api/app-config")) {
+    return { area: "systemSettings", requiredLevel };
+  }
   if (pathname.startsWith("/api/parties") || pathname.startsWith("/api/materials") || pathname.startsWith("/api/warehouses")) {
     return { area: "masterData", requiredLevel };
   }
@@ -248,8 +251,13 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   return null;
 }
 
-function isPublicPath(pathname: string): boolean {
-  return pathname === "/health" || pathname.startsWith("/api/meta/") || pathname.startsWith("/api/auth/");
+function isPublicPath(pathname: string, method: string): boolean {
+  return (
+    pathname === "/health" ||
+    pathname.startsWith("/api/meta/") ||
+    pathname.startsWith("/api/auth/") ||
+    (pathname === "/api/app-config" && method === "GET")
+  );
 }
 
 export function registerAuth(
@@ -266,7 +274,7 @@ export function registerAuth(
 
   app.addHook("preHandler", async (request, reply) => {
     const pathname = new URL(request.url, "http://company-erp.local").pathname;
-    if (isPublicPath(pathname)) return;
+    if (isPublicPath(pathname, request.method)) return;
 
     if (!authRepository) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });

@@ -79,6 +79,8 @@ const externalProjectSiteUser = {
   assignedProjectSiteIds: ["12121212-1212-4121-8121-121212121212"],
 };
 
+const defaultAppConfig = { companyName: "Company ERP" };
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -93,11 +95,18 @@ function jsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Res
 
 function mockShellFetch(
   user: typeof adminUser | typeof viewerUser | typeof projectSiteUser | typeof externalProjectSiteUser | null = adminUser,
+  appConfig = defaultAppConfig,
 ) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
 
+    if (url.endsWith("/api/app-config") && method === "GET") return Promise.resolve(jsonResponse({ appConfig }));
+    if (url.endsWith("/api/app-config") && method === "PATCH") {
+      const payload = init?.body ? JSON.parse(String(init.body)) : {};
+      if (!payload.companyName?.trim()) return Promise.resolve(jsonResponse({ error: "APP_CONFIG_VALIDATION_FAILED" }, false, 400));
+      return Promise.resolve(jsonResponse({ appConfig: { companyName: payload.companyName.trim() } }));
+    }
     if (url.endsWith("/api/auth/me")) return Promise.resolve(jsonResponse({ user }));
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
@@ -695,12 +704,12 @@ const projectUsageRequest: ProjectUsageRequestDto = {
 
 describe("Company ERP app shell", () => {
   it("renders login screen when there is no active session", async () => {
-    mockShellFetch(null);
+    mockShellFetch(null, { companyName: "无锡餐服 ERP" });
 
     render(<App />);
 
     expect(await screen.findByText("内网 ERP 登录")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Company ERP" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "无锡餐服 ERP" })).toBeInTheDocument();
     expect(screen.getByLabelText("用户名")).toBeInTheDocument();
     expect(screen.getByLabelText("密码")).toBeInTheDocument();
   });
@@ -741,12 +750,12 @@ describe("Company ERP app shell", () => {
   });
 
   it("renders the Apple-style dashboard navigation and top bar", async () => {
-    mockShellFetch(adminUser);
+    mockShellFetch(adminUser, { companyName: "无锡餐服 ERP" });
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Company ERP" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "无锡餐服 ERP" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Dashboard/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByPlaceholderText("搜索菜单、功能、物料、供应商、单据号...")).toBeInTheDocument();
     expect(screen.getByText("数据库已连接")).toBeInTheDocument();
@@ -755,6 +764,62 @@ describe("Company ERP app shell", () => {
     for (const label of ["基础资料", "采购", "库存", "合同", "业务项目", "项目点", "人员权限", "Excel 导入", "系统设置"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
+  });
+
+  it("saves the company name from system settings", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+    expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
+    expect(screen.getByText("当前显示：Company ERP")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("公司名称"), { target: { value: "无锡餐服 ERP" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(await screen.findByText("系统设置已保存。")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "无锡餐服 ERP" })).toBeInTheDocument();
+  });
+
+  it("keeps system settings read-only for viewer sessions", async () => {
+    mockShellFetch(viewerUser, { companyName: "无锡餐服 ERP" });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
+    expect(screen.getByLabelText("公司名称")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "保存设置" })).not.toBeInTheDocument();
+    expect(screen.getByText("当前账号没有 systemSettings.manage 权限，不能修改公司名称。")).toBeInTheDocument();
+  });
+
+  it("switches to real workspaces from dashboard cards, panels, workflow, and rows", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /采购需求/ })[0]);
+    expect(await screen.findByRole("heading", { name: "采购管理" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /入库记录/ }))[0]);
+    expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
+    fireEvent.click((await screen.findAllByText("科技园一期项目部"))[0]);
+    expect(await screen.findByRole("heading", { name: "项目点" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
+    fireEvent.click(await screen.findByText("合同审批 HT20240509008"));
+    expect((await screen.findAllByRole("heading", { name: "合同台账" })).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Dashboard$/ }));
+    fireEvent.click(await screen.findByText("API 服务"));
+    expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
   });
 
   it("renders the dashboard workflow, metrics, and operational panels", async () => {

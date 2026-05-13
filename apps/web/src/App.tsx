@@ -5,9 +5,11 @@ import { DashboardShell } from "./components/DashboardShell";
 export default function App() {
   return (
     <AuthGate>
-      {(user, onUserChange) => (
+      {(user, onUserChange, appConfig, onAppConfigChange) => (
         <DashboardShell
           currentUser={user}
+          appConfig={appConfig}
+          onAppConfigChange={onAppConfigChange}
           onLogout={async () => {
             await logout();
             onUserChange(null);

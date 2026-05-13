@@ -66,6 +66,15 @@ enum PartyEntityType {
   individual
 }
 
+model AppConfig {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_config")
+}
+
 enum ProjectSiteServiceMode {
   direct
   subcontracted
