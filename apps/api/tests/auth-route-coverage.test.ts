@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const routeSource = ["../src/app.ts", "../src/appCoreRoutes.ts"]
+const routeSource = [
+  "../src/app.ts",
+  "../src/appCoreRoutes.ts",
+  "../src/importJobRoutes.ts",
+  "../src/masterDataRoutes.ts",
+  "../src/peoplePermissionsRoutes.ts",
+  "../src/purchaseRoutes.ts",
+  "../src/inventoryRoutes.ts",
+  "../src/projectSiteRoutes.ts",
+  "../src/marketOperationsRoutes.ts",
+  "../src/contractsBusinessCertificatesRoutes.ts",
+]
   .map((file) => readFileSync(new URL(file, import.meta.url), "utf8"))
   .join("\n");
 const authSource = readFileSync(new URL("../src/auth.ts", import.meta.url), "utf8");
