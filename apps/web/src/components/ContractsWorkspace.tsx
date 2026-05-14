@@ -22,7 +22,7 @@ import {
   type ProjectSiteDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
+import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
@@ -66,6 +66,8 @@ type AttachmentFormState = {
   fileSize: string;
   remark: string;
 };
+
+type ContractFormDrawer = "contract" | "attachment" | null;
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
 const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
@@ -145,6 +147,8 @@ export function ContractsWorkspace({
   const [expiryFilter, setExpiryFilter] = useState<"all" | ContractExpiryStateCode>("all");
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [attachmentSubmitState, setAttachmentSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
+  const [selectedContractId, setSelectedContractId] = useState("");
   const [contractForm, setContractForm] = useState<ContractFormState>({
     contractNo: "",
     contractName: "",
@@ -271,6 +275,11 @@ export function ContractsWorkspace({
     });
   }, [contracts, expiryFilter, query, statusFilter]);
 
+  const selectedContract = useMemo(
+    () => contracts.find((contract) => contract.id === selectedContractId) ?? null,
+    [contracts, selectedContractId],
+  );
+
   async function handleContractSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setContractSubmitState("saving");
@@ -317,6 +326,7 @@ export function ContractsWorkspace({
         remark: "",
       });
       setContractSubmitState("saved");
+      setOpenFormDrawer(null);
     } catch {
       setContractSubmitState("error");
     }
@@ -345,6 +355,7 @@ export function ContractsWorkspace({
         remark: "",
       }));
       setAttachmentSubmitState("saved");
+      setOpenFormDrawer(null);
     } catch {
       setAttachmentSubmitState("error");
     }
@@ -374,7 +385,14 @@ export function ContractsWorkspace({
         <SummaryCard label="已终止" value={contracts.filter((contract) => contract.status === "terminated").length} detail="历史归档" tone="disabled" />
       </div>
 
-      <div className="people-section-grid">
+      {canManage ? (
+        <div className="project-site-action-bar" aria-label="合同快捷操作">
+          <button type="button" onClick={() => setOpenFormDrawer("contract")}>新增合同</button>
+          <button type="button" onClick={() => setOpenFormDrawer("attachment")}>登记附件路径</button>
+        </div>
+      ) : null}
+
+      <div className="project-site-list-layout">
         <SectionCard title="合同风险台账" action={<FileText aria-hidden="true" size={17} />}>
           <ContractToolbar
             query={query}
@@ -387,10 +405,11 @@ export function ContractsWorkspace({
           {contractStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载合同台账..." /> : null}
           {contractStatus === "error" ? <StateMessage text="合同台账加载失败" /> : null}
           {contractStatus === "ready" && filteredContracts.length === 0 ? <StateMessage text="暂无合同资料" /> : null}
-          {contractStatus === "ready" && filteredContracts.length > 0 ? <ContractsTable contracts={filteredContracts} /> : null}
+          {contractStatus === "ready" && filteredContracts.length > 0 ? <ContractsTable contracts={filteredContracts} onSelectContract={(contract) => setSelectedContractId(contract.id)} /> : null}
         </SectionCard>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleContractSubmit}>
+        <FormDrawer title="新增合同" open={openFormDrawer === "contract"} onClose={() => setOpenFormDrawer(null)}>
+          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleContractSubmit} noValidate>
           <div className="panel-header">
             <h3>新增合同</h3>
             <button type="submit" disabled={contractSubmitState === "saving" || !hasCounterparties}>
@@ -522,10 +541,11 @@ export function ContractsWorkspace({
           </label>
           {contractSubmitState === "saved" ? <p className="form-success">合同已保存。</p> : null}
           {contractSubmitState === "error" ? <p className="form-error">合同保存失败，请检查编号、日期或金额。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div>
 
-      <div className="people-section-grid">
+      <div className="project-site-list-layout">
         <SectionCard title="附件路径" action={<Paperclip aria-hidden="true" size={17} />}>
           {attachmentStatus === "idle" ? <StateMessage text="请选择合同查看附件路径" /> : null}
           {attachmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载附件路径..." /> : null}
@@ -534,7 +554,8 @@ export function ContractsWorkspace({
           {attachmentStatus === "ready" && attachments.length > 0 ? <AttachmentsTable attachments={attachments} /> : null}
         </SectionCard>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit}>
+        <FormDrawer title="登记附件路径" open={openFormDrawer === "attachment"} onClose={() => setOpenFormDrawer(null)}>
+          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit} noValidate>
           <div className="panel-header">
             <h3>登记附件路径</h3>
             <button type="submit" disabled={attachmentSubmitState === "saving" || contracts.length === 0}>
@@ -574,8 +595,13 @@ export function ContractsWorkspace({
           </label>
           {attachmentSubmitState === "saved" ? <p className="form-success">附件路径已保存。</p> : null}
           {attachmentSubmitState === "error" ? <p className="form-error">附件路径保存失败，请检查合同和路径。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div>
+
+      <DetailDrawer title="合同详情" open={Boolean(selectedContract)} onClose={() => setSelectedContractId("")}>
+        {selectedContract ? <ContractDetail contract={selectedContract} /> : null}
+      </DetailDrawer>
     </section>
   );
 }
@@ -633,7 +659,7 @@ function ContractToolbar({
   );
 }
 
-function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
+function ContractsTable({ contracts, onSelectContract }: { contracts: ContractDto[]; onSelectContract: (contract: ContractDto) => void }) {
   return (
     <div className="table-wrap">
       <table>
@@ -656,7 +682,7 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
         </thead>
         <tbody>
           {contracts.map((contract) => (
-            <tr key={contract.id}>
+            <tr key={contract.id} tabIndex={0} onClick={() => onSelectContract(contract)} onKeyDown={(event) => { if (event.key === "Enter") onSelectContract(contract); }}>
               <td>{contract.contractNo}</td>
               <td>{contract.contractName}</td>
               <td>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</td>
@@ -681,6 +707,31 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ContractDetail({ contract }: { contract: ContractDto }) {
+  return (
+    <dl className="detail-grid">
+      <dt>合同编号</dt>
+      <dd>{contract.contractNo}</dd>
+      <dt>合同名称</dt>
+      <dd>{contract.contractName}</dd>
+      <dt>相对方</dt>
+      <dd>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</dd>
+      <dt>方向/形态</dt>
+      <dd>{directionLabel.get(contract.direction)} / {contractFormLabel.get(contract.contractForm)}</dd>
+      <dt>项目点/业务项目</dt>
+      <dd>{contract.projectSiteName ?? "-"} / {contract.businessProjectName ?? "-"}</dd>
+      <dt>起止日期</dt>
+      <dd>{contract.startDate} / {contract.endDate ?? "长期"}</dd>
+      <dt>金额/预算</dt>
+      <dd>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</dd>
+      <dt>到期状态</dt>
+      <dd>{expiryLabel.get(contract.expiryState)}</dd>
+      <dt>附件</dt>
+      <dd>{contract.attachmentRef ?? "暂无主附件引用"}</dd>
+    </dl>
   );
 }
 

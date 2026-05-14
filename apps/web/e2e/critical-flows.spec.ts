@@ -52,6 +52,7 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.goto("/");
   await page.getByRole("button", { name: "采购", exact: true }).click();
 
+  await page.getByRole("button", { name: "新增采购需求" }).click();
   await page.getByLabel("采购需求编号").fill("DEMO-E2E-PR");
   await page.getByLabel("申请人").fill("DEMO 申请人");
   await page.getByLabel("申请部门").fill("DEMO 部门");
@@ -61,6 +62,7 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.getByRole("button", { name: "保存采购需求" }).click();
   await expect(page.getByRole("cell", { name: "DEMO-E2E-PR", exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "新增采购记录" }).click();
   await page.getByLabel("采购单号").fill("DEMO-E2E-PO");
   await page.getByLabel("采购人").fill("DEMO 采购人");
   await page.getByLabel("采购平台/渠道").fill("DEMO 平台");
@@ -144,12 +146,15 @@ test("contract failure and Excel import permissions are visible in the browser",
 
   await page.goto("/");
   await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("button", { name: "新增合同" }).click();
   await page.getByLabel("合同编号").fill("DEMO-E2E-CONTRACT");
   await page.getByLabel("合同名称").fill("DEMO E2E 合同");
   await page.getByLabel("开始日期").fill("2026-05-13");
   await page.getByLabel("结束日期").fill("2027-05-12");
   await page.getByRole("button", { name: "保存合同" }).click();
   await expect(page.getByText("合同保存失败，请检查编号、日期或金额。")).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("button", { name: "保存合同" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Excel 导入" }).click();
   await page.getByLabel("Excel 文件").setInputFiles({

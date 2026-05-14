@@ -1638,6 +1638,25 @@ tbody tr.clickable-row {
   margin-bottom: 16px;
 }
 
+.detail-grid {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px 14px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.detail-grid dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.detail-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .people-panel-title h3 {
   display: inline-flex;
   align-items: center;
