@@ -1869,6 +1869,32 @@ tbody tr.clickable-row {
   font-weight: 650;
 }
 
+.table-action.danger {
+  border-color: rgba(220, 38, 38, 0.24);
+  color: #b42318;
+  background: #fff5f4;
+}
+
+.inline-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-confirm-actions span {
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.form-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .full-width-field {
   display: grid;
   gap: 6px;
