@@ -99,7 +99,7 @@ export function DataTable({
   if (rows.length === 0) return <div className="ui-table-state">{emptyState ?? "暂无数据"}</div>;
 
   return (
-    <div className="ui-table-wrap">
+    <div className="ui-table-wrap table-wrap">
       <table className="ui-data-table">
         <thead>
           <tr>

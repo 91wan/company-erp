@@ -12,6 +12,7 @@ import {
   type EmployeeDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { DataTable, PageHeader, SectionCard, SummaryCard, Toolbar } from "./ui";
 
 type BusinessProjectsWorkspaceProps = {
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
@@ -76,6 +77,7 @@ export function BusinessProjectsWorkspace({
   const [projectStatus, setProjectStatus] = useState<"loading" | "ready" | "error">("loading");
   const [summaryStatus, setSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [query, setQuery] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [form, setForm] = useState<FormState>({
     projectCode: "",
@@ -154,6 +156,24 @@ export function BusinessProjectsWorkspace({
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   );
+  const filteredProjects = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return projects;
+    return projects.filter((project) =>
+      [
+        project.projectCode,
+        project.projectName,
+        project.location,
+        project.managerEmployeeName,
+        projectTypeLabel.get(project.projectType),
+        statusLabel.get(project.status),
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [projects, query]);
+  const activeProjects = projects.filter((project) => project.status === "active").length;
+  const preparingProjects = projects.filter((project) => project.status === "preparing").length;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -192,60 +212,59 @@ export function BusinessProjectsWorkspace({
 
   return (
     <section className="business-projects-workspace" aria-label="业务项目">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">业务项目</span>
-          <h2>业务项目</h2>
-          <p>归集自营建设项目和项目点投入合同，先做合同金额汇总，不做工程进度和付款节点。</p>
-        </div>
-        <span className="parties-total">
+      <PageHeader
+        eyebrow="经营业务"
+        title="业务项目"
+        subtitle="归集自营建设项目和项目点投入合同，先做合同金额汇总，不做工程进度和付款节点。"
+        actions={(
+          <span className="parties-total">
           <BriefcaseBusiness aria-hidden="true" size={18} />
           {projects.length} 个业务项目
-        </span>
+          </span>
+        )}
+      />
+
+      <div className="summary-grid" aria-label="业务项目摘要">
+        <SummaryCard label="业务项目" value={projects.length} detail="经营项目台账" tone="info" />
+        <SummaryCard label="执行中" value={activeProjects} detail="当前运营或建设中" tone="success" />
+        <SummaryCard label="筹备中" value={preparingProjects} detail="待启动或筹备阶段" tone="warning" />
+        <SummaryCard label="合同金额" value={summary ? formatMoney(summary.totalAmount) : "选择项目后查看"} detail="所选项目投入汇总" tone="neutral" />
       </div>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <BriefcaseBusiness aria-hidden="true" size={17} />
-              业务项目台账
-            </h3>
-          </div>
+        <SectionCard title="业务项目台账" action={<BriefcaseBusiness aria-hidden="true" size={17} />}>
+          <Toolbar
+            search={(
+              <label className="table-search">
+                <input
+                  aria-label="搜索业务项目"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索编码、名称、地点、负责人"
+                />
+              </label>
+            )}
+          />
           {projectStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载业务项目..." /> : null}
           {projectStatus === "error" ? <StateMessage text="业务项目加载失败" /> : null}
           {projectStatus === "ready" && projects.length === 0 ? <StateMessage text="暂无业务项目" /> : null}
-          {projectStatus === "ready" && projects.length > 0 ? (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>项目编码</th>
-                    <th>项目名称</th>
-                    <th>类型</th>
-                    <th>状态</th>
-                    <th>地点</th>
-                    <th>负责人</th>
-                    <th>起止日期</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projects.map((project) => (
-                    <tr key={project.id} onClick={() => setSelectedProjectId(project.id)}>
-                      <td>{project.projectCode}</td>
-                      <td>{project.projectName}</td>
-                      <td>{projectTypeLabel.get(project.projectType)}</td>
-                      <td>{statusLabel.get(project.status)}</td>
-                      <td>{project.location ?? "-"}</td>
-                      <td>{project.managerEmployeeName ?? "-"}</td>
-                      <td>{project.startDate ?? "-"} / {project.endDate ?? "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {projectStatus === "ready" && projects.length > 0 && filteredProjects.length === 0 ? <StateMessage text="没有匹配的业务项目" /> : null}
+          {projectStatus === "ready" && filteredProjects.length > 0 ? (
+            <DataTable
+              headers={["项目编码", "项目名称", "类型", "状态", "地点", "负责人", "起止日期"]}
+              rows={filteredProjects.map((project) => [
+                project.projectCode,
+                project.projectName,
+                projectTypeLabel.get(project.projectType) ?? project.projectType,
+                statusLabel.get(project.status) ?? project.status,
+                project.location ?? "-",
+                project.managerEmployeeName ?? "-",
+                `${project.startDate ?? "-"} / ${project.endDate ?? "-"}`,
+              ])}
+              onRowClick={(rowIndex) => setSelectedProjectId(filteredProjects[rowIndex]?.id ?? "")}
+            />
           ) : null}
-        </section>
+        </SectionCard>
 
         {canManage ? (
           <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
@@ -318,53 +337,28 @@ export function BusinessProjectsWorkspace({
         ) : null}
       </div>
 
-      <section className="dashboard-panel table-panel">
-        <div className="panel-header people-panel-title">
-          <h3>投入合同金额汇总</h3>
-          {selectedProject ? <span>{selectedProject.projectName}</span> : null}
-        </div>
+      <SectionCard title="投入合同金额汇总" badge={selectedProject ? selectedProject.projectName : null}>
         {summaryStatus === "idle" ? <StateMessage text="请选择业务项目查看投入汇总" /> : null}
         {summaryStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载投入汇总..." /> : null}
         {summaryStatus === "error" ? <StateMessage text="投入汇总加载失败" /> : null}
         {summaryStatus === "ready" && summary ? (
           <>
-            <div className="party-summary people-summary" aria-label="业务项目投入摘要">
-              <SummaryCard label="合同数" value={summary.contractCount} />
-              <SummaryCard label="合同金额合计" value={formatMoney(summary.totalAmount)} />
+            <div className="summary-grid compact-summary" aria-label="业务项目投入摘要">
+              <SummaryCard label="合同数" value={summary.contractCount} detail="关联合同数量" tone="info" />
+              <SummaryCard label="合同金额合计" value={formatMoney(summary.totalAmount)} detail="按合同金额汇总" tone="neutral" />
             </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>投入分类</th>
-                    <th>合同数</th>
-                    <th>金额合计</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.categories.map((category) => (
-                    <tr key={category.investmentCategory}>
-                      <td>{categoryLabel.get(category.investmentCategory)}</td>
-                      <td>{category.contractCount}</td>
-                      <td>{formatMoney(category.totalAmount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              headers={["投入分类", "合同数", "金额合计"]}
+              rows={summary.categories.map((category) => [
+                categoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
+                category.contractCount,
+                formatMoney(category.totalAmount),
+              ])}
+            />
           </>
         ) : null}
-      </section>
+      </SectionCard>
     </section>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <article>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
   );
 }
 
