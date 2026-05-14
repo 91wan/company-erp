@@ -297,28 +297,32 @@ describe("MVP permission constants", () => {
     expect(canManage(["admin"], "projectUsage")).toBe(true);
   });
 
-  it("limits external project-site accounts to project usage request work", () => {
+  it("limits external project-site accounts to scoped project-site submission work", () => {
     expect(canRead(["external_project_site"], "projectUsage")).toBe(true);
     expect(canManage(["external_project_site"], "projectUsageRequest")).toBe(true);
     expect(canRead(["external_project_site"], "projectSiteKitchenEquipment")).toBe(true);
     expect(canManage(["external_project_site"], "projectSiteKitchenEquipment")).toBe(true);
+    expect(canRead(["external_project_site"], "certificates")).toBe(true);
+    expect(canManage(["external_project_site"], "certificates")).toBe(true);
     expect(canRead(["external_project_site"], "projectSites")).toBe(false);
     expect(canRead(["external_project_site"], "contracts")).toBe(false);
     expect(canRead(["external_project_site"], "inventoryQuantity")).toBe(false);
     expect(canRead(["external_project_site"], "masterData")).toBe(false);
   });
 
-  it("defines certificates as an HR/admin managed risk ledger", () => {
+  it("defines certificates as an HR/admin ledger with scoped external submissions", () => {
     expect(MVP_PERMISSION_MATRIX.certificates.read).toEqual([
       "admin",
       "hr",
       "procurement",
       "project_site",
       "operations",
+      "external_project_site",
       "viewer",
     ]);
-    expect(MVP_PERMISSION_MATRIX.certificates.manage).toEqual(["admin", "hr"]);
+    expect(MVP_PERMISSION_MATRIX.certificates.manage).toEqual(["admin", "hr", "external_project_site"]);
     expect(canManage(["hr"], "certificates")).toBe(true);
+    expect(canManage(["external_project_site"], "certificates")).toBe(true);
     expect(canManage(["procurement"], "certificates")).toBe(false);
     expect(canRead(["project_site"], "certificates")).toBe(true);
   });

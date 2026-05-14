@@ -111,8 +111,9 @@ export function redactPartyForResponse<T extends Record<string, unknown>>(party:
 export function certificateFiltersForRequest(request: unknown) {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return {};
-  if (hasRole(user, "project_site")) {
-    return { ownerTypes: ["project_site" as const, "person" as const], projectSiteIds: [...(user.assignedProjectSiteIds ?? [])] };
+  const scopedSiteIds = scopedProjectSiteIds(request);
+  if (scopedSiteIds !== null) {
+    return { ownerTypes: ["project_site" as const, "person" as const], projectSiteIds: scopedSiteIds };
   }
   if (user.roles.length === 1 && user.roles[0] === "procurement") {
     return { ownerTypes: ["supplier" as const, "company" as const] };
@@ -130,10 +131,10 @@ export function isOutsideCertificateScope(
 ): boolean {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user || !certificate) return false;
-  if (hasRole(user, "project_site")) {
-    const assigned = user.assignedProjectSiteIds ?? [];
-    if (certificate.ownerType === "project_site") return !assigned.includes(certificate.ownerProjectSiteId ?? "");
-    if (certificate.ownerType === "person") return !assigned.includes(certificate.ownerRosterPersonProjectSiteId ?? "");
+  const scopedSiteIds = scopedProjectSiteIds(request);
+  if (scopedSiteIds !== null) {
+    if (certificate.ownerType === "project_site") return !scopedSiteIds.includes(certificate.ownerProjectSiteId ?? "");
+    if (certificate.ownerType === "person") return !scopedSiteIds.includes(certificate.ownerRosterPersonProjectSiteId ?? "");
     return true;
   }
   if (user.roles.length === 1 && user.roles[0] === "procurement") {

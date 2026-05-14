@@ -7,6 +7,22 @@ certificates.
 Keep real NAS IPs, SSH users, passwords, production `.env` files, scanned
 contracts, staff data, WeChat exports, and business attachments outside Git.
 
+## Future Public Access Boundary
+
+Do not expose the current NAS Web port directly to the public internet. Remote
+project-site access must be handled as a separate hardening slice before any
+public DNS or router forwarding is configured. The minimum public-access gate is:
+
+- HTTPS with a trusted certificate and `AUTH_COOKIE_SECURE=true`.
+- Explicit domain allowlists for CORS and reverse proxy hosts.
+- Origin/Host checks or CSRF protection on non-GET business requests.
+- Audit logging for account, certificate, insurance, payroll, inventory, and
+  project-site mutations.
+- A unified attachment service that generates storage keys and enforces
+  ownership permissions instead of accepting arbitrary file paths from the UI.
+- External project-site accounts kept single-role, single-site, and scoped to
+  their bound project site for every create/update/read path.
+
 ## Services
 
 `docker-compose.yml` starts four services:

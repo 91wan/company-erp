@@ -36,8 +36,6 @@ import {
   type MetricCard as MetricCardType,
   type MetricTone,
 } from "../dashboardData";
-
-const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 import { ApiStatus } from "./ApiStatus";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
@@ -51,6 +49,10 @@ import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { apiBaseUrl, getAppVersion, requestJson, updateAppConfig } from "../apiClient";
+
+const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
+const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
+const SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES = ["roster"] as const;
 
 type DashboardShellProps = {
   currentUser: AuthenticatedUserDto;
@@ -68,7 +70,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
   );
   const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
   const visibleNavigationItems = isExternalProjectSite
-    ? navigationItems.filter((item) => item.label === "项目点")
+    ? navigationItems.filter((item) => item.label === "项目点" || item.label === "证照资质")
     : navigationItems.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea));
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
@@ -115,7 +117,13 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           {activeWorkspace === "业务项目" ? (
             <BusinessProjectsWorkspace canManage={canManage(currentUser.roles, "businessProjects")} />
           ) : null}
-          {activeWorkspace === "证照资质" ? <CertificatesWorkspace canManage={canManage(currentUser.roles, "certificates")} /> : null}
+          {activeWorkspace === "证照资质" ? (
+            <CertificatesWorkspace
+              canManage={canManage(currentUser.roles, "certificates")}
+              allowedOwnerTypes={isProjectSiteScoped ? SCOPED_CERTIFICATE_OWNER_TYPES : undefined}
+              allowedPersonOwnerSources={isProjectSiteScoped ? SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES : undefined}
+            />
+          ) : null}
           {activeWorkspace === "项目点" ? (
             <ProjectSitesWorkspace
               canManageSites={canManage(currentUser.roles, "projectSites")}

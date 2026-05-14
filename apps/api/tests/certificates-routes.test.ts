@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import type {
   CertificateRecordDto,
   CreateCertificateRecordInput,
+  ProjectSiteComplianceSummaryDto,
+  ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
+  ProjectSitePayrollSubmissionDto,
+  ProjectSiteRosterPersonDto,
   UpdateCertificateRecordInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
@@ -14,11 +19,23 @@ import {
   type CertificateRepository,
 } from "../src/certificates";
 import { hashPassword } from "../src/password";
+import type {
+  CreateProjectSiteInsuranceCoveredPersonInput,
+  CreateProjectSiteInsurancePolicyInput,
+  CreateProjectSitePayrollSubmissionInput,
+  CreateProjectSiteRosterPersonInput,
+  ProjectSiteComplianceRepository,
+  ProjectSiteInsurancePolicyListFilters,
+  ProjectSitePayrollSubmissionListFilters,
+  ProjectSiteRosterPersonListFilters,
+} from "../src/projectSites";
 
 const now = "2026-05-12T08:00:00.000Z";
 const certificateId = "11111111-1111-4111-8111-111111111111";
 const assignedProjectSiteId = "22222222-2222-4222-8222-222222222222";
 const unassignedProjectSiteId = "33333333-3333-4333-8333-333333333333";
+const assignedRosterPersonId = "55555555-5555-4555-8555-555555555555";
+const unassignedRosterPersonId = "66666666-6666-4666-8666-666666666666";
 
 function makeCertificate(overrides: Partial<CertificateRecordDto> = {}): CertificateRecordDto {
   return {
@@ -60,6 +77,73 @@ function makeCertificate(overrides: Partial<CertificateRecordDto> = {}): Certifi
     createdAt: now,
     updatedAt: now,
     ...overrides,
+  };
+}
+
+function makeRosterPerson(overrides: Partial<ProjectSiteRosterPersonDto> = {}): ProjectSiteRosterPersonDto {
+  return {
+    id: assignedRosterPersonId,
+    projectSiteId: assignedProjectSiteId,
+    projectSiteName: "科技园一期项目点",
+    personName: "王现场",
+    phone: "13800001111",
+    identityNoLast4: "1234",
+    workerType: "subcontractor_site_staff",
+    jobRole: "厨师",
+    startDate: "2026-05-01",
+    endDate: null,
+    status: "active",
+    sourceAttachmentPath: null,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
+  const rosterPeople = [
+    makeRosterPerson(),
+    makeRosterPerson({
+      id: unassignedRosterPersonId,
+      projectSiteId: unassignedProjectSiteId,
+      projectSiteName: "滨江项目点",
+      personName: "李现场",
+    }),
+  ];
+
+  return {
+    async listRosterPeople(filters: ProjectSiteRosterPersonListFilters) {
+      return rosterPeople.filter((person) => {
+        const matchesSite = filters.projectSiteId ? person.projectSiteId === filters.projectSiteId : true;
+        const matchesScope = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(person.projectSiteId) : true;
+        const matchesStatus = filters.status ? person.status === filters.status : true;
+        return matchesSite && matchesScope && matchesStatus;
+      });
+    },
+    async createRosterPerson(input: CreateProjectSiteRosterPersonInput) {
+      const person = makeRosterPerson({ id: "77777777-7777-4777-8777-777777777777", ...input });
+      rosterPeople.unshift(person);
+      return person;
+    },
+    async listInsurancePolicies(_filters: ProjectSiteInsurancePolicyListFilters): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto[]> {
+      return [];
+    },
+    async createInsurancePolicy(_input: CreateProjectSiteInsurancePolicyInput): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto> {
+      throw new Error("not used");
+    },
+    async createCoveredPerson(_input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto> {
+      throw new Error("not used");
+    },
+    async listPayrollSubmissions(_filters: ProjectSitePayrollSubmissionListFilters): Promise<ProjectSitePayrollSubmissionDto[]> {
+      return [];
+    },
+    async createPayrollSubmission(_input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto> {
+      throw new Error("not used");
+    },
+    async getComplianceSummary(_projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null> {
+      return null;
+    },
   };
 }
 
@@ -170,6 +254,22 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
     updatedAt: now,
     ...overrides,
   };
+}
+
+function makeExternalProjectSiteAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return makeAuthAccount({
+    id: "edededed-eded-4ded-8ded-edededededed",
+    username: "site-manager",
+    employeeId: null,
+    employeeNo: null,
+    employeeName: null,
+    employeeStatus: null,
+    roles: ["external_project_site"],
+    assignedProjectSiteIds: [assignedProjectSiteId],
+    externalProjectSiteContactName: "王项目",
+    externalProjectSiteContactPhone: "13900000000",
+    ...overrides,
+  });
 }
 
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
@@ -570,6 +670,105 @@ describe("certificates API", () => {
     expect(hiddenDetail.statusCode).toBe(404);
     expect(projectSiteCreate.statusCode).toBe(403);
     expect(buyerList.json().certificates.map((item: CertificateRecordDto) => item.id)).toEqual(["supplier-cert"]);
+  });
+
+  it("lets external project-site accounts create only assigned-site certificates", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-external-certificates" },
+      authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
+      certificateRepository: createFakeCertificateRepository(),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+    });
+    const cookie = await loginCookie(app, "site-manager");
+
+    const assignedHealth = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        certificateCode: "HC-ASSIGNED-001",
+        certificateName: "本项目点健康证",
+        certificateType: "person_health_cert",
+        ownerType: "person",
+        ownerRosterPersonId: assignedRosterPersonId,
+        ownerNameSnapshot: "王现场",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+      },
+    });
+    const unassignedHealth = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        certificateCode: "HC-UNASSIGNED-001",
+        certificateName: "其他项目点健康证",
+        certificateType: "person_health_cert",
+        ownerType: "person",
+        ownerRosterPersonId: unassignedRosterPersonId,
+        ownerNameSnapshot: "李现场",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+      },
+    });
+    const assignedFoodLicense = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        certificateCode: "FOOD-ASSIGNED-001",
+        certificateName: "本项目点食品经营许可证",
+        certificateType: "food_operation_license",
+        ownerType: "project_site",
+        ownerProjectSiteId: assignedProjectSiteId,
+        ownerNameSnapshot: "科技园一期项目点",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+      },
+    });
+    const unassignedFoodLicense = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        certificateCode: "FOOD-UNASSIGNED-001",
+        certificateName: "其他项目点食品经营许可证",
+        certificateType: "food_operation_license",
+        ownerType: "project_site",
+        ownerProjectSiteId: unassignedProjectSiteId,
+        ownerNameSnapshot: "滨江项目点",
+        validityType: "fixed_expiry",
+        expiryDate: "2027-05-01",
+      },
+    });
+    const supplierCertificate = await app.inject({
+      method: "POST",
+      url: "/api/certificates",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        certificateCode: "SUP-FORBIDDEN-001",
+        certificateName: "供应商资质",
+        certificateType: "supplier_qualification",
+        ownerType: "supplier",
+        ownerPartyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        ownerNameSnapshot: "供应商",
+        validityType: "long_term",
+      },
+    });
+    await app.close();
+
+    expect(assignedHealth.statusCode).toBe(201);
+    expect(assignedHealth.json()).toMatchObject({
+      certificate: { ownerType: "person", ownerRosterPersonId: assignedRosterPersonId },
+    });
+    expect(unassignedHealth.statusCode).toBe(404);
+    expect(assignedFoodLicense.statusCode).toBe(201);
+    expect(assignedFoodLicense.json()).toMatchObject({
+      certificate: { ownerType: "project_site", ownerProjectSiteId: assignedProjectSiteId },
+    });
+    expect(unassignedFoodLicense.statusCode).toBe(404);
+    expect(supplierCertificate.statusCode).toBe(403);
   });
 
   it("keeps certificate scope defensive for project-site roles even if extra roles are present", () => {

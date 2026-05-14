@@ -26,6 +26,8 @@ type CertificatesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadParties?: () => Promise<PartyDto[]>;
   canManage?: boolean;
+  allowedOwnerTypes?: readonly CertificateOwnerTypeCode[];
+  allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
 };
 
 type CertificateFormState = {
@@ -91,12 +93,16 @@ async function defaultLoadParties(): Promise<PartyDto[]> {
   return payload.parties;
 }
 
-const emptyForm: CertificateFormState = {
+function createEmptyForm(
+  ownerType: CertificateOwnerTypeCode = "company",
+  ownerPersonSource: CertificateFormState["ownerPersonSource"] = "employee",
+): CertificateFormState {
+  return {
   certificateCode: "",
   certificateName: "",
-  certificateType: "food_operation_license",
-  ownerType: "company",
-  ownerPersonSource: "employee",
+  certificateType: ownerType === "person" ? "person_health_cert" : "food_operation_license",
+  ownerType,
+  ownerPersonSource,
   ownerEmployeeId: "",
   ownerRosterPersonId: "",
   ownerProjectSiteId: "",
@@ -113,7 +119,8 @@ const emptyForm: CertificateFormState = {
   sourcePageNo: "",
   responsibleEmployeeId: "",
   remark: "",
-};
+  };
+}
 
 export function CertificatesWorkspace({
   loadCertificates = defaultLoadCertificates,
@@ -123,7 +130,23 @@ export function CertificatesWorkspace({
   loadProjectSites = defaultLoadProjectSites,
   loadParties = defaultLoadParties,
   canManage = true,
+  allowedOwnerTypes,
+  allowedPersonOwnerSources,
 }: CertificatesWorkspaceProps) {
+  const ownerTypeOptions = useMemo(
+    () => CERTIFICATE_OWNER_TYPES.filter((item) => !allowedOwnerTypes || allowedOwnerTypes.includes(item.code)),
+    [allowedOwnerTypes],
+  );
+  const personOwnerSourceOptions = useMemo(
+    () => (allowedPersonOwnerSources ?? ["employee", "roster"]) as readonly CertificateFormState["ownerPersonSource"][],
+    [allowedPersonOwnerSources],
+  );
+  const defaultOwnerType = ownerTypeOptions[0]?.code ?? "company";
+  const defaultPersonOwnerSource = personOwnerSourceOptions[0] ?? "employee";
+  const shouldLoadEmployees = ownerTypeOptions.some((item) => item.code === "person") && personOwnerSourceOptions.includes("employee");
+  const shouldLoadRosterPeople = ownerTypeOptions.some((item) => item.code === "person") && personOwnerSourceOptions.includes("roster");
+  const shouldLoadProjectSites = ownerTypeOptions.some((item) => item.code === "project_site");
+  const shouldLoadParties = ownerTypeOptions.some((item) => item.code === "supplier" || item.code === "company");
   const [certificates, setCertificates] = useState<CertificateRecordDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [rosterPeople, setRosterPeople] = useState<ProjectSiteRosterPersonDto[]>([]);
@@ -134,7 +157,22 @@ export function CertificatesWorkspace({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CertificateComputedStatusCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [form, setForm] = useState<CertificateFormState>(emptyForm);
+  const [form, setForm] = useState<CertificateFormState>(() => createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
+
+  useEffect(() => {
+    const ownerTypeAllowed = ownerTypeOptions.some((item) => item.code === form.ownerType);
+    const personSourceAllowed = form.ownerType !== "person" || personOwnerSourceOptions.includes(form.ownerPersonSource);
+    if (ownerTypeAllowed && personSourceAllowed) return;
+    setForm((current) => ({
+      ...current,
+      ownerType: ownerTypeAllowed ? current.ownerType : defaultOwnerType,
+      ownerPersonSource: personSourceAllowed ? current.ownerPersonSource : defaultPersonOwnerSource,
+      ownerEmployeeId: "",
+      ownerRosterPersonId: "",
+      ownerProjectSiteId: "",
+      ownerPartyId: "",
+    }));
+  }, [defaultOwnerType, defaultPersonOwnerSource, form.ownerPersonSource, form.ownerType, ownerTypeOptions, personOwnerSourceOptions]);
 
   useEffect(() => {
     let mounted = true;
@@ -157,7 +195,12 @@ export function CertificatesWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
-    Promise.all([loadEmployees(), loadRosterPeople(), loadProjectSites(), loadParties()])
+    Promise.all([
+      shouldLoadEmployees ? loadEmployees() : Promise.resolve([]),
+      shouldLoadRosterPeople ? loadRosterPeople() : Promise.resolve([]),
+      shouldLoadProjectSites ? loadProjectSites() : Promise.resolve([]),
+      shouldLoadParties ? loadParties() : Promise.resolve([]),
+    ])
       .then(([nextEmployees, nextRosterPeople, nextProjectSites, nextParties]) => {
         if (!mounted) return;
         setEmployees(nextEmployees);
@@ -173,7 +216,16 @@ export function CertificatesWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadEmployees, loadParties, loadProjectSites, loadRosterPeople]);
+  }, [
+    loadEmployees,
+    loadParties,
+    loadProjectSites,
+    loadRosterPeople,
+    shouldLoadEmployees,
+    shouldLoadParties,
+    shouldLoadProjectSites,
+    shouldLoadRosterPeople,
+  ]);
 
   const filteredCertificates = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -240,7 +292,7 @@ export function CertificatesWorkspace({
         remark: form.remark || null,
       });
       setCertificates((current) => [created, ...current.filter((certificate) => certificate.id !== created.id)]);
-      setForm(emptyForm);
+      setForm(createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
       setSubmitState("saved");
     } catch {
       setSubmitState("error");
@@ -369,7 +421,7 @@ export function CertificatesWorkspace({
                     })
                   }
                 >
-                  {CERTIFICATE_OWNER_TYPES.map((item) => (
+                  {ownerTypeOptions.map((item) => (
                     <option key={item.code} value={item.code}>{item.label}</option>
                   ))}
                 </select>
@@ -389,8 +441,8 @@ export function CertificatesWorkspace({
                         })
                       }
                     >
-                      <option value="employee">公司员工</option>
-                      <option value="roster">项目点现场人员</option>
+                      {personOwnerSourceOptions.includes("employee") ? <option value="employee">公司员工</option> : null}
+                      {personOwnerSourceOptions.includes("roster") ? <option value="roster">项目点现场人员</option> : null}
                     </select>
                   </label>
                   {form.ownerPersonSource === "employee" ? (

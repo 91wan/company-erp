@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
 import type { BuildAppOptions } from "./appRouteContext.js";
 import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "./businessProjects.js";
@@ -17,6 +18,43 @@ import {
   normalizeContractInput,
   validateContractEndDateState,
 } from "./contracts.js";
+
+type CertificateOwnerScopeInput = Pick<
+  CreateCertificateRecordInput | UpdateCertificateRecordInput,
+  "ownerType" | "ownerEmployeeId" | "ownerRosterPersonId" | "ownerProjectSiteId" | "ownerPartyId"
+>;
+
+async function certificateOwnerScopeFailure(
+  request: unknown,
+  options: BuildAppOptions,
+  owner: CertificateOwnerScopeInput,
+): Promise<{ statusCode: number; body: Record<string, unknown> } | null> {
+  const scope = scopedProjectSiteIds(request);
+  if (scope === null) return null;
+
+  if (owner.ownerType === "project_site") {
+    return isOutsideProjectSiteScope(scope, owner.ownerProjectSiteId)
+      ? { statusCode: 404, body: { error: "CERTIFICATE_NOT_FOUND" } }
+      : null;
+  }
+
+  if (owner.ownerType === "person") {
+    if (owner.ownerEmployeeId) {
+      return { statusCode: 403, body: { error: "FORBIDDEN", permissionArea: "certificates", requiredLevel: "manage" } };
+    }
+    if (!owner.ownerRosterPersonId) return { statusCode: 404, body: { error: "PROJECT_SITE_ROSTER_PERSON_NOT_FOUND" } };
+    if (!options.projectSiteComplianceRepository) {
+      return { statusCode: 503, body: { error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" } };
+    }
+
+    const scopedRosterPeople = await options.projectSiteComplianceRepository.listRosterPeople({ projectSiteIds: scope });
+    return scopedRosterPeople.some((person) => person.id === owner.ownerRosterPersonId)
+      ? null
+      : { statusCode: 404, body: { error: "PROJECT_SITE_ROSTER_PERSON_NOT_FOUND" } };
+  }
+
+  return { statusCode: 403, body: { error: "FORBIDDEN", permissionArea: "certificates", requiredLevel: "manage" } };
+}
 
 export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/contracts", async (request, reply) => {
@@ -286,6 +324,8 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
 
     try {
       const input = normalizeCertificateInput(request.body, "create");
+      const scopeFailure = await certificateOwnerScopeFailure(request, options, input);
+      if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const certificate = await options.certificateRepository.create(input);
       return reply.status(201).send({ certificate });
     } catch (error) {
@@ -307,18 +347,28 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     const { id } = request.params as { id: string };
     try {
       const current = await options.certificateRepository.getById(id);
+      if (!current) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
       if (isOutsideCertificateScope(request, current)) {
         return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
       }
       const input = normalizeCertificateInput(request.body, "update");
+      const finalOwner = {
+        ownerType: input.ownerType ?? current.ownerType,
+        ownerEmployeeId: input.ownerEmployeeId !== undefined ? input.ownerEmployeeId : current.ownerEmployeeId,
+        ownerRosterPersonId: input.ownerRosterPersonId !== undefined ? input.ownerRosterPersonId : current.ownerRosterPersonId,
+        ownerProjectSiteId: input.ownerProjectSiteId !== undefined ? input.ownerProjectSiteId : current.ownerProjectSiteId,
+        ownerPartyId: input.ownerPartyId !== undefined ? input.ownerPartyId : current.ownerPartyId,
+      };
       const ownerIssues = validateCertificateOwnerState({
-        ownerType: input.ownerType ?? current?.ownerType,
-        ownerEmployeeId: input.ownerEmployeeId !== undefined ? input.ownerEmployeeId : current?.ownerEmployeeId,
-        ownerRosterPersonId: input.ownerRosterPersonId !== undefined ? input.ownerRosterPersonId : current?.ownerRosterPersonId,
-        ownerProjectSiteId: input.ownerProjectSiteId !== undefined ? input.ownerProjectSiteId : current?.ownerProjectSiteId,
-        ownerPartyId: input.ownerPartyId !== undefined ? input.ownerPartyId : current?.ownerPartyId,
+        ownerType: finalOwner.ownerType,
+        ownerEmployeeId: finalOwner.ownerEmployeeId,
+        ownerRosterPersonId: finalOwner.ownerRosterPersonId,
+        ownerProjectSiteId: finalOwner.ownerProjectSiteId,
+        ownerPartyId: finalOwner.ownerPartyId,
       });
       if (ownerIssues.length > 0) throw new CertificateValidationError(ownerIssues);
+      const scopeFailure = await certificateOwnerScopeFailure(request, options, finalOwner);
+      if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const certificate = await options.certificateRepository.update(id, input);
       if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
       return { certificate };

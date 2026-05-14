@@ -187,7 +187,11 @@ export function mockShellFetch(
     if (url.includes("/investment-summary")) {
       return Promise.resolve(jsonResponse({ investmentSummary: { ...projectSiteInvestmentSummary, contractCount: 0, totalAmount: 0, categories: [] } }));
     }
-    if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [] }));
+    if (url.includes("/api/project-site-roster-persons")) return Promise.resolve(jsonResponse({ rosterPeople: [rosterPerson] }));
+    if (url.includes("/api/employer-liability-insurance-policies")) return Promise.resolve(jsonResponse({ insurancePolicies: [] }));
+    if (url.includes("/api/employer-liability-insurance-covered-persons")) return Promise.resolve(jsonResponse({ coveredPersons: [] }));
+    if (url.includes("/api/project-site-payroll-submissions")) return Promise.resolve(jsonResponse({ payrollSubmissions: [] }));
+    if (url.includes("/api/project-sites")) return Promise.resolve(jsonResponse({ projectSites: [projectSite] }));
     if (url.includes("/api/project-usage-requests")) {
       return Promise.resolve(jsonResponse({ projectUsageRequests: data.projectUsageRequests ?? [projectUsageRequest] }));
     }

@@ -800,7 +800,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname === "/api/contracts") return { contracts: state.contracts };
   if (pathname.startsWith("/api/certificates")) return { certificates: state.certificates };
   if (pathname === "/api/import-jobs") return { importJobs: state.importJobs };
-  if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPersons: [] };
+  if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPeople: [] };
   if (pathname.startsWith("/api/employer-liability-insurance-policies")) return { insurancePolicies: [] };
   if (pathname.startsWith("/api/employer-liability-insurance-covered-persons")) return { coveredPersons: [] };
   if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: [] };

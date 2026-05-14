@@ -96,7 +96,7 @@ test("project-site users see usage actions but not global inventory actions", as
   await expectHealthyShell(page, issues);
 });
 
-test("external project-site accounts render only the usage request workspace", async ({ page }) => {
+test("external project-site accounts render only scoped project-site compliance workspaces", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: externalProjectSiteUser });
 
@@ -104,11 +104,20 @@ test("external project-site accounts render only the usage request workspace", a
 
   await expect(page.getByText("site-manager").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "项目点" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "证照资质" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Dashboard" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "基础资料" })).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "证照资质" }).click();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存证照" })).toBeVisible();
+  const ownerTypeSelect = page.getByLabel("归属对象");
+  await expect(ownerTypeSelect).toHaveValue("person");
+  await expect(page.getByLabel("人员来源")).toHaveValue("roster");
+  expect(await ownerTypeSelect.locator("option").allTextContents()).toEqual(["人员", "项目点"]);
   await expectHealthyShell(page, issues);
 });
 
