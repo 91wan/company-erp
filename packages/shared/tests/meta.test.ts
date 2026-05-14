@@ -244,7 +244,7 @@ describe("MVP permission constants", () => {
     expect(MVP_PERMISSION_MATRIX.userAccounts.manage).toEqual(["admin"]);
     expect(MVP_PERMISSION_MATRIX.roleAssignment.manage).toEqual(["admin"]);
     expect(MVP_PERMISSION_MATRIX.auditLogs.read).toEqual(["admin"]);
-    expect(MVP_PERMISSION_MATRIX.attachments.read).toEqual(["admin", "hr", "procurement", "operations"]);
+    expect(MVP_PERMISSION_MATRIX.attachments.read).toEqual(["admin", "hr", "procurement", "operations", "external_project_site"]);
     expect(MVP_PERMISSION_MATRIX.attachments.manage).toEqual(["admin", "hr"]);
   });
 

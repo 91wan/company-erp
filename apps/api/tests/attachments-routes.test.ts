@@ -317,4 +317,73 @@ describe("attachments API", () => {
     expect(notFound.statusCode).toBe(404);
     expect(notFound.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
   });
+
+  it("returns scoped download references without exposing absolute storage paths", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const siteId = "77777777-7777-4777-8777-777777777777";
+    const otherSiteId = "88888888-8888-4888-8888-888888888888";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [siteId],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([
+        makeAttachment({
+          id: "22222222-2222-4222-8222-222222222222",
+          attachmentCode: "ATT-SITE-001",
+          storageKey: "project-sites/site-license.pdf",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: siteId,
+        }),
+        makeAttachment({
+          id: "33333333-3333-4333-8333-333333333333",
+          attachmentCode: "ATT-SITE-OTHER",
+          storageKey: "project-sites/other-license.pdf",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: otherSiteId,
+        }),
+      ]),
+    });
+
+    const adminCookie = await loginCookie(app, "admin");
+    const externalCookie = await loginCookie(app, "external-site");
+    const adminDownload = await app.inject({
+      method: "GET",
+      url: "/api/attachments/22222222-2222-4222-8222-222222222222/download-url",
+      cookies: { company_erp_session: adminCookie },
+    });
+    const scopedDownload = await app.inject({
+      method: "GET",
+      url: "/api/attachments/22222222-2222-4222-8222-222222222222/download-url",
+      cookies: { company_erp_session: externalCookie },
+    });
+    const outOfScope = await app.inject({
+      method: "GET",
+      url: "/api/attachments/33333333-3333-4333-8333-333333333333/download-url",
+      cookies: { company_erp_session: externalCookie },
+    });
+    await app.close();
+
+    expect(adminDownload.statusCode).toBe(200);
+    expect(scopedDownload.statusCode).toBe(200);
+    expect(scopedDownload.json()).toEqual({
+      attachmentDownload: {
+        attachmentId: "22222222-2222-4222-8222-222222222222",
+        storageKey: "project-sites/site-license.pdf",
+        downloadRef: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+      },
+    });
+    expect(JSON.stringify(scopedDownload.json())).not.toContain("/volume1");
+    expect(outOfScope.statusCode).toBe(404);
+    expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+  });
 });
