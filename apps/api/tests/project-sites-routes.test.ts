@@ -379,8 +379,22 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
   const rosterPeople = [
     makeRosterPerson(),
     makeRosterPerson({ id: "16161616-1616-4161-8161-161616161616", personName: "李离场", status: "left" }),
+    makeRosterPerson({
+      id: "30303030-3030-4303-8303-303030303030",
+      projectSiteId: "22222222-2222-4222-8222-222222222222",
+      projectSiteName: "滨江项目点",
+      personName: "周外场",
+    }),
   ];
-  const policies = [makeInsurancePolicy()];
+  const policies = [
+    makeInsurancePolicy(),
+    makeInsurancePolicy({
+      id: "31313131-3131-4313-8313-313131313131",
+      projectSiteId: "22222222-2222-4222-8222-222222222222",
+      projectSiteName: "滨江项目点",
+      policyNo: "ELI202605999",
+    }),
+  ];
   const coveredPeople = [makeCoveredPerson()];
   const payrollSubmissions = [makePayrollSubmission()];
 
@@ -1346,6 +1360,113 @@ describe("project usage request API", () => {
     expect(contractAccess.statusCode).toBe(403);
     expect(inventoryAccess.statusCode).toBe(403);
     expect(projectSiteAccess.statusCode).toBe(403);
+  });
+
+  it("lets external project-site accounts submit only assigned-site compliance records", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-external-compliance" },
+      authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+      projectSiteRepository: createFakeProjectSiteRepository([
+        makeProjectSite(),
+        makeProjectSite({
+          id: "22222222-2222-4222-8222-222222222222",
+          siteCode: "SITE-WX-002",
+          siteName: "滨江项目点",
+        }),
+      ]),
+    });
+    const cookie = await loginCookie(app, "site-manager");
+
+    const assignedRoster = await app.inject({
+      method: "POST",
+      url: "/api/project-site-roster-persons",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        personName: "赵新员工",
+        workerType: "subcontractor_site_staff",
+      },
+    });
+    const unassignedRoster = await app.inject({
+      method: "POST",
+      url: "/api/project-site-roster-persons",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "22222222-2222-4222-8222-222222222222",
+        personName: "越权人员",
+        workerType: "subcontractor_site_staff",
+      },
+    });
+    const assignedPolicy = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-policies",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        policyNo: "ELI202605002",
+        insurerName: "平安保险",
+        startDate: "2026-05-13",
+        endDate: "2027-05-12",
+      },
+    });
+    const assignedCoveredPerson = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-covered-persons",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        policyId: "13131313-1313-4131-8131-131313131313",
+        rosterPersonId: "12121212-1212-4121-8121-121212121212",
+        coveredNameSnapshot: "王现场",
+      },
+    });
+    const unassignedPolicyCoveredPerson = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-covered-persons",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        policyId: "31313131-3131-4313-8313-313131313131",
+        rosterPersonId: "12121212-1212-4121-8121-121212121212",
+        coveredNameSnapshot: "王现场",
+      },
+    });
+    const unassignedRosterCoveredPerson = await app.inject({
+      method: "POST",
+      url: "/api/employer-liability-insurance-covered-persons",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        policyId: "13131313-1313-4131-8131-131313131313",
+        rosterPersonId: "30303030-3030-4303-8303-303030303030",
+        coveredNameSnapshot: "周外场",
+      },
+    });
+    const assignedPayroll = await app.inject({
+      method: "POST",
+      url: "/api/project-site-payroll-submissions",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        payrollMonth: "2026-05",
+        attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+      },
+    });
+    const updateProjectSite = await app.inject({
+      method: "PATCH",
+      url: "/api/project-sites/11111111-1111-4111-8111-111111111111",
+      cookies: { company_erp_session: cookie },
+      payload: { remark: "不能改主数据" },
+    });
+    await app.close();
+
+    expect(assignedRoster.statusCode).toBe(201);
+    expect(unassignedRoster.statusCode).toBe(404);
+    expect(assignedPolicy.statusCode).toBe(201);
+    expect(assignedCoveredPerson.statusCode).toBe(201);
+    expect(unassignedPolicyCoveredPerson.statusCode).toBe(404);
+    expect(unassignedRosterCoveredPerson.statusCode).toBe(404);
+    expect(assignedPayroll.statusCode).toBe(201);
+    expect(updateProjectSite.statusCode).toBe(403);
   });
 });
 

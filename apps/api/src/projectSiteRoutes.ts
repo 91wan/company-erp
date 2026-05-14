@@ -4,6 +4,32 @@ import type { AuthenticatedRequest } from "./auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds } from "./appRouteContext.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
+async function coveredPersonScopeFailure(
+  request: unknown,
+  options: BuildAppOptions,
+  input: { policyId: string; rosterPersonId?: string | null },
+): Promise<{ statusCode: number; body: Record<string, unknown> } | null> {
+  const scope = scopedProjectSiteIds(request);
+  if (scope === null) return null;
+  if (!options.projectSiteComplianceRepository) {
+    return { statusCode: 503, body: { error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" } };
+  }
+
+  const policies = await options.projectSiteComplianceRepository.listInsurancePolicies({ projectSiteIds: scope });
+  if (!policies.some((policy) => policy.id === input.policyId)) {
+    return { statusCode: 404, body: { error: "PROJECT_SITE_INSURANCE_POLICY_NOT_FOUND" } };
+  }
+
+  if (input.rosterPersonId) {
+    const rosterPeople = await options.projectSiteComplianceRepository.listRosterPeople({ projectSiteIds: scope });
+    if (!rosterPeople.some((person) => person.id === input.rosterPersonId)) {
+      return { statusCode: 404, body: { error: "PROJECT_SITE_ROSTER_PERSON_NOT_FOUND" } };
+    }
+  }
+
+  return null;
+}
+
 export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/project-sites", async (request, reply) => {
     if (!options.projectSiteRepository) {
@@ -185,6 +211,8 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
     }
     try {
       const input = normalizeCoveredPersonInput(request.body);
+      const scopeFailure = await coveredPersonScopeFailure(request, options, input);
+      if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const coveredPerson = await options.projectSiteComplianceRepository.createCoveredPerson(input);
       return reply.status(201).send({ coveredPerson });
     } catch (error) {
