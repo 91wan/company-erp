@@ -35,6 +35,7 @@ import {
   projectSiteInvestmentSummary,
   projectSiteKitchenEquipment,
   projectSiteKitchenEquipmentChangeRequest,
+  rosterPerson,
   projectUsageRequest,
   purchaseRecord,
   purchaseRequest,
@@ -443,16 +444,17 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("合规资料")).toBeInTheDocument();
-    expect(screen.getByText("现场人员名单")).toBeInTheDocument();
+    expect(screen.getByText("项目点现场人员名单")).toBeInTheDocument();
     expect(screen.getByText("雇主责任险")).toBeInTheDocument();
     expect(screen.getByText("人员健康证")).toBeInTheDocument();
     expect(screen.getByText("食品经营许可证")).toBeInTheDocument();
-    expect(screen.getByText("人员工资表")).toBeInTheDocument();
+    expect(screen.getByText("工资表")).toBeInTheDocument();
     expect(await screen.findByText("12 人")).toBeInTheDocument();
     expect(screen.getByText("缺 1 / 临期 2 / 过期 1")).toBeInTheDocument();
     expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
     expect(screen.getByText("即将到期")).toBeInTheDocument();
     expect(screen.getByText("待审核")).toBeInTheDocument();
+    expect(screen.getByText("红色风险")).toBeInTheDocument();
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {
@@ -913,6 +915,49 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
 
     expect(await screen.findByText("证照保存失败，请检查编码、归属对象或日期。")).toBeInTheDocument();
+  });
+
+  it("creates a health certificate for a project-site roster person", async () => {
+    const createCertificate = vi.fn().mockResolvedValue({
+      ...expiredCertificate,
+      id: "54545454-5454-4454-8454-545454545454",
+      certificateCode: "CERT0005",
+      ownerEmployeeId: null,
+      ownerEmployeeName: null,
+      ownerRosterPersonId: rosterPerson.id,
+      ownerRosterPersonName: rosterPerson.personName,
+      ownerRosterPersonProjectSiteId: rosterPerson.projectSiteId,
+      ownerNameSnapshot: rosterPerson.personName,
+    });
+
+    render(
+      <CertificatesWorkspace
+        loadCertificates={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadParties={() => Promise.resolve([party])}
+        loadRosterPeople={() => Promise.resolve([rosterPerson])}
+        createCertificate={createCertificate}
+      />,
+    );
+
+    await screen.findByText("暂无证照资料");
+    fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0005" } });
+    fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "李现场健康证" } });
+    fireEvent.change(screen.getByLabelText("证照类型"), { target: { value: "person_health_cert" } });
+    fireEvent.change(screen.getByLabelText("归属对象"), { target: { value: "person" } });
+    fireEvent.change(screen.getByLabelText("人员来源"), { target: { value: "roster" } });
+    fireEvent.change(screen.getByLabelText("项目点现场人员"), { target: { value: rosterPerson.id } });
+    fireEvent.change(screen.getByLabelText("到期日期"), { target: { value: "2026-06-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+
+    expect(createCertificate).toHaveBeenCalledWith(expect.objectContaining({
+      ownerType: "person",
+      ownerEmployeeId: null,
+      ownerRosterPersonId: rosterPerson.id,
+      ownerNameSnapshot: rosterPerson.personName,
+    }));
+    expect(await screen.findByText("CERT0005")).toBeInTheDocument();
   });
 
   it("previews and confirms Excel import jobs", async () => {

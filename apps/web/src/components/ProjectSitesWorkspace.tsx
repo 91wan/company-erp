@@ -1201,11 +1201,11 @@ export function ProjectSitesWorkspace({
           <ResponsiveTable
             headers={[
               "项目点",
-              "现场人员名单",
+              "项目点现场人员名单",
               "人员健康证",
               "雇主责任险",
               "食品经营许可证",
-              "人员工资表",
+              "工资表",
               "风险",
             ]}
             rows={filteredSites.map((site) => {
@@ -1231,7 +1231,14 @@ export function ProjectSitesWorkspace({
                       "缺失"}
                   </StatusBadge>
                 ) : "不需要",
-                summary ? `${summary.blockingIssueCount} 阻断 / ${summary.warningIssueCount} 提醒` : "-",
+                summary ? (
+                  <span>
+                    <StatusBadge tone={summary.blockingIssueCount > 0 ? "orange" : summary.warningIssueCount > 0 ? "orange" : "green"}>
+                      {complianceRiskLabel(summary)}
+                    </StatusBadge>{" "}
+                    {summary.blockingIssueCount} 阻断 / {summary.warningIssueCount} 提醒
+                  </span>
+                ) : "-",
               ];
             })}
           />
@@ -1710,6 +1717,12 @@ function complianceStatusTone(status: string): "green" | "orange" | "gray" {
   }
   if (status === "expiring_soon" || status === "pending" || status === "review_due_soon") return "orange";
   return "gray";
+}
+
+function complianceRiskLabel(summary: ProjectSiteComplianceSummaryDto): "红色风险" | "黄色预警" | "绿色正常" {
+  if (summary.blockingIssueCount > 0) return "红色风险";
+  if (summary.warningIssueCount > 0) return "黄色预警";
+  return "绿色正常";
 }
 
 function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray"; children: ReactNode }) {

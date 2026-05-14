@@ -14,6 +14,7 @@ import {
   type EmployeeDto,
   type PartyDto,
   type ProjectSiteDto,
+  type ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
 
@@ -21,6 +22,7 @@ type CertificatesWorkspaceProps = {
   loadCertificates?: () => Promise<CertificateRecordDto[]>;
   createCertificate?: (input: CreateCertificateRecordInput) => Promise<CertificateRecordDto>;
   loadEmployees?: () => Promise<EmployeeDto[]>;
+  loadRosterPeople?: () => Promise<ProjectSiteRosterPersonDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadParties?: () => Promise<PartyDto[]>;
   canManage?: boolean;
@@ -31,7 +33,9 @@ type CertificateFormState = {
   certificateName: string;
   certificateType: CertificateTypeCode;
   ownerType: CertificateOwnerTypeCode;
+  ownerPersonSource: "employee" | "roster";
   ownerEmployeeId: string;
+  ownerRosterPersonId: string;
   ownerProjectSiteId: string;
   ownerPartyId: string;
   ownerNameSnapshot: string;
@@ -70,6 +74,13 @@ async function defaultLoadEmployees(): Promise<EmployeeDto[]> {
   return payload.employees;
 }
 
+async function defaultLoadRosterPeople(): Promise<ProjectSiteRosterPersonDto[]> {
+  const payload = await requestJson<{ rosterPeople: ProjectSiteRosterPersonDto[] }>(
+    `${apiBaseUrl}/api/project-site-roster-persons?status=active`,
+  );
+  return payload.rosterPeople;
+}
+
 async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
   const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
   return payload.projectSites;
@@ -85,7 +96,9 @@ const emptyForm: CertificateFormState = {
   certificateName: "",
   certificateType: "food_operation_license",
   ownerType: "company",
+  ownerPersonSource: "employee",
   ownerEmployeeId: "",
+  ownerRosterPersonId: "",
   ownerProjectSiteId: "",
   ownerPartyId: "",
   ownerNameSnapshot: "",
@@ -106,12 +119,14 @@ export function CertificatesWorkspace({
   loadCertificates = defaultLoadCertificates,
   createCertificate = defaultCreateCertificate,
   loadEmployees = defaultLoadEmployees,
+  loadRosterPeople = defaultLoadRosterPeople,
   loadProjectSites = defaultLoadProjectSites,
   loadParties = defaultLoadParties,
   canManage = true,
 }: CertificatesWorkspaceProps) {
   const [certificates, setCertificates] = useState<CertificateRecordDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
+  const [rosterPeople, setRosterPeople] = useState<ProjectSiteRosterPersonDto[]>([]);
   const [projectSites, setProjectSites] = useState<ProjectSiteDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -142,10 +157,11 @@ export function CertificatesWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
-    Promise.all([loadEmployees(), loadProjectSites(), loadParties()])
-      .then(([nextEmployees, nextProjectSites, nextParties]) => {
+    Promise.all([loadEmployees(), loadRosterPeople(), loadProjectSites(), loadParties()])
+      .then(([nextEmployees, nextRosterPeople, nextProjectSites, nextParties]) => {
         if (!mounted) return;
         setEmployees(nextEmployees);
+        setRosterPeople(nextRosterPeople);
         setProjectSites(nextProjectSites);
         setParties(nextParties);
         setMasterStatus("ready");
@@ -157,7 +173,7 @@ export function CertificatesWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadEmployees, loadParties, loadProjectSites]);
+  }, [loadEmployees, loadParties, loadProjectSites, loadRosterPeople]);
 
   const filteredCertificates = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -181,6 +197,9 @@ export function CertificatesWorkspace({
 
   function ownerNameFromForm() {
     if (form.ownerType === "person") {
+      if (form.ownerPersonSource === "roster") {
+        return rosterPeople.find((person) => person.id === form.ownerRosterPersonId)?.personName ?? form.ownerNameSnapshot;
+      }
       return employees.find((employee) => employee.id === form.ownerEmployeeId)?.name ?? form.ownerNameSnapshot;
     }
     if (form.ownerType === "project_site") {
@@ -202,7 +221,8 @@ export function CertificatesWorkspace({
         certificateName: form.certificateName,
         certificateType: form.certificateType,
         ownerType: form.ownerType,
-        ownerEmployeeId: form.ownerType === "person" ? form.ownerEmployeeId || null : null,
+        ownerEmployeeId: form.ownerType === "person" && form.ownerPersonSource === "employee" ? form.ownerEmployeeId || null : null,
+        ownerRosterPersonId: form.ownerType === "person" && form.ownerPersonSource === "roster" ? form.ownerRosterPersonId || null : null,
         ownerProjectSiteId: form.ownerType === "project_site" ? form.ownerProjectSiteId || null : null,
         ownerPartyId: form.ownerType === "supplier" || form.ownerType === "company" ? form.ownerPartyId || null : null,
         ownerNameSnapshot: ownerNameFromForm(),
@@ -336,20 +356,65 @@ export function CertificatesWorkspace({
               </label>
               <label>
                 归属对象
-                <select value={form.ownerType} onChange={(event) => setForm({ ...form, ownerType: event.target.value as CertificateOwnerTypeCode })}>
+                <select
+                  value={form.ownerType}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      ownerType: event.target.value as CertificateOwnerTypeCode,
+                      ownerEmployeeId: "",
+                      ownerRosterPersonId: "",
+                      ownerProjectSiteId: "",
+                      ownerPartyId: "",
+                    })
+                  }
+                >
                   {CERTIFICATE_OWNER_TYPES.map((item) => (
                     <option key={item.code} value={item.code}>{item.label}</option>
                   ))}
                 </select>
               </label>
               {form.ownerType === "person" ? (
-                <label>
-                  人员
-                  <select value={form.ownerEmployeeId} onChange={(event) => setForm({ ...form, ownerEmployeeId: event.target.value })}>
-                    <option value="">仅填写名称快照</option>
-                    {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
-                  </select>
-                </label>
+                <>
+                  <label>
+                    人员来源
+                    <select
+                      value={form.ownerPersonSource}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          ownerPersonSource: event.target.value as "employee" | "roster",
+                          ownerEmployeeId: "",
+                          ownerRosterPersonId: "",
+                        })
+                      }
+                    >
+                      <option value="employee">公司员工</option>
+                      <option value="roster">项目点现场人员</option>
+                    </select>
+                  </label>
+                  {form.ownerPersonSource === "employee" ? (
+                    <label>
+                      公司员工
+                      <select value={form.ownerEmployeeId} onChange={(event) => setForm({ ...form, ownerEmployeeId: event.target.value })}>
+                        <option value="">仅填写名称快照</option>
+                        {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+                      </select>
+                    </label>
+                  ) : (
+                    <label>
+                      项目点现场人员
+                      <select value={form.ownerRosterPersonId} onChange={(event) => setForm({ ...form, ownerRosterPersonId: event.target.value })}>
+                        <option value="">仅填写名称快照</option>
+                        {rosterPeople.map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.personName}{person.projectSiteName ? ` / ${person.projectSiteName}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </>
               ) : null}
               {form.ownerType === "project_site" ? (
                 <label>
