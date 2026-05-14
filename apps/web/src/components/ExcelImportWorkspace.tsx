@@ -7,6 +7,7 @@ import {
   type ImportTemplateTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { DataTable, PageHeader, SectionCard, StatusBadge, SummaryCard } from "./ui";
 
 type ExcelImportWorkspaceProps = {
   loadImportJobs?: () => Promise<ImportJobSummaryDto[]>;
@@ -144,20 +145,18 @@ export function ExcelImportWorkspace({
 
   return (
     <section className="purchase-workspace excel-import-workspace" aria-label="Excel 导入">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">数据初始化</span>
-          <h2>Excel 导入</h2>
-          <p>先预检基础资料和期初库存模板，确认无错误后再写入系统。</p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="数据初始化"
+        title="Excel 导入"
+        subtitle="先预检基础资料和期初库存模板，确认无错误后再写入系统。"
+      />
 
-      <div className="party-summary material-summary" aria-label="导入摘要">
-        <SummaryCard label="总行数" value={summary.total} />
-        <SummaryCard label="可导入" value={summary.valid + summary.warning} />
-        <SummaryCard label="错误" value={summary.error} />
-        <SummaryCard label="已跳过" value={summary.skipped} />
-        <SummaryCard label="已导入" value={summary.imported} />
+      <div className="summary-grid" aria-label="导入摘要">
+        <SummaryCard label="总行数" value={summary.total} detail="当前批次行数" tone="info" />
+        <SummaryCard label="可导入" value={summary.valid + summary.warning} detail="包含警告行" tone="success" />
+        <SummaryCard label="错误" value={summary.error} detail="需修正后才能确认" tone={summary.error > 0 ? "danger" : "success"} />
+        <SummaryCard label="已跳过" value={summary.skipped} detail="重复编码默认跳过" tone="warning" />
+        <SummaryCard label="已导入" value={summary.imported} detail="确认后写入成功" tone="neutral" />
       </div>
 
       {canManage ? (
@@ -198,90 +197,49 @@ export function ExcelImportWorkspace({
       {actionStatus === "success" ? <StateMessage icon={<CheckCircle2 size={18} />} text="Excel 导入操作成功" /> : null}
       {status === "ready" && jobs.length === 0 ? <StateMessage text="暂无导入批次" /> : null}
 
-      <section className="dashboard-panel data-panel import-job-panel" aria-label="导入批次">
-        <div className="panel-title-row">
-          <h3>导入批次</h3>
-          <span>{jobs.length} 批</span>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>文件</th>
-                <th>模板</th>
-                <th>状态</th>
-                <th>总行</th>
-                <th>错误</th>
-                <th>跳过</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id} onClick={() => void handleSelectJob(job.id)}>
-                  <td>{job.originalFileName}</td>
-                  <td>{IMPORT_TEMPLATE_TYPES.find((template) => template.code === job.templateType)?.label ?? job.templateType}</td>
-                  <td>
-                    <span className={`status-pill ${job.status}`}>{statusLabel(job.status)}</span>
-                  </td>
-                  <td>{job.totalRows}</td>
-                  <td>{job.errorRows}</td>
-                  <td>{job.skippedRows}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <SectionCard title="导入批次" badge={`${jobs.length} 批`}>
+        <DataTable
+          headers={["文件", "模板", "状态", "总行", "错误", "跳过"]}
+          rows={jobs.map((job) => [
+            job.originalFileName,
+            IMPORT_TEMPLATE_TYPES.find((template) => template.code === job.templateType)?.label ?? job.templateType,
+            <ImportStatusBadge key={job.id} status={job.status} />,
+            job.totalRows,
+            job.errorRows,
+            job.skippedRows,
+          ])}
+          emptyState="暂无导入批次"
+          onRowClick={(rowIndex) => {
+            const job = jobs[rowIndex];
+            if (job) void handleSelectJob(job.id);
+          }}
+        />
+      </SectionCard>
 
-      <section className="dashboard-panel data-panel import-row-panel" aria-label="行级预览">
-        <div className="panel-title-row">
-          <h3>行级预览</h3>
-          {selectedJob && canManage && selectedJob.status === "previewed" && selectedJob.errorRows === 0 ? (
+      <SectionCard
+        title="行级预览"
+        action={selectedJob && canManage && selectedJob.status === "previewed" && selectedJob.errorRows === 0 ? (
             <button className="primary-action" type="button" onClick={handleConfirm} disabled={actionStatus === "saving"}>
               <CheckCircle2 aria-hidden="true" size={16} />
               确认导入
             </button>
           ) : null}
-        </div>
+      >
         {selectedJob && selectedJob.errorRows > 0 ? <StateMessage icon={<XCircle size={18} />} text="存在错误行，不能确认导入" /> : null}
         {rows.length === 0 ? <StateMessage icon={<FileSpreadsheet size={18} />} text="选择或预检一个批次后查看行级结果" /> : null}
         {rows.length > 0 ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>行号</th>
-                  <th>状态</th>
-                  <th>目标</th>
-                  <th>问题</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.rowNumber}</td>
-                    <td>
-                      <span className={`status-pill ${row.status}`}>{statusLabel(row.status)}</span>
-                    </td>
-                    <td>{row.targetRecordType ?? "-"}</td>
-                    <td>{row.issues.length ? row.issues.map((item) => item.message).join("；") : "通过"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            headers={["行号", "状态", "目标", "问题"]}
+            rows={rows.map((row) => [
+              row.rowNumber,
+              <ImportStatusBadge key={row.id} status={row.status} />,
+              row.targetRecordType ?? "-",
+              row.issues.length ? row.issues.map((item) => item.message).join("；") : "通过",
+            ])}
+          />
         ) : null}
-      </section>
+      </SectionCard>
     </section>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <article>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
   );
 }
 
@@ -292,4 +250,16 @@ function StateMessage({ text, icon }: { text: string; icon?: ReactNode }) {
       <span>{text}</span>
     </div>
   );
+}
+
+function ImportStatusBadge({ status }: { status: string }) {
+  const tone =
+    status === "failed" || status === "error"
+      ? "danger"
+      : status === "warning" || status === "skipped"
+        ? "warning"
+        : status === "confirmed" || status === "imported" || status === "valid"
+          ? "success"
+          : "info";
+  return <StatusBadge tone={tone}>{statusLabel(status)}</StatusBadge>;
 }

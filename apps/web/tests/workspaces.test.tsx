@@ -288,12 +288,13 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("建议 24 套")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "生成补货建议" }));
-    expect(await screen.findByText("待确认建议 1 条")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("补货建议摘要")).getByText("待确认建议")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("补货建议摘要")).getByText("1")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("采购需求编号"), { target: { value: "PR-REP-20260511001" } });
     fireEvent.change(screen.getByLabelText("申请人"), { target: { value: "王仓管" } });
     fireEvent.change(screen.getByLabelText("申请部门"), { target: { value: "仓储部" } });
-    fireEvent.click(screen.getByRole("button", { name: "转采购需求" }));
+    fireEvent.submit(screen.getByRole("button", { name: "转采购需求" }).closest("form")!);
 
     expect(await screen.findByText("已转采购需求：PR-REP-20260511001")).toBeInTheDocument();
   });
@@ -319,6 +320,13 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("MAT0001").length).toBeGreaterThan(0);
     expect(screen.getAllByText("低库存").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("RK20260511001"));
+    expect(await screen.findByRole("heading", { name: "库存流水详情" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(screen.getAllByText("2026-05-11")[1]);
+    expect(await screen.findByRole("heading", { name: "库存余额详情" })).toBeInTheDocument();
   });
 
   it("renders inventory empty and error states", async () => {
@@ -833,7 +841,7 @@ describe("Company ERP workspace components", () => {
 
     expect(screen.getByRole("heading", { name: "业务项目" })).toBeInTheDocument();
     expect((await screen.findAllByText("扬中中央厨房")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("CNY 1,680,000")).toBeInTheDocument();
+    expect((await screen.findAllByText("CNY 1,680,000")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("装修/改造").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("项目编码"), { target: { value: "BP-YZ-CK-002" } });
@@ -1010,7 +1018,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    expect((await screen.findAllByText("暂无导入批次")).length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText("Excel 文件"), {
       target: {
         files: [new File(["xlsx"], "suppliers.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })],
@@ -1048,7 +1056,7 @@ describe("Company ERP workspace components", () => {
         previewImportJob={() => Promise.reject(new Error("invalid template"))}
       />,
     );
-    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    expect((await screen.findAllByText("暂无导入批次")).length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText("Excel 文件"), {
       target: {
         files: [new File(["bad"], "bad.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })],

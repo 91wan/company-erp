@@ -11,7 +11,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
+import { DataTable, DetailDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
@@ -98,6 +98,8 @@ export function InventoryWorkspace({
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [movementFilter, setMovementFilter] = useState<"all" | InventoryMovementTypeCode>("all");
+  const [selectedMovementId, setSelectedMovementId] = useState("");
+  const [selectedBalanceKey, setSelectedBalanceKey] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [form, setForm] = useState<MovementFormState>({
     movementNo: "",
@@ -208,6 +210,9 @@ export function InventoryWorkspace({
   const inboundQuantity = movements
     .filter((movement) => movement.movementType === "inbound")
     .reduce((sum, movement) => sum + movement.quantity, 0);
+  const selectedMovement = movements.find((movement) => movement.id === selectedMovementId) ?? null;
+  const selectedBalance =
+    balances.find((balance) => `${balance.warehouseId}:${balance.materialId}` === selectedBalanceKey) ?? null;
 
   function updateSelectedMaterial(materialId: string) {
     const material = materials.find((candidate) => candidate.id === materialId);
@@ -335,7 +340,7 @@ export function InventoryWorkspace({
           ) : filteredMovements.length === 0 ? (
             <StateMessage icon={<PackageCheck size={16} />} text="暂无库存流水" />
           ) : (
-            <ResponsiveTable
+            <DataTable
               headers={["单号", "日期", "类型", "仓库", "物料", "数量", "来源", "经办人"]}
               rows={filteredMovements.map((movement) => [
                 movement.movementNo,
@@ -347,6 +352,7 @@ export function InventoryWorkspace({
                 movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "-",
                 movement.handledBy ?? "-",
               ])}
+              onRowClick={(rowIndex) => setSelectedMovementId(filteredMovements[rowIndex]?.id ?? "")}
             />
           )}
         </SectionCard>
@@ -482,7 +488,7 @@ export function InventoryWorkspace({
         ) : balances.length === 0 ? (
           <StateMessage icon={<Warehouse size={16} />} text="暂无当前库存" />
         ) : (
-          <ResponsiveTable
+          <DataTable
             headers={["仓库", "物料编码", "物料名称", "当前库存", "安全库存", "状态", "最近变动"]}
             rows={balances.map((balance) => [
               balance.warehouseCode,
@@ -493,35 +499,30 @@ export function InventoryWorkspace({
               <InventoryStockBadge key={`${balance.warehouseId}-${balance.materialId}`} low={balance.isLowStock} />,
               balance.lastMovementAt ?? "-",
             ])}
+            onRowClick={(rowIndex) => {
+              const balance = balances[rowIndex];
+              setSelectedBalanceKey(balance ? `${balance.warehouseId}:${balance.materialId}` : "");
+            }}
           />
         )}
       </SectionCard> : null}
-    </section>
-  );
-}
 
-function ResponsiveTable({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => (
-                <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      <DetailDrawer
+        title="库存流水详情"
+        open={Boolean(selectedMovement)}
+        onClose={() => setSelectedMovementId("")}
+      >
+        {selectedMovement ? <InventoryMovementDetail movement={selectedMovement} /> : null}
+      </DetailDrawer>
+
+      <DetailDrawer
+        title="库存余额详情"
+        open={Boolean(selectedBalance)}
+        onClose={() => setSelectedBalanceKey("")}
+      >
+        {selectedBalance ? <InventoryBalanceDetail balance={selectedBalance} /> : null}
+      </DetailDrawer>
+    </section>
   );
 }
 
@@ -536,4 +537,50 @@ function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
 
 function InventoryStockBadge({ low }: { low: boolean }) {
   return <StatusBadge tone={low ? "danger" : "success"}>{low ? "低库存" : "正常"}</StatusBadge>;
+}
+
+function InventoryMovementDetail({ movement }: { movement: InventoryMovementDto }) {
+  return (
+    <dl className="detail-grid">
+      <dt>流水单号</dt>
+      <dd>{movement.movementNo}</dd>
+      <dt>日期</dt>
+      <dd>{movement.movementDate}</dd>
+      <dt>类型</dt>
+      <dd>{movementTypeLabel.get(movement.movementType) ?? movement.movementType}</dd>
+      <dt>仓库</dt>
+      <dd>{movement.warehouseCode} {movement.warehouseName}</dd>
+      <dt>物料</dt>
+      <dd>{movement.materialCode} {movement.materialName}</dd>
+      <dt>数量</dt>
+      <dd>{movement.quantity} {movement.unit}</dd>
+      <dt>来源</dt>
+      <dd>{movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "-"}</dd>
+      <dt>经办人</dt>
+      <dd>{movement.handledBy ?? "-"}</dd>
+      <dt>备注</dt>
+      <dd>{movement.remark ?? "-"}</dd>
+    </dl>
+  );
+}
+
+function InventoryBalanceDetail({ balance }: { balance: InventoryBalanceDto }) {
+  return (
+    <dl className="detail-grid">
+      <dt>仓库</dt>
+      <dd>{balance.warehouseCode} {balance.warehouseName}</dd>
+      <dt>物料编码</dt>
+      <dd>{balance.materialCode}</dd>
+      <dt>物料名称</dt>
+      <dd>{balance.materialName}</dd>
+      <dt>当前库存</dt>
+      <dd>{balance.currentQuantity} {balance.unit}</dd>
+      <dt>安全库存</dt>
+      <dd>{balance.safeStock ?? "-"}</dd>
+      <dt>状态</dt>
+      <dd><InventoryStockBadge low={balance.isLowStock} /></dd>
+      <dt>最近变动</dt>
+      <dd>{balance.lastMovementAt ?? "-"}</dd>
+    </dl>
+  );
 }
