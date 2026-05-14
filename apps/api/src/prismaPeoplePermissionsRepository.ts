@@ -38,7 +38,7 @@ import {
   type UserAccountRepository,
 } from "./peoplePermissions.js";
 import { hashPassword } from "./password.js";
-import type { AuthRepository, AuthAccountRecord } from "./auth.js";
+import type { AuthRepository, AuthAccountRecord, AuthSessionRecord } from "./auth.js";
 
 type PrismaDepartment = Prisma.DepartmentGetPayload<{
   include: {
@@ -97,6 +97,8 @@ type PrismaProjectSiteAssignment = Prisma.EmployeeProjectSiteAssignmentGetPayloa
     projectSite: true;
   };
 }>;
+
+type PrismaAuthSession = Prisma.AuthSessionGetPayload<Record<string, never>>;
 
 function dateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
@@ -195,6 +197,22 @@ function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
     createdAt: account.createdAt.toISOString(),
     updatedAt: account.updatedAt.toISOString(),
+  };
+}
+
+function toAuthSessionRecord(session: PrismaAuthSession): AuthSessionRecord {
+  return {
+    id: session.id,
+    userAccountId: session.userAccountId,
+    tokenHash: session.tokenHash,
+    expiresAt: session.expiresAt.toISOString(),
+    revokedAt: session.revokedAt?.toISOString() ?? null,
+    revokedReason: session.revokedReason,
+    ip: session.ip,
+    userAgent: session.userAgent,
+    lastSeenAt: session.lastSeenAt?.toISOString() ?? null,
+    createdAt: session.createdAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
   };
 }
 
@@ -444,6 +462,10 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
               where: { employeeId: id },
               data: { status: "disabled" },
             });
+            await tx.authSession.updateMany({
+              where: { userAccount: { employeeId: id }, revokedAt: null },
+              data: { revokedAt: new Date(), revokedReason: "employee_status_changed" },
+            });
           }
 
           return tx.employee.findUniqueOrThrow({ where: { id: updated.id }, include });
@@ -522,6 +544,9 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
                   ? []
                   : ["viewer"]) as PrismaRoleCode[] | undefined;
           const passwordHash = input.resetPassword ? await hashPassword(input.resetPassword) : undefined;
+          const accountChangedAt = new Date();
+          const shouldRevokeSessions =
+            Boolean(passwordHash) || input.status !== undefined || input.employeeId !== undefined || roles !== undefined;
 
           await tx.userAccount.update({
             where: { id },
@@ -529,7 +554,7 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
               ...(input.employeeId !== undefined ? { employee: relationUpdate(input.employeeId) } : {}),
               ...(input.username !== undefined ? { username: input.username } : {}),
               ...(input.status !== undefined ? { status: input.status } : {}),
-              ...(passwordHash ? { passwordHash, passwordChangedAt: new Date() } : {}),
+              ...(passwordHash ? { passwordHash, passwordChangedAt: accountChangedAt } : {}),
             },
           });
 
@@ -540,6 +565,13 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
                 data: roles.map((role) => ({ userAccountId: id, role })),
               });
             }
+          }
+
+          if (shouldRevokeSessions) {
+            await tx.authSession.updateMany({
+              where: { userAccountId: id, revokedAt: null },
+              data: { revokedAt: accountChangedAt, revokedReason: "account_changed" },
+            });
           }
 
           return tx.userAccount.findUniqueOrThrow({ where: { id }, include });
@@ -651,6 +683,16 @@ export function createPrismaExternalProjectSiteAccountRepository(
         const nextStatus = input.status ?? current.status;
         if (nextStatus === "active") await assertNoActiveProjectManager(nextProjectSiteId, id);
         const passwordHash = input.resetPassword ? await hashPassword(input.resetPassword) : undefined;
+        const accountChangedAt = new Date();
+        const shouldRevokeSessions =
+          Boolean(passwordHash) ||
+          input.username !== undefined ||
+          input.status !== undefined ||
+          input.projectSiteId !== undefined ||
+          input.currentContactName !== undefined ||
+          input.currentContactPhone !== undefined ||
+          input.startDate !== undefined ||
+          input.endDate !== undefined;
 
         const account = await prisma.$transaction(async (tx) => {
           await tx.userAccount.update({
@@ -658,11 +700,11 @@ export function createPrismaExternalProjectSiteAccountRepository(
             data: {
               ...(input.username !== undefined ? { username: input.username } : {}),
               ...(input.status !== undefined ? { status: input.status } : {}),
-              ...(passwordHash ? { passwordHash, passwordChangedAt: new Date() } : {}),
+              ...(passwordHash ? { passwordHash, passwordChangedAt: accountChangedAt } : {}),
             },
           });
 
-          return tx.externalProjectSiteAccount.update({
+          await tx.externalProjectSiteAccount.update({
             where: { id },
             data: {
               ...(input.projectSiteId !== undefined ? { projectSite: { connect: { id: input.projectSiteId } } } : {}),
@@ -682,6 +724,15 @@ export function createPrismaExternalProjectSiteAccountRepository(
             },
             include,
           });
+
+          if (shouldRevokeSessions) {
+            await tx.authSession.updateMany({
+              where: { userAccountId: current.userAccountId, revokedAt: null },
+              data: { revokedAt: accountChangedAt, revokedReason: "external_project_site_account_changed" },
+            });
+          }
+
+          return tx.externalProjectSiteAccount.findUniqueOrThrow({ where: { id }, include });
         });
         return toExternalProjectSiteAccountDto(account);
       } catch (error) {
@@ -862,6 +913,42 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       await prisma.userAccount.update({
         where: { id },
         data: { lastLoginAt: at },
+      });
+    },
+    async createSession(input) {
+      const session = await prisma.authSession.create({
+        data: {
+          userAccountId: input.userAccountId,
+          tokenHash: input.tokenHash,
+          expiresAt: input.expiresAt,
+          ip: input.ip ?? null,
+          userAgent: input.userAgent ?? null,
+          lastSeenAt: input.createdAt,
+          createdAt: input.createdAt,
+        },
+      });
+      return toAuthSessionRecord(session);
+    },
+    async findSessionByTokenHash(tokenHash: string) {
+      const session = await prisma.authSession.findUnique({ where: { tokenHash } });
+      return session ? toAuthSessionRecord(session) : null;
+    },
+    async touchSession(id: string, at: Date) {
+      await prisma.authSession.updateMany({
+        where: { id, revokedAt: null },
+        data: { lastSeenAt: at },
+      });
+    },
+    async revokeSession(id: string, at: Date, reason: string) {
+      await prisma.authSession.updateMany({
+        where: { id, revokedAt: null },
+        data: { revokedAt: at, revokedReason: reason },
+      });
+    },
+    async revokeSessionsForAccount(userAccountId: string, at: Date, reason: string) {
+      await prisma.authSession.updateMany({
+        where: { userAccountId, revokedAt: null },
+        data: { revokedAt: at, revokedReason: reason },
       });
     },
   };

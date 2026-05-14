@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { createSessionToken, type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { hashSessionToken, type AuthAccountRecord, type AuthRepository, type AuthSessionRecord } from "../src/auth";
 import { hashPassword } from "../src/password";
 import type { DepartmentDto } from "@company-erp/shared";
 import type { DepartmentRepository } from "../src/peoplePermissions";
@@ -28,6 +28,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
+  const sessions: AuthSessionRecord[] = [];
 
   return {
     async findByUsername(username) {
@@ -39,6 +40,45 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
     async updateLastLogin(id, at) {
       const account = accounts.find((item) => item.id === id);
       if (account) account.lastLoginAt = at.toISOString();
+    },
+    async createSession(input) {
+      const session: AuthSessionRecord = {
+        id: `session-${sessions.length + 1}`,
+        userAccountId: input.userAccountId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt.toISOString(),
+        revokedAt: null,
+        revokedReason: null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        lastSeenAt: input.createdAt.toISOString(),
+        createdAt: input.createdAt.toISOString(),
+        updatedAt: input.createdAt.toISOString(),
+      };
+      sessions.push(session);
+      return session;
+    },
+    async findSessionByTokenHash(tokenHash) {
+      return sessions.find((session) => session.tokenHash === tokenHash) ?? null;
+    },
+    async touchSession(id, at) {
+      const session = sessions.find((item) => item.id === id);
+      if (session) session.lastSeenAt = at.toISOString();
+    },
+    async revokeSession(id, at, reason) {
+      const session = sessions.find((item) => item.id === id);
+      if (session) {
+        session.revokedAt = at.toISOString();
+        session.revokedReason = reason;
+      }
+    },
+    async revokeSessionsForAccount(userAccountId, at, reason) {
+      for (const session of sessions) {
+        if (session.userAccountId === userAccountId && !session.revokedAt) {
+          session.revokedAt = at.toISOString();
+          session.revokedReason = reason;
+        }
+      }
     },
   };
 }
@@ -116,6 +156,7 @@ describe("auth API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.cookies[0]).toMatchObject({ name: "company_erp_session", httpOnly: true, sameSite: "Lax" });
+    expect(response.cookies[0].value).not.toContain(".");
     expect(response.json()).toMatchObject({ user: { username: "admin", roles: ["admin", "viewer"] } });
     expect(JSON.stringify(response.json())).not.toContain("passwordHash");
     expect(account.lastLoginAt).toBeTruthy();
@@ -186,10 +227,9 @@ describe("auth API", () => {
     const validCookie = await loginCookie(app);
     const valid = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: validCookie } });
     const missing = await app.inject({ method: "GET", url: "/api/auth/me" });
-    const expiredToken = createSessionToken(account.id, "test-secret", -1);
-    const expired = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: expiredToken } });
     const tampered = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: `${validCookie}x` } });
     const logout = await app.inject({ method: "POST", url: "/api/auth/logout", cookies: { company_erp_session: validCookie } });
+    const afterLogout = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: validCookie } });
     await app.close();
 
     expect(valid.json()).toMatchObject({
@@ -200,10 +240,46 @@ describe("auth API", () => {
       },
     });
     expect(missing.json()).toEqual({ user: null });
-    expect(expired.json()).toEqual({ user: null });
     expect(tampered.json()).toEqual({ user: null });
     expect(logout.statusCode).toBe(200);
     expect(logout.cookies[0]).toMatchObject({ name: "company_erp_session", value: "" });
+    expect(afterLogout.json()).toEqual({ user: null });
+  });
+
+  it("rejects expired or revoked server-side sessions even when the cookie token is intact", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const account = makeAuthAccount({ passwordHash });
+    const repository = createFakeAuthRepository([account]);
+    const expiredToken = "expired-session-token";
+    await repository.createSession?.({
+      userAccountId: account.id,
+      tokenHash: hashSessionToken(expiredToken),
+      expiresAt: new Date("2026-05-11T09:00:00.000Z"),
+      createdAt: new Date("2026-05-11T08:00:00.000Z"),
+      ip: null,
+      userAgent: null,
+    });
+    const revokedToken = "revoked-session-token";
+    const revoked = await repository.createSession?.({
+      userAccountId: account.id,
+      tokenHash: hashSessionToken(revokedToken),
+      expiresAt: new Date("2999-05-11T09:00:00.000Z"),
+      createdAt: new Date("2026-05-11T08:00:00.000Z"),
+      ip: null,
+      userAgent: null,
+    });
+    await repository.revokeSession?.(revoked?.id ?? "", new Date("2026-05-11T08:30:00.000Z"), "test");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: repository,
+    });
+
+    const expired = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: expiredToken } });
+    const revokedResponse = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: revokedToken } });
+    await app.close();
+
+    expect(expired.json()).toEqual({ user: null });
+    expect(revokedResponse.json()).toEqual({ user: null });
   });
 
   it("rejects sessions issued before the account password changed", async () => {
@@ -212,21 +288,43 @@ describe("auth API", () => {
       passwordHash,
       passwordChangedAt: "2026-05-11T10:00:00.000Z",
     });
+    const repository = createFakeAuthRepository([account]);
+    const staleToken = "stale-session-token";
+    await repository.createSession?.({
+      userAccountId: account.id,
+      tokenHash: hashSessionToken(staleToken),
+      expiresAt: new Date("2999-05-11T10:00:00.000Z"),
+      createdAt: new Date("2026-05-11T09:59:00.000Z"),
+      ip: null,
+      userAgent: null,
+    });
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
-      authRepository: createFakeAuthRepository([account]),
+      authRepository: repository,
     });
-
-    const staleToken = createSessionToken(
-      account.id,
-      "test-secret",
-      12 * 60 * 60,
-      Math.floor(new Date("2026-05-11T09:59:00.000Z").getTime() / 1000),
-    );
     const response = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: staleToken } });
     await app.close();
 
     expect(response.json()).toEqual({ user: null });
+  });
+
+  it("revokes active sessions when an account password or roles change", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const account = makeAuthAccount({ passwordHash });
+    const repository = createFakeAuthRepository([account]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: repository,
+    });
+
+    const activeCookie = await loginCookie(app);
+    const active = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: activeCookie } });
+    await repository.revokeSessionsForAccount?.(account.id, new Date(), "account_changed");
+    const revoked = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: activeCookie } });
+    await app.close();
+
+    expect(active.json()).toMatchObject({ user: { username: "admin" } });
+    expect(revoked.json()).toEqual({ user: null });
   });
 
   it("guards business routes by fixed role permissions while keeping meta routes public", async () => {

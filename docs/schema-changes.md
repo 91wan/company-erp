@@ -7,6 +7,15 @@ This file records every database schema decision and migration.
 - Confirm import tables.
 - Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
+## 2026-05-14 Server-Side Session Foundation
+
+- Added `auth_sessions` as the server-side session ledger for login cookies.
+- Session cookies now use opaque random tokens; only SHA-256 token hashes are stored in PostgreSQL.
+- Sessions track account id, expiration, revocation timestamp/reason, IP, User-Agent, last seen time, and timestamps.
+- Logout revokes the current session; account status, password, role, employee status, and external project-site account scope changes revoke active sessions for the affected account.
+- Added migration `20260514193000_auth_sessions_foundation`.
+- Confirmed this phase keeps `/api/auth/login`, `/api/auth/logout`, and `/api/auth/me` response envelopes stable; CSRF tokens remain a follow-up slice.
+
 ## 2026-05-14 Attachment Service Foundation
 
 - Added `AttachmentStatus` and `attachment_records` as a unified attachment metadata ledger.
