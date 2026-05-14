@@ -18,8 +18,10 @@ public DNS or router forwarding is configured. The minimum public-access gate is
 - Origin/Host checks or CSRF protection on non-GET business requests.
 - Audit logging for account, certificate, insurance, payroll, inventory, and
   project-site mutations.
-- A unified attachment service that generates storage keys and enforces
-  ownership permissions instead of accepting arbitrary file paths from the UI.
+- Unified attachment metadata is now available for safe relative storage keys;
+  public access still requires a future authenticated upload/download service
+  that generates keys server-side and checks object ownership before serving
+  any file bytes.
 - External project-site accounts kept single-role, single-site, and scoped to
   their bound project site for every create/update/read path.
 

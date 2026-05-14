@@ -20,6 +20,7 @@ import {
   MVP_ROLES,
   type AppConfigDto,
   type AppVersionDto,
+  type AttachmentRecordDto,
   type AuditLogDto,
   type AuthenticatedUserDto,
   type CertificateRecordDto,
@@ -49,7 +50,7 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
-import { apiBaseUrl, getAppVersion, getAuditLogs, requestJson, updateAppConfig } from "../apiClient";
+import { apiBaseUrl, createAttachment, getAppVersion, getAttachments, getAuditLogs, requestJson, updateAppConfig } from "../apiClient";
 
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
@@ -142,6 +143,8 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               companyName={appConfig.companyName}
               canManage={canManage(currentUser.roles, "systemSettings")}
               canReadAuditLogs={canRead(currentUser.roles, "auditLogs")}
+              canReadAttachments={canRead(currentUser.roles, "attachments")}
+              canManageAttachments={canManage(currentUser.roles, "attachments")}
               onCompanyNameChange={onAppConfigChange}
             />
           ) : null}
@@ -838,11 +841,15 @@ function SystemSettingsWorkspace({
   companyName,
   canManage,
   canReadAuditLogs,
+  canReadAttachments,
+  canManageAttachments,
   onCompanyNameChange,
 }: {
   companyName: string;
   canManage: boolean;
   canReadAuditLogs: boolean;
+  canReadAttachments: boolean;
+  canManageAttachments: boolean;
   onCompanyNameChange: (appConfig: AppConfigDto) => void;
 }) {
   const [nextCompanyName, setNextCompanyName] = useState(companyName);
@@ -853,6 +860,20 @@ function SystemSettingsWorkspace({
   const [auditStatus, setAuditStatus] = useState<"idle" | "loading" | "success" | "error">(
     canReadAuditLogs ? "loading" : "idle",
   );
+  const [attachments, setAttachments] = useState<AttachmentRecordDto[]>([]);
+  const [attachmentStatus, setAttachmentStatus] = useState<"idle" | "loading" | "success" | "error">(
+    canReadAttachments ? "loading" : "idle",
+  );
+  const [attachmentForm, setAttachmentForm] = useState({
+    attachmentCode: "",
+    displayName: "",
+    storageKey: "",
+    ownerModule: "contracts",
+    ownerEntityType: "contract",
+    ownerEntityId: "",
+    remark: "",
+  });
+  const [attachmentSaveStatus, setAttachmentSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
 
   useEffect(() => {
     let isMounted = true;
@@ -895,6 +916,27 @@ function SystemSettingsWorkspace({
     };
   }, [canReadAuditLogs]);
 
+  useEffect(() => {
+    if (!canReadAttachments) return;
+    let isMounted = true;
+    setAttachmentStatus("loading");
+    getAttachments()
+      .then((records) => {
+        if (!isMounted) return;
+        setAttachments(records);
+        setAttachmentStatus("success");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setAttachments([]);
+        setAttachmentStatus("error");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canReadAttachments]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus("saving");
@@ -905,6 +947,36 @@ function SystemSettingsWorkspace({
       setStatus("success");
     } catch {
       setStatus("error");
+    }
+  }
+
+  async function handleAttachmentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAttachmentSaveStatus("saving");
+    try {
+      const attachment = await createAttachment({
+        attachmentCode: attachmentForm.attachmentCode,
+        displayName: attachmentForm.displayName,
+        storageKey: attachmentForm.storageKey,
+        ownerModule: attachmentForm.ownerModule,
+        ownerEntityType: attachmentForm.ownerEntityType,
+        ownerEntityId: attachmentForm.ownerEntityId.trim() ? attachmentForm.ownerEntityId.trim() : null,
+        remark: attachmentForm.remark.trim() ? attachmentForm.remark.trim() : null,
+      });
+      setAttachments((records) => [attachment, ...records.filter((record) => record.id !== attachment.id)]);
+      setAttachmentForm({
+        attachmentCode: "",
+        displayName: "",
+        storageKey: "",
+        ownerModule: "contracts",
+        ownerEntityType: "contract",
+        ownerEntityId: "",
+        remark: "",
+      });
+      setAttachmentStatus("success");
+      setAttachmentSaveStatus("success");
+    } catch {
+      setAttachmentSaveStatus("error");
     }
   }
 
@@ -1015,6 +1087,122 @@ function SystemSettingsWorkspace({
                       <td>{log.action}</td>
                       <td>{log.entityType}</td>
                       <td>{log.ip ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {canReadAttachments ? (
+        <section className="dashboard-panel settings-version-panel" aria-label="附件元数据">
+          <div className="form-header">
+            <div>
+              <h3>附件元数据</h3>
+              <p>登记后端认可的相对 storage key；不要填写 NAS 绝对路径、URL 或本地文件路径。</p>
+            </div>
+          </div>
+
+          {canManageAttachments ? (
+            <form className="party-form settings-form" onSubmit={handleAttachmentSubmit}>
+              <div className="form-grid">
+                <label>
+                  <span>附件编号</span>
+                  <input
+                    value={attachmentForm.attachmentCode}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, attachmentCode: event.target.value }))}
+                    placeholder="ATT-DEMO-001"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>显示名称</span>
+                  <input
+                    value={attachmentForm.displayName}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, displayName: event.target.value }))}
+                    placeholder="合同附件"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Storage Key</span>
+                  <input
+                    value={attachmentForm.storageKey}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, storageKey: event.target.value }))}
+                    placeholder="contracts/uuid.pdf"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>归属模块</span>
+                  <input
+                    value={attachmentForm.ownerModule}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, ownerModule: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>归属对象</span>
+                  <input
+                    value={attachmentForm.ownerEntityType}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, ownerEntityType: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>归属 ID（可选）</span>
+                  <input
+                    value={attachmentForm.ownerEntityId}
+                    onChange={(event) => setAttachmentForm((form) => ({ ...form, ownerEntityId: event.target.value }))}
+                    placeholder="UUID"
+                  />
+                </label>
+              </div>
+              <label>
+                <span>备注</span>
+                <textarea
+                  value={attachmentForm.remark}
+                  onChange={(event) => setAttachmentForm((form) => ({ ...form, remark: event.target.value }))}
+                  rows={2}
+                />
+              </label>
+              <button type="submit" className="primary-action" disabled={attachmentSaveStatus === "saving"}>
+                {attachmentSaveStatus === "saving" ? "登记中" : "登记附件引用"}
+              </button>
+              {attachmentSaveStatus === "success" ? <p className="form-success">附件引用已登记。</p> : null}
+              {attachmentSaveStatus === "error" ? <p className="form-error">附件引用格式不合法或保存失败。</p> : null}
+            </form>
+          ) : (
+            <p className="form-hint">当前账号只能查看附件元数据，不能登记或修改附件引用。</p>
+          )}
+
+          {attachmentStatus === "loading" ? <p className="form-hint">附件元数据加载中。</p> : null}
+          {attachmentStatus === "error" ? <p className="form-error">附件元数据暂不可用</p> : null}
+          {attachmentStatus === "success" && attachments.length === 0 ? <p className="form-hint">暂无附件元数据。</p> : null}
+          {attachmentStatus === "success" && attachments.length > 0 ? (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>附件编号</th>
+                    <th>名称</th>
+                    <th>Storage Key</th>
+                    <th>归属</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attachments.map((attachment) => (
+                    <tr key={attachment.id}>
+                      <td>{attachment.attachmentCode}</td>
+                      <td>{attachment.displayName}</td>
+                      <td>{attachment.storageKey}</td>
+                      <td>
+                        {attachment.ownerModule}/{attachment.ownerEntityType}
+                      </td>
+                      <td>{attachment.status === "active" ? "启用" : "停用"}</td>
                     </tr>
                   ))}
                 </tbody>

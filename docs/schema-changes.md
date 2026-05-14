@@ -7,6 +7,14 @@ This file records every database schema decision and migration.
 - Confirm import tables.
 - Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
+## 2026-05-14 Attachment Service Foundation
+
+- Added `AttachmentStatus` and `attachment_records` as a unified attachment metadata ledger.
+- Attachment records store a business attachment code, display name, backend-managed relative `storage_key`, optional original filename, file type, file size, owner module/entity fields, status, creator snapshot, remarks, and timestamps.
+- Added migration `20260514190000_attachment_records_foundation`.
+- Confirmed this phase does not upload, download, move, preview, OCR, or migrate files; it only introduces metadata and safe storage-key validation.
+- Existing contract, certificate, and project-site attachment path fields remain compatible and are not bulk rewritten in this slice.
+
 ## 2026-05-13 Purchase Request Approval Foundation
 
 - Added `pending_approval` and `rejected` to `PurchaseRequestStatus`.

@@ -94,6 +94,35 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+enum AttachmentStatus {
+  active
+  disabled
+}
+
+model AttachmentRecord {
+  id                String           @id @default(uuid()) @db.Uuid
+  attachmentCode    String           @unique @map("attachment_code")
+  displayName       String           @map("display_name")
+  storageKey        String           @map("storage_key")
+  originalFileName  String?          @map("original_file_name")
+  fileType          String?          @map("file_type")
+  fileSize          Int?             @map("file_size")
+  ownerModule       String           @map("owner_module")
+  ownerEntityType   String           @map("owner_entity_type")
+  ownerEntityId     String?          @map("owner_entity_id") @db.Uuid
+  status            AttachmentStatus @default(active)
+  createdByUserId   String?          @map("created_by_user_id") @db.Uuid
+  createdByUsername String?          @map("created_by_username")
+  remark            String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@index([ownerModule, ownerEntityType, ownerEntityId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("attachment_records")
+}
+
 enum ProjectSiteServiceMode {
   direct
   subcontracted

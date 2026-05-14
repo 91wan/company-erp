@@ -1,0 +1,320 @@
+import { describe, expect, it } from "vitest";
+import type { AttachmentRecordDto, CreateAttachmentRecordInput, UpdateAttachmentRecordInput } from "@company-erp/shared";
+import { buildApp } from "../src/app";
+import type { AttachmentRecordRepository } from "../src/attachments";
+import type { AuditLogRepository } from "../src/auditLogs";
+import type { AuthAccountRecord, AuthRepository } from "../src/auth";
+import { hashPassword } from "../src/password";
+
+const now = "2026-05-14T10:00:00.000Z";
+
+function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    username: "admin",
+    passwordHash: "scrypt$missing$missing",
+    status: "active",
+    employeeId: null,
+    employeeNo: null,
+    employeeName: null,
+    employeeStatus: null,
+    roles: ["admin"],
+    lastLoginAt: null,
+    passwordChangedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+  const accounts = [...seed];
+  return {
+    async findByUsername(username) {
+      return accounts.find((account) => account.username === username) ?? null;
+    },
+    async findById(id) {
+      return accounts.find((account) => account.id === id) ?? null;
+    },
+    async updateLastLogin(id, at) {
+      const account = accounts.find((item) => item.id === id);
+      if (account) account.lastLoginAt = at.toISOString();
+    },
+  };
+}
+
+function makeAttachment(overrides: Partial<AttachmentRecordDto> = {}): AttachmentRecordDto {
+  return {
+    id: "22222222-2222-4222-8222-222222222222",
+    attachmentCode: "ATT-DEMO-001",
+    displayName: "DEMO 合同附件",
+    storageKey: "contracts/demo-contract.pdf",
+    originalFileName: "demo-contract.pdf",
+    fileType: "application/pdf",
+    fileSize: 1024,
+    ownerModule: "contracts",
+    ownerEntityType: "contract",
+    ownerEntityId: "33333333-3333-4333-8333-333333333333",
+    status: "active",
+    createdByUserId: "11111111-1111-4111-8111-111111111111",
+    createdByUsername: "admin",
+    remark: "DEMO metadata only",
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeAttachmentRepository(seed: AttachmentRecordDto[] = [makeAttachment()]): AttachmentRecordRepository {
+  const attachments = [...seed];
+  return {
+    async list(filters) {
+      return attachments.filter((attachment) => {
+        if (filters.ownerModule && attachment.ownerModule !== filters.ownerModule) return false;
+        if (filters.ownerEntityType && attachment.ownerEntityType !== filters.ownerEntityType) return false;
+        if (filters.status && attachment.status !== filters.status) return false;
+        if (filters.q && !`${attachment.attachmentCode} ${attachment.displayName} ${attachment.storageKey}`.includes(filters.q)) {
+          return false;
+        }
+        return true;
+      });
+    },
+    async getById(id) {
+      return attachments.find((attachment) => attachment.id === id) ?? null;
+    },
+    async create(input: CreateAttachmentRecordInput) {
+      if (attachments.some((attachment) => attachment.attachmentCode === input.attachmentCode)) {
+        throw new Error("ATTACHMENT_CONFLICT");
+      }
+      const attachment = makeAttachment({
+        id: "44444444-4444-4444-8444-444444444444",
+        attachmentCode: input.attachmentCode,
+        displayName: input.displayName,
+        storageKey: input.storageKey,
+        originalFileName: input.originalFileName ?? null,
+        fileType: input.fileType ?? null,
+        fileSize: input.fileSize ?? null,
+        ownerModule: input.ownerModule,
+        ownerEntityType: input.ownerEntityType,
+        ownerEntityId: input.ownerEntityId ?? null,
+        status: input.status ?? "active",
+        createdByUserId: input.createdByUserId ?? null,
+        createdByUsername: input.createdByUsername ?? null,
+        remark: input.remark ?? null,
+      });
+      attachments.push(attachment);
+      return attachment;
+    },
+    async update(id, input: UpdateAttachmentRecordInput) {
+      const index = attachments.findIndex((attachment) => attachment.id === id);
+      if (index === -1) return null;
+      attachments[index] = { ...attachments[index], ...input, updatedAt: now };
+      return attachments[index];
+    },
+  };
+}
+
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: Awaited<ReturnType<AuditLogRepository["list"]>> = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log = {
+        id: `99999999-9999-4999-8999-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
+
+async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password: "ChangeMe123!" },
+  });
+  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+}
+
+describe("attachments API", () => {
+  it("requires attachment permissions for list/detail/create/update", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "55555555-5555-4555-8555-555555555555",
+          username: "procurement",
+          passwordHash,
+          roles: ["procurement"],
+        }),
+        makeAuthAccount({
+          id: "66666666-6666-4666-8666-666666666666",
+          username: "viewer",
+          passwordHash,
+          roles: ["viewer"],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository(),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    const anonymous = await app.inject({ method: "GET", url: "/api/attachments" });
+    const adminCookie = await loginCookie(app, "admin");
+    const procurementCookie = await loginCookie(app, "procurement");
+    const viewerCookie = await loginCookie(app, "viewer");
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/attachments?ownerModule=contracts&q=DEMO",
+      cookies: { company_erp_session: procurementCookie },
+    });
+    const forbiddenRead = await app.inject({
+      method: "GET",
+      url: "/api/attachments",
+      cookies: { company_erp_session: viewerCookie },
+    });
+    const forbiddenWrite = await app.inject({
+      method: "POST",
+      url: "/api/attachments",
+      cookies: { company_erp_session: procurementCookie },
+      payload: {
+        attachmentCode: "ATT-DEMO-002",
+        displayName: "DEMO 证照附件",
+        storageKey: "certificates/demo-certificate.jpg",
+        ownerModule: "certificates",
+        ownerEntityType: "certificate",
+      },
+    });
+    const detail = await app.inject({
+      method: "GET",
+      url: "/api/attachments/22222222-2222-4222-8222-222222222222",
+      cookies: { company_erp_session: adminCookie },
+    });
+    await app.close();
+
+    expect(anonymous.statusCode).toBe(401);
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({ attachments: [expect.objectContaining({ attachmentCode: "ATT-DEMO-001" })] });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toEqual({ attachment: expect.objectContaining({ storageKey: "contracts/demo-contract.pdf" }) });
+    expect(forbiddenRead.statusCode).toBe(403);
+    expect(forbiddenWrite.statusCode).toBe(403);
+    expect(forbiddenWrite.json()).toMatchObject({ permissionArea: "attachments", requiredLevel: "manage" });
+  });
+
+  it("creates and updates attachment metadata with audit logs", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository,
+    });
+
+    const cookie = await loginCookie(app);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/attachments",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        attachmentCode: "ATT-DEMO-002",
+        displayName: "DEMO 证照附件",
+        storageKey: "certificates/demo-certificate.jpg",
+        originalFileName: "demo-certificate.jpg",
+        fileType: "image/jpeg",
+        fileSize: 2048,
+        ownerModule: "certificates",
+        ownerEntityType: "certificate",
+        ownerEntityId: "77777777-7777-4777-8777-777777777777",
+        remark: "metadata only",
+      },
+    });
+    const id = created.json().attachment.id;
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/attachments/${id}`,
+      cookies: { company_erp_session: cookie },
+      payload: { displayName: "DEMO 证照附件 v2", status: "disabled" },
+    });
+    const logs = await auditLogRepository.list({});
+    await app.close();
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({
+      attachment: expect.objectContaining({
+        attachmentCode: "ATT-DEMO-002",
+        storageKey: "certificates/demo-certificate.jpg",
+        createdByUserId: "11111111-1111-4111-8111-111111111111",
+        createdByUsername: "admin",
+      }),
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toEqual({ attachment: expect.objectContaining({ displayName: "DEMO 证照附件 v2", status: "disabled" }) });
+    expect(logs.map((log) => log.action)).toEqual(["attachment.create", "attachment.update"]);
+    expect(JSON.stringify(logs)).not.toContain("secret");
+  });
+
+  it("rejects unsafe storage keys", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+    const cookie = await loginCookie(app);
+
+    for (const storageKey of ["", "/tmp/demo.pdf", "https://example.com/demo.pdf", "../demo.pdf", "contracts\\demo.pdf", "contracts/demo\u0000.pdf"]) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/attachments",
+        cookies: { company_erp_session: cookie },
+        payload: {
+          attachmentCode: `ATT-${storageKey.length}`,
+          displayName: "DEMO 附件",
+          storageKey,
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ error: "ATTACHMENT_VALIDATION_FAILED" });
+    }
+
+    await app.close();
+  });
+
+  it("returns repository missing and not found errors", async () => {
+    const appWithoutRepository = await buildApp({ auth: { enabled: false } });
+    const missingRepository = await appWithoutRepository.inject({ method: "GET", url: "/api/attachments" });
+    await appWithoutRepository.close();
+
+    const app = await buildApp({
+      auth: { enabled: false },
+      attachmentRepository: createFakeAttachmentRepository([]),
+    });
+    const notFound = await app.inject({ method: "GET", url: "/api/attachments/22222222-2222-4222-8222-222222222222" });
+    await app.close();
+
+    expect(missingRepository.statusCode).toBe(503);
+    expect(missingRepository.json()).toEqual({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+  });
+});

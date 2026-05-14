@@ -29,6 +29,7 @@ import type {
   EmployeeProjectSiteAssignmentDto,
   ExternalProjectSiteAccountDto,
   AppVersionDto,
+  AttachmentRecordDto,
   AuditLogDto,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteKitchenEquipmentChangeRequestDto,
@@ -94,6 +95,7 @@ export const defaultAppVersion: AppVersionDto = {
 
 type MockShellData = {
   auditLogs?: AuditLogDto[];
+  attachments?: AttachmentRecordDto[];
   purchaseRequests?: PurchaseRequestDto[];
   purchaseRecords?: PurchaseRecordDto[];
   inventoryMovements?: InventoryMovementDto[];
@@ -145,6 +147,14 @@ export function mockShellFetch(
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
     if (url.includes("/api/audit-logs")) return Promise.resolve(jsonResponse({ auditLogs: data.auditLogs ?? [] }));
+    if (url.includes("/api/attachments") && method === "POST") {
+      const payload = init?.body ? JSON.parse(String(init.body)) : {};
+      if (String(payload.storageKey ?? "").startsWith("/") || String(payload.storageKey ?? "").includes("..")) {
+        return Promise.resolve(jsonResponse({ error: "ATTACHMENT_VALIDATION_FAILED" }, false, 400));
+      }
+      return Promise.resolve(jsonResponse({ attachment: { ...attachmentRecord, ...payload, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" } }));
+    }
+    if (url.includes("/api/attachments")) return Promise.resolve(jsonResponse({ attachments: data.attachments ?? [] }));
     if (url.endsWith("/health")) return Promise.resolve(jsonResponse({ status: "ok", service: "company-erp-api" }));
     if (url.includes("/api/parties")) return Promise.resolve(jsonResponse({ parties: [] }));
     if (url.includes("/api/materials")) return Promise.resolve(jsonResponse({ materials: [] }));
@@ -795,6 +805,25 @@ export const contractAttachment: ContractAttachmentDto = {
   uploadedBy: "Admin",
   uploadedAt: "2026-05-11T13:30:00.000Z",
   remark: "扫描件路径",
+};
+
+export const attachmentRecord: AttachmentRecordDto = {
+  id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+  attachmentCode: "ATT-DEMO-001",
+  displayName: "DEMO 合同附件",
+  storageKey: "contracts/demo-contract.pdf",
+  originalFileName: "demo-contract.pdf",
+  fileType: "application/pdf",
+  fileSize: 1024,
+  ownerModule: "contracts",
+  ownerEntityType: "contract",
+  ownerEntityId: contract.id,
+  status: "active",
+  createdByUserId: adminUser.id,
+  createdByUsername: "admin",
+  remark: "metadata only",
+  createdAt: "2026-05-14T10:00:00.000Z",
+  updatedAt: "2026-05-14T10:00:00.000Z",
 };
 
 export const projectUsageRequest: ProjectUsageRequestDto = {

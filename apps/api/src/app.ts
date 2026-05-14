@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import { registerAuditLogRoutes } from "./auditLogRoutes.js";
 import { AuditLogWriteError } from "./auditLogs.js";
 import { registerAppCoreRoutes } from "./appCoreRoutes.js";
+import { registerAttachmentRoutes } from "./attachmentRoutes.js";
 import { registerAuth } from "./auth.js";
 import { registerContractsBusinessCertificatesRoutes } from "./contractsBusinessCertificatesRoutes.js";
 import { registerImportJobRoutes } from "./importJobRoutes.js";
@@ -223,6 +224,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   registerAuth(app, options.authRepository, options.auth);
   registerAppCoreRoutes(app, { appConfigRepository: options.appConfigRepository });
   registerAuditLogRoutes(app, options);
+  registerAttachmentRoutes(app, options);
   registerImportJobRoutes(app, options);
   registerMasterDataRoutes(app, options);
   registerPeoplePermissionsRoutes(app, options);
