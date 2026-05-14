@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildApp, buildLoggerOptions, redactLogPayload } from "../src/app";
+import { buildApp, buildLoggerOptions, redactLogPayload, validateRuntimeSecurityEnvironment } from "../src/app";
 import { hashPassword } from "../src/password";
 import { parseCookieHeader, type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import { validateIdentityEncryptionSecret } from "../src/identityCrypto";
@@ -293,6 +293,157 @@ describe("CORS allowlist", () => {
 
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://allowed.example.com");
     expect(blocked.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+});
+
+describe("public access origin guard", () => {
+  const savedPublicAccess = process.env.PUBLIC_ACCESS_ENABLED;
+  const savedCors = process.env.CORS_ALLOWED_ORIGINS;
+
+  afterEach(() => {
+    if (savedPublicAccess === undefined) delete process.env.PUBLIC_ACCESS_ENABLED;
+    else process.env.PUBLIC_ACCESS_ENABLED = savedPublicAccess;
+    if (savedCors === undefined) delete process.env.CORS_ALLOWED_ORIGINS;
+    else process.env.CORS_ALLOWED_ORIGINS = savedCors;
+  });
+
+  async function appWithPublicAccess() {
+    process.env.PUBLIC_ACCESS_ENABLED = "true";
+    process.env.CORS_ALLOWED_ORIGINS = "https://erp.example.com";
+    const passwordHash = await hashPassword("ChangeMe123!");
+    return buildApp({
+      auth: { enabled: true, sessionSecret: "origin-guard-test-secret-long-enough" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+    });
+  }
+
+  it("rejects unsafe requests without an origin or referer in public-access mode", async () => {
+    const app = await appWithPublicAccess();
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com" },
+    });
+    const businessWrite = await app.inject({
+      method: "POST",
+      url: "/api/departments",
+      payload: { departmentCode: "DEP-TEST", name: "测试部门" },
+      headers: { host: "erp.example.com" },
+    });
+    await app.close();
+
+    expect(login.statusCode).toBe(403);
+    expect(login.json()).toEqual({ error: "ORIGIN_NOT_ALLOWED" });
+    expect(businessWrite.statusCode).toBe(403);
+    expect(businessWrite.json()).toEqual({ error: "ORIGIN_NOT_ALLOWED" });
+  });
+
+  it("allows unsafe requests from the same origin or the HTTPS allowlist", async () => {
+    const app = await appWithPublicAccess();
+
+    const sameOrigin = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com", origin: "https://erp.example.com" },
+    });
+    const allowlistedOrigin = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "internal.example.local", origin: "https://erp.example.com" },
+    });
+    const sameOriginReferer = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com", referer: "https://erp.example.com/login" },
+    });
+    await app.close();
+
+    expect(sameOrigin.statusCode).toBe(200);
+    expect(allowlistedOrigin.statusCode).toBe(200);
+    expect(sameOriginReferer.statusCode).toBe(200);
+  });
+
+  it("rejects unsafe requests from non-allowlisted or insecure origins in public-access mode", async () => {
+    const app = await appWithPublicAccess();
+
+    const nonAllowlisted = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com", origin: "https://evil.example.com" },
+    });
+    const insecureOrigin = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com", origin: "http://erp.example.com" },
+    });
+    await app.close();
+
+    expect(nonAllowlisted.statusCode).toBe(403);
+    expect(insecureOrigin.statusCode).toBe(403);
+  });
+
+  it("keeps public and read-only GET routes compatible in public-access mode", async () => {
+    const app = await appWithPublicAccess();
+
+    const health = await app.inject({ method: "GET", url: "/health", headers: { host: "erp.example.com" } });
+    const roles = await app.inject({ method: "GET", url: "/api/meta/roles", headers: { host: "erp.example.com" } });
+    const me = await app.inject({ method: "GET", url: "/api/auth/me", headers: { host: "erp.example.com" } });
+    await app.close();
+
+    expect(health.statusCode).toBe(200);
+    expect(roles.statusCode).toBe(200);
+    expect(me.statusCode).toBe(200);
+  });
+});
+
+describe("runtime security environment validation", () => {
+  it("rejects production placeholder database passwords and short secrets", () => {
+    expect(() =>
+      validateRuntimeSecurityEnvironment({
+        APP_ENVIRONMENT: "nas",
+        DATABASE_URL: "postgresql://company_erp:change-me-in-nas@postgres:5432/company_erp?schema=public",
+        POSTGRES_PASSWORD: "change-me-in-nas",
+        AUTH_SESSION_SECRET: "short",
+        IDENTITY_ENCRYPTION_SECRET: "also-short",
+      }),
+    ).toThrow(/POSTGRES_PASSWORD/);
+  });
+
+  it("requires secure cookies and HTTPS allowlist origins when public access is enabled", () => {
+    expect(() =>
+      validateRuntimeSecurityEnvironment({
+        APP_ENVIRONMENT: "nas",
+        PUBLIC_ACCESS_ENABLED: "true",
+        DATABASE_URL: "postgresql://company_erp:strong-db-password-123@postgres:5432/company_erp?schema=public",
+        POSTGRES_PASSWORD: "strong-db-password-123",
+        AUTH_SESSION_SECRET: "long-random-session-secret-for-public-access-tests",
+        IDENTITY_ENCRYPTION_SECRET: "long-random-identity-secret-for-public-access-tests",
+        AUTH_COOKIE_SECURE: "false",
+        CORS_ALLOWED_ORIGINS: "http://erp.example.com",
+      }),
+    ).toThrow(/AUTH_COOKIE_SECURE/);
+  });
+
+  it("accepts hardened production settings for public access", () => {
+    expect(() =>
+      validateRuntimeSecurityEnvironment({
+        APP_ENVIRONMENT: "nas",
+        PUBLIC_ACCESS_ENABLED: "true",
+        DATABASE_URL: "postgresql://company_erp:strong-db-password-123@postgres:5432/company_erp?schema=public",
+        POSTGRES_PASSWORD: "strong-db-password-123",
+        AUTH_SESSION_SECRET: "long-random-session-secret-for-public-access-tests",
+        IDENTITY_ENCRYPTION_SECRET: "long-random-identity-secret-for-public-access-tests",
+        AUTH_COOKIE_SECURE: "true",
+        CORS_ALLOWED_ORIGINS: "https://erp.example.com",
+      }),
+    ).not.toThrow();
   });
 });
 
