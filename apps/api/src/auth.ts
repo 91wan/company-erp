@@ -203,6 +203,9 @@ async function resolveSessionUser(
 
 function routePermission(pathname: string, method: string): { area: PermissionAreaCode; requiredLevel: "read" | "manage" } | null {
   const requiredLevel = method === "GET" ? "read" : "manage";
+  if (pathname.startsWith("/api/audit-logs")) {
+    return { area: "auditLogs", requiredLevel };
+  }
   if (pathname.startsWith("/api/app-config")) {
     return { area: "systemSettings", requiredLevel };
   }

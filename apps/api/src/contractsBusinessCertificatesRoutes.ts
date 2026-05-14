@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
-import type { BuildAppOptions } from "./appRouteContext.js";
-import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
+import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "./businessProjects.js";
 import {
   CertificateConflictError,
@@ -182,6 +181,12 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     try {
       const input = normalizeContractInput(request.body, "create");
       const contract = await options.contractRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "contract.create",
+        entityType: "contract",
+        entityId: contract.id,
+        afterJson: contract,
+      });
       return reply.status(201).send({ contract });
     } catch (error) {
       if (error instanceof ContractValidationError) {
@@ -214,6 +219,13 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       if (finalStateIssues.length > 0) throw new ContractValidationError(finalStateIssues);
       const contract = await options.contractRepository.update(id, input);
       if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "contract.update",
+        entityType: "contract",
+        entityId: contract.id,
+        beforeJson: current,
+        afterJson: contract,
+      });
       return { contract };
     } catch (error) {
       if (error instanceof ContractValidationError) {
@@ -327,6 +339,12 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       const scopeFailure = await certificateOwnerScopeFailure(request, options, input);
       if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const certificate = await options.certificateRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "certificate.create",
+        entityType: "certificate",
+        entityId: certificate.id,
+        afterJson: certificate,
+      });
       return reply.status(201).send({ certificate });
     } catch (error) {
       if (error instanceof CertificateValidationError) {
@@ -371,6 +389,13 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const certificate = await options.certificateRepository.update(id, input);
       if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "certificate.update",
+        entityType: "certificate",
+        entityId: certificate.id,
+        beforeJson: current,
+        afterJson: certificate,
+      });
       return { certificate };
     } catch (error) {
       if (error instanceof CertificateValidationError) {

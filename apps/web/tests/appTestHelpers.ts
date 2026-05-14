@@ -29,6 +29,7 @@ import type {
   EmployeeProjectSiteAssignmentDto,
   ExternalProjectSiteAccountDto,
   AppVersionDto,
+  AuditLogDto,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteKitchenEquipmentChangeRequestDto,
   ProjectSiteKitchenEquipmentDto,
@@ -92,6 +93,7 @@ export const defaultAppVersion: AppVersionDto = {
 };
 
 type MockShellData = {
+  auditLogs?: AuditLogDto[];
   purchaseRequests?: PurchaseRequestDto[];
   purchaseRecords?: PurchaseRecordDto[];
   inventoryMovements?: InventoryMovementDto[];
@@ -142,6 +144,7 @@ export function mockShellFetch(
     if (url.endsWith("/api/auth/me")) return Promise.resolve(jsonResponse({ user }));
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
+    if (url.includes("/api/audit-logs")) return Promise.resolve(jsonResponse({ auditLogs: data.auditLogs ?? [] }));
     if (url.endsWith("/health")) return Promise.resolve(jsonResponse({ status: "ok", service: "company-erp-api" }));
     if (url.includes("/api/parties")) return Promise.resolve(jsonResponse({ parties: [] }));
     if (url.includes("/api/materials")) return Promise.resolve(jsonResponse({ materials: [] }));

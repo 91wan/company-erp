@@ -243,6 +243,7 @@ describe("MVP permission constants", () => {
   it("keeps admin as the only role that can manage user accounts and role assignment", () => {
     expect(MVP_PERMISSION_MATRIX.userAccounts.manage).toEqual(["admin"]);
     expect(MVP_PERMISSION_MATRIX.roleAssignment.manage).toEqual(["admin"]);
+    expect(MVP_PERMISSION_MATRIX.auditLogs.read).toEqual(["admin"]);
   });
 
   it("allows fixed-role union permissions for multi-role users", () => {
@@ -276,6 +277,8 @@ describe("MVP permission constants", () => {
     expect(canManage(["viewer", "procurement"], "procurement")).toBe(true);
     expect(canManage(["hr"], "roleAssignment")).toBe(false);
     expect(canManage(["admin"], "systemSettings")).toBe(true);
+    expect(canRead(["admin"], "auditLogs")).toBe(true);
+    expect(canRead(["viewer"], "auditLogs")).toBe(false);
   });
 
   it("gives operations quantity-only inventory access and usage request creation without warehouse mutation", () => {

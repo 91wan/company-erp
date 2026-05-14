@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
 import type { AuthenticatedRequest } from "./auth.js";
-import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds } from "./appRouteContext.js";
+import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
 async function coveredPersonScopeFailure(
@@ -162,6 +161,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
       const rosterPerson = await options.projectSiteComplianceRepository.createRosterPerson(input);
+      await writeAuditLog(request, options, {
+        action: "project_site_roster_person.create",
+        entityType: "project_site_roster_person",
+        entityId: rosterPerson.id,
+        afterJson: rosterPerson,
+      });
       return reply.status(201).send({ rosterPerson });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -196,6 +201,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
       const insurancePolicy = await options.projectSiteComplianceRepository.createInsurancePolicy(input);
+      await writeAuditLog(request, options, {
+        action: "employer_liability_insurance_policy.create",
+        entityType: "employer_liability_insurance_policy",
+        entityId: insurancePolicy.id,
+        afterJson: insurancePolicy,
+      });
       return reply.status(201).send({ insurancePolicy });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -214,6 +225,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       const scopeFailure = await coveredPersonScopeFailure(request, options, input);
       if (scopeFailure) return reply.status(scopeFailure.statusCode).send(scopeFailure.body);
       const coveredPerson = await options.projectSiteComplianceRepository.createCoveredPerson(input);
+      await writeAuditLog(request, options, {
+        action: "employer_liability_insurance_covered_person.create",
+        entityType: "employer_liability_insurance_covered_person",
+        entityId: coveredPerson.id,
+        afterJson: coveredPerson,
+      });
       return reply.status(201).send({ coveredPerson });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -248,6 +265,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
       const payrollSubmission = await options.projectSiteComplianceRepository.createPayrollSubmission(input);
+      await writeAuditLog(request, options, {
+        action: "project_site_payroll_submission.create",
+        entityType: "project_site_payroll_submission",
+        entityId: payrollSubmission.id,
+        afterJson: payrollSubmission,
+      });
       return reply.status(201).send({ payrollSubmission });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -601,6 +624,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       const input = normalizeIssueProjectUsageRequestInput(request.body);
       const projectUsageRequest = await options.projectUsageRequestRepository.issue(id, input);
       if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "project_usage_request.issue",
+        entityType: "project_usage_request",
+        entityId: projectUsageRequest.id,
+        afterJson: projectUsageRequest,
+      });
       return reply.status(201).send({ projectUsageRequest });
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {

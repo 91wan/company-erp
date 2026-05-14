@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
+import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { DepartmentConflictError, DepartmentValidationError, EmployeeConflictError, EmployeeProjectSiteAssignmentConflictError, EmployeeProjectSiteAssignmentValidationError, EmployeeValidationError, ExternalProjectSiteAccountConflictError, ExternalProjectSiteAccountValidationError, UserAccountConflictError, UserAccountValidationError, normalizeDepartmentFilters, normalizeDepartmentInput, normalizeEmployeeFilters, normalizeEmployeeInput, normalizeExternalProjectSiteAccountFilters, normalizeExternalProjectSiteAccountInput, normalizeProjectSiteAssignmentFilters, normalizeProjectSiteAssignmentInput, normalizeUserAccountFilters, normalizeUserAccountInput } from "./peoplePermissions.js";
 
 export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: BuildAppOptions) {
@@ -249,6 +249,12 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const input = normalizeUserAccountInput(request.body, "create");
       const userAccount = await options.userAccountRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "user_account.create",
+        entityType: "user_account",
+        entityId: userAccount.id,
+        afterJson: userAccount,
+      });
       return reply.status(201).send({ userAccount });
     } catch (error) {
       if (error instanceof UserAccountValidationError) {
@@ -268,9 +274,17 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
 
     const { id } = request.params as { id: string };
     try {
+      const current = await options.userAccountRepository.getById(id);
       const input = normalizeUserAccountInput(request.body, "update");
       const userAccount = await options.userAccountRepository.update(id, input);
       if (!userAccount) return reply.status(404).send({ error: "USER_ACCOUNT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "user_account.update",
+        entityType: "user_account",
+        entityId: userAccount.id,
+        beforeJson: current,
+        afterJson: userAccount,
+      });
       return { userAccount };
     } catch (error) {
       if (error instanceof UserAccountValidationError) {
@@ -308,6 +322,12 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const input = normalizeExternalProjectSiteAccountInput(request.body, "create");
       const externalProjectSiteAccount = await options.externalProjectSiteAccountRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "external_project_site_account.create",
+        entityType: "external_project_site_account",
+        entityId: externalProjectSiteAccount.id,
+        afterJson: externalProjectSiteAccount,
+      });
       return reply.status(201).send({ externalProjectSiteAccount });
     } catch (error) {
       if (error instanceof ExternalProjectSiteAccountValidationError) {
@@ -327,9 +347,17 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
 
     const { id } = request.params as { id: string };
     try {
+      const current = await options.externalProjectSiteAccountRepository.getById(id);
       const input = normalizeExternalProjectSiteAccountInput(request.body, "update");
       const externalProjectSiteAccount = await options.externalProjectSiteAccountRepository.update(id, input);
       if (!externalProjectSiteAccount) return reply.status(404).send({ error: "EXTERNAL_PROJECT_SITE_ACCOUNT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "external_project_site_account.update",
+        entityType: "external_project_site_account",
+        entityId: externalProjectSiteAccount.id,
+        beforeJson: current,
+        afterJson: externalProjectSiteAccount,
+      });
       return { externalProjectSiteAccount };
     } catch (error) {
       if (error instanceof ExternalProjectSiteAccountValidationError) {

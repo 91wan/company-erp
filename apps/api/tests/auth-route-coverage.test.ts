@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const routeSource = [
   "../src/app.ts",
   "../src/appCoreRoutes.ts",
+  "../src/auditLogRoutes.ts",
   "../src/importJobRoutes.ts",
   "../src/masterDataRoutes.ts",
   "../src/peoplePermissionsRoutes.ts",
