@@ -10,16 +10,25 @@ import type {
 } from "@company-erp/shared";
 
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
+let csrfToken: string | null = null;
+
+function rememberCsrfToken(nextToken: string | null | undefined): void {
+  if (nextToken) csrfToken = nextToken;
+}
+
+function isUnsafeMethod(method: string | undefined): boolean {
+  return ["POST", "PATCH", "PUT", "DELETE"].includes((method ?? "GET").toUpperCase());
+}
 
 export async function requestJson<TPayload>(url: string, init?: RequestInit): Promise<TPayload> {
   const shouldSetJsonContentType = Boolean(init?.body) && !(init?.body instanceof FormData);
+  const headers = new Headers(init?.headers);
+  if (shouldSetJsonContentType && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (isUnsafeMethod(init?.method) && csrfToken) headers.set("X-CSRF-Token", csrfToken);
   const response = await fetch(url, {
     ...init,
     credentials: "include",
-    headers: {
-      ...(shouldSetJsonContentType ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -30,7 +39,8 @@ export async function requestJson<TPayload>(url: string, init?: RequestInit): Pr
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUserDto | null> {
-  const payload = await requestJson<{ user: AuthenticatedUserDto | null }>(`${apiBaseUrl}/api/auth/me`);
+  const payload = await requestJson<{ user: AuthenticatedUserDto | null; csrfToken?: string }>(`${apiBaseUrl}/api/auth/me`);
+  rememberCsrfToken(payload.csrfToken);
   return payload.user;
 }
 
@@ -71,13 +81,15 @@ export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppC
 }
 
 export async function login(input: LoginInput): Promise<AuthenticatedUserDto> {
-  const payload = await requestJson<{ user: AuthenticatedUserDto }>(`${apiBaseUrl}/api/auth/login`, {
+  const payload = await requestJson<{ user: AuthenticatedUserDto; csrfToken?: string }>(`${apiBaseUrl}/api/auth/login`, {
     method: "POST",
     body: JSON.stringify(input),
   });
+  rememberCsrfToken(payload.csrfToken);
   return payload.user;
 }
 
 export async function logout(): Promise<void> {
   await requestJson<{ ok: true }>(`${apiBaseUrl}/api/auth/logout`, { method: "POST" });
+  csrfToken = null;
 }

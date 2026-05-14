@@ -401,6 +401,52 @@ describe("public access origin guard", () => {
     expect(roles.statusCode).toBe(200);
     expect(me.statusCode).toBe(200);
   });
+
+  it("requires a matching CSRF token for authenticated unsafe requests in public-access mode", async () => {
+    const app = await appWithPublicAccess();
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+      headers: { host: "erp.example.com", origin: "https://erp.example.com" },
+    });
+    const cookie = login.cookies.find((item) => item.name === "company_erp_session")?.value ?? "";
+    const csrfToken = login.json().csrfToken as string;
+
+    const missingToken = await app.inject({
+      method: "POST",
+      url: "/api/unmapped-write",
+      cookies: { company_erp_session: cookie },
+      headers: { host: "erp.example.com", origin: "https://erp.example.com" },
+      payload: {},
+    });
+    const wrongToken = await app.inject({
+      method: "POST",
+      url: "/api/unmapped-write",
+      cookies: { company_erp_session: cookie },
+      headers: { host: "erp.example.com", origin: "https://erp.example.com", "x-csrf-token": "wrong-token" },
+      payload: {},
+    });
+    const matchingToken = await app.inject({
+      method: "POST",
+      url: "/api/unmapped-write",
+      cookies: { company_erp_session: cookie },
+      headers: { host: "erp.example.com", origin: "https://erp.example.com", "x-csrf-token": csrfToken },
+      payload: {},
+    });
+    await app.close();
+
+    expect(login.statusCode).toBe(200);
+    expect(typeof csrfToken).toBe("string");
+    expect(csrfToken.length).toBeGreaterThan(20);
+    expect(missingToken.statusCode).toBe(403);
+    expect(missingToken.json()).toEqual({ error: "CSRF_TOKEN_INVALID" });
+    expect(wrongToken.statusCode).toBe(403);
+    expect(wrongToken.json()).toEqual({ error: "CSRF_TOKEN_INVALID" });
+    expect(matchingToken.statusCode).toBe(403);
+    expect(matchingToken.json()).toEqual({ error: "PERMISSION_NOT_MAPPED" });
+  });
 });
 
 describe("runtime security environment validation", () => {

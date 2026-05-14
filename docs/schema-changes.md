@@ -7,6 +7,14 @@ This file records every database schema decision and migration.
 - Confirm import tables.
 - Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
+## 2026-05-14 CSRF Token Foundation
+
+- Added nullable `auth_sessions.csrf_token_hash` for per-session CSRF validation.
+- Login and `/api/auth/me` return a random CSRF token while the database stores only its SHA-256 hash.
+- In public-access mode, authenticated unsafe requests require both the existing Origin/Host guard and a matching `X-CSRF-Token` header.
+- Added migration `20260514201500_auth_session_csrf`.
+- Confirmed this phase does not change auth response envelopes for existing clients that ignore the extra `csrfToken` field.
+
 ## 2026-05-14 Server-Side Session Foundation
 
 - Added `auth_sessions` as the server-side session ledger for login cookies.

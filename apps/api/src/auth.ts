@@ -14,6 +14,7 @@ import { verifyPassword } from "./password.js";
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const unsafeMethods = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const INSECURE_SESSION_SECRET_PLACEHOLDERS = new Set([
   "company-erp-local-dev-session-secret-change-me",
   "change-me-long-random-local-secret",
@@ -42,6 +43,7 @@ export type AuthRepository = {
   createSession?(input: CreateAuthSessionInput): Promise<AuthSessionRecord>;
   findSessionByTokenHash?(tokenHash: string): Promise<AuthSessionRecord | null>;
   touchSession?(id: string, at: Date): Promise<void>;
+  updateSessionCsrfToken?(id: string, csrfTokenHash: string, at: Date): Promise<void>;
   revokeSession?(id: string, at: Date, reason: string): Promise<void>;
   revokeSessionsForAccount?(userAccountId: string, at: Date, reason: string): Promise<void>;
 };
@@ -61,6 +63,7 @@ export type AuthenticatedRequest = FastifyRequest & {
 export type CreateAuthSessionInput = {
   userAccountId: string;
   tokenHash: string;
+  csrfTokenHash?: string | null;
   expiresAt: Date;
   createdAt: Date;
   ip?: string | null;
@@ -71,6 +74,7 @@ export type AuthSessionRecord = {
   id: string;
   userAccountId: string;
   tokenHash: string;
+  csrfTokenHash?: string | null;
   expiresAt: string;
   revokedAt?: string | null;
   revokedReason?: string | null;
@@ -85,7 +89,15 @@ export function createOpaqueSessionToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+export function createCsrfToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
 export function hashSessionToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function hashCsrfToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -162,7 +174,12 @@ function authSessionIsActive(session: AuthSessionRecord, now = new Date()): bool
 
 type AuthSessionStore = Required<Pick<
   AuthRepository,
-  "createSession" | "findSessionByTokenHash" | "touchSession" | "revokeSession" | "revokeSessionsForAccount"
+  | "createSession"
+  | "findSessionByTokenHash"
+  | "touchSession"
+  | "updateSessionCsrfToken"
+  | "revokeSession"
+  | "revokeSessionsForAccount"
 >>;
 
 function createInMemorySessionStore(): AuthSessionStore {
@@ -174,6 +191,7 @@ function createInMemorySessionStore(): AuthSessionStore {
         id: randomBytes(16).toString("hex"),
         userAccountId: input.userAccountId,
         tokenHash: input.tokenHash,
+        csrfTokenHash: input.csrfTokenHash ?? null,
         expiresAt: input.expiresAt.toISOString(),
         revokedAt: null,
         revokedReason: null,
@@ -193,6 +211,15 @@ function createInMemorySessionStore(): AuthSessionStore {
       for (const session of sessions.values()) {
         if (session.id === id) {
           session.lastSeenAt = at.toISOString();
+          session.updatedAt = at.toISOString();
+          return;
+        }
+      }
+    },
+    async updateSessionCsrfToken(id, csrfTokenHash, at) {
+      for (const session of sessions.values()) {
+        if (session.id === id) {
+          session.csrfTokenHash = csrfTokenHash;
           session.updatedAt = at.toISOString();
           return;
         }
@@ -225,6 +252,7 @@ function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
     authRepository.createSession &&
     authRepository.findSessionByTokenHash &&
     authRepository.touchSession &&
+    authRepository.updateSessionCsrfToken &&
     authRepository.revokeSession &&
     authRepository.revokeSessionsForAccount
   ) {
@@ -232,6 +260,7 @@ function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
       createSession: authRepository.createSession.bind(authRepository),
       findSessionByTokenHash: authRepository.findSessionByTokenHash.bind(authRepository),
       touchSession: authRepository.touchSession.bind(authRepository),
+      updateSessionCsrfToken: authRepository.updateSessionCsrfToken.bind(authRepository),
       revokeSession: authRepository.revokeSession.bind(authRepository),
       revokeSessionsForAccount: authRepository.revokeSessionsForAccount.bind(authRepository),
     };
@@ -273,6 +302,37 @@ async function resolveSessionUser(
   await sessionStore.touchSession(session.id, new Date());
   (request as AuthenticatedRequest).currentSessionId = session.id;
   return toAuthenticatedUser(account);
+}
+
+function publicAccessEnabled(): boolean {
+  return process.env.PUBLIC_ACCESS_ENABLED === "true" || process.env.PUBLIC_ACCESS_ENABLED === "1";
+}
+
+function csrfTokenFromHeader(request: FastifyRequest): string {
+  const header = request.headers["x-csrf-token"];
+  return typeof header === "string" ? header : "";
+}
+
+async function sessionForRequest(
+  request: FastifyRequest,
+  sessionStore: AuthSessionStore,
+): Promise<AuthSessionRecord | null> {
+  const requestWithCookies = request as FastifyRequest & { cookies?: Record<string, string> };
+  const cookies = { ...parseCookieHeader(request.headers.cookie), ...(requestWithCookies.cookies ?? {}) };
+  const token = cookies[AUTH_COOKIE_NAME];
+  if (!token) return null;
+  const session = await sessionStore.findSessionByTokenHash(hashSessionToken(token));
+  return session && authSessionIsActive(session) ? session : null;
+}
+
+function csrfTokenMatches(session: AuthSessionRecord, token: string): boolean {
+  return Boolean(session.csrfTokenHash && token && session.csrfTokenHash === hashCsrfToken(token));
+}
+
+async function rotateCsrfToken(sessionStore: AuthSessionStore, sessionId: string): Promise<string> {
+  const csrfToken = createCsrfToken();
+  await sessionStore.updateSessionCsrfToken(sessionId, hashCsrfToken(csrfToken), new Date());
+  return csrfToken;
 }
 
 function routePermission(pathname: string, method: string): { area: PermissionAreaCode; requiredLevel: "read" | "manage" } | null {
@@ -386,6 +446,13 @@ export function registerAuth(
 
     (request as AuthenticatedRequest).currentUser = user;
 
+    if (publicAccessEnabled() && unsafeMethods.has(request.method)) {
+      const session = await sessionForRequest(request, sessionStore ?? createInMemorySessionStore());
+      if (!session || !csrfTokenMatches(session, csrfTokenFromHeader(request))) {
+        return reply.status(403).send({ error: "CSRF_TOKEN_INVALID" });
+      }
+    }
+
     // Unmapped routes are fail-closed: authenticated but unknown API paths are forbidden
     const permission = routePermission(pathname, request.method);
     if (!permission) {
@@ -436,9 +503,11 @@ export function registerAuth(
       const user = toAuthenticatedUser(refreshed ?? account);
       const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
       const token = createOpaqueSessionToken();
+      const csrfToken = createCsrfToken();
       await (sessionStore ?? createInMemorySessionStore()).createSession({
         userAccountId: account.id,
         tokenHash: hashSessionToken(token),
+        csrfTokenHash: hashCsrfToken(csrfToken),
         expiresAt: new Date(issuedAt.getTime() + ttlSeconds * 1000),
         createdAt: issuedAt,
         ip: request.ip ?? null,
@@ -453,14 +522,17 @@ export function registerAuth(
           secure,
         }),
       );
-      return { user };
+      return { user, csrfToken };
     },
   );
 
   app.get("/api/auth/me", async (request) => {
     if (!authRepository) return { user: null };
     const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
-    return { user };
+    const currentSessionId = (request as AuthenticatedRequest).currentSessionId;
+    if (!user || !currentSessionId || !sessionStore) return { user };
+    const csrfToken = await rotateCsrfToken(sessionStore, currentSessionId);
+    return { user, csrfToken };
   });
 
   app.post("/api/auth/logout", async (request, reply: FastifyReply) => {

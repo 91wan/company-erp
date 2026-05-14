@@ -46,6 +46,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
         id: `session-${sessions.length + 1}`,
         userAccountId: input.userAccountId,
         tokenHash: input.tokenHash,
+        csrfTokenHash: input.csrfTokenHash ?? null,
         expiresAt: input.expiresAt.toISOString(),
         revokedAt: null,
         revokedReason: null,
@@ -64,6 +65,13 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
     async touchSession(id, at) {
       const session = sessions.find((item) => item.id === id);
       if (session) session.lastSeenAt = at.toISOString();
+    },
+    async updateSessionCsrfToken(id, csrfTokenHash, at) {
+      const session = sessions.find((item) => item.id === id);
+      if (session) {
+        session.csrfTokenHash = csrfTokenHash;
+        session.updatedAt = at.toISOString();
+      }
     },
     async revokeSession(id, at, reason) {
       const session = sessions.find((item) => item.id === id);
@@ -158,6 +166,8 @@ describe("auth API", () => {
     expect(response.cookies[0]).toMatchObject({ name: "company_erp_session", httpOnly: true, sameSite: "Lax" });
     expect(response.cookies[0].value).not.toContain(".");
     expect(response.json()).toMatchObject({ user: { username: "admin", roles: ["admin", "viewer"] } });
+    expect(response.json().csrfToken).toEqual(expect.any(String));
+    expect(response.json().csrfToken.length).toBeGreaterThan(20);
     expect(JSON.stringify(response.json())).not.toContain("passwordHash");
     expect(account.lastLoginAt).toBeTruthy();
   });
@@ -239,6 +249,8 @@ describe("auth API", () => {
         assignedProjectSiteIds: ["77777777-7777-4777-8777-777777777777"],
       },
     });
+    expect(valid.json().csrfToken).toEqual(expect.any(String));
+    expect(valid.json().csrfToken.length).toBeGreaterThan(20);
     expect(missing.json()).toEqual({ user: null });
     expect(tampered.json()).toEqual({ user: null });
     expect(logout.statusCode).toBe(200);

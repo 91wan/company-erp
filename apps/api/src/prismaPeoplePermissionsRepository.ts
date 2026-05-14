@@ -205,6 +205,7 @@ function toAuthSessionRecord(session: PrismaAuthSession): AuthSessionRecord {
     id: session.id,
     userAccountId: session.userAccountId,
     tokenHash: session.tokenHash,
+    csrfTokenHash: session.csrfTokenHash,
     expiresAt: session.expiresAt.toISOString(),
     revokedAt: session.revokedAt?.toISOString() ?? null,
     revokedReason: session.revokedReason,
@@ -920,6 +921,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
         data: {
           userAccountId: input.userAccountId,
           tokenHash: input.tokenHash,
+          csrfTokenHash: input.csrfTokenHash ?? null,
           expiresAt: input.expiresAt,
           ip: input.ip ?? null,
           userAgent: input.userAgent ?? null,
@@ -937,6 +939,12 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       await prisma.authSession.updateMany({
         where: { id, revokedAt: null },
         data: { lastSeenAt: at },
+      });
+    },
+    async updateSessionCsrfToken(id: string, csrfTokenHash: string, at: Date) {
+      await prisma.authSession.updateMany({
+        where: { id, revokedAt: null },
+        data: { csrfTokenHash, lastSeenAt: at },
       });
     },
     async revokeSession(id: string, at: Date, reason: string) {
