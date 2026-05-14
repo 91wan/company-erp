@@ -183,6 +183,7 @@ export function PeoplePermissionsWorkspace({
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [externalAccountSubmit, setExternalAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [assignmentSubmit, setAssignmentSubmit] = useState<"idle" | "saving" | "error">("idle");
+  const [pendingDeactivateExternalAccountId, setPendingDeactivateExternalAccountId] = useState("");
   const [departmentForm, setDepartmentForm] = useState<CreateDepartmentInput>({
     departmentCode: "",
     name: "",
@@ -537,25 +538,33 @@ export function PeoplePermissionsWorkspace({
 
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<KeyRound size={18} />} title="项目点外部账号管理" />
-          {externalAccountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点外部账号..." /> : null}
-          {externalAccountStatus === "error" ? <StateMessage text="项目点外部账号加载失败" /> : null}
+          <PanelTitle icon={<KeyRound size={18} />} title="项目点账号" />
+          <p className="form-hint">项目点账号代表当前现场负责人/项目经理，不代表分包主体，也不等同于项目点现场人员。</p>
+          {externalAccountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点账号..." /> : null}
+          {externalAccountStatus === "error" ? <StateMessage text="项目点账号加载失败" /> : null}
           {externalAccountStatus === "ready" && filteredExternalProjectSiteAccounts.length === 0 ? (
-            <StateMessage text="暂无项目点外部账号" />
+            <StateMessage text="暂无项目点账号" />
           ) : null}
           {externalAccountStatus === "ready" && filteredExternalProjectSiteAccounts.length > 0 ? (
             <ExternalProjectSiteAccountsTable
               accounts={filteredExternalProjectSiteAccounts}
               canManage={canManage}
               saving={externalAccountSubmit === "saving"}
-              onDeactivate={deactivateExternalAccount}
+              pendingDeactivateId={pendingDeactivateExternalAccountId}
+              onRequestDeactivate={(account) => setPendingDeactivateExternalAccountId(account.id)}
+              onCancelDeactivate={() => setPendingDeactivateExternalAccountId("")}
+              onConfirmDeactivate={(account) => {
+                setPendingDeactivateExternalAccountId("");
+                void deactivateExternalAccount(account);
+              }}
             />
           ) : null}
         </section>
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleExternalAccountSubmit}>
-          <FormHeader title="新增项目点外部账号" buttonText="保存外部账号" saving={externalAccountSubmit === "saving"} />
+          <FormHeader title="新增项目点账号" buttonText="保存项目点账号" saving={externalAccountSubmit === "saving"} />
+          <p className="form-hint">一个项目点最多一个当前有效项目点账号；更换项目经理建议停用旧账号并创建新账号。</p>
           <label>
-            <span>外部账号项目点</span>
+            <span>账号绑定项目点</span>
             <select
               required
               value={externalAccountForm.projectSiteId}
@@ -597,7 +606,7 @@ export function PeoplePermissionsWorkspace({
             />
           </label>
           <label>
-            <span>外部登录账号</span>
+            <span>项目点登录账号</span>
             <input
               required
               value={externalAccountForm.username}
@@ -607,7 +616,7 @@ export function PeoplePermissionsWorkspace({
             />
           </label>
           <label>
-            <span>外部初始密码</span>
+            <span>项目点初始密码</span>
             <input
               required
               type="password"
@@ -627,13 +636,13 @@ export function PeoplePermissionsWorkspace({
               }
             />
           </label>
-          {externalAccountSubmit === "error" ? <p className="form-error">保存失败，请检查账号是否重复或项目点是否已有启用外部账号。</p> : null}
+          {externalAccountSubmit === "error" ? <p className="form-error">保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。</p> : null}
         </form> : null}
       </section>
 
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<IdCard size={18} />} title="员工台账" />
+          <PanelTitle icon={<IdCard size={18} />} title="公司员工" />
           {employeeStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载员工资料..." /> : null}
           {employeeStatus === "error" ? <StateMessage text="员工资料加载失败" /> : null}
           {employeeStatus === "ready" && filteredEmployees.length === 0 ? <StateMessage text="暂无员工资料" /> : null}
@@ -666,7 +675,8 @@ export function PeoplePermissionsWorkspace({
 
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<KeyRound size={18} />} title="账号角色" />
+          <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
+          <p className="form-hint">总部内部账号按固定角色授权；项目点账号不混入普通用户账号操作区。</p>
           {accountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载账号资料..." /> : null}
           {accountStatus === "error" ? <StateMessage text="账号资料加载失败" /> : null}
           {accountStatus === "ready" && filteredUserAccounts.length === 0 ? <StateMessage text="暂无账号资料" /> : null}
@@ -930,12 +940,18 @@ function ExternalProjectSiteAccountsTable({
   accounts,
   canManage,
   saving,
-  onDeactivate,
+  pendingDeactivateId,
+  onRequestDeactivate,
+  onCancelDeactivate,
+  onConfirmDeactivate,
 }: {
   accounts: ExternalProjectSiteAccountDto[];
   canManage: boolean;
   saving: boolean;
-  onDeactivate: (account: ExternalProjectSiteAccountDto) => void;
+  pendingDeactivateId: string;
+  onRequestDeactivate: (account: ExternalProjectSiteAccountDto) => void;
+  onCancelDeactivate: () => void;
+  onConfirmDeactivate: (account: ExternalProjectSiteAccountDto) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -972,14 +988,31 @@ function ExternalProjectSiteAccountsTable({
               </td>
               {canManage ? (
                 <td>
-                  <button
-                    type="button"
-                    className="table-action"
-                    disabled={saving || account.status !== "active"}
-                    onClick={() => onDeactivate(account)}
-                  >
-                    停用
-                  </button>
+                  {pendingDeactivateId === account.id ? (
+                    <div className="inline-confirm-actions" aria-label={`确认停用 ${account.username}`}>
+                      <span>确认停用？</span>
+                      <button
+                        type="button"
+                        className="table-action danger"
+                        disabled={saving}
+                        onClick={() => onConfirmDeactivate(account)}
+                      >
+                        确认停用
+                      </button>
+                      <button type="button" className="table-action" disabled={saving} onClick={onCancelDeactivate}>
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="table-action"
+                      disabled={saving || account.status !== "active"}
+                      onClick={() => onRequestDeactivate(account)}
+                    >
+                      停用
+                    </button>
+                  )}
                 </td>
               ) : null}
             </tr>
