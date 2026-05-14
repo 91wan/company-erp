@@ -36,18 +36,18 @@ test("admin can navigate from dashboard cards and sidebar to real workspaces", a
   await page.getByRole("button", { name: /采购需求/ }).first().click();
   await expect(page.getByRole("heading", { name: "采购管理" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Dashboard" }).click();
-  await page.getByRole("button", { name: /入库记录/ }).first().click();
+  await page.getByRole("button", { name: "总览" }).click();
+  await page.getByRole("button", { name: /查看低库存/ }).first().click();
   await expect(page.getByRole("heading", { name: "库存管理" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Dashboard" }).click();
+  await page.getByRole("button", { name: "总览" }).click();
   await page.getByRole("button", { name: /项目点领用/ }).first().click();
   await expect(page.getByRole("heading", { name: "项目点", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "合同" }).click();
   await expect(page.locator("h2").filter({ hasText: "合同台账" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Dashboard" }).click();
+  await page.getByRole("button", { name: "总览" }).click();
   await page.getByText("DEMO-CERT-001").click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
 
@@ -103,15 +103,15 @@ test("external project-site accounts render only scoped project-site compliance 
   await page.goto("/");
 
   await expect(page.getByText("site-manager").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "项目点" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "我的项目点" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "现场人员/健康证" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Dashboard" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "总览" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "基础资料" })).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
 
-  await page.getByRole("button", { name: "证照资质" }).click();
+  await page.getByRole("button", { name: "现场人员/健康证" }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存证照" })).toBeVisible();
   const ownerTypeSelect = page.getByLabel("归属对象");

@@ -22,6 +22,7 @@ import {
   type ProjectSiteDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader } from "./ui";
 
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
@@ -353,17 +354,17 @@ export function ContractsWorkspace({
 
   return (
     <section className="contracts-workspace" aria-label="合同管理">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">合同</span>
-          <h2>合同台账</h2>
-          <p>维护合同基础信息、项目点关联和附件路径，采购记录可选关联合同。</p>
-        </div>
-        <span className="parties-total">
-          <FileText aria-hidden="true" size={18} />
-          {contracts.length} 份合同
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="合同风险台账"
+        title="合同台账"
+        subtitle="维护合同基础信息、项目点和业务项目关联、附件引用与到期风险。"
+        actions={(
+          <span className="parties-total">
+            <FileText aria-hidden="true" size={18} />
+            {contracts.length} 份合同
+          </span>
+        )}
+      />
 
       <div className="party-summary people-summary" aria-label="合同摘要指标">
         <SummaryCard label="合同总数" value={contracts.length} />

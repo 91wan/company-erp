@@ -14,6 +14,7 @@ import {
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader } from "./ui";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -354,17 +355,17 @@ export function PurchaseWorkspace({
 
   return (
     <section className="purchase-workspace" aria-label="采购管理">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">采购</span>
-          <h2>采购管理</h2>
-          <p>登记采购需求和采购执行记录，供应商资料可选，入库后续模块处理。</p>
-        </div>
-        <span className="parties-total">
-          <ShoppingCart aria-hidden="true" size={18} />
-          {purchaseRequests.length + purchaseRecords.length} 条采购数据
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="经营业务"
+        title="采购管理"
+        subtitle="登记采购需求、提交审批并跟踪采购执行；采购入库由库存模块完成闭环。"
+        actions={(
+          <span className="parties-total">
+            <ShoppingCart aria-hidden="true" size={18} />
+            {purchaseRequests.length + purchaseRecords.length} 条采购数据
+          </span>
+        )}
+      />
 
       <div className="party-summary material-summary" aria-label="采购摘要指标">
         <SummaryCard label="采购需求" value={purchaseRequests.length} />

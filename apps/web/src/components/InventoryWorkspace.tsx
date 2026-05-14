@@ -11,6 +11,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader } from "./ui";
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
@@ -264,17 +265,17 @@ export function InventoryWorkspace({
 
   return (
     <section className="inventory-workspace" aria-label="库存管理">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">库存管理</span>
-          <h2>库存管理</h2>
-          <p>总部仓库入库登记、库存流水和当前库存余额查询。</p>
-        </div>
-        <span className="parties-total">
-          <Warehouse aria-hidden="true" size={18} />
-          {balances.length} 个库存项
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="库存风险与流水"
+        title="库存管理"
+        subtitle="总部仓库入库登记、库存流水和当前库存余额查询；低库存风险在工作台与本页同步突出。"
+        actions={(
+          <span className="parties-total">
+            <Warehouse aria-hidden="true" size={18} />
+            {balances.length} 个库存项
+          </span>
+        )}
+      />
 
       <div className="inventory-heading">
         <p>{"采购记录 -> 仓库入库 -> 库存流水 -> 当前库存余额"}</p>
