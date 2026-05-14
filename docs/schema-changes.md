@@ -7,6 +7,14 @@ This file records every database schema decision and migration.
 - Confirm import tables.
 - Confirm whether monthly operating reports need a table after the usage-request MVP is stable.
 
+## 2026-05-14 Identity Crypto Policy Finalization
+
+- Confirmed individual-party identity numbers are decryptable sensitive fields, not public business fields.
+- Added `parties.identity_no_key_version` to record the key version used by encrypted identity-number values.
+- Added migration `20260514210000_identity_key_version`.
+- Documented the current `v1` AES-256-GCM policy and future rotation workflow in `docs/security/identity-crypto.md`.
+- Confirmed normal API/UI responses continue to expose only masked and last-four identity fields.
+
 ## 2026-05-14 CSRF Token Foundation
 
 - Added nullable `auth_sessions.csrf_token_hash` for per-session CSRF validation.

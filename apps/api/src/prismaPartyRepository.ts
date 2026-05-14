@@ -7,7 +7,12 @@ import type {
   UpdatePartyInput,
 } from "@company-erp/shared";
 import { PartyConflictError, type PartyListFilters, type PartyRepository } from "./parties.js";
-import { encryptIdentityNo, identityNoLast4, maskIdentityNoFromLast4 } from "./identityCrypto.js";
+import {
+  CURRENT_IDENTITY_KEY_VERSION,
+  encryptIdentityNo,
+  identityNoLast4,
+  maskIdentityNoFromLast4,
+} from "./identityCrypto.js";
 
 type PrismaParty = Awaited<ReturnType<PrismaClient["party"]["findFirstOrThrow"]>>;
 
@@ -42,6 +47,7 @@ function toCreateData(input: CreatePartyInput): Prisma.PartyCreateInput {
     entityType: input.entityType ?? "company",
     unifiedSocialCreditCode: input.unifiedSocialCreditCode,
     identityNoEncrypted: input.identityNo ? encryptIdentityNo(input.identityNo) : undefined,
+    identityNoKeyVersion: input.identityNo ? CURRENT_IDENTITY_KEY_VERSION : undefined,
     identityNoLast4: input.identityNo ? identityNoLast4(input.identityNo) : undefined,
     primaryContactName: input.primaryContactName,
     primaryContactPhone: input.primaryContactPhone,
@@ -66,6 +72,7 @@ function toUpdateData(input: UpdatePartyInput): Prisma.PartyUpdateInput {
     ...(input.identityNo !== undefined
       ? {
           identityNoEncrypted: input.identityNo ? encryptIdentityNo(input.identityNo) : null,
+          identityNoKeyVersion: input.identityNo ? CURRENT_IDENTITY_KEY_VERSION : null,
           identityNoLast4: input.identityNo ? identityNoLast4(input.identityNo) : null,
         }
       : {}),
