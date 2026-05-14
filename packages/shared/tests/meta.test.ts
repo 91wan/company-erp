@@ -244,6 +244,8 @@ describe("MVP permission constants", () => {
     expect(MVP_PERMISSION_MATRIX.userAccounts.manage).toEqual(["admin"]);
     expect(MVP_PERMISSION_MATRIX.roleAssignment.manage).toEqual(["admin"]);
     expect(MVP_PERMISSION_MATRIX.auditLogs.read).toEqual(["admin"]);
+    expect(MVP_PERMISSION_MATRIX.attachments.read).toEqual(["admin", "hr", "procurement", "operations"]);
+    expect(MVP_PERMISSION_MATRIX.attachments.manage).toEqual(["admin", "hr"]);
   });
 
   it("allows fixed-role union permissions for multi-role users", () => {
@@ -279,6 +281,9 @@ describe("MVP permission constants", () => {
     expect(canManage(["admin"], "systemSettings")).toBe(true);
     expect(canRead(["admin"], "auditLogs")).toBe(true);
     expect(canRead(["viewer"], "auditLogs")).toBe(false);
+    expect(canRead(["procurement"], "attachments")).toBe(true);
+    expect(canManage(["procurement"], "attachments")).toBe(false);
+    expect(canManage(["hr"], "attachments")).toBe(true);
   });
 
   it("gives operations quantity-only inventory access and usage request creation without warehouse mutation", () => {

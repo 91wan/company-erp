@@ -40,6 +40,7 @@ export type MvpPermissionMatrix = {
   projectUsageRequest: MvpPermissionRule;
   marketOperationsHandoffs: MvpPermissionRule;
   auditLogs: MvpPermissionRule;
+  attachments: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
 };
 
@@ -92,6 +93,47 @@ export type AuditLogDto = {
   ip?: string | null;
   userAgent?: string | null;
   createdAt: string;
+};
+
+export type AttachmentStatusCode = "active" | "disabled";
+
+export type AttachmentRecordDto = {
+  id: string;
+  attachmentCode: string;
+  displayName: string;
+  storageKey: string;
+  originalFileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  ownerModule: string;
+  ownerEntityType: string;
+  ownerEntityId?: string | null;
+  status: AttachmentStatusCode;
+  createdByUserId?: string | null;
+  createdByUsername?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateAttachmentRecordInput = {
+  attachmentCode: string;
+  displayName: string;
+  storageKey: string;
+  originalFileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  ownerModule: string;
+  ownerEntityType: string;
+  ownerEntityId?: string | null;
+  status?: AttachmentStatusCode;
+  createdByUserId?: string | null;
+  createdByUsername?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateAttachmentRecordInput = Partial<Omit<CreateAttachmentRecordInput, "attachmentCode" | "createdByUserId" | "createdByUsername">> & {
+  attachmentCode?: string;
 };
 
 export type MvpDictionary = {
@@ -1835,6 +1877,10 @@ export const MVP_PERMISSION_MATRIX = {
   auditLogs: {
     read: ["admin"],
     manage: ["admin"],
+  },
+  attachments: {
+    read: ["admin", "hr", "procurement", "operations"],
+    manage: ["admin", "hr"],
   },
   systemSettings: {
     read: ["admin"],

@@ -413,6 +413,26 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
         createdAt: now,
       },
     ],
+    attachments: [
+      {
+        id: "fafafafa-fafa-4afa-8afa-fafafafafafa",
+        attachmentCode: "ATT-DEMO-001",
+        displayName: "DEMO 合同附件",
+        storageKey: "contracts/demo-contract.pdf",
+        originalFileName: "demo-contract.pdf",
+        fileType: "application/pdf",
+        fileSize: 1024,
+        ownerModule: "contracts",
+        ownerEntityType: "contract",
+        ownerEntityId: demoContract.id,
+        status: "active",
+        createdByUserId: adminUser.id,
+        createdByUsername: "admin",
+        remark: "metadata only",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
     contractAttachments: [] as Record<string, unknown>[],
     importJobs: [] as Record<string, unknown>[],
   };
@@ -821,6 +841,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: [] };
   if (pathname.startsWith("/api/market-operations-handoffs")) return { marketOperationsHandoffs: [] };
   if (pathname.startsWith("/api/audit-logs")) return { auditLogs: state.auditLogs };
+  if (pathname.startsWith("/api/attachments")) return { attachments: state.attachments };
   return {};
 }
 
@@ -838,6 +859,7 @@ function makeStateShape() {
     contracts: [demoContract],
     certificates: [demoCertificate],
     auditLogs: [] as Record<string, unknown>[],
+    attachments: [] as Record<string, unknown>[],
     contractAttachments: [] as Record<string, unknown>[],
     importJobs: [] as Record<string, unknown>[],
   };

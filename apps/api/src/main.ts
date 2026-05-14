@@ -34,6 +34,7 @@ import { createPrismaImportJobRepository } from "./prismaImportJobRepository.js"
 import { createPrismaMarketOperationsHandoffRepository } from "./prismaMarketOperationsHandoffsRepository.js";
 import { createPrismaAppConfigRepository } from "./prismaAppConfigRepository.js";
 import { createPrismaAuditLogRepository } from "./prismaAuditLogRepository.js";
+import { createPrismaAttachmentRepository } from "./prismaAttachmentsRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -62,6 +63,7 @@ const app = await buildApp({
     : { enabled: false },
   authRepository: prisma ? createPrismaAuthRepository(prisma) : undefined,
   auditLogRepository: prisma ? createPrismaAuditLogRepository(prisma) : undefined,
+  attachmentRepository: prisma ? createPrismaAttachmentRepository(prisma) : undefined,
   appConfigRepository: prisma ? createPrismaAppConfigRepository(prisma) : undefined,
   partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
   materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,

@@ -5,6 +5,7 @@ const routeSource = [
   "../src/app.ts",
   "../src/appCoreRoutes.ts",
   "../src/auditLogRoutes.ts",
+  "../src/attachmentRoutes.ts",
   "../src/importJobRoutes.ts",
   "../src/masterDataRoutes.ts",
   "../src/peoplePermissionsRoutes.ts",

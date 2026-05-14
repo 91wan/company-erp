@@ -1,5 +1,6 @@
 import { USER_ROLE_ASSIGNMENT_POLICY, type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
 import type { AppConfigRepository } from "./appConfig.js";
+import type { AttachmentRecordRepository } from "./attachments.js";
 import { AuditLogWriteError, redactAuditJson, type AuditLogRepository } from "./auditLogs.js";
 import type { AuthenticatedRequest, AuthOptions, AuthRepository } from "./auth.js";
 import type { BusinessProjectRepository } from "./businessProjects.js";
@@ -30,6 +31,7 @@ export type BuildAppOptions = {
   auth?: AuthOptions;
   authRepository?: AuthRepository;
   auditLogRepository?: AuditLogRepository;
+  attachmentRepository?: AttachmentRecordRepository;
   appConfigRepository?: AppConfigRepository;
   partyRepository?: PartyRepository;
   materialRepository?: MaterialRepository;

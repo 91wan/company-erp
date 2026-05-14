@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiStatus,
   App,
   adminUser,
+  attachmentRecord,
   contract,
   defaultAppVersion,
   expiredCertificate,
@@ -150,6 +151,55 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "审计日志" })).not.toBeInTheDocument();
+  });
+
+  it("shows and creates attachment metadata from system settings for attachment managers", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" }, defaultAppVersion, {
+      attachments: [attachmentRecord],
+    });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "附件元数据" })).toBeInTheDocument();
+    expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-002" } });
+    fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "DEMO 证照附件" } });
+    fireEvent.change(screen.getByLabelText("Storage Key"), { target: { value: "certificates/demo-certificate.jpg" } });
+    fireEvent.change(screen.getByLabelText("归属模块"), { target: { value: "certificates" } });
+    fireEvent.change(screen.getByLabelText("归属对象"), { target: { value: "certificate" } });
+    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
+
+    expect(await screen.findByText("附件引用已登记。")).toBeInTheDocument();
+    expect(screen.getByText("certificates/demo-certificate.jpg")).toBeInTheDocument();
+  });
+
+  it("shows attachment format failures and hides attachment metadata from viewers", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+    expect(await screen.findByRole("heading", { name: "附件元数据" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-003" } });
+    fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "错误附件" } });
+    fireEvent.change(screen.getByLabelText("Storage Key"), { target: { value: "../bad.pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
+
+    expect(await screen.findByText("附件引用格式不合法或保存失败。")).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+    cleanup();
+    mockShellFetch(viewerUser, { companyName: "无锡餐服 ERP" });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "附件元数据" })).not.toBeInTheDocument();
   });
 
   it("shows version unavailable when deployment metadata cannot be loaded", async () => {

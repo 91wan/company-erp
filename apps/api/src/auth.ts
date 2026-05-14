@@ -206,6 +206,9 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/audit-logs")) {
     return { area: "auditLogs", requiredLevel };
   }
+  if (pathname.startsWith("/api/attachments")) {
+    return { area: "attachments", requiredLevel };
+  }
   if (pathname.startsWith("/api/app-config")) {
     return { area: "systemSettings", requiredLevel };
   }

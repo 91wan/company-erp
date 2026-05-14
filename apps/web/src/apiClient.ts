@@ -1,8 +1,10 @@
 import type {
   AppConfigDto,
   AppVersionDto,
+  AttachmentRecordDto,
   AuditLogDto,
   AuthenticatedUserDto,
+  CreateAttachmentRecordInput,
   LoginInput,
   UpdateAppConfigInput,
 } from "@company-erp/shared";
@@ -45,6 +47,19 @@ export async function getAppVersion(): Promise<AppVersionDto> {
 export async function getAuditLogs(): Promise<AuditLogDto[]> {
   const payload = await requestJson<{ auditLogs: AuditLogDto[] }>(`${apiBaseUrl}/api/audit-logs?limit=20`);
   return payload.auditLogs;
+}
+
+export async function getAttachments(): Promise<AttachmentRecordDto[]> {
+  const payload = await requestJson<{ attachments: AttachmentRecordDto[] }>(`${apiBaseUrl}/api/attachments?limit=20`);
+  return payload.attachments;
+}
+
+export async function createAttachment(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto> {
+  const payload = await requestJson<{ attachment: AttachmentRecordDto }>(`${apiBaseUrl}/api/attachments`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return payload.attachment;
 }
 
 export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppConfigDto> {
