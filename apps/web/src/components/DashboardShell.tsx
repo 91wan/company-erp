@@ -1,6 +1,5 @@
 import {
   LogOut,
-  Bell,
   ChevronLeft,
   ChevronsRight,
   ClipboardCheck,
@@ -8,8 +7,6 @@ import {
   MapPin,
   PackageCheck,
   Search,
-  Server,
-  ShoppingCart,
   Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -33,10 +30,14 @@ import {
 } from "@company-erp/shared";
 import {
   SettingsIcon,
+  externalProjectSiteNavigationItems,
+  navigationGroups,
   navigationItems,
   workflowSteps,
   type MetricCard as MetricCardType,
   type MetricTone,
+  type NavigationGroup,
+  type NavigationItem,
 } from "../dashboardData";
 import { ApiStatus } from "./ApiStatus";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
@@ -51,6 +52,14 @@ import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { apiBaseUrl, createAttachment, getAppVersion, getAttachments, getAuditLogs, requestJson, updateAppConfig } from "../apiClient";
+import {
+  DataTable,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+  StatusBadge as UiStatusBadge,
+  SummaryCard,
+} from "./ui";
 
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
@@ -63,17 +72,15 @@ type DashboardShellProps = {
   onLogout: () => Promise<void> | void;
 };
 
-type WorkspaceKey = (typeof navigationItems)[number]["label"] | "系统设置";
+type WorkspaceKey = (typeof navigationItems)[number]["workspace"] | "系统设置";
 
 export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLogout }: DashboardShellProps) {
   const isExternalProjectSite = currentUser.roles.includes("external_project_site");
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
-    isExternalProjectSite ? "项目点" : "Dashboard",
+    isExternalProjectSite ? "项目点" : "总览",
   );
   const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
-  const visibleNavigationItems = isExternalProjectSite
-    ? navigationItems.filter((item) => item.label === "项目点" || item.label === "证照资质")
-    : navigationItems.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea));
+  const visibleNavigationGroups = buildVisibleNavigationGroups(currentUser, isExternalProjectSite);
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
     canManage(currentUser.roles, "procurement") ||
@@ -90,13 +97,14 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
       <Sidebar
         companyName={appConfig.companyName}
         activeWorkspace={activeWorkspace}
-        items={visibleNavigationItems}
+        groups={visibleNavigationGroups}
+        externalMode={isExternalProjectSite}
         onSelectWorkspace={setActiveWorkspace}
       />
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
-          {activeWorkspace === "Dashboard" ? (
+          {activeWorkspace === "总览" ? (
             <DashboardOverview currentUser={currentUser} onNavigate={setActiveWorkspace} />
           ) : null}
           {activeWorkspace === "基础资料" ? (
@@ -154,15 +162,35 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
   );
 }
 
+function buildVisibleNavigationGroups(currentUser: AuthenticatedUserDto, isExternalProjectSite: boolean): NavigationGroup[] {
+  if (isExternalProjectSite) {
+    return [
+      {
+        label: "项目点门户",
+        items: externalProjectSiteNavigationItems.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea)),
+      },
+    ];
+  }
+
+  return navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 function Sidebar({
   companyName,
   activeWorkspace,
-  items,
+  groups,
+  externalMode,
   onSelectWorkspace,
 }: {
   companyName: string;
   activeWorkspace: WorkspaceKey;
-  items: typeof navigationItems;
+  groups: NavigationGroup[];
+  externalMode: boolean;
   onSelectWorkspace: (workspace: WorkspaceKey) => void;
 }) {
   return (
@@ -176,17 +204,18 @@ function Sidebar({
       </div>
 
       <nav className="sidebar-nav">
-        {items.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            className={item.label === activeWorkspace ? "nav-item active" : "nav-item"}
-            aria-current={item.label === activeWorkspace ? "page" : undefined}
-            onClick={() => onSelectWorkspace(item.label)}
-          >
-            <item.icon aria-hidden="true" size={20} strokeWidth={1.9} />
-            <span>{item.label}</span>
-          </button>
+        {groups.map((group) => (
+          <div className="nav-group" key={group.label}>
+            <span className="nav-group-title">{group.label}</span>
+            {group.items.map((item) => (
+              <SidebarItem
+                key={`${group.label}-${item.label}`}
+                item={item}
+                activeWorkspace={activeWorkspace}
+                onSelectWorkspace={onSelectWorkspace}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -198,9 +227,37 @@ function Sidebar({
       >
         <SettingsIcon aria-hidden="true" size={20} strokeWidth={1.9} />
         <span>系统设置</span>
+        {externalMode ? <small>账号</small> : null}
         <ChevronsRight aria-hidden="true" size={16} className="settings-chevron" />
       </button>
     </aside>
+  );
+}
+
+function SidebarItem({
+  item,
+  activeWorkspace,
+  onSelectWorkspace,
+}: {
+  item: NavigationItem;
+  activeWorkspace: WorkspaceKey;
+  onSelectWorkspace: (workspace: WorkspaceKey) => void;
+}) {
+  const isDuplicatePortalTarget = item.workspace === "项目点" || item.workspace === "证照资质";
+  const isPrimaryPortalItem =
+    (item.workspace === "项目点" && item.label === "我的项目点") ||
+    (item.workspace === "证照资质" && item.label === "现场人员/健康证");
+  const isActive = item.workspace === activeWorkspace && (!isDuplicatePortalTarget || isPrimaryPortalItem);
+  return (
+    <button
+      type="button"
+      className={isActive ? "nav-item active" : "nav-item"}
+      aria-current={isActive ? "page" : undefined}
+      onClick={() => onSelectWorkspace(item.workspace as WorkspaceKey)}
+    >
+      <item.icon aria-hidden="true" size={20} strokeWidth={1.9} />
+      <span>{item.label}</span>
+    </button>
   );
 }
 
@@ -303,16 +360,16 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
 
   return (
     <>
-      <DashboardHeader onNavigate={onNavigate} />
-      <MetricStrip data={data} onNavigate={onNavigate} />
-      <section className="dashboard-grid dashboard-grid-primary">
-        <ApprovalPanel data={data} onNavigate={onNavigate} />
-        <PurchasePanel purchaseRecords={data.purchaseRecords} onNavigate={onNavigate} />
-        <ReceivingPanel inventoryMovements={data.inventoryMovements} onNavigate={onNavigate} />
+      <DashboardHeader currentUser={currentUser} onNavigate={onNavigate} />
+      <OperationsMetricStrip data={data} onNavigate={onNavigate} />
+      <section className="dashboard-grid dashboard-grid-primary operations-console-grid">
+        <TodoQueuePanel data={data} onNavigate={onNavigate} />
+        <RiskQueuePanel data={data} onNavigate={onNavigate} />
+        <RecentActivityPanel data={data} onNavigate={onNavigate} />
       </section>
       <section className="dashboard-grid dashboard-grid-secondary">
+        <QuickEntryPanel onNavigate={onNavigate} />
         <LowStockPanel inventoryBalances={data.inventoryBalances} onNavigate={onNavigate} />
-        <SiteUsagePanel projectUsageRequests={data.projectUsageRequests} onNavigate={onNavigate} />
         <SystemStatusPanel appVersion={data.appVersion} onNavigate={onNavigate} />
       </section>
     </>
@@ -337,11 +394,6 @@ function TopBar({ currentUser, onLogout }: { currentUser: AuthenticatedUserDto; 
           <span>数据库已连接</span>
         </div>
 
-        <button className="notification-button" type="button" aria-label="通知">
-          <Bell aria-hidden="true" size={19} />
-          <span>3</span>
-        </button>
-
         <div className="user-chip">
           <div className="avatar">{currentUser.username.slice(0, 1).toUpperCase()}</div>
           <div>
@@ -362,7 +414,7 @@ function TopBar({ currentUser, onLogout }: { currentUser: AuthenticatedUserDto; 
 }
 
 function dashboardTarget(label: string): WorkspaceKey {
-  if (/证照|资质/.test(label)) return "证照资质";
+  if (/证照|资质|临期|红色风险|待审核资料/.test(label)) return "证照资质";
   if (/合同/.test(label)) return "合同";
   if (/入库|库存/.test(label)) return "库存";
   if (/项目点|领用/.test(label)) return "项目点";
@@ -370,13 +422,20 @@ function dashboardTarget(label: string): WorkspaceKey {
   return "采购";
 }
 
-function DashboardHeader({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+function DashboardHeader({
+  currentUser,
+  onNavigate,
+}: {
+  currentUser: AuthenticatedUserDto;
+  onNavigate: NavigateToWorkspace;
+}) {
   return (
     <section className="dashboard-header">
-      <div>
-        <h2>工作台</h2>
-        <p>欢迎回来，Admin！以下是系统的最新运行情况。</p>
-      </div>
+      <PageHeader
+        eyebrow="总部运营驾驶舱"
+        title="工作台"
+        subtitle={`${currentUser.username}，这里汇总待办、风险、审核和最近动态。所有数字来自现有业务 API；接口不可用时不会显示假数据。`}
+      />
 
       <div className="workflow-panel" aria-label="业务流程">
         <strong>业务流程</strong>
@@ -410,20 +469,6 @@ function formatDateTime(value: string | null | undefined): string {
 
 function sortByUpdatedAt<T extends { updatedAt: string }>(items: T[]): T[] {
   return [...items].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
-}
-
-function purchaseRequestStatusLabel(status: PurchaseRequestDto["status"]): string {
-  const labels: Record<PurchaseRequestDto["status"], string> = {
-    draft: "草稿",
-    pending_approval: "待审批",
-    pending_purchase: "待采购",
-    purchasing: "采购中",
-    partially_received: "部分到货",
-    completed: "已完成",
-    rejected: "已驳回",
-    cancelled: "已取消",
-  };
-  return labels[status] ?? status;
 }
 
 function purchaseRecordStatusLabel(status: PurchaseRecordDto["status"]): string {
@@ -470,40 +515,43 @@ function certificateStatusLabel(status: CertificateRecordDto["computedStatus"]):
   return labels[status] ?? status;
 }
 
-function formatCurrency(value: number | null | undefined): string {
-  return `¥${Number(value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function PanelStateMessage({ text }: { text: string }) {
   return <p className="form-hint">{text}</p>;
 }
 
 function buildMetrics(data: DashboardLiveData): MetricCardType[] {
   const pendingApprovalCount = data.purchaseRequests.data.filter((request) => request.status === "pending_approval").length;
-  const inboundCount = data.inventoryMovements.data.filter((movement) =>
-    ["opening", "inbound", "adjustment_in"].includes(movement.movementType),
+  const pendingUsageCount = data.projectUsageRequests.data.filter((request) => request.status === "pending").length;
+  const expiredCertificateCount = data.certificates.data.filter((certificate) => certificate.computedStatus === "expired").length;
+  const expiredContractCount = data.contracts.data.filter((contract) => contract.expiryState === "expired").length;
+  const warningCertificateCount = data.certificates.data.filter((certificate) =>
+    ["expiring_soon", "review_due", "review_due_soon"].includes(certificate.computedStatus),
   ).length;
+  const warningContractCount = data.contracts.data.filter((contract) => contract.expiryState === "expiring_soon").length;
   const lowStockCount = data.inventoryBalances.data.filter((balance) => balance.isLowStock).length;
+  const todoCount = pendingApprovalCount + pendingUsageCount;
+  const dangerCount = expiredCertificateCount + expiredContractCount;
+  const warningCount = warningCertificateCount + warningContractCount;
 
   return [
     {
-      label: "待审批",
-      value: String(pendingApprovalCount),
-      detail: data.purchaseRequests.status === "error" ? "数据暂不可用" : "待处理采购需求",
+      label: "今日待办",
+      value: String(todoCount),
+      detail: data.purchaseRequests.status === "error" || data.projectUsageRequests.status === "error" ? "数据暂不可用" : "采购审批与领用处理",
       tone: "blue",
       icon: ClipboardCheck,
     },
     {
-      label: "采购需求",
-      value: String(data.purchaseRequests.data.length),
-      detail: data.purchaseRequests.status === "error" ? "数据暂不可用" : "当前可见",
-      tone: "green",
-      icon: ShoppingCart,
+      label: "红色风险",
+      value: String(dangerCount),
+      detail: data.contracts.status === "error" || data.certificates.status === "error" ? "数据暂不可用" : "已过期合同/证照",
+      tone: "orange",
+      icon: PackageCheck,
     },
     {
-      label: "入库记录",
-      value: String(inboundCount),
-      detail: data.inventoryMovements.status === "error" ? "数据暂不可用" : "当前可见",
+      label: "临期提醒",
+      value: String(warningCount),
+      detail: data.contracts.status === "error" || data.certificates.status === "error" ? "数据暂不可用" : "合同/证照/复核",
       tone: "purple",
       icon: Truck,
     },
@@ -515,38 +563,32 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
       icon: PackageCheck,
     },
     {
-      label: "项目点领用",
-      value: String(data.projectUsageRequests.data.length),
-      detail: data.projectUsageRequests.status === "error" ? "数据暂不可用" : "当前可见",
+      label: "待审核资料",
+      value: String(warningCertificateCount),
+      detail: data.certificates.status === "error" ? "数据暂不可用" : "证照临期或待复核",
       tone: "cyan",
       icon: MapPin,
     },
   ];
 }
 
-function MetricStrip({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+function OperationsMetricStrip({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
   const metricCards = buildMetrics(data);
   return (
     <section className="metric-strip" aria-label="运营指标">
       {metricCards.map((metric) => (
-        <MetricCard key={metric.label} metric={metric} onNavigate={onNavigate} />
+        <button type="button" className="metric-card metric-card-action" key={metric.label} onClick={() => onNavigate(dashboardTarget(metric.label))}>
+          <span className={`metric-icon ${metric.tone}`}>
+            <metric.icon aria-hidden="true" size={26} strokeWidth={1.9} />
+          </span>
+          <div>
+            <h3>{metric.label}</h3>
+            <strong>{metric.value}</strong>
+            <p>{metric.detail}</p>
+          </div>
+        </button>
       ))}
     </section>
-  );
-}
-
-function MetricCard({ metric, onNavigate }: { metric: MetricCardType; onNavigate: NavigateToWorkspace }) {
-  return (
-    <button type="button" className="metric-card metric-card-action" onClick={() => onNavigate(dashboardTarget(metric.label))}>
-      <span className={`metric-icon ${metric.tone}`}>
-        <metric.icon aria-hidden="true" size={26} strokeWidth={1.9} />
-      </span>
-      <div>
-        <h3>{metric.label}</h3>
-        <strong>{metric.value}</strong>
-        <p className={metric.detail.includes("超时") ? "metric-alert" : ""}>{metric.detail}</p>
-      </div>
-    </button>
   );
 }
 
@@ -562,139 +604,214 @@ function PanelHeader({ title, badge, onNavigate }: { title: string; badge?: stri
   );
 }
 
-function ApprovalPanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
-  const navigateTo = (title: string) => onNavigate(dashboardTarget(title));
-  const pendingRequests = sortByUpdatedAt(data.purchaseRequests.data)
+type QueueItem = {
+  title: string;
+  category: string;
+  owner: string;
+  status: string;
+  updatedAt: string;
+  target: WorkspaceKey;
+  tone?: "info" | "success" | "warning" | "danger" | "rejected" | "notApplicable";
+};
+
+function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+  const pendingRequests: QueueItem[] = sortByUpdatedAt(data.purchaseRequests.data)
     .filter((request) => request.status === "pending_approval")
-    .slice(0, 4);
-  const riskyContracts = sortByUpdatedAt(data.contracts.data)
+    .slice(0, 4)
+    .map((request) => ({
+      title: `采购需求 ${request.requestNo}`,
+      category: "采购待审批",
+      owner: request.requesterName ?? "-",
+      status: "待审批",
+      updatedAt: formatDateTime(request.submittedAt ?? request.updatedAt),
+      target: "采购",
+      tone: "info",
+    }));
+  const pendingUsage: QueueItem[] = sortByUpdatedAt(data.projectUsageRequests.data)
+    .filter((request) => request.status === "pending")
+    .slice(0, 4)
+    .map((request) => ({
+      title: `领用申请 ${request.requestNo}`,
+      category: "项目点领用待处理",
+      owner: request.projectSiteName,
+      status: "待处理",
+      updatedAt: formatDateTime(request.updatedAt),
+      target: "项目点",
+      tone: "warning",
+    }));
+  const certificateReviews: QueueItem[] = sortByUpdatedAt(data.certificates.data)
+    .filter((certificate) => certificate.computedStatus === "review_due" || certificate.computedStatus === "review_due_soon")
+    .slice(0, 3)
+    .map((certificate) => ({
+      title: `${certificate.certificateCode} ${certificate.certificateName}`,
+      category: "证照待复核",
+      owner: certificate.ownerNameSnapshot || certificate.ownerProjectSiteName || certificate.ownerPartyName || "-",
+      status: certificateStatusLabel(certificate.computedStatus),
+      updatedAt: formatDateTime(certificate.nextReviewDate ?? certificate.updatedAt),
+      target: "证照资质",
+      tone: certificate.computedStatus === "review_due" ? "danger" : "warning",
+    }));
+  const rows = [...pendingRequests, ...pendingUsage, ...certificateReviews].slice(0, 8);
+
+  return (
+    <SectionCard title="待办队列" badge={<UiStatusBadge tone="info">{rows.length} 项</UiStatusBadge>} action={<button type="button" onClick={() => onNavigate("采购")}>查看采购</button>}>
+      {data.purchaseRequests.status === "error" ? <PanelStateMessage text="采购待办数据暂不可用" /> : null}
+      {data.projectUsageRequests.status === "error" ? <PanelStateMessage text="项目点领用待办数据暂不可用" /> : null}
+      {data.certificates.status === "error" ? <PanelStateMessage text="证照待复核数据暂不可用" /> : null}
+      <DataTable
+        headers={["事项", "类型", "负责人/项目点", "状态", "时间"]}
+        rows={rows.map((item) => [
+          item.title,
+          item.category,
+          item.owner,
+          <UiStatusBadge key={`${item.title}-status`} tone={item.tone ?? "info"}>{item.status}</UiStatusBadge>,
+          item.updatedAt,
+        ])}
+        emptyState={<EmptyState title="暂无待办" description="当前没有采购审批、领用处理或证照复核事项。" />}
+        onRowClick={(index) => onNavigate(rows[index].target)}
+      />
+    </SectionCard>
+  );
+}
+
+function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+  const certificateRisks: QueueItem[] = sortByUpdatedAt(data.certificates.data)
+    .filter((certificate) => certificate.computedStatus === "expired" || certificate.computedStatus === "expiring_soon")
+    .slice(0, 4)
+    .map((certificate) => ({
+      title: `${certificate.certificateCode} ${certificate.certificateName}`,
+      category: "证照风险",
+      owner: certificate.ownerNameSnapshot || certificate.ownerProjectSiteName || certificate.ownerPartyName || "-",
+      status: certificateStatusLabel(certificate.computedStatus),
+      updatedAt: formatDateTime(certificate.expiryDate ?? certificate.updatedAt),
+      target: "证照资质",
+      tone: certificate.computedStatus === "expired" ? "danger" : "warning",
+    }));
+  const contractRisks: QueueItem[] = sortByUpdatedAt(data.contracts.data)
     .filter((contract) => contract.expiryState === "expired" || contract.expiryState === "expiring_soon")
-    .slice(0, 2);
-  const riskyCertificates = sortByUpdatedAt(data.certificates.data)
-    .filter((certificate) =>
-      ["expired", "expiring_soon", "review_due", "review_due_soon"].includes(certificate.computedStatus),
-    )
-    .slice(0, 2);
-  const items = [
-    ...pendingRequests.map((request) => ({
-      title: `采购需求单 ${request.requestNo}`,
-      applicant: request.requesterName,
-      amount: `${request.lines.length} 行物料`,
-      amountLabel: "内容",
-      age: formatDateTime(request.submittedAt ?? request.updatedAt),
-      risk: purchaseRequestStatusLabel(request.status),
-    })),
-    ...riskyContracts.map((contract) => ({
-      title: `合同风险 ${contract.contractNo}`,
-      applicant: contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot,
-      amount: formatCurrency(contract.amount),
-      amountLabel: "金额",
-      age: formatDateTime(contract.endDate ?? contract.updatedAt),
-      risk: contractExpiryLabel(contract.expiryState),
-    })),
-    ...riskyCertificates.map((certificate) => ({
-      title: `证照风险 ${certificate.certificateCode} ${certificate.certificateName}`,
-      applicant: certificate.ownerNameSnapshot || certificate.ownerPartyName || certificate.ownerProjectSiteName || "-",
-      amount: certificate.certificateName,
-      amountLabel: "证照",
-      age: formatDateTime(certificate.expiryDate ?? certificate.nextReviewDate ?? certificate.updatedAt),
-      risk: certificateStatusLabel(certificate.computedStatus),
-    })),
+    .slice(0, 3)
+    .map((contract) => ({
+      title: `${contract.contractNo} ${contract.contractName}`,
+      category: "合同风险",
+      owner: contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot,
+      status: contractExpiryLabel(contract.expiryState),
+      updatedAt: formatDateTime(contract.endDate ?? contract.updatedAt),
+      target: "合同",
+      tone: contract.expiryState === "expired" ? "danger" : "warning",
+    }));
+  const lowStocks: QueueItem[] = data.inventoryBalances.data
+    .filter((balance) => balance.isLowStock)
+    .slice(0, 3)
+    .map((balance) => ({
+      title: balance.materialName,
+      category: "低库存",
+      owner: balance.warehouseName,
+      status: "预警",
+      updatedAt: formatDateTime(balance.lastMovementAt),
+      target: "库存",
+      tone: "warning",
+    }));
+  const rows = [...certificateRisks, ...contractRisks, ...lowStocks].slice(0, 8);
+
+  return (
+    <SectionCard title="风险队列" badge={<UiStatusBadge tone={rows.some((row) => row.tone === "danger") ? "danger" : "warning"}>{rows.length} 项</UiStatusBadge>} action={<button type="button" onClick={() => onNavigate("证照资质")}>查看风险</button>}>
+      {data.certificates.status === "error" ? <PanelStateMessage text="证照风险数据暂不可用" /> : null}
+      {data.contracts.status === "error" ? <PanelStateMessage text="合同风险数据暂不可用" /> : null}
+      {data.inventoryBalances.status === "error" ? <PanelStateMessage text="库存风险数据暂不可用" /> : null}
+      <DataTable
+        headers={["风险", "类型", "归属", "状态", "时间"]}
+        rows={rows.map((item) => [
+          item.title,
+          item.category,
+          item.owner,
+          <UiStatusBadge key={`${item.title}-status`} tone={item.tone ?? "warning"}>{item.status}</UiStatusBadge>,
+          item.updatedAt,
+        ])}
+        emptyState={<EmptyState title="暂无风险" description="当前没有已过期、临期或低库存事项。" />}
+        onRowClick={(index) => onNavigate(rows[index].target)}
+      />
+    </SectionCard>
+  );
+}
+
+function RecentActivityPanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+  const inbound = data.inventoryMovements.data
+    .filter((movement) => ["opening", "inbound", "adjustment_in"].includes(movement.movementType))
+    .map((movement) => ({
+      title: `入库 ${movement.movementNo}`,
+      category: "最近入库",
+      owner: movement.warehouseName,
+      status: movement.materialName,
+      sortAt: movement.movementDate,
+      updatedAt: formatDateTime(movement.movementDate),
+      target: "库存" as WorkspaceKey,
+    }));
+  const purchase = data.purchaseRecords.data.map((record) => ({
+    title: `采购 ${record.purchaseNo}`,
+    category: "最近采购",
+    owner: record.purchaserName,
+    status: purchaseRecordStatusLabel(record.status),
+    sortAt: record.updatedAt,
+    updatedAt: formatDateTime(record.updatedAt),
+    target: "采购" as WorkspaceKey,
+  }));
+  const usage = data.projectUsageRequests.data.map((request) => ({
+    title: `领用 ${request.requestNo}`,
+    category: "最近领用",
+    owner: request.projectSiteName,
+    status: projectUsageStatusLabel(request.status),
+    sortAt: request.updatedAt,
+    updatedAt: formatDateTime(request.updatedAt),
+    target: "项目点" as WorkspaceKey,
+  }));
+  const certificate = data.certificates.data.map((record) => ({
+    title: `证照 ${record.certificateName}`,
+    category: "最近证照提交",
+    owner: record.ownerNameSnapshot || record.ownerProjectSiteName || "-",
+    status: certificateStatusLabel(record.computedStatus),
+    sortAt: record.updatedAt,
+    updatedAt: formatDateTime(record.updatedAt),
+    target: "证照资质" as WorkspaceKey,
+  }));
+  const rows = [...purchase, ...inbound, ...usage, ...certificate]
+    .sort((left, right) => new Date(right.sortAt).getTime() - new Date(left.sortAt).getTime())
+    .slice(0, 8);
+
+  return (
+    <SectionCard title="最近动态" action={<button type="button" onClick={() => onNavigate("系统设置")}>系统状态</button>}>
+      <DataTable
+        headers={["动态", "类型", "归属", "状态", "时间"]}
+        rows={rows.map((item) => [item.title, item.category, item.owner, item.status, item.updatedAt])}
+        emptyState={<EmptyState title="暂无动态" description="近期业务记录为空，或当前账号无可读模块。" />}
+        onRowClick={(index) => onNavigate(rows[index].target)}
+      />
+    </SectionCard>
+  );
+}
+
+function QuickEntryPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
+  const entries = [
+    { label: "新建采购需求", detail: "进入采购工作区登记需求", target: "采购" as WorkspaceKey, tone: "info" as const },
+    { label: "新建项目点", detail: "进入项目点台账维护", target: "项目点" as WorkspaceKey, tone: "success" as const },
+    { label: "提交证照", detail: "进入证照资质台账", target: "证照资质" as WorkspaceKey, tone: "warning" as const },
+    { label: "查看低库存", detail: "进入库存风险列表", target: "库存" as WorkspaceKey, tone: "danger" as const },
   ];
 
   return (
-    <section className="dashboard-panel approval-panel">
-      <PanelHeader title="待审批" badge={String(pendingRequests.length)} onNavigate={() => onNavigate("采购")} />
-      {data.purchaseRequests.status === "error" ? <PanelStateMessage text="待审批数据暂不可用" /> : null}
-      {data.contracts.status === "error" ? <PanelStateMessage text="合同风险数据暂不可用" /> : null}
-      {data.certificates.status === "error" ? <PanelStateMessage text="证照风险数据暂不可用" /> : null}
-      {items.length === 0 &&
-      data.purchaseRequests.status !== "error" &&
-      data.contracts.status !== "error" &&
-      data.certificates.status !== "error" ? (
-        <PanelStateMessage text="暂无待审批或到期风险" />
-      ) : null}
-      <div className="approval-list">
-        {items.map((item) => (
-          <button key={item.title} type="button" className="approval-item clickable-row" onClick={() => navigateTo(item.title)}>
-            <span className="document-icon">
-              <Server aria-hidden="true" size={16} />
-            </span>
-            <div>
-              <strong>{item.title}</strong>
-              <small>
-                申请人：{item.applicant}
-                <span>{item.amountLabel}：{item.amount}</span>
-              </small>
-            </div>
-            <div className="approval-age">
-              <span>{item.age}</span>
-              {item.risk ? <em>{item.risk}</em> : null}
-            </div>
-          </button>
+    <SectionCard title="快捷入口">
+      <div className="quick-entry-grid">
+        {entries.map((entry) => (
+          <SummaryCard
+            key={entry.label}
+            label={entry.label}
+            value="进入"
+            detail={entry.detail}
+            tone={entry.tone}
+            onClick={() => onNavigate(entry.target)}
+          />
         ))}
       </div>
-    </section>
-  );
-}
-
-function PurchasePanel({
-  purchaseRecords,
-  onNavigate,
-}: {
-  purchaseRecords: LoadState<PurchaseRecordDto[]>;
-  onNavigate: NavigateToWorkspace;
-}) {
-  const rows = sortByUpdatedAt(purchaseRecords.data).slice(0, 5);
-  return (
-    <section className="dashboard-panel table-panel">
-      <PanelHeader title="最近采购记录" onNavigate={() => onNavigate("采购")} />
-      {purchaseRecords.status === "error" ? <PanelStateMessage text="采购记录数据暂不可用" /> : null}
-      {purchaseRecords.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无采购记录" /> : null}
-      <ResponsiveTable
-        headers={["采购单号", "采购人", "来源", "供应商", "物料数", "状态", "下单时间"]}
-        onRowClick={() => onNavigate("采购")}
-        rows={rows.map((row) => [
-          row.purchaseNo,
-          `采购人：${row.purchaserName}`,
-          row.purchasePlatform || row.shopName || row.purchaseDescription || row.sourceType,
-          row.supplierPartyName || row.supplierNameText || "未建供应商",
-          String(row.lines.length),
-          <StatusBadge key={`${row.id}-status`} status={purchaseRecordStatusLabel(row.status)} />,
-          formatDateTime(row.purchaseDate ?? row.updatedAt),
-        ])}
-      />
-    </section>
-  );
-}
-
-function ReceivingPanel({
-  inventoryMovements,
-  onNavigate,
-}: {
-  inventoryMovements: LoadState<InventoryMovementDto[]>;
-  onNavigate: NavigateToWorkspace;
-}) {
-  const rows = sortByUpdatedAt(inventoryMovements.data)
-    .filter((movement) => ["opening", "inbound", "adjustment_in"].includes(movement.movementType))
-    .slice(0, 5);
-  return (
-    <section className="dashboard-panel table-panel">
-      <PanelHeader title="最近入库记录" onNavigate={() => onNavigate("库存")} />
-      {inventoryMovements.status === "error" ? <PanelStateMessage text="入库记录数据暂不可用" /> : null}
-      {inventoryMovements.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无入库记录" /> : null}
-      <ResponsiveTable
-        headers={["入库单号", "仓库", "物料/数量", "金额", "入库时间"]}
-        onRowClick={() => onNavigate("库存")}
-        rows={rows.map((row) => [
-          row.movementNo,
-          row.warehouseName,
-          `${row.materialName} ${row.quantity} ${row.unit}`,
-          formatCurrency(row.unitPrice ? Number(row.unitPrice) * Number(row.quantity) : 0),
-          formatDateTime(row.movementDate),
-        ])}
-      />
-    </section>
+    </SectionCard>
   );
 }
 
@@ -720,33 +837,6 @@ function LowStockPanel({
           `${row.currentQuantity} ${row.unit}`,
           String(row.safeStock ?? "-"),
           <StatusBadge key={`${row.materialCode}-status`} status={row.isLowStock ? "低库存" : "正常"} />,
-        ])}
-      />
-    </section>
-  );
-}
-
-function SiteUsagePanel({
-  projectUsageRequests,
-  onNavigate,
-}: {
-  projectUsageRequests: LoadState<ProjectUsageRequestDto[]>;
-  onNavigate: NavigateToWorkspace;
-}) {
-  const rows = sortByUpdatedAt(projectUsageRequests.data).slice(0, 5);
-  return (
-    <section className="dashboard-panel table-panel">
-      <PanelHeader title="项目点领用汇总（本月）" onNavigate={() => onNavigate("项目点")} />
-      {projectUsageRequests.status === "error" ? <PanelStateMessage text="项目点领用数据暂不可用" /> : null}
-      {projectUsageRequests.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无项目点领用申请" /> : null}
-      <ResponsiveTable
-        headers={["项目点", "领用金额", "状态", "更新时间"]}
-        onRowClick={() => onNavigate("项目点")}
-        rows={rows.map((row) => [
-          row.projectSiteName,
-          formatCurrency(row.chargeAmount),
-          <StatusBadge key={`${row.id}-status`} status={projectUsageStatusLabel(row.status)} />,
-          formatDateTime(row.updatedAt),
         ])}
       />
     </section>

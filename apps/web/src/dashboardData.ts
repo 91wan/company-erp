@@ -20,9 +20,15 @@ import {
 
 export type NavigationItem = {
   label: string;
+  workspace: string;
   icon: LucideIcon;
   permissionArea?: PermissionAreaCode;
   active?: boolean;
+};
+
+export type NavigationGroup = {
+  label: string;
+  items: NavigationItem[];
 };
 
 export type MetricTone = "blue" | "green" | "purple" | "orange" | "cyan";
@@ -35,17 +41,47 @@ export type MetricCard = {
   icon: LucideIcon;
 };
 
-export const navigationItems: NavigationItem[] = [
-  { label: "Dashboard", icon: Home, active: true },
-  { label: "基础资料", icon: Building2, permissionArea: "masterData" },
-  { label: "采购", icon: ShoppingCart, permissionArea: "procurement" },
-  { label: "库存", icon: Warehouse, permissionArea: "inventoryQuantity" },
-  { label: "合同", icon: FileText, permissionArea: "contracts" },
-  { label: "业务项目", icon: Landmark, permissionArea: "businessProjects" },
-  { label: "证照资质", icon: ShieldCheck, permissionArea: "certificates" },
-  { label: "项目点", icon: MapPin, permissionArea: "projectUsage" },
-  { label: "人员权限", icon: Users, permissionArea: "employees" },
-  { label: "Excel 导入", icon: FileSpreadsheet, permissionArea: "masterData" },
+export const navigationGroups: NavigationGroup[] = [
+  {
+    label: "工作台",
+    items: [{ label: "总览", workspace: "总览", icon: Home, active: true }],
+  },
+  {
+    label: "经营业务",
+    items: [
+      { label: "采购", workspace: "采购", icon: ShoppingCart, permissionArea: "procurement" },
+      { label: "库存", workspace: "库存", icon: Warehouse, permissionArea: "inventoryQuantity" },
+      { label: "项目点", workspace: "项目点", icon: MapPin, permissionArea: "projectUsage" },
+      { label: "业务项目", workspace: "业务项目", icon: Landmark, permissionArea: "businessProjects" },
+      { label: "合同", workspace: "合同", icon: FileText, permissionArea: "contracts" },
+    ],
+  },
+  {
+    label: "合规与人员",
+    items: [
+      { label: "证照资质", workspace: "证照资质", icon: ShieldCheck, permissionArea: "certificates" },
+      { label: "项目点合规", workspace: "项目点", icon: ClipboardCheck, permissionArea: "projectUsage" },
+      { label: "人员权限", workspace: "人员权限", icon: Users, permissionArea: "employees" },
+    ],
+  },
+  {
+    label: "基础与系统",
+    items: [
+      { label: "基础资料", workspace: "基础资料", icon: Building2, permissionArea: "masterData" },
+      { label: "Excel 导入", workspace: "Excel 导入", icon: FileSpreadsheet, permissionArea: "masterData" },
+    ],
+  },
+];
+
+export const navigationItems: NavigationItem[] = navigationGroups.flatMap((group) => group.items);
+
+export const externalProjectSiteNavigationItems: NavigationItem[] = [
+  { label: "我的项目点", workspace: "项目点", icon: MapPin, permissionArea: "projectUsage" },
+  { label: "物料领用", workspace: "项目点", icon: Truck, permissionArea: "projectUsage" },
+  { label: "现场人员/健康证", workspace: "证照资质", icon: Users, permissionArea: "certificates" },
+  { label: "食品经营许可证", workspace: "证照资质", icon: ShieldCheck, permissionArea: "certificates" },
+  { label: "雇主责任险", workspace: "项目点", icon: ClipboardCheck, permissionArea: "projectUsage" },
+  { label: "工资表", workspace: "项目点", icon: FileText, permissionArea: "projectUsage" },
 ];
 
 export const workflowSteps = [

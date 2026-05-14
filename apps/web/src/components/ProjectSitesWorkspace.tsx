@@ -29,6 +29,8 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader } from "./ui";
+import { ExternalProjectSitePortal } from "./project-sites/ExternalProjectSitePortal";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -894,17 +896,33 @@ export function ProjectSitesWorkspace({
 
   return (
     <section className="project-sites-workspace" aria-label="项目点">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">项目点</span>
-          <h2>项目点</h2>
-          <p>维护项目点基础台账，登记领用申请，并从总部仓库执行出库。</p>
-        </div>
+      {usageOnly ? (
+        <ExternalProjectSitePortal
+          visibleProjectSiteCount={new Set(usageRequests.map((request) => request.projectSiteId)).size}
+          pendingUsageCount={pendingUsageCount}
+          equipmentCount={filteredKitchenEquipment.length}
+          pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+        />
+      ) : (
+        <PageHeader
+          eyebrow="项目点"
+          title="项目点"
+          subtitle="维护项目点基础台账、合规资料、领用申请、厨房设备和总部出库动作。"
+          actions={(
+            <span className="parties-total">
+              <MapPin aria-hidden="true" size={18} />
+              {sites.length} 个项目点
+            </span>
+          )}
+        />
+      )}
+
+      {!usageOnly ? <div className="parties-heading project-sites-legacy-heading">
         <span className="parties-total">
           <MapPin aria-hidden="true" size={18} />
-          {usageOnly ? `${new Set(usageRequests.map((request) => request.projectSiteId)).size} 个项目点` : `${sites.length} 个项目点`}
+          {sites.length} 个项目点
         </span>
-      </div>
+      </div> : null}
 
       <div className="inventory-heading">
         <p>{"当前库存余额 -> 项目点领用申请 -> 总部仓库出库 -> 库存流水扣减"}</p>
@@ -1537,7 +1555,7 @@ export function ProjectSitesWorkspace({
               ))}
             </select>
           </label> : null}
-          <label>
+          {!usageOnly ? <label>
             <span>仓库</span>
             <select value={usageForm.warehouseId} onChange={(event) => setUsageForm({ ...usageForm, warehouseId: event.target.value })}>
               <option value="">选择仓库</option>
@@ -1547,7 +1565,7 @@ export function ProjectSitesWorkspace({
                 </option>
               ))}
             </select>
-          </label>
+          </label> : null}
           <label>
             <span>物料</span>
             <select value={usageForm.materialId} onChange={(event) => updateSelectedMaterial(event.target.value)}>

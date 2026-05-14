@@ -22,6 +22,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -488,17 +489,17 @@ export function PeoplePermissionsWorkspace({
 
   return (
     <section className="people-permissions-workspace" aria-label="人员权限基础">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">人员权限</span>
-          <h2>人员权限</h2>
-          <p>维护部门、员工、账号和固定角色；本阶段不启用登录拦截。</p>
-        </div>
-        <label className="party-search people-search">
-          <Search aria-hidden="true" size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索部门、员工、账号" />
-        </label>
-      </div>
+      <PageHeader
+        eyebrow="合规与人员"
+        title="人员权限"
+        subtitle="维护公司员工、登录账号、项目点账号和项目点人员分配；项目点现场人员名单在项目点模块维护。"
+        actions={(
+          <label className="party-search people-search">
+            <Search aria-hidden="true" size={16} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索部门、员工、账号" />
+          </label>
+        )}
+      />
 
       <div className="party-summary people-summary" aria-label="人员权限指标摘要">
         <SummaryItem label="部门" value={departments.length} />
