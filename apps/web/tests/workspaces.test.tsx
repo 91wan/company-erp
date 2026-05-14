@@ -422,6 +422,12 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("新增领用申请")).toBeInTheDocument();
     expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
     expect(screen.getAllByText("科技园一期项目点").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("SITE-WX-001"));
+    expect(await screen.findByRole("heading", { name: "SITE-WX-001 科技园一期项目点" })).toBeInTheDocument();
+    for (const tab of ["概览", "现场人员", "健康证", "食品经营许可证", "雇主责任险", "工资表", "物料领用", "厨房设备", "项目点账号"]) {
+      expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     expect(screen.getByText("投入合同")).toBeInTheDocument();
     expect(await screen.findByText("装修/改造")).toBeInTheDocument();
     expect(screen.getByText("¥260,000.00")).toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { ClipboardList, Filter, MapPin, PackageMinus, RefreshCw, Save, Search, Wrench } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
@@ -31,6 +31,12 @@ import {
 import { apiBaseUrl, requestJson } from "../apiClient";
 import { PageHeader } from "./ui";
 import { ExternalProjectSitePortal } from "./project-sites/ExternalProjectSitePortal";
+import { ProjectSiteCompliancePanel } from "./project-sites/ProjectSiteCompliancePanel";
+import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
+import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
+import { ProjectSiteList } from "./project-sites/ProjectSiteList";
+import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
+import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -346,6 +352,7 @@ export function ProjectSitesWorkspace({
   const [issueSubmitState, setIssueSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [kitchenEquipmentSubmitState, setKitchenEquipmentSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [kitchenEquipmentChangeSubmitState, setKitchenEquipmentChangeSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
   const [siteForm, setSiteForm] = useState<SiteFormState>({
     siteCode: "",
     siteName: "",
@@ -627,6 +634,7 @@ export function ProjectSitesWorkspace({
         .some((value) => value!.toLowerCase().includes(normalizedQuery));
     });
   }, [query, sites]);
+  const selectedDetailSite = filteredSites.find((site) => site.id === selectedDetailSiteId) ?? null;
 
   const filteredUsageRequests = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -967,84 +975,16 @@ export function ProjectSitesWorkspace({
         </article> : null}
       </div>
 
-      <section className="dashboard-panel table-panel" aria-label="项目点厨房设备">
-        <PanelTitle icon={<Wrench size={16} />} title="厨房设备" />
-        {kitchenEquipmentStatus === "loading" ? (
-          <StateMessage icon={<RefreshCw size={16} />} text="厨房设备加载中" />
-        ) : kitchenEquipmentStatus === "error" ? (
-          <StateMessage icon={<Wrench size={16} />} text="厨房设备加载失败" />
-        ) : filteredKitchenEquipment.length === 0 ? (
-          <StateMessage icon={<Wrench size={16} />} text="暂无厨房设备" />
-        ) : (
-          <ResponsiveTable
-            headers={[
-              ...(usageOnly ? [] : ["项目点"]),
-              "设备",
-              "类目",
-              "规格",
-              "数量",
-              "位置",
-              "状态",
-              "资产标签",
-              "最近核对",
-            ]}
-            rows={filteredKitchenEquipment.map((item) => [
-              ...(usageOnly ? [] : [item.projectSiteName ?? "-"]),
-              item.equipmentName,
-              item.equipmentCategory ?? "-",
-              item.specification ?? "-",
-              `${item.quantity} ${item.unit}`,
-              item.location ?? "-",
-              kitchenEquipmentStatusLabel.get(item.status) ?? item.status,
-              item.companyAssetTag ?? "-",
-              item.lastCheckedDate ?? "-",
-            ])}
-          />
-        )}
-      </section>
-
-      <section className="dashboard-panel table-panel" aria-label="厨房设备变更上报">
-        <PanelTitle icon={<ClipboardList size={16} />} title="厨房设备变更上报" />
-        {filteredKitchenEquipmentChangeRequests.length === 0 ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="暂无设备变更上报" />
-        ) : (
-          <ResponsiveTable
-            headers={[
-              "设备",
-              "类型",
-              "数量",
-              "位置",
-              "状态",
-              "说明",
-              "审核",
-              ...(usageOnly ? [] : ["操作"]),
-            ]}
-            rows={filteredKitchenEquipmentChangeRequests.map((request) => [
-              request.equipmentName,
-              kitchenEquipmentChangeTypeLabel.get(request.changeType) ?? request.changeType,
-              request.proposedQuantity ?? "-",
-              request.proposedLocation ?? "-",
-              request.proposedStatus ? kitchenEquipmentStatusLabel.get(request.proposedStatus) ?? request.proposedStatus : "-",
-              request.description ?? "-",
-              complianceReviewStatusLabel.get(request.reviewStatus) ?? request.reviewStatus,
-              ...(usageOnly
-                ? []
-                : [
-                    request.reviewStatus === "pending" ? (
-                      <div className="table-actions" key={request.id}>
-                        <button type="button" onClick={() => void handleReviewKitchenEquipmentChangeRequest(request.id, "approved")}>
-                          通过
-                        </button>
-                        <button type="button" onClick={() => void handleReviewKitchenEquipmentChangeRequest(request.id, "rejected")}>
-                          驳回
-                        </button>
-                      </div>
-                    ) : "-",
-                  ]),
-            ])}
-          />
-        )}
-      </section>
+      <ProjectSiteKitchenEquipmentPanel
+        kitchenEquipment={filteredKitchenEquipment}
+        changeRequests={filteredKitchenEquipmentChangeRequests}
+        status={kitchenEquipmentStatus}
+        usageOnly={usageOnly}
+        kitchenEquipmentStatusLabel={kitchenEquipmentStatusLabel}
+        kitchenEquipmentChangeTypeLabel={kitchenEquipmentChangeTypeLabel}
+        complianceReviewStatusLabel={complianceReviewStatusLabel}
+        onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
+      />
 
       {!usageOnly && canEditSites ? (
         <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipment} aria-label="新增厨房设备表单">
@@ -1207,61 +1147,15 @@ export function ProjectSitesWorkspace({
         {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">设备变更上报失败，请检查设备名称或项目点。</p> : null}
       </form>
 
-      {!usageOnly ? <section className="dashboard-panel table-panel" aria-label="项目点合规资料">
-        <PanelTitle icon={<ClipboardList size={16} />} title="合规资料" />
-        {complianceStatus === "loading" ? (
-          <StateMessage icon={<RefreshCw size={16} />} text="合规资料加载中" />
-        ) : complianceStatus === "error" ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="合规资料加载失败" />
-        ) : filteredSites.length === 0 ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="暂无合规资料" />
-        ) : (
-          <ResponsiveTable
-            headers={[
-              "项目点",
-              "项目点现场人员名单",
-              "人员健康证",
-              "雇主责任险",
-              "食品经营许可证",
-              "工资表",
-              "风险",
-            ]}
-            rows={filteredSites.map((site) => {
-              const summary = complianceSummaries[site.id];
-              return [
-                `${site.siteCode} ${site.siteName}`,
-                summary ? `${summary.activeRosterCount} 人` : "-",
-                summary
-                  ? `缺 ${summary.missingHealthCertificateCount} / 临期 ${summary.expiringHealthCertificateCount} / 过期 ${summary.expiredHealthCertificateCount}`
-                  : "-",
-                summary
-                  ? `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} / 临期 ${summary.insuranceExpiringSoonCount} / 过期 ${summary.insuranceExpiredCount}`
-                  : "-",
-                summary ? (
-                  <StatusBadge key={`${site.id}-food-license`} tone={complianceStatusTone(summary.foodOperationLicenseStatus)}>
-                    {complianceComputedStatusLabel.get(summary.foodOperationLicenseStatus) ?? summary.foodOperationLicenseStatus}
-                  </StatusBadge>
-                ) : "-",
-                site.payrollAgencyRequired ? (
-                  <StatusBadge key={`${site.id}-payroll`} tone={complianceStatusTone(summary?.payrollCurrentMonthStatus ?? "missing")}>
-                    {complianceReviewStatusLabel.get(summary?.payrollCurrentMonthStatus ?? "missing") ??
-                      summary?.payrollCurrentMonthStatus ??
-                      "缺失"}
-                  </StatusBadge>
-                ) : "不需要",
-                summary ? (
-                  <span>
-                    <StatusBadge tone={summary.blockingIssueCount > 0 ? "orange" : summary.warningIssueCount > 0 ? "orange" : "green"}>
-                      {complianceRiskLabel(summary)}
-                    </StatusBadge>{" "}
-                    {summary.blockingIssueCount} 阻断 / {summary.warningIssueCount} 提醒
-                  </span>
-                ) : "-",
-              ];
-            })}
-          />
-        )}
-      </section> : null}
+      {!usageOnly ? (
+        <ProjectSiteCompliancePanel
+          sites={filteredSites}
+          summaries={complianceSummaries}
+          status={complianceStatus}
+          complianceComputedStatusLabel={complianceComputedStatusLabel}
+          complianceReviewStatusLabel={complianceReviewStatusLabel}
+        />
+      ) : null}
 
       <div className="party-toolbar">
         <label className="party-search">
@@ -1290,33 +1184,13 @@ export function ProjectSitesWorkspace({
       </div>
 
       {!usageOnly ? <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<MapPin size={16} />} title="项目点台账" />
-          {siteStatus === "loading" ? (
-            <StateMessage icon={<RefreshCw size={16} />} text="项目点资料加载中" />
-          ) : siteStatus === "error" ? (
-            <StateMessage icon={<MapPin size={16} />} text="项目点资料加载失败" />
-          ) : filteredSites.length === 0 ? (
-            <StateMessage icon={<MapPin size={16} />} text="暂无项目点资料" />
-          ) : (
-            <ResponsiveTable
-              headers={["编码", "名称", "客户/服务单位", "模式", "外包方", "业务项目", "负责人", "状态", "更新时间"]}
-              rows={filteredSites.map((site) => [
-                site.siteCode,
-                site.siteName,
-                site.clientPartyName ?? "-",
-                serviceModeLabel.get(site.serviceMode) ?? site.serviceMode,
-                site.subcontractorPartyName ?? "-",
-                site.businessProjectName ?? "-",
-                site.primaryManagerEmployeeName ?? "-",
-                <StatusBadge key={`${site.id}-status`} tone={site.status === "active" ? "green" : "gray"}>
-                  {siteStatusLabel.get(site.status) ?? site.status}
-                </StatusBadge>,
-                site.updatedAt.slice(0, 10),
-              ])}
-            />
-          )}
-        </section>
+        <ProjectSiteList
+          sites={filteredSites}
+          status={siteStatus}
+          serviceModeLabel={serviceModeLabel}
+          siteStatusLabel={siteStatusLabel}
+          onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
+        />
 
         {canEditSites ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
           <div className="panel-header people-panel-title">
@@ -1473,47 +1347,12 @@ export function ProjectSitesWorkspace({
       </section> : null}
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<ClipboardList size={16} />} title="领用申请" />
-          {usageStatus === "loading" ? (
-            <StateMessage icon={<RefreshCw size={16} />} text="领用申请加载中" />
-          ) : usageStatus === "error" ? (
-            <StateMessage icon={<ClipboardList size={16} />} text="领用申请加载失败" />
-          ) : filteredUsageRequests.length === 0 ? (
-            <StateMessage icon={<ClipboardList size={16} />} text="暂无领用申请" />
-          ) : (
-            <ResponsiveTable
-              headers={[
-                "申请单号",
-                ...(usageOnly ? [] : ["项目点"]),
-                "物料",
-                "申请数量",
-                "已出库",
-                ...(usageOnly ? [] : ["领用金额"]),
-                "领用人",
-                "领用时间",
-                "仓库",
-                "状态",
-                "期望日期",
-              ]}
-              rows={filteredUsageRequests.map((request) => [
-                request.requestNo,
-                ...(usageOnly ? [] : [request.projectSiteName]),
-                `${request.materialCode} ${request.materialName}`,
-                `${request.requestedQuantity} ${request.unit}`,
-                `${request.issuedQuantity} ${request.unit}`,
-                ...(usageOnly ? [] : [formatMoney(request.chargeAmount)]),
-                request.lastReceivedByName ?? "-",
-                request.lastIssuedAt ?? "-",
-                request.warehouseCode,
-                <StatusBadge key={`${request.id}-status`} tone={request.status === "issued" ? "green" : "orange"}>
-                  {usageStatusLabel.get(request.status) ?? request.status}
-                </StatusBadge>,
-                request.expectedDate ?? "-",
-              ])}
-            />
-          )}
-        </section>
+        <ProjectSiteUsagePanel
+          usageRequests={filteredUsageRequests}
+          status={usageStatus}
+          usageOnly={usageOnly}
+          usageStatusLabel={usageStatusLabel}
+        />
 
         {canCreateUsage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
           <div className="panel-header people-panel-title">
@@ -1680,75 +1519,16 @@ export function ProjectSitesWorkspace({
         ) : null}
         {issueSubmitState === "error" ? <p className="form-error">出库失败，请检查库存余额、单号或申请状态。</p> : null}
       </form> : null}
+
+      {!usageOnly ? (
+        <ProjectSiteDetailDrawer
+          site={selectedDetailSite}
+          complianceSummary={selectedDetailSite ? complianceSummaries[selectedDetailSite.id] : undefined}
+          usageRequests={selectedDetailSite ? usageRequests.filter((request) => request.projectSiteId === selectedDetailSite.id) : []}
+          kitchenEquipment={selectedDetailSite ? kitchenEquipment.filter((item) => item.projectSiteId === selectedDetailSite.id) : []}
+          onClose={() => setSelectedDetailSiteId("")}
+        />
+      ) : null}
     </section>
   );
-}
-
-function PanelTitle({ icon, title }: { icon: ReactNode; title: string }) {
-  return (
-    <div className="panel-header people-panel-title">
-      <h3>
-        {icon}
-        {title}
-      </h3>
-    </div>
-  );
-}
-
-function ResponsiveTable({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => (
-                <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <div className="party-state">
-      {icon}
-      {text}
-    </div>
-  );
-}
-
-function complianceStatusTone(status: string): "green" | "orange" | "gray" {
-  if (status === "valid" || status === "approved" || status === "not_required" || status === "not_applicable") {
-    return "green";
-  }
-  if (status === "expiring_soon" || status === "pending" || status === "review_due_soon") return "orange";
-  return "gray";
-}
-
-function complianceRiskLabel(summary: ProjectSiteComplianceSummaryDto): "红色风险" | "黄色预警" | "绿色正常" {
-  if (summary.blockingIssueCount > 0) return "红色风险";
-  if (summary.warningIssueCount > 0) return "黄色预警";
-  return "绿色正常";
-}
-
-function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray"; children: ReactNode }) {
-  const className = tone === "green" ? "status-badge green" : tone === "orange" ? "status-badge amber" : "status-badge gray";
-  return <span className={className}>{children}</span>;
-}
-
-function formatMoney(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "-";
-  return `¥${value.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
