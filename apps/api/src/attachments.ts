@@ -21,6 +21,12 @@ export type AttachmentRecordRepository = {
   update(id: string, input: UpdateAttachmentRecordInput): Promise<AttachmentRecordDto | null>;
 };
 
+export type AttachmentDownloadRef = {
+  attachmentId: string;
+  storageKey: string;
+  downloadRef: string;
+};
+
 export class AttachmentValidationError extends Error {
   constructor(public readonly issues: string[]) {
     super("Attachment validation failed");
@@ -82,6 +88,17 @@ function isUnsafeStorageKey(storageKey: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(storageKey)) return true;
   if (!storageKeyPattern.test(storageKey)) return true;
   return false;
+}
+
+export function createAttachmentDownloadRef(attachment: Pick<AttachmentRecordDto, "id" | "storageKey">): AttachmentDownloadRef {
+  if (isUnsafeStorageKey(attachment.storageKey)) {
+    throw new AttachmentValidationError(["storageKey must be a safe relative storage key"]);
+  }
+  return {
+    attachmentId: attachment.id,
+    storageKey: attachment.storageKey,
+    downloadRef: `/api/attachments/${attachment.id}/content`,
+  };
 }
 
 function normalizeStorageKey(value: unknown, issues: string[], required: boolean): string | undefined {

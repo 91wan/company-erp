@@ -1879,7 +1879,7 @@ export const MVP_PERMISSION_MATRIX = {
     manage: ["admin"],
   },
   attachments: {
-    read: ["admin", "hr", "procurement", "operations"],
+    read: ["admin", "hr", "procurement", "operations", "external_project_site"],
     manage: ["admin", "hr"],
   },
   systemSettings: {
