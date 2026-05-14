@@ -234,7 +234,7 @@ export function ContractsWorkspace({
     loadContractAttachments(attachmentForm.contractId)
       .then((nextAttachments) => {
         if (!mounted) return;
-        setAttachments(nextAttachments);
+        setAttachments(nextAttachments ?? []);
         setAttachmentStatus("ready");
       })
       .catch(() => {
