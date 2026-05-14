@@ -22,7 +22,7 @@ import {
   type ProjectSiteDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader } from "./ui";
+import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
@@ -366,21 +366,16 @@ export function ContractsWorkspace({
         )}
       />
 
-      <div className="party-summary people-summary" aria-label="合同摘要指标">
-        <SummaryCard label="合同总数" value={contracts.length} />
-        <SummaryCard label="即将到期" value={contracts.filter((contract) => contract.expiryState === "expiring_soon").length} />
-        <SummaryCard label="已到期" value={contracts.filter((contract) => contract.expiryState === "expired").length} />
-        <SummaryCard label="已终止" value={contracts.filter((contract) => contract.status === "terminated").length} />
+      <div className="summary-grid" aria-label="合同摘要指标">
+        <SummaryCard label="合同总数" value={contracts.length} detail="合同风险台账" tone="info" />
+        <SummaryCard label="执行中" value={contracts.filter((contract) => contract.status === "active").length} detail="当前有效合同" tone="success" />
+        <SummaryCard label="30 天内到期" value={contracts.filter((contract) => contract.expiryState === "expiring_soon").length} detail="需要续签或复核" tone="warning" />
+        <SummaryCard label="已到期" value={contracts.filter((contract) => contract.expiryState === "expired").length} detail="阻断风险" tone={contracts.some((contract) => contract.expiryState === "expired") ? "danger" : "success"} />
+        <SummaryCard label="已终止" value={contracts.filter((contract) => contract.status === "terminated").length} detail="历史归档" tone="disabled" />
       </div>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <FileText aria-hidden="true" size={17} />
-              合同台账
-            </h3>
-          </div>
+        <SectionCard title="合同风险台账" action={<FileText aria-hidden="true" size={17} />}>
           <ContractToolbar
             query={query}
             onQueryChange={setQuery}
@@ -393,7 +388,7 @@ export function ContractsWorkspace({
           {contractStatus === "error" ? <StateMessage text="合同台账加载失败" /> : null}
           {contractStatus === "ready" && filteredContracts.length === 0 ? <StateMessage text="暂无合同资料" /> : null}
           {contractStatus === "ready" && filteredContracts.length > 0 ? <ContractsTable contracts={filteredContracts} /> : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleContractSubmit}>
           <div className="panel-header">
@@ -531,19 +526,13 @@ export function ContractsWorkspace({
       </div>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <Paperclip aria-hidden="true" size={17} />
-              附件路径
-            </h3>
-          </div>
+        <SectionCard title="附件路径" action={<Paperclip aria-hidden="true" size={17} />}>
           {attachmentStatus === "idle" ? <StateMessage text="请选择合同查看附件路径" /> : null}
           {attachmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载附件路径..." /> : null}
           {attachmentStatus === "error" ? <StateMessage text="附件路径加载失败" /> : null}
           {attachmentStatus === "ready" && attachments.length === 0 ? <StateMessage text="暂无附件路径" /> : null}
           {attachmentStatus === "ready" && attachments.length > 0 ? <AttachmentsTable attachments={attachments} /> : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit}>
           <div className="panel-header">
@@ -591,15 +580,6 @@ export function ContractsWorkspace({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <article>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
 function ContractToolbar({
   query,
   onQueryChange,
@@ -616,34 +596,40 @@ function ContractToolbar({
   onExpiryChange: (value: string) => void;
 }) {
   return (
-    <div className="party-toolbar">
-      <label className="party-search">
-        <Search aria-hidden="true" size={16} />
-        <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索合同编号、名称、相对方、业务项目、项目点" />
-      </label>
-      <label className="party-filter">
-        <Filter aria-hidden="true" size={16} />
-        <select aria-label="合同状态筛选" value={statusFilter} onChange={(event) => onStatusChange(event.target.value)}>
-          <option value="all">全部状态</option>
-          {CONTRACT_STATUSES.map((status) => (
-            <option key={status.code} value={status.code}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="party-filter">
-        <Filter aria-hidden="true" size={16} />
-        <select aria-label="到期状态筛选" value={expiryFilter} onChange={(event) => onExpiryChange(event.target.value)}>
-          <option value="all">全部到期状态</option>
-          {CONTRACT_EXPIRY_STATES.map((state) => (
-            <option key={state.code} value={state.code}>
-              {state.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+    <UiToolbar
+      search={(
+        <label className="table-search">
+          <Search aria-hidden="true" size={16} />
+          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索合同编号、名称、相对方、业务项目、项目点" />
+        </label>
+      )}
+      filters={(
+        <>
+          <label className="table-filter">
+            <Filter aria-hidden="true" size={16} />
+            <select aria-label="合同状态筛选" value={statusFilter} onChange={(event) => onStatusChange(event.target.value)}>
+              <option value="all">全部状态</option>
+              {CONTRACT_STATUSES.map((status) => (
+                <option key={status.code} value={status.code}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="table-filter">
+            <Filter aria-hidden="true" size={16} />
+            <select aria-label="到期状态筛选" value={expiryFilter} onChange={(event) => onExpiryChange(event.target.value)}>
+              <option value="all">全部到期状态</option>
+              {CONTRACT_EXPIRY_STATES.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+    />
   );
 }
 
@@ -685,9 +671,9 @@ function ContractsTable({ contracts }: { contracts: ContractDto[] }) {
               </td>
               <td>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</td>
               <td>
-                <span className={`status-badge ${expiryTone(contract.expiryState)}`}>
+                <StatusBadge tone={contractExpiryTone(contract.expiryState)}>
                   {expiryLabel.get(contract.expiryState)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{formatDateTime(contract.updatedAt)}</td>
             </tr>
@@ -752,8 +738,9 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-function expiryTone(expiryState: ContractExpiryStateCode): "green" | "orange" | "blue" {
-  if (expiryState === "expired" || expiryState === "terminated") return "orange";
-  if (expiryState === "expiring_soon") return "blue";
-  return "green";
+function contractExpiryTone(expiryState: ContractExpiryStateCode): "success" | "warning" | "danger" | "disabled" {
+  if (expiryState === "expired") return "danger";
+  if (expiryState === "terminated") return "disabled";
+  if (expiryState === "expiring_soon") return "warning";
+  return "success";
 }

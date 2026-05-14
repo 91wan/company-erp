@@ -14,7 +14,7 @@ import {
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader } from "./ui";
+import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -367,21 +367,15 @@ export function PurchaseWorkspace({
         )}
       />
 
-      <div className="party-summary material-summary" aria-label="采购摘要指标">
-        <SummaryCard label="采购需求" value={purchaseRequests.length} />
-        <SummaryCard label="待审批" value={pendingApprovalRequests.length} />
-        <SummaryCard label="待采购" value={purchaseRequests.filter((request) => request.status === "pending_purchase").length} />
-        <SummaryCard label="采购记录" value={purchaseRecords.length} />
-        <SummaryCard label="已下单" value={purchaseRecords.filter((record) => record.status === "ordered").length} />
+      <div className="summary-grid" aria-label="采购摘要指标">
+        <SummaryCard label="采购需求" value={purchaseRequests.length} detail="需求台账" tone="info" />
+        <SummaryCard label="待审批" value={pendingApprovalRequests.length} detail="需要采购管理处理" tone={pendingApprovalRequests.length > 0 ? "warning" : "success"} />
+        <SummaryCard label="待采购" value={purchaseRequests.filter((request) => request.status === "pending_purchase").length} detail="已准入未采购" tone="neutral" />
+        <SummaryCard label="采购记录" value={purchaseRecords.length} detail="采购执行" tone="info" />
+        <SummaryCard label="已下单" value={purchaseRecords.filter((record) => record.status === "ordered").length} detail="等待到货/入库" tone="success" />
       </div>
 
-      <section className="dashboard-panel table-panel" aria-label="采购需求审批">
-        <div className="panel-header people-panel-title">
-          <h3>
-            <Check aria-hidden="true" size={17} />
-            待审批
-          </h3>
-        </div>
+      <SectionCard title="待审批" action={<Check aria-hidden="true" size={17} />}>
         {pendingApprovalRequests.length === 0 ? <StateMessage text="暂无待审批采购需求" /> : null}
         {pendingApprovalRequests.length > 0 ? (
           <>
@@ -431,16 +425,10 @@ export function PurchaseWorkspace({
           </>
         ) : null}
         {reviewState === "error" ? <p className="form-error">审批操作失败</p> : null}
-      </section>
+      </SectionCard>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <ClipboardList aria-hidden="true" size={17} />
-              采购需求
-            </h3>
-          </div>
+        <SectionCard title="采购需求" action={<ClipboardList aria-hidden="true" size={17} />}>
           <Toolbar
             query={requestQuery}
             onQueryChange={setRequestQuery}
@@ -460,7 +448,7 @@ export function PurchaseWorkspace({
               onSubmitRequest={(request) => handleRequestReview("submit", request)}
             />
           ) : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit}>
           <div className="panel-header">
@@ -503,13 +491,7 @@ export function PurchaseWorkspace({
       </div>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <PackageCheck aria-hidden="true" size={17} />
-              采购记录
-            </h3>
-          </div>
+        <SectionCard title="采购执行" action={<PackageCheck aria-hidden="true" size={17} />}>
           <Toolbar
             query={recordQuery}
             onQueryChange={setRecordQuery}
@@ -522,7 +504,7 @@ export function PurchaseWorkspace({
           {recordStatus === "error" ? <StateMessage text="采购记录加载失败" /> : null}
           {recordStatus === "ready" && filteredRecords.length === 0 ? <StateMessage text="暂无采购记录" /> : null}
           {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} /> : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit}>
           <div className="panel-header">
@@ -596,15 +578,6 @@ export function PurchaseWorkspace({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <article>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
 function Toolbar({
   query,
   onQueryChange,
@@ -621,23 +594,27 @@ function Toolbar({
   searchLabel: string;
 }) {
   return (
-    <div className="party-toolbar">
-      <label className="party-search">
-        <Search aria-hidden="true" size={16} />
-        <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={searchLabel} />
-      </label>
-      <label className="party-filter">
-        <Filter aria-hidden="true" size={16} />
-        <select aria-label={searchLabel} value={filter} onChange={(event) => onFilterChange(event.target.value)}>
-          <option value="all">全部状态</option>
-          {options.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+    <UiToolbar
+      search={(
+        <label className="table-search">
+          <Search aria-hidden="true" size={16} />
+          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={searchLabel} />
+        </label>
+      )}
+      filters={(
+        <label className="table-filter">
+          <Filter aria-hidden="true" size={16} />
+          <select aria-label={searchLabel} value={filter} onChange={(event) => onFilterChange(event.target.value)}>
+            <option value="all">全部状态</option>
+            {options.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    />
   );
 }
 
@@ -683,9 +660,9 @@ function PurchaseRequestsTable({
                 <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
                 <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
                 <td>
-                  <span className={`status-badge ${request.status === "cancelled" || request.status === "rejected" ? "orange" : "blue"}`}>
+                  <StatusBadge tone={purchaseRequestTone(request.status)}>
                     {requestStatusLabel.get(request.status)}
-                  </span>
+                  </StatusBadge>
                 </td>
                 <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
                 <td>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "-"}</td>
@@ -741,9 +718,9 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
                 <td>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</td>
                 <td>{record.purchaseDate}</td>
                 <td>
-                  <span className={`status-badge ${record.status === "cancelled" ? "orange" : "green"}`}>
+                  <StatusBadge tone={record.status === "cancelled" ? "warning" : "success"}>
                     {recordStatusLabel.get(record.status)}
-                  </span>
+                  </StatusBadge>
                 </td>
               </tr>
             );
@@ -752,6 +729,15 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
       </table>
     </div>
   );
+}
+
+function purchaseRequestTone(status: PurchaseRequestStatusCode): "info" | "success" | "warning" | "danger" | "rejected" {
+  if (status === "rejected") return "rejected";
+  if (status === "cancelled") return "warning";
+  if (status === "completed") return "success";
+  if (status === "pending_approval") return "warning";
+  if (status === "draft") return "info";
+  return "success";
 }
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
