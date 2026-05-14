@@ -22,7 +22,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader } from "./ui";
+import { PageHeader, StatusBadge, SummaryCard } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -501,13 +501,17 @@ export function PeoplePermissionsWorkspace({
         )}
       />
 
-      <div className="party-summary people-summary" aria-label="人员权限指标摘要">
-        <SummaryItem label="部门" value={departments.length} />
-        <SummaryItem label="在职员工" value={employees.filter((employee) => employee.employmentStatus === "active").length} />
-        <SummaryItem label="启用账号" value={userAccounts.filter((account) => account.status === "active").length} />
-        <SummaryItem label="外部账号" value={externalProjectSiteAccounts.filter((account) => account.status === "active").length} />
-        <SummaryItem label="Admin账号" value={userAccounts.filter((account) => account.roles.includes("admin")).length} />
+      <div className="summary-grid" aria-label="人员权限指标摘要">
+        <SummaryCard label="部门" value={departments.length} detail="组织基础" tone="neutral" />
+        <SummaryCard label="公司员工" value={employees.filter((employee) => employee.employmentStatus === "active").length} detail="HR 员工台账" tone="success" />
+        <SummaryCard label="启用账号" value={userAccounts.filter((account) => account.status === "active").length} detail="内部登录账号" tone="info" />
+        <SummaryCard label="项目点账号" value={externalProjectSiteAccounts.filter((account) => account.status === "active").length} detail="当前有效项目经理账号" tone="warning" />
+        <SummaryCard label="Admin账号" value={userAccounts.filter((account) => account.roles.includes("admin")).length} detail="高权限账号" tone="danger" />
       </div>
+
+      <p className="form-hint people-safety-note">
+        项目点账号单独管理；一个项目点最多一个当前有效项目点账号，更换项目经理建议停用旧账号并创建新账号。
+      </p>
 
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
@@ -790,15 +794,6 @@ export function PeoplePermissionsWorkspace({
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: number }) {
-  return (
-    <article>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
 function PanelTitle({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div className="panel-header people-panel-title">
@@ -842,9 +837,9 @@ function DepartmentsTable({ departments }: { departments: DepartmentDto[] }) {
               <td>{department.name}</td>
               <td>{department.managerEmployeeName || "-"}</td>
               <td>
-                <span className={`status-badge ${department.status === "enabled" ? "green" : "orange"}`}>
+                <StatusBadge tone={department.status === "enabled" ? "success" : "disabled"}>
                   {departmentStatusLabel.get(department.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{department.sortOrder}</td>
             </tr>
@@ -879,9 +874,9 @@ function EmployeesTable({ employees }: { employees: EmployeeDto[] }) {
               <td>{employee.position || "-"}</td>
               <td>{employee.phone || "-"}</td>
               <td>
-                <span className={`status-badge ${employee.employmentStatus === "active" ? "green" : "orange"}`}>
+                <StatusBadge tone={employee.employmentStatus === "active" ? "success" : "disabled"}>
                   {employeeStatusLabel.get(employee.employmentStatus)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{employee.username || "未开通"}</td>
             </tr>
@@ -918,9 +913,9 @@ function UserAccountsTable({ userAccounts }: { userAccounts: UserAccountDto[] })
                 </div>
               </td>
               <td>
-                <span className={`status-badge ${account.status === "active" ? "green" : "orange"}`}>
+                <StatusBadge tone={account.status === "active" ? "success" : "disabled"}>
                   {accountStatusLabel.get(account.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{account.passwordChangedAt ? formatDateTime(account.passwordChangedAt) : "-"}</td>
             </tr>
@@ -968,9 +963,9 @@ function ExternalProjectSiteAccountsTable({
               <td>{account.username}</td>
               <td>{account.subcontractorPartyName || "-"}</td>
               <td>
-                <span className={`status-badge ${account.status === "active" ? "green" : "orange"}`}>
+                <StatusBadge tone={account.status === "active" ? "success" : "disabled"}>
                   {accountStatusLabel.get(account.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>
                 {account.startDate ?? "-"} / {account.endDate ?? "长期"}
@@ -1024,9 +1019,9 @@ function ProjectSiteAssignmentsTable({ assignments }: { assignments: EmployeePro
                 {assignment.startDate ?? "-"} / {assignment.endDate ?? "长期"}
               </td>
               <td>
-                <span className={`status-badge ${assignment.isActive ? "green" : "orange"}`}>
+                <StatusBadge tone={assignment.isActive ? "success" : "disabled"}>
                   {assignment.isActive ? "有效" : "失效"}
-                </span>
+                </StatusBadge>
               </td>
             </tr>
           ))}

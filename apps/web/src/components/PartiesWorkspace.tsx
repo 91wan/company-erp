@@ -7,6 +7,7 @@ import {
   type PartyTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
@@ -112,63 +113,62 @@ export function PartiesWorkspace({
 
   return (
     <section className="parties-workspace" aria-label="往来方基础资料">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">基础资料</span>
-          <h2>往来方基础</h2>
-          <p>统一维护供应商、甲方客户/服务单位、外包方和我方公司主体。</p>
-        </div>
-        <span className="parties-total">
-          <Building2 aria-hidden="true" size={18} />
-          {parties.length} 个往来方
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="基础资料"
+        title="往来单位"
+        subtitle="统一维护客户、供应商、分包商、个人承包人和运营主体；个人承包人仍作为 Party 个人主体管理。"
+        actions={(
+          <span className="parties-total">
+            <Building2 aria-hidden="true" size={18} />
+            {parties.length} 个往来方
+          </span>
+        )}
+      />
 
-      <div className="party-summary" aria-label="往来方指标摘要">
+      <div className="summary-grid" aria-label="往来方指标摘要">
         {PARTY_METADATA.partyTypes.map((partyType) => {
           const count = parties.filter((party) => party.partyTypes.includes(partyType.code)).length;
-          return (
-            <article key={partyType.code}>
-              <span>{partyType.label}</span>
-              <strong>{count}</strong>
-            </article>
-          );
+          return <SummaryCard key={partyType.code} label={partyType.label} value={count} detail="往来单位分类" tone="neutral" />;
         })}
       </div>
 
       <div className="parties-layout">
-        <section className="dashboard-panel table-panel">
-          <div className="party-toolbar">
-            <label className="party-search">
-              <Search aria-hidden="true" size={16} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索编码、名称、联系人、电话"
-              />
-            </label>
-            <label className="party-filter">
-              <Filter aria-hidden="true" size={16} />
-              <select
-                aria-label="往来方类型筛选"
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as "all" | PartyTypeCode)}
-              >
-                <option value="all">全部类型</option>
-                {PARTY_METADATA.partyTypes.map((partyType) => (
-                  <option key={partyType.code} value={partyType.code}>
-                    {partyType.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <SectionCard title="往来单位台账">
+          <Toolbar
+            search={(
+              <label className="table-search">
+                <Search aria-hidden="true" size={16} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索编码、名称、联系人、电话"
+                />
+              </label>
+            )}
+            filters={(
+              <label className="table-filter">
+                <Filter aria-hidden="true" size={16} />
+                <select
+                  aria-label="往来方类型筛选"
+                  value={typeFilter}
+                  onChange={(event) => setTypeFilter(event.target.value as "all" | PartyTypeCode)}
+                >
+                  <option value="all">全部类型</option>
+                  {PARTY_METADATA.partyTypes.map((partyType) => (
+                    <option key={partyType.code} value={partyType.code}>
+                      {partyType.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          />
 
           {status === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载往来方资料..." /> : null}
           {status === "error" ? <StateMessage text="往来方资料加载失败" /> : null}
           {status === "ready" && filteredParties.length === 0 ? <StateMessage text="暂无往来方资料" /> : null}
           {status === "ready" && filteredParties.length > 0 ? <PartiesTable parties={filteredParties} /> : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
           <div className="panel-header">
@@ -281,9 +281,9 @@ function PartiesTable({ parties }: { parties: PartyDto[] }) {
               <td>{party.primaryContactName || "-"}</td>
               <td>{party.primaryContactPhone || "-"}</td>
               <td>
-                <span className={`status-badge ${party.status === "enabled" ? "green" : "orange"}`}>
+                <StatusBadge tone={party.status === "enabled" ? "success" : "disabled"}>
                   {statusLabel.get(party.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{formatDateTime(party.updatedAt)}</td>
               <td>

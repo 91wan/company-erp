@@ -151,10 +151,8 @@ export function SectionCard({
   return (
     <section className="ui-section-card">
       <div className="ui-section-header">
-        <h3>
-          {title}
-          {badge ? <span>{badge}</span> : null}
-        </h3>
+        <h3>{title}</h3>
+        {badge ? <span>{badge}</span> : null}
         {action}
       </div>
       {children}

@@ -9,6 +9,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
+import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
 
 type MaterialsWarehousesWorkspaceProps = {
   loadMaterials?: () => Promise<MaterialDto[]>;
@@ -198,57 +199,57 @@ export function MaterialsWarehousesWorkspace({
 
   return (
     <section className="materials-warehouses-workspace" aria-label="物料和仓库基础资料">
-      <div className="parties-heading">
-        <div>
-          <span className="section-kicker">基础资料</span>
-          <h2>物料基础</h2>
-          <p>维护总部库存需要的物料编码、类别、单位、安全库存和默认供应商。</p>
-        </div>
-        <span className="parties-total">
-          <Boxes aria-hidden="true" size={18} />
-          {materials.length} 个物料
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="基础资料"
+        title="物料与仓库"
+        subtitle="分区维护物料、仓库和库存基础口径；项目点收费、耗材和安全库存用于后续业务风险提示。"
+        actions={(
+          <span className="parties-total">
+            <Boxes aria-hidden="true" size={18} />
+            {materials.length} 个物料
+          </span>
+        )}
+      />
 
-      <div className="party-summary material-summary" aria-label="物料指标摘要">
+      <div className="summary-grid" aria-label="物料指标摘要">
         {MATERIAL_CATEGORIES.map((category) => {
           const count = materials.filter((material) => material.materialCategory === category).length;
-          return (
-            <article key={category}>
-              <span>{category}</span>
-              <strong>{count}</strong>
-            </article>
-          );
+          return <SummaryCard key={category} label={category} value={count} detail="物料类别" tone="neutral" />;
         })}
+        <SummaryCard label="仓库" value={warehouses.length} detail="总部库存仓库" tone="info" />
       </div>
 
       <div className="parties-layout">
-        <section className="dashboard-panel table-panel">
-          <div className="party-toolbar">
-            <label className="party-search">
-              <Search aria-hidden="true" size={16} />
-              <input
-                value={materialQuery}
-                onChange={(event) => setMaterialQuery(event.target.value)}
-                placeholder="搜索物料编码、名称、规格、供应商"
-              />
-            </label>
-            <label className="party-filter">
-              <Filter aria-hidden="true" size={16} />
-              <select
-                aria-label="物料类别筛选"
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-              >
-                <option value="all">全部类别</option>
-                {MATERIAL_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <SectionCard title="物料台账" action={<Boxes aria-hidden="true" size={17} />}>
+          <Toolbar
+            search={(
+              <label className="table-search">
+                <Search aria-hidden="true" size={16} />
+                <input
+                  value={materialQuery}
+                  onChange={(event) => setMaterialQuery(event.target.value)}
+                  placeholder="搜索物料编码、名称、规格、供应商"
+                />
+              </label>
+            )}
+            filters={(
+              <label className="table-filter">
+                <Filter aria-hidden="true" size={16} />
+                <select
+                  aria-label="物料类别筛选"
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                >
+                  <option value="all">全部类别</option>
+                  {MATERIAL_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          />
 
           {materialStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载物料资料..." /> : null}
           {materialStatus === "error" ? <StateMessage text="物料资料加载失败" /> : null}
@@ -256,7 +257,7 @@ export function MaterialsWarehousesWorkspace({
           {materialStatus === "ready" && filteredMaterials.length > 0 ? (
             <MaterialsTable materials={filteredMaterials} />
           ) : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleMaterialSubmit}>
           <div className="panel-header">
@@ -404,17 +405,19 @@ export function MaterialsWarehousesWorkspace({
       </div>
 
       <div className="parties-layout">
-        <section className="dashboard-panel table-panel">
-          <div className="party-toolbar warehouse-toolbar">
-            <label className="party-search">
-              <Search aria-hidden="true" size={16} />
-              <input
-                value={warehouseQuery}
-                onChange={(event) => setWarehouseQuery(event.target.value)}
-                placeholder="搜索仓库编码、名称、负责人、电话"
-              />
-            </label>
-          </div>
+        <SectionCard title="仓库台账" action={<Warehouse aria-hidden="true" size={17} />}>
+          <Toolbar
+            search={(
+              <label className="table-search">
+                <Search aria-hidden="true" size={16} />
+                <input
+                  value={warehouseQuery}
+                  onChange={(event) => setWarehouseQuery(event.target.value)}
+                  placeholder="搜索仓库编码、名称、负责人、电话"
+                />
+              </label>
+            )}
+          />
 
           {warehouseStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载仓库资料..." /> : null}
           {warehouseStatus === "error" ? <StateMessage text="仓库资料加载失败" /> : null}
@@ -422,7 +425,7 @@ export function MaterialsWarehousesWorkspace({
           {warehouseStatus === "ready" && filteredWarehouses.length > 0 ? (
             <WarehousesTable warehouses={filteredWarehouses} />
           ) : null}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleWarehouseSubmit}>
           <div className="panel-header">
@@ -539,9 +542,9 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
               </td>
               <td>{material.isConsumable ? "是" : "否"}</td>
               <td>
-                <span className={`status-badge ${material.status === "enabled" ? "green" : "orange"}`}>
+                <StatusBadge tone={material.status === "enabled" ? "success" : "disabled"}>
                   {statusLabel.get(material.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{formatDateTime(material.updatedAt)}</td>
             </tr>
@@ -576,9 +579,9 @@ function WarehousesTable({ warehouses }: { warehouses: WarehouseDto[] }) {
               <td>{warehouse.managerName || "-"}</td>
               <td>{warehouse.managerPhone || "-"}</td>
               <td>
-                <span className={`status-badge ${warehouse.status === "enabled" ? "green" : "orange"}`}>
+                <StatusBadge tone={warehouse.status === "enabled" ? "success" : "disabled"}>
                   {statusLabel.get(warehouse.status)}
-                </span>
+                </StatusBadge>
               </td>
               <td>{formatDateTime(warehouse.updatedAt)}</td>
             </tr>
