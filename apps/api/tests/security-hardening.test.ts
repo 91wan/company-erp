@@ -164,7 +164,7 @@ describe("login rate limit (integration)", () => {
 
   it("allows login attempts again after the rate-limit time window expires", async () => {
     const savedWindow = process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS;
-    process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS = "50";
+    process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS = "250";
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "rate-limit-reset-test-secret-long-enough" },
       authRepository: createFakeAuthRepository([]),
@@ -189,7 +189,7 @@ describe("login rate limit (integration)", () => {
       });
       expect(blocked.statusCode).toBe(429);
 
-      await new Promise((resolve) => setTimeout(resolve, 75));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const afterReset = await app.inject({
         method: "POST",

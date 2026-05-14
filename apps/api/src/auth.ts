@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   canManage,
@@ -39,6 +39,11 @@ export type AuthRepository = {
   findByUsername(username: string): Promise<AuthAccountRecord | null>;
   findById(id: string): Promise<AuthAccountRecord | null>;
   updateLastLogin(id: string, at: Date): Promise<void>;
+  createSession?(input: CreateAuthSessionInput): Promise<AuthSessionRecord>;
+  findSessionByTokenHash?(tokenHash: string): Promise<AuthSessionRecord | null>;
+  touchSession?(id: string, at: Date): Promise<void>;
+  revokeSession?(id: string, at: Date, reason: string): Promise<void>;
+  revokeSessionsForAccount?(userAccountId: string, at: Date, reason: string): Promise<void>;
 };
 
 export type AuthOptions = {
@@ -50,41 +55,38 @@ export type AuthOptions = {
 
 export type AuthenticatedRequest = FastifyRequest & {
   currentUser?: AuthenticatedUserDto;
+  currentSessionId?: string;
 };
 
-type SessionPayload = {
-  sub: string;
-  iat: number;
-  exp: number;
+export type CreateAuthSessionInput = {
+  userAccountId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  createdAt: Date;
+  ip?: string | null;
+  userAgent?: string | null;
 };
 
-function base64UrlEncode(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64url");
+export type AuthSessionRecord = {
+  id: string;
+  userAccountId: string;
+  tokenHash: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  revokedReason?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  lastSeenAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function createOpaqueSessionToken(): string {
+  return randomBytes(32).toString("base64url");
 }
 
-function sign(value: string, secret: string): string {
-  return createHmac("sha256", secret).update(value).digest("base64url");
-}
-
-function safeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-export function createSessionToken(
-  accountId: string,
-  secret: string,
-  ttlSeconds = DEFAULT_SESSION_TTL_SECONDS,
-  issuedAtSeconds = Math.floor(Date.now() / 1000),
-): string {
-  const payload: SessionPayload = {
-    sub: accountId,
-    iat: issuedAtSeconds,
-    exp: issuedAtSeconds + ttlSeconds,
-  };
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  return `${encodedPayload}.${sign(encodedPayload, secret)}`;
+export function hashSessionToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function getSessionIssuedAtForAccount(account: AuthAccountRecord): number {
@@ -93,22 +95,6 @@ function getSessionIssuedAtForAccount(account: AuthAccountRecord): number {
 
   const passwordChangedAt = Math.floor(new Date(account.passwordChangedAt).getTime() / 1000);
   return Number.isFinite(passwordChangedAt) ? Math.max(now, passwordChangedAt) : now;
-}
-
-function verifySessionToken(token: string, secret: string): SessionPayload | null {
-  const [encodedPayload, signature] = token.split(".");
-  if (!encodedPayload || !signature) return null;
-  if (!safeEqual(signature, sign(encodedPayload, secret))) return null;
-
-  try {
-    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as Partial<SessionPayload>;
-    if (!payload.sub || typeof payload.sub !== "string") return null;
-    if (typeof payload.iat !== "number") return null;
-    if (typeof payload.exp !== "number" || payload.exp <= Math.floor(Date.now() / 1000)) return null;
-    return { sub: payload.sub, iat: payload.iat, exp: payload.exp };
-  } catch {
-    return null;
-  }
 }
 
 export function parseCookieHeader(header: string | undefined): Record<string, string> {
@@ -168,6 +154,91 @@ function accountCanLogin(account: AuthAccountRecord): boolean {
   return !account.employeeStatus || account.employeeStatus === "active";
 }
 
+function authSessionIsActive(session: AuthSessionRecord, now = new Date()): boolean {
+  if (session.revokedAt) return false;
+  const expiresAt = new Date(session.expiresAt);
+  return Number.isFinite(expiresAt.getTime()) && expiresAt > now;
+}
+
+type AuthSessionStore = Required<Pick<
+  AuthRepository,
+  "createSession" | "findSessionByTokenHash" | "touchSession" | "revokeSession" | "revokeSessionsForAccount"
+>>;
+
+function createInMemorySessionStore(): AuthSessionStore {
+  const sessions = new Map<string, AuthSessionRecord>();
+  return {
+    async createSession(input) {
+      const now = input.createdAt.toISOString();
+      const session: AuthSessionRecord = {
+        id: randomBytes(16).toString("hex"),
+        userAccountId: input.userAccountId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt.toISOString(),
+        revokedAt: null,
+        revokedReason: null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        lastSeenAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      sessions.set(session.tokenHash, session);
+      return session;
+    },
+    async findSessionByTokenHash(tokenHash) {
+      return sessions.get(tokenHash) ?? null;
+    },
+    async touchSession(id, at) {
+      for (const session of sessions.values()) {
+        if (session.id === id) {
+          session.lastSeenAt = at.toISOString();
+          session.updatedAt = at.toISOString();
+          return;
+        }
+      }
+    },
+    async revokeSession(id, at, reason) {
+      for (const session of sessions.values()) {
+        if (session.id === id) {
+          session.revokedAt = at.toISOString();
+          session.revokedReason = reason;
+          session.updatedAt = at.toISOString();
+          return;
+        }
+      }
+    },
+    async revokeSessionsForAccount(userAccountId, at, reason) {
+      for (const session of sessions.values()) {
+        if (session.userAccountId === userAccountId && !session.revokedAt) {
+          session.revokedAt = at.toISOString();
+          session.revokedReason = reason;
+          session.updatedAt = at.toISOString();
+        }
+      }
+    },
+  };
+}
+
+function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
+  if (
+    authRepository.createSession &&
+    authRepository.findSessionByTokenHash &&
+    authRepository.touchSession &&
+    authRepository.revokeSession &&
+    authRepository.revokeSessionsForAccount
+  ) {
+    return {
+      createSession: authRepository.createSession.bind(authRepository),
+      findSessionByTokenHash: authRepository.findSessionByTokenHash.bind(authRepository),
+      touchSession: authRepository.touchSession.bind(authRepository),
+      revokeSession: authRepository.revokeSession.bind(authRepository),
+      revokeSessionsForAccount: authRepository.revokeSessionsForAccount.bind(authRepository),
+    };
+  }
+  return createInMemorySessionStore();
+}
+
 function normalizeLoginPayload(payload: unknown): { username: string; password: string } | { issues: string[] } {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return { issues: ["Payload must be an object"] };
@@ -184,20 +255,23 @@ function normalizeLoginPayload(payload: unknown): { username: string; password: 
 async function resolveSessionUser(
   request: FastifyRequest,
   authRepository: AuthRepository,
-  secret: string,
+  sessionStore: AuthSessionStore,
 ): Promise<AuthenticatedUserDto | null> {
   const requestWithCookies = request as FastifyRequest & { cookies?: Record<string, string> };
   const cookies = { ...parseCookieHeader(request.headers.cookie), ...(requestWithCookies.cookies ?? {}) };
   const token = cookies[AUTH_COOKIE_NAME];
   if (!token) return null;
-  const payload = verifySessionToken(token, secret);
-  if (!payload) return null;
-  const account = await authRepository.findById(payload.sub);
+  const session = await sessionStore.findSessionByTokenHash(hashSessionToken(token));
+  if (!session || !authSessionIsActive(session)) return null;
+  const account = await authRepository.findById(session.userAccountId);
   if (!account || !accountCanLogin(account)) return null;
   if (account.passwordChangedAt) {
     const passwordChangedAt = Math.floor(new Date(account.passwordChangedAt).getTime() / 1000);
-    if (Number.isFinite(passwordChangedAt) && payload.iat < passwordChangedAt) return null;
+    const sessionCreatedAt = Math.floor(new Date(session.createdAt).getTime() / 1000);
+    if (Number.isFinite(passwordChangedAt) && sessionCreatedAt < passwordChangedAt) return null;
   }
+  await sessionStore.touchSession(session.id, new Date());
+  (request as AuthenticatedRequest).currentSessionId = session.id;
   return toAuthenticatedUser(account);
 }
 
@@ -293,9 +367,10 @@ export function registerAuth(
   const enabled = authOptions?.enabled ?? false;
   if (!enabled) return;
 
-  const secret = normalizeSessionSecret(authOptions?.sessionSecret);
+  normalizeSessionSecret(authOptions?.sessionSecret);
   const ttlSeconds = authOptions?.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
   const secure = authOptions?.cookieSecure ?? false;
+  const sessionStore = authRepository ? createSessionStore(authRepository) : null;
 
   app.addHook("preHandler", async (request, reply) => {
     const pathname = new URL(request.url, "http://company-erp.local").pathname;
@@ -306,7 +381,7 @@ export function registerAuth(
     }
 
     // Require a valid session for ALL non-public paths (default-deny for unauthenticated)
-    const user = await resolveSessionUser(request, authRepository, secret);
+    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
 
     (request as AuthenticatedRequest).currentUser = user;
@@ -359,7 +434,16 @@ export function registerAuth(
       await authRepository.updateLastLogin(account.id, new Date());
       const refreshed = await authRepository.findById(account.id);
       const user = toAuthenticatedUser(refreshed ?? account);
-      const token = createSessionToken(account.id, secret, ttlSeconds, getSessionIssuedAtForAccount(refreshed ?? account));
+      const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
+      const token = createOpaqueSessionToken();
+      await (sessionStore ?? createInMemorySessionStore()).createSession({
+        userAccountId: account.id,
+        tokenHash: hashSessionToken(token),
+        expiresAt: new Date(issuedAt.getTime() + ttlSeconds * 1000),
+        createdAt: issuedAt,
+        ip: request.ip ?? null,
+        userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+      });
       reply.header(
         "Set-Cookie",
         serializeCookie(AUTH_COOKIE_NAME, token, {
@@ -375,11 +459,20 @@ export function registerAuth(
 
   app.get("/api/auth/me", async (request) => {
     if (!authRepository) return { user: null };
-    const user = await resolveSessionUser(request, authRepository, secret);
+    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
     return { user };
   });
 
-  app.post("/api/auth/logout", async (_request, reply: FastifyReply) => {
+  app.post("/api/auth/logout", async (request, reply: FastifyReply) => {
+    if (authRepository && sessionStore) {
+      const requestWithCookies = request as FastifyRequest & { cookies?: Record<string, string> };
+      const cookies = { ...parseCookieHeader(request.headers.cookie), ...(requestWithCookies.cookies ?? {}) };
+      const token = cookies[AUTH_COOKIE_NAME];
+      if (token) {
+        const session = await sessionStore.findSessionByTokenHash(hashSessionToken(token));
+        if (session && !session.revokedAt) await sessionStore.revokeSession(session.id, new Date(), "logout");
+      }
+    }
     reply.header(
       "Set-Cookie",
       serializeCookie(AUTH_COOKIE_NAME, "", {
