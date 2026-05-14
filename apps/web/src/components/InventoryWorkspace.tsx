@@ -11,7 +11,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader } from "./ui";
+import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
@@ -290,43 +290,28 @@ export function InventoryWorkspace({
         <button type="button" disabled>项目点领用出库 请到项目点模块办理</button>
       </div>
 
-      <div className="party-summary people-summary" aria-label="库存指标摘要">
-        <article>
-          <span>库存流水</span>
-          <strong>{movements.length}</strong>
-        </article>
-        <article>
-          <span>当前库存项</span>
-          <strong>{balances.length}</strong>
-        </article>
-        <article>
-          <span>低库存</span>
-          <strong>{lowStockCount}</strong>
-        </article>
-        <article>
-          <span>本轮入库数量</span>
-          <strong>{inboundQuantity}</strong>
-        </article>
+      <div className="summary-grid" aria-label="库存指标摘要">
+        <SummaryCard label="库存流水" value={movements.length} detail="最近出入库记录" tone="info" />
+        <SummaryCard label="当前库存项" value={balances.length} detail={showBalances ? "按仓库和物料汇总" : "无权限查看余额"} tone={showBalances ? "neutral" : "disabled"} />
+        <SummaryCard label="低库存" value={lowStockCount} detail="低于安全库存" tone={lowStockCount > 0 ? "danger" : "success"} />
+        <SummaryCard label="本轮入库数量" value={inboundQuantity} detail="入库流水合计" tone="success" />
       </div>
 
       <div className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <div className="panel-header people-panel-title">
-            <h3>
-              <ClipboardList aria-hidden="true" size={16} />
-              库存流水
-            </h3>
-          </div>
-          <div className="party-toolbar">
-            <label className="party-search">
+        <SectionCard title="库存流水" action={<ClipboardList aria-hidden="true" size={16} />}>
+          <Toolbar
+            search={(
+              <label className="table-search">
               <Search aria-hidden="true" size={16} />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="搜索单号、物料、仓库、经办人"
               />
-            </label>
-            <label className="party-filter">
+              </label>
+            )}
+            filters={(
+              <label className="table-filter">
               <Filter aria-hidden="true" size={16} />
               <select
                 aria-label="库存流水类型筛选"
@@ -340,8 +325,9 @@ export function InventoryWorkspace({
                   </option>
                 ))}
               </select>
-            </label>
-          </div>
+              </label>
+            )}
+          />
           {movementStatus === "loading" ? (
             <StateMessage icon={<RefreshCw size={16} />} text="库存流水加载中" />
           ) : movementStatus === "error" ? (
@@ -363,7 +349,7 @@ export function InventoryWorkspace({
               ])}
             />
           )}
-        </section>
+        </SectionCard>
 
         {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="入库登记表单">
           <div className="panel-header people-panel-title">
@@ -488,13 +474,7 @@ export function InventoryWorkspace({
         </form> : null}
       </div>
 
-      {showBalances ? <section className="dashboard-panel table-panel">
-        <div className="panel-header people-panel-title">
-          <h3>
-            <Warehouse aria-hidden="true" size={16} />
-            当前库存查询
-          </h3>
-        </div>
+      {showBalances ? <SectionCard title="当前库存查询" action={<Warehouse aria-hidden="true" size={16} />}>
         {balanceStatus === "loading" ? (
           <StateMessage icon={<RefreshCw size={16} />} text="当前库存加载中" />
         ) : balanceStatus === "error" ? (
@@ -510,12 +490,12 @@ export function InventoryWorkspace({
               balance.materialName,
               `${balance.currentQuantity} ${balance.unit}`,
               balance.safeStock ?? "-",
-              <StatusBadge key={`${balance.warehouseId}-${balance.materialId}`} low={balance.isLowStock} />,
+              <InventoryStockBadge key={`${balance.warehouseId}-${balance.materialId}`} low={balance.isLowStock} />,
               balance.lastMovementAt ?? "-",
             ])}
           />
         )}
-      </section> : null}
+      </SectionCard> : null}
     </section>
   );
 }
@@ -554,6 +534,6 @@ function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-function StatusBadge({ low }: { low: boolean }) {
-  return <span className={low ? "status-badge red" : "status-badge green"}>{low ? "低库存" : "正常"}</span>;
+function InventoryStockBadge({ low }: { low: boolean }) {
+  return <StatusBadge tone={low ? "danger" : "success"}>{low ? "低库存" : "正常"}</StatusBadge>;
 }
