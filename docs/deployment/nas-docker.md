@@ -93,6 +93,8 @@ POSTGRES_PORT=5432
 AUTH_SESSION_SECRET=<long-random-secret>
 IDENTITY_ENCRYPTION_SECRET=<long-random-secret-distinct-from-session-secret>
 AUTH_COOKIE_SECURE=false
+CORS_ALLOWED_ORIGINS=
+PUBLIC_ACCESS_ENABLED=false
 LOG_LEVEL=info
 
 POSTGRES_MEMORY_LIMIT=1g
@@ -104,6 +106,7 @@ BOOTSTRAP_ADMIN_PASSWORD=<temporary-strong-admin-password>
 
 NAS_DATA_ROOT=/volume1/company-erp/data
 NAS_ATTACHMENTS_ROOT=/volume1/company-erp/attachments
+ERP_WEB_BIND_HOST=<NAS_LAN_BIND_HOST_OR_REVERSE_PROXY_ONLY>
 ERP_WEB_PORT=8080
 
 APP_COMMIT_SHA=<git-commit-sha>
@@ -129,6 +132,18 @@ The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
 `POSTGRES_MEMORY_LIMIT`, `API_MEMORY_LIMIT`, and `WEB_MEMORY_LIMIT` in the NAS
 `.env` after checking actual RAM pressure in Container Manager.
+
+The Web container binds to `${ERP_WEB_BIND_HOST:-127.0.0.1}` by default. For a
+LAN-only NAS deployment, set `ERP_WEB_BIND_HOST` deliberately to the NAS LAN
+bind address or publish through the NAS reverse proxy. Do not set it to a public
+interface unless the public-access gate above is complete.
+
+For the current internal deployment, keep `PUBLIC_ACCESS_ENABLED=false` and
+`AUTH_COOKIE_SECURE=false` unless HTTPS is already terminated in front of the
+ERP. If `PUBLIC_ACCESS_ENABLED=true`, the API refuses to start unless
+`AUTH_COOKIE_SECURE=true` and every `CORS_ALLOWED_ORIGINS` entry is HTTPS. This
+mode is reserved for a future public-domain or tunnel deployment, not direct NAS
+port forwarding.
 
 `DATABASE_URL` in `.env.example` is for local development. In Docker Compose,
 the API container uses the internal `postgres` service name automatically.

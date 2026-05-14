@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { buildApp } from "./app.js";
+import { buildApp, validateRuntimeSecurityEnvironment } from "./app.js";
 import { validateIdentityEncryptionSecret } from "./identityCrypto.js";
 import {
   createPrismaMaterialRepository,
@@ -42,6 +42,8 @@ const requiresDatabase = appEnvironment !== "local" || process.env.NODE_ENV === 
 if (!process.env.DATABASE_URL && requiresDatabase) {
   throw new Error("DATABASE_URL is required in production");
 }
+
+validateRuntimeSecurityEnvironment();
 
 const prisma = process.env.DATABASE_URL ? new PrismaClient() : null;
 
