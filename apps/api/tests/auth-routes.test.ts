@@ -144,6 +144,34 @@ describe("auth API", () => {
     expect(resigned.statusCode).toBe(401);
   });
 
+  it("rejects historical project-site scoped accounts with extra roles", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "mixed-site", passwordHash, roles: ["project_site", "viewer"] }),
+        makeAuthAccount({ username: "mixed-external", passwordHash, roles: ["external_project_site", "operations"] }),
+      ]),
+    });
+
+    const projectSite = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "mixed-site", password: "ChangeMe123!" },
+    });
+    const externalProjectSite = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "mixed-external", password: "ChangeMe123!" },
+    });
+    await app.close();
+
+    expect(projectSite.statusCode).toBe(401);
+    expect(projectSite.json()).toEqual({ error: "INVALID_CREDENTIALS" });
+    expect(externalProjectSite.statusCode).toBe(401);
+    expect(externalProjectSite.json()).toEqual({ error: "INVALID_CREDENTIALS" });
+  });
+
   it("returns current user for valid sessions and null for missing, expired, or tampered sessions", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const account = makeAuthAccount({

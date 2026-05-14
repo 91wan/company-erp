@@ -249,6 +249,7 @@ describe("MVP permission constants", () => {
     expect(USER_ROLE_ASSIGNMENT_POLICY.allowMultipleRoles).toBe(true);
     expect(USER_ROLE_ASSIGNMENT_POLICY.effectivePermissionRule).toBe("union");
     expect(USER_ROLE_ASSIGNMENT_POLICY.adminRoleAssignableBy).toEqual(["admin"]);
+    expect(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles).toEqual(["project_site", "external_project_site"]);
   });
 
   it("exposes a master data permission area for parties, materials, and warehouses", () => {

@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { PermissionAreaCode } from "@company-erp/shared";
 import {
   Bell,
   Building2,
@@ -20,6 +21,7 @@ import {
 export type NavigationItem = {
   label: string;
   icon: LucideIcon;
+  permissionArea?: PermissionAreaCode;
   active?: boolean;
 };
 
@@ -35,15 +37,15 @@ export type MetricCard = {
 
 export const navigationItems: NavigationItem[] = [
   { label: "Dashboard", icon: Home, active: true },
-  { label: "基础资料", icon: Building2 },
-  { label: "采购", icon: ShoppingCart },
-  { label: "库存", icon: Warehouse },
-  { label: "合同", icon: FileText },
-  { label: "业务项目", icon: Landmark },
-  { label: "证照资质", icon: ShieldCheck },
-  { label: "项目点", icon: MapPin },
-  { label: "人员权限", icon: Users },
-  { label: "Excel 导入", icon: FileSpreadsheet },
+  { label: "基础资料", icon: Building2, permissionArea: "masterData" },
+  { label: "采购", icon: ShoppingCart, permissionArea: "procurement" },
+  { label: "库存", icon: Warehouse, permissionArea: "inventoryQuantity" },
+  { label: "合同", icon: FileText, permissionArea: "contracts" },
+  { label: "业务项目", icon: Landmark, permissionArea: "businessProjects" },
+  { label: "证照资质", icon: ShieldCheck, permissionArea: "certificates" },
+  { label: "项目点", icon: MapPin, permissionArea: "projectUsage" },
+  { label: "人员权限", icon: Users, permissionArea: "employees" },
+  { label: "Excel 导入", icon: FileSpreadsheet, permissionArea: "masterData" },
 ];
 
 export const workflowSteps = [

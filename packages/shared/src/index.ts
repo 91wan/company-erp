@@ -1431,11 +1431,13 @@ export const USER_ROLE_ASSIGNMENT_POLICY = {
   effectivePermissionRule: "union",
   defaultRole: "viewer",
   adminRoleAssignableBy: ["admin"],
+  exclusiveRoles: ["project_site", "external_project_site"],
 } as const satisfies {
   allowMultipleRoles: boolean;
   effectivePermissionRule: "union";
   defaultRole: MvpRoleCode;
   adminRoleAssignableBy: readonly MvpRoleCode[];
+  exclusiveRoles: readonly MvpRoleCode[];
 };
 
 export const PARTY_TYPES = [

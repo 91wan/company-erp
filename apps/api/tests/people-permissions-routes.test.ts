@@ -634,6 +634,38 @@ describe("user accounts API", () => {
     expect(duplicateResponse.json()).toMatchObject({ error: "USER_ACCOUNT_CONFLICT", field: "username" });
     expect(missingResponse.statusCode).toBe(404);
   });
+
+  it("rejects project-site scoped roles when they are combined with other roles", async () => {
+    const app = await buildApp({ userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]) });
+
+    const projectSiteWithViewer = await app.inject({
+      method: "POST",
+      url: "/api/user-accounts",
+      payload: { username: "site-viewer", initialPassword: "ChangeMe123!", roles: ["project_site", "viewer"] },
+    });
+    const projectSiteWithOperations = await app.inject({
+      method: "POST",
+      url: "/api/user-accounts",
+      payload: { username: "site-ops", initialPassword: "ChangeMe123!", roles: ["project_site", "operations"] },
+    });
+    const externalWithViewer = await app.inject({
+      method: "POST",
+      url: "/api/user-accounts",
+      payload: { username: "external-viewer", initialPassword: "ChangeMe123!", roles: ["external_project_site", "viewer"] },
+    });
+    const bothScopedRoles = await app.inject({
+      method: "PATCH",
+      url: `/api/user-accounts/${accountId}`,
+      payload: { roles: ["project_site", "external_project_site"] },
+    });
+    await app.close();
+
+    for (const response of [projectSiteWithViewer, projectSiteWithOperations, externalWithViewer, bothScopedRoles]) {
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ error: "USER_ACCOUNT_VALIDATION_FAILED" });
+      expect(response.json().issues).toContain("project_site and external_project_site roles must be assigned as the only role");
+    }
+  });
 });
 
 describe("external project-site accounts API", () => {
