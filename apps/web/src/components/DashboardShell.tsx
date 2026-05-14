@@ -1072,13 +1072,12 @@ function SystemSettingsWorkspace({
 
   return (
     <section className="system-settings-workspace">
-      <header className="inventory-heading">
-        <div>
-          <h2>系统设置</h2>
-          <p>维护内网 ERP 的基础显示配置。公司名称会同步到登录页和侧边栏。</p>
-        </div>
-        <span>{canManage ? "Admin 可修改" : "只读查看"}</span>
-      </header>
+      <PageHeader
+        eyebrow="基础与系统"
+        title="系统设置"
+        subtitle="分区查看公司信息、部署版本、附件管理、审计日志和安全状态；公司名称会同步到登录页和侧边栏。"
+        actions={<UiStatusBadge tone={canManage ? "success" : "disabled"}>{canManage ? "Admin 可修改" : "只读查看"}</UiStatusBadge>}
+      />
 
       <form className="dashboard-panel party-form settings-form" onSubmit={handleSubmit}>
         <div className="form-header">
@@ -1109,13 +1108,8 @@ function SystemSettingsWorkspace({
         {!canManage ? <p className="form-hint">当前账号没有 systemSettings.manage 权限，不能修改公司名称。</p> : null}
       </form>
 
-      <section className="dashboard-panel settings-version-panel" aria-label="当前版本">
-        <div className="form-header">
-          <div>
-            <h3>当前版本</h3>
-            <p>部署元数据只读显示，用于确认 NAS 当前运行版本。</p>
-          </div>
-        </div>
+      <SectionCard title="部署版本" badge={<UiStatusBadge tone={versionStatus === "success" ? "success" : "warning"}>{versionStatus === "success" ? "可用" : "检查中"}</UiStatusBadge>}>
+        <p className="form-hint">部署元数据只读显示，用于确认 NAS 当前运行版本。</p>
 
         {versionStatus === "loading" ? <p className="form-hint">版本信息加载中。</p> : null}
         {versionStatus === "error" ? <p className="form-error">版本信息不可用</p> : null}
@@ -1143,16 +1137,11 @@ function SystemSettingsWorkspace({
             </div>
           </dl>
         ) : null}
-      </section>
+      </SectionCard>
 
       {canReadAuditLogs ? (
-        <section className="dashboard-panel settings-version-panel" aria-label="审计日志">
-          <div className="form-header">
-            <div>
-              <h3>审计日志</h3>
-              <p>只读查看最近的高风险业务操作记录。</p>
-            </div>
-          </div>
+        <SectionCard title="审计日志" badge={<UiStatusBadge tone="info">只读</UiStatusBadge>}>
+          <p className="form-hint">只读查看最近的高风险业务操作记录。</p>
 
           {auditStatus === "loading" ? <p className="form-hint">审计日志加载中。</p> : null}
           {auditStatus === "error" ? <p className="form-error">审计日志暂不可用</p> : null}
@@ -1183,17 +1172,12 @@ function SystemSettingsWorkspace({
               </table>
             </div>
           ) : null}
-        </section>
+        </SectionCard>
       ) : null}
 
       {canReadAttachments ? (
-        <section className="dashboard-panel settings-version-panel" aria-label="附件元数据">
-          <div className="form-header">
-            <div>
-              <h3>附件元数据</h3>
-              <p>登记后端认可的相对 storage key；不要填写 NAS 绝对路径、URL 或本地文件路径。</p>
-            </div>
-          </div>
+        <SectionCard title="附件管理" badge={<UiStatusBadge tone={canManageAttachments ? "success" : "disabled"}>{canManageAttachments ? "可登记" : "只读"}</UiStatusBadge>}>
+          <p className="form-hint">登记后端认可的相对 storage key；不要填写 NAS 绝对路径、URL 或本地文件路径。</p>
 
           {canManageAttachments ? (
             <form className="party-form settings-form" onSubmit={handleAttachmentSubmit}>
@@ -1299,7 +1283,7 @@ function SystemSettingsWorkspace({
               </table>
             </div>
           ) : null}
-        </section>
+        </SectionCard>
       ) : null}
     </section>
   );

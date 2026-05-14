@@ -48,7 +48,7 @@ describe("Company ERP workspace components", () => {
   it("renders populated counterparty master data", async () => {
     render(<PartiesWorkspace loadParties={() => Promise.resolve([party])} />);
 
-    expect(screen.getByText("往来方基础")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "往来单位" })).toBeInTheDocument();
     expect(screen.getByText("加载往来方资料...")).toBeInTheDocument();
 
     expect(await screen.findByText("晨光贸易有限公司")).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(screen.getByText("物料基础")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "物料与仓库" })).toBeInTheDocument();
     expect(screen.getByText("仓库基础")).toBeInTheDocument();
     expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
     expect(screen.getByText("98 / 套")).toBeInTheDocument();

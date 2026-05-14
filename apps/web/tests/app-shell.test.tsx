@@ -107,7 +107,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
 
-    expect(await screen.findByRole("heading", { name: "当前版本" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "部署版本" })).toBeInTheDocument();
     expect(screen.getByText("9ac5cb7")).toBeInTheDocument();
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
     expect(screen.getByText("nas")).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
 
-    expect(await screen.findByRole("heading", { name: "附件元数据" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "附件管理" })).toBeInTheDocument();
     expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-002" } });
@@ -182,7 +182,7 @@ describe("Company ERP app shell", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
-    expect(await screen.findByRole("heading", { name: "附件元数据" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "附件管理" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-003" } });
     fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "错误附件" } });
@@ -199,7 +199,7 @@ describe("Company ERP app shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
 
     expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "附件元数据" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "附件管理" })).not.toBeInTheDocument();
   });
 
   it("shows version unavailable when deployment metadata cannot be loaded", async () => {
@@ -209,7 +209,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
 
-    expect(await screen.findByRole("heading", { name: "当前版本" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "部署版本" })).toBeInTheDocument();
     expect(screen.getByText("版本信息不可用")).toBeInTheDocument();
   });
 
