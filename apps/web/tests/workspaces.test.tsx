@@ -420,6 +420,10 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("出库登记").length).toBeGreaterThan(0);
     expect(screen.getByText("新增项目点")).toBeInTheDocument();
     expect(screen.getByText("新增领用申请")).toBeInTheDocument();
+    expect(screen.queryByLabelText("项目点编码")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增项目点" }));
+    expect(screen.getByLabelText("项目点编码")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
     expect(screen.getAllByText("科技园一期项目点").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("SITE-WX-001"));
@@ -493,11 +497,15 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("WX-ZC-ICE-001")).toBeInTheDocument();
     expect(screen.getByText("压缩机异响，需要维修")).toBeInTheDocument();
 
+    expect(screen.queryByLabelText("关联设备")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "上报设备变更" }));
     fireEvent.change(screen.getByLabelText("关联设备"), { target: { value: projectSiteKitchenEquipment.id } });
+    fireEvent.change(screen.getByLabelText("设备名称"), { target: { value: "六门冰柜" } });
     fireEvent.change(screen.getByLabelText("变更状态"), { target: { value: "damaged" } });
     fireEvent.change(screen.getByLabelText("说明"), { target: { value: "门封条损坏" } });
     fireEvent.click(screen.getByRole("button", { name: "提交上报" }));
 
+    expect(createChangeRequest).toHaveBeenCalled();
     expect(await screen.findByText("门封条损坏")).toBeInTheDocument();
     expect(createChangeRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -569,6 +577,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无项目点资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增项目点" }));
     fireEvent.change(screen.getByLabelText("项目点编码"), { target: { value: "SITE-WX-002" } });
     fireEvent.change(screen.getByLabelText("项目点名称"), { target: { value: "滨江项目点" } });
     fireEvent.change(screen.getByLabelText("业务项目"), { target: { value: businessProject.id } });
@@ -577,6 +586,7 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("SITE-WX-002")).toBeInTheDocument();
     expect(createProjectSite).toHaveBeenCalledWith(expect.objectContaining({ businessProjectId: businessProject.id }));
     expect(screen.getAllByText("扬中中央厨房").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     fireEvent.change(screen.getByLabelText("领用申请单号"), { target: { value: "USE20260511002" } });
     fireEvent.change(screen.getByLabelText("申请日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getAllByLabelText("项目点").find((element) => element.tagName === "SELECT")!, {
@@ -617,6 +627,8 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("USE20260511001");
+    expect(screen.queryByLabelText("出库单号")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "出库登记" }));
     fireEvent.change(screen.getByLabelText("领用申请"), { target: { value: projectUsageRequest.id } });
     fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511001" } });
     fireEvent.change(screen.getByLabelText("领用时间"), { target: { value: "2026-05-11" } });
@@ -644,6 +656,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("USE20260511001");
+    fireEvent.click(screen.getByRole("button", { name: "出库登记" }));
     fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511002" } });
     fireEvent.change(screen.getByLabelText("领用时间"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "30" } });

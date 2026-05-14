@@ -29,7 +29,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader } from "./ui";
+import { FormDrawer, PageHeader } from "./ui";
 import { ExternalProjectSitePortal } from "./project-sites/ExternalProjectSitePortal";
 import { ProjectSiteCompliancePanel } from "./project-sites/ProjectSiteCompliancePanel";
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
@@ -140,6 +140,8 @@ type IssueFormState = {
   handledBy: string;
   receivedByName: string;
 };
+
+type ProjectSiteFormDrawer = "site" | "usage" | "issue" | "equipment" | "equipmentChange" | null;
 
 const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
@@ -353,6 +355,7 @@ export function ProjectSitesWorkspace({
   const [kitchenEquipmentSubmitState, setKitchenEquipmentSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [kitchenEquipmentChangeSubmitState, setKitchenEquipmentChangeSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
+  const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [siteForm, setSiteForm] = useState<SiteFormState>({
     siteCode: "",
     siteName: "",
@@ -742,6 +745,7 @@ export function ProjectSitesWorkspace({
         remark: "",
       });
       setSiteSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setSiteSubmitState("error");
     }
@@ -779,6 +783,7 @@ export function ProjectSitesWorkspace({
         expectedDate: "",
       }));
       setUsageSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setUsageSubmitState("error");
     }
@@ -806,6 +811,7 @@ export function ProjectSitesWorkspace({
         receivedByName: "",
       }));
       setIssueSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setIssueSubmitState("error");
     }
@@ -853,6 +859,7 @@ export function ProjectSitesWorkspace({
         remark: "",
       }));
       setKitchenEquipmentSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setKitchenEquipmentSubmitState("error");
     }
@@ -941,10 +948,23 @@ export function ProjectSitesWorkspace({
         {!usageOnly ? <button type="button" aria-current="page">项目点台账</button> : null}
         <button type="button" disabled={false}>厨房设备</button>
         <button type="button" aria-current={usageOnly ? "page" : undefined}>领用申请</button>
-        {!usageOnly ? <button type="button" disabled={!canIssueUsage}>出库登记</button> : null}
+        {!usageOnly ? <button type="button" disabled={!canIssueUsage}>总部出库</button> : null}
         <button type="button" disabled>月度经营报表 后续开放</button>
         {!usageOnly ? <button type="button" disabled>现场库存 后续开放</button> : null}
       </div>
+
+      <div className="project-site-action-bar" aria-label="项目点快捷操作">
+        {!usageOnly && canEditSites ? <button type="button" onClick={() => setOpenFormDrawer("site")}>新增项目点</button> : null}
+        {canCreateUsage ? <button type="button" onClick={() => setOpenFormDrawer("usage")}>新增领用申请</button> : null}
+        {!usageOnly && canIssueUsage ? <button type="button" onClick={() => setOpenFormDrawer("issue")}>出库登记</button> : null}
+        {!usageOnly && canEditSites ? <button type="button" onClick={() => setOpenFormDrawer("equipment")}>新增厨房设备</button> : null}
+        <button type="button" onClick={() => setOpenFormDrawer("equipmentChange")}>上报设备变更</button>
+      </div>
+      {masterStatus === "error" ? (
+        <p className="form-error">
+          {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
+        </p>
+      ) : null}
 
       <div className="party-summary people-summary" aria-label="项目点指标摘要">
         <article>
@@ -986,8 +1006,9 @@ export function ProjectSitesWorkspace({
         onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
       />
 
-      {!usageOnly && canEditSites ? (
-        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipment} aria-label="新增厨房设备表单">
+      <FormDrawer title="新增厨房设备" open={openFormDrawer === "equipment"} onClose={() => setOpenFormDrawer(null)}>
+        {!usageOnly && canEditSites ? (
+        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipment} aria-label="新增厨房设备表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <Wrench aria-hidden="true" size={16} />
@@ -1058,9 +1079,11 @@ export function ProjectSitesWorkspace({
           </label>
           {kitchenEquipmentSubmitState === "error" ? <p className="form-error">厨房设备保存失败，请检查必填项或项目点。</p> : null}
         </form>
-      ) : null}
+        ) : null}
+      </FormDrawer>
 
-      <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipmentChangeRequest} aria-label="厨房设备变更上报表单">
+      <FormDrawer title="上报设备变更" open={openFormDrawer === "equipmentChange"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipmentChangeRequest} aria-label="厨房设备变更上报表单" noValidate>
         <div className="panel-header people-panel-title">
           <h3>
             <ClipboardList aria-hidden="true" size={16} />
@@ -1145,7 +1168,8 @@ export function ProjectSitesWorkspace({
           <textarea value={kitchenEquipmentChangeForm.description} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, description: event.target.value })} />
         </label>
         {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">设备变更上报失败，请检查设备名称或项目点。</p> : null}
-      </form>
+        </form>
+      </FormDrawer>
 
       {!usageOnly ? (
         <ProjectSiteCompliancePanel
@@ -1183,7 +1207,7 @@ export function ProjectSitesWorkspace({
         </label>
       </div>
 
-      {!usageOnly ? <div className="people-section-grid">
+      {!usageOnly ? <div className="project-site-list-layout">
         <ProjectSiteList
           sites={filteredSites}
           status={siteStatus}
@@ -1192,7 +1216,8 @@ export function ProjectSitesWorkspace({
           onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
         />
 
-        {canEditSites ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单">
+        <FormDrawer title="新增项目点" open={openFormDrawer === "site"} onClose={() => setOpenFormDrawer(null)}>
+          {canEditSites ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <MapPin aria-hidden="true" size={16} />
@@ -1304,7 +1329,8 @@ export function ProjectSitesWorkspace({
           </label>
           {masterStatus === "error" ? <p className="form-error">基础资料或业务项目接口暂不可用，项目点可先保存文本字段。</p> : null}
           {siteSubmitState === "error" ? <p className="form-error">项目点保存失败，请检查编码是否重复或服务模式规则。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div> : null}
 
       {!usageOnly ? <section className="dashboard-panel table-panel">
@@ -1346,7 +1372,7 @@ export function ProjectSitesWorkspace({
         )}
       </section> : null}
 
-      <div className="people-section-grid">
+      <div className="project-site-list-layout">
         <ProjectSiteUsagePanel
           usageRequests={filteredUsageRequests}
           status={usageStatus}
@@ -1354,7 +1380,8 @@ export function ProjectSitesWorkspace({
           usageStatusLabel={usageStatusLabel}
         />
 
-        {canCreateUsage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单">
+        <FormDrawer title="新增领用申请" open={openFormDrawer === "usage"} onClose={() => setOpenFormDrawer(null)}>
+          {canCreateUsage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <ClipboardList aria-hidden="true" size={16} />
@@ -1452,10 +1479,12 @@ export function ProjectSitesWorkspace({
             </p>
           ) : null}
           {usageSubmitState === "error" ? <p className="form-error">领用申请保存失败，请检查必填项或单号是否重复。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div>
 
-      {canIssueUsage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单">
+      <FormDrawer title="出库登记" open={openFormDrawer === "issue"} onClose={() => setOpenFormDrawer(null)}>
+        {canIssueUsage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单" noValidate>
         <div className="panel-header people-panel-title">
           <h3>
             <PackageMinus aria-hidden="true" size={16} />
@@ -1518,7 +1547,8 @@ export function ProjectSitesWorkspace({
           </p>
         ) : null}
         {issueSubmitState === "error" ? <p className="form-error">出库失败，请检查库存余额、单号或申请状态。</p> : null}
-      </form> : null}
+        </form> : null}
+      </FormDrawer>
 
       {!usageOnly ? (
         <ProjectSiteDetailDrawer

@@ -87,9 +87,12 @@ test("project-site users see usage actions but not global inventory actions", as
   await expect(page.getByText("1 个项目点")).toBeVisible();
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存项目点" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "执行出库" })).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("button", { name: "保存领用申请" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "库存", exact: true }).click();
   await expect(page.getByRole("button", { name: "当前库存查询" })).toHaveCount(0);
@@ -105,7 +108,10 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByText("site-manager").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "我的项目点" })).toBeVisible();
   await expect(page.getByRole("button", { name: "现场人员/健康证" })).toBeVisible();
+  await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("button", { name: "保存领用申请" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "总览" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "基础资料" })).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);

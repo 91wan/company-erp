@@ -1347,6 +1347,24 @@ tbody tr.clickable-row {
   font-weight: 650;
 }
 
+.project-site-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.project-site-action-bar button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #175cd3;
+  background: #eff8ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .inventory-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1609,6 +1627,13 @@ tbody tr.clickable-row {
 .people-section-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.project-site-list-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
