@@ -756,7 +756,7 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
     expect(screen.getByText("扬中中央厨房")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
-    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "/volume1/company-erp/attachments/contracts/supplement.pdf" } });
+    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "contracts/test-supplement.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
 
     expect(await screen.findByText("supplement.pdf")).toBeInTheDocument();
@@ -783,7 +783,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
 
     fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
-    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "/volume1/company-erp/attachments/contracts/supplement.pdf" } });
+    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "contracts/test-supplement.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
 
     expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
@@ -835,10 +835,14 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByRole("heading", { name: "证照资质" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "保存证照" })).not.toBeInTheDocument();
     expect(await screen.findByText("CERT0001")).toBeInTheDocument();
+    expect(screen.getByText("证照风险台账")).toBeInTheDocument();
+    expect(screen.getByText("人员匹配")).toBeInTheDocument();
+    expect(screen.getByText("审核状态")).toBeInTheDocument();
     expect(screen.getByText("项目点食品经营许可证")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
-    expect(screen.getByText("/volume1/company-erp/attachments/certificates/CERT0001.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("CERT0001"));
+    expect(screen.getByText("certificates/test-CERT0001.pdf")).toBeInTheDocument();
   });
 
   it("renders certificate empty and error states", async () => {
