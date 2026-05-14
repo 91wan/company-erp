@@ -20,6 +20,7 @@ import {
   MVP_ROLES,
   type AppConfigDto,
   type AppVersionDto,
+  type AuditLogDto,
   type AuthenticatedUserDto,
   type CertificateRecordDto,
   type ContractDto,
@@ -48,7 +49,7 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
-import { apiBaseUrl, getAppVersion, requestJson, updateAppConfig } from "../apiClient";
+import { apiBaseUrl, getAppVersion, getAuditLogs, requestJson, updateAppConfig } from "../apiClient";
 
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
@@ -140,6 +141,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
             <SystemSettingsWorkspace
               companyName={appConfig.companyName}
               canManage={canManage(currentUser.roles, "systemSettings")}
+              canReadAuditLogs={canRead(currentUser.roles, "auditLogs")}
               onCompanyNameChange={onAppConfigChange}
             />
           ) : null}
@@ -835,16 +837,22 @@ function ResponsiveTable({
 function SystemSettingsWorkspace({
   companyName,
   canManage,
+  canReadAuditLogs,
   onCompanyNameChange,
 }: {
   companyName: string;
   canManage: boolean;
+  canReadAuditLogs: boolean;
   onCompanyNameChange: (appConfig: AppConfigDto) => void;
 }) {
   const [nextCompanyName, setNextCompanyName] = useState(companyName);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [appVersion, setAppVersion] = useState<AppVersionDto | null>(null);
   const [versionStatus, setVersionStatus] = useState<"loading" | "success" | "error">("loading");
+  const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
+  const [auditStatus, setAuditStatus] = useState<"idle" | "loading" | "success" | "error">(
+    canReadAuditLogs ? "loading" : "idle",
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -865,6 +873,27 @@ function SystemSettingsWorkspace({
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canReadAuditLogs) return;
+    let isMounted = true;
+    setAuditStatus("loading");
+    getAuditLogs()
+      .then((logs) => {
+        if (!isMounted) return;
+        setAuditLogs(logs);
+        setAuditStatus("success");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setAuditLogs([]);
+        setAuditStatus("error");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canReadAuditLogs]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -953,6 +982,47 @@ function SystemSettingsWorkspace({
           </dl>
         ) : null}
       </section>
+
+      {canReadAuditLogs ? (
+        <section className="dashboard-panel settings-version-panel" aria-label="审计日志">
+          <div className="form-header">
+            <div>
+              <h3>审计日志</h3>
+              <p>只读查看最近的高风险业务操作记录。</p>
+            </div>
+          </div>
+
+          {auditStatus === "loading" ? <p className="form-hint">审计日志加载中。</p> : null}
+          {auditStatus === "error" ? <p className="form-error">审计日志暂不可用</p> : null}
+          {auditStatus === "success" && auditLogs.length === 0 ? <p className="form-hint">暂无审计日志。</p> : null}
+          {auditStatus === "success" && auditLogs.length > 0 ? (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>账号</th>
+                    <th>动作</th>
+                    <th>对象</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{log.createdAt}</td>
+                      <td>{log.actorUsername ?? "-"}</td>
+                      <td>{log.action}</td>
+                      <td>{log.entityType}</td>
+                      <td>{log.ip ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </section>
   );
 }

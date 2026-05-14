@@ -200,6 +200,14 @@ Before creating migrations, confirm the MVP data model for:
 - Confirmed procurement records do not get separate investment statistics fields in this slice; optional `purchase_records.contract_id` remains the trace-back path.
 - Added migration `20260513110000_business_project_contract_investments`.
 
+## 2026-05-14 Audit Log Foundation
+
+- Added `audit_logs` as append-only database-resident audit events for high-risk business mutations.
+- Recorded actor account snapshot, action, entity type/id, redacted before/after JSON, request IP, user agent, and created time.
+- Confirmed audit logs are query-only in the API; no delete/export/archive workflow is added in this slice.
+- Added shared `auditLogs` permission area, readable by admin only.
+- Added migration `20260514161000_audit_logs_foundation`.
+
 ## 2026-05-13 Contract Status Form And Subject Classification
 
 - Split contract classification into direction, form, subject category, investment category, and manual business status.

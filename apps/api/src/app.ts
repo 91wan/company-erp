@@ -2,6 +2,8 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
+import { registerAuditLogRoutes } from "./auditLogRoutes.js";
+import { AuditLogWriteError } from "./auditLogs.js";
 import { registerAppCoreRoutes } from "./appCoreRoutes.js";
 import { registerAuth } from "./auth.js";
 import { registerContractsBusinessCertificatesRoutes } from "./contractsBusinessCertificatesRoutes.js";
@@ -203,6 +205,13 @@ export async function buildApp(options: BuildAppOptions = {}) {
     },
   });
 
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof AuditLogWriteError) {
+      return reply.status(500).send({ error: "AUDIT_LOG_WRITE_FAILED" });
+    }
+    return reply.send(error);
+  });
+
   if ((options.auth?.enabled ?? false) && publicAccessEnabled()) {
     app.addHook("preHandler", async (request, reply) => {
       if (!unsafeMethods.has(request.method)) return;
@@ -213,6 +222,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   registerAuth(app, options.authRepository, options.auth);
   registerAppCoreRoutes(app, { appConfigRepository: options.appConfigRepository });
+  registerAuditLogRoutes(app, options);
   registerImportJobRoutes(app, options);
   registerMasterDataRoutes(app, options);
   registerPeoplePermissionsRoutes(app, options);

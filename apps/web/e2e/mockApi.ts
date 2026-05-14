@@ -398,6 +398,21 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     projectUsageRequests: [{ ...demoUsageRequest }],
     contracts: [{ ...demoContract }],
     certificates: [{ ...demoCertificate }],
+    auditLogs: [
+      {
+        id: "efefefef-efef-4fef-8fef-efefefefefef",
+        actorUserId: adminUser.id,
+        actorUsername: "admin",
+        action: "certificate.create",
+        entityType: "certificate",
+        entityId: demoCertificate.id,
+        beforeJson: null,
+        afterJson: { certificateCode: demoCertificate.certificateCode },
+        ip: "127.0.0.1",
+        userAgent: "playwright",
+        createdAt: now,
+      },
+    ],
     contractAttachments: [] as Record<string, unknown>[],
     importJobs: [] as Record<string, unknown>[],
   };
@@ -805,6 +820,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname.startsWith("/api/employer-liability-insurance-covered-persons")) return { coveredPersons: [] };
   if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: [] };
   if (pathname.startsWith("/api/market-operations-handoffs")) return { marketOperationsHandoffs: [] };
+  if (pathname.startsWith("/api/audit-logs")) return { auditLogs: state.auditLogs };
   return {};
 }
 
@@ -820,6 +836,8 @@ function makeStateShape() {
     projectSites: [demoProjectSite],
     projectUsageRequests: [demoUsageRequest],
     contracts: [demoContract],
+    certificates: [demoCertificate],
+    auditLogs: [] as Record<string, unknown>[],
     contractAttachments: [] as Record<string, unknown>[],
     importJobs: [] as Record<string, unknown>[],
   };

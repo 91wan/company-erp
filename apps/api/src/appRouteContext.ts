@@ -1,5 +1,6 @@
 import { USER_ROLE_ASSIGNMENT_POLICY, type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
 import type { AppConfigRepository } from "./appConfig.js";
+import { AuditLogWriteError, redactAuditJson, type AuditLogRepository } from "./auditLogs.js";
 import type { AuthenticatedRequest, AuthOptions, AuthRepository } from "./auth.js";
 import type { BusinessProjectRepository } from "./businessProjects.js";
 import type { CertificateRepository } from "./certificates.js";
@@ -28,6 +29,7 @@ import type { ReplenishmentSuggestionRepository } from "./replenishment.js";
 export type BuildAppOptions = {
   auth?: AuthOptions;
   authRepository?: AuthRepository;
+  auditLogRepository?: AuditLogRepository;
   appConfigRepository?: AppConfigRepository;
   partyRepository?: PartyRepository;
   materialRepository?: MaterialRepository;
@@ -141,4 +143,37 @@ export function isOutsideCertificateScope(
     return certificate.ownerType !== "supplier" && certificate.ownerType !== "company";
   }
   return false;
+}
+
+export async function writeAuditLog(
+  request: unknown,
+  options: BuildAppOptions,
+  event: {
+    action: string;
+    entityType: string;
+    entityId?: string | null;
+    beforeJson?: unknown | null;
+    afterJson?: unknown | null;
+  },
+): Promise<void> {
+  if (!options.auditLogRepository) return;
+  const user = (request as AuthenticatedRequest).currentUser;
+  try {
+    await options.auditLogRepository.create({
+      actorUserId: user?.id ?? null,
+      actorUsername: user?.username ?? null,
+      action: event.action,
+      entityType: event.entityType,
+      entityId: event.entityId ?? null,
+      beforeJson: redactAuditJson(event.beforeJson ?? null),
+      afterJson: redactAuditJson(event.afterJson ?? null),
+      ip: (request as { ip?: string }).ip ?? null,
+      userAgent:
+        typeof (request as { headers?: Record<string, unknown> }).headers?.["user-agent"] === "string"
+          ? ((request as { headers: Record<string, string> }).headers["user-agent"] ?? null)
+          : null,
+    });
+  } catch {
+    throw new AuditLogWriteError();
+  }
 }

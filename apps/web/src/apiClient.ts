@@ -1,6 +1,7 @@
 import type {
   AppConfigDto,
   AppVersionDto,
+  AuditLogDto,
   AuthenticatedUserDto,
   LoginInput,
   UpdateAppConfigInput,
@@ -39,6 +40,11 @@ export async function getAppConfig(): Promise<AppConfigDto> {
 export async function getAppVersion(): Promise<AppVersionDto> {
   const payload = await requestJson<{ appVersion: AppVersionDto }>(`${apiBaseUrl}/api/app-version`);
   return payload.appVersion;
+}
+
+export async function getAuditLogs(): Promise<AuditLogDto[]> {
+  const payload = await requestJson<{ auditLogs: AuditLogDto[] }>(`${apiBaseUrl}/api/audit-logs?limit=20`);
+  return payload.auditLogs;
 }
 
 export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppConfigDto> {

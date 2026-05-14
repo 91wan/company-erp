@@ -39,6 +39,7 @@ export type MvpPermissionMatrix = {
   projectUsage: MvpPermissionRule;
   projectUsageRequest: MvpPermissionRule;
   marketOperationsHandoffs: MvpPermissionRule;
+  auditLogs: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
 };
 
@@ -77,6 +78,20 @@ export type AppVersionDto = {
   buildTime: string;
   deployedAt: string;
   environment: string;
+};
+
+export type AuditLogDto = {
+  id: string;
+  actorUserId?: string | null;
+  actorUsername?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  beforeJson?: unknown | null;
+  afterJson?: unknown | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
 };
 
 export type MvpDictionary = {
@@ -1816,6 +1831,10 @@ export const MVP_PERMISSION_MATRIX = {
   marketOperationsHandoffs: {
     read: ["admin", "marketing", "operations"],
     manage: ["admin", "marketing", "operations"],
+  },
+  auditLogs: {
+    read: ["admin"],
+    manage: ["admin"],
   },
   systemSettings: {
     read: ["admin"],

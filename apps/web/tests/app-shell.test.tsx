@@ -5,6 +5,7 @@ import {
   App,
   adminUser,
   contract,
+  defaultAppVersion,
   expiredCertificate,
   externalProjectSiteUser,
   inventoryBalance,
@@ -110,6 +111,45 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
     expect(screen.getByText("nas")).toBeInTheDocument();
     expect(screen.getByText("2026-05-13T07:30:00.000Z")).toBeInTheDocument();
+  });
+
+  it("shows admin-only audit logs in system settings", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" }, defaultAppVersion, {
+      auditLogs: [
+        {
+          id: "99999999-9999-4999-8999-999999999999",
+          actorUserId: adminUser.id,
+          actorUsername: "admin",
+          action: "certificate.create",
+          entityType: "certificate",
+          entityId: "88888888-8888-4888-8888-888888888888",
+          beforeJson: null,
+          afterJson: { certificateCode: "CERT-DEMO-001" },
+          ip: "127.0.0.1",
+          userAgent: "vitest",
+          createdAt: "2026-05-14T10:00:00.000Z",
+        },
+      ],
+    });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "审计日志" })).toBeInTheDocument();
+    expect(screen.getByText("certificate.create")).toBeInTheDocument();
+    expect(screen.getByText("certificate")).toBeInTheDocument();
+  });
+
+  it("hides audit logs from non-admin system settings users", async () => {
+    mockShellFetch(viewerUser, { companyName: "无锡餐服 ERP" });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+
+    expect(await screen.findByRole("heading", { name: "系统设置" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "审计日志" })).not.toBeInTheDocument();
   });
 
   it("shows version unavailable when deployment metadata cannot be loaded", async () => {

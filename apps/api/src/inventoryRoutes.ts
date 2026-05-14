@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
-import { isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
+import { isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { InventoryMovementConflictError, InventoryMovementValidationError, normalizeInventoryBalanceFilters, normalizeInventoryMovementFilters, normalizeInventoryMovementInput } from "./inventory.js";
 import { ReplenishmentSuggestionConflictError, ReplenishmentSuggestionValidationError, normalizeConvertReplenishmentSuggestionInput, normalizeReplenishmentSuggestionFilters, normalizeUpdateReplenishmentSuggestionInput } from "./replenishment.js";
 
@@ -55,6 +54,12 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
     try {
       const input = normalizeInventoryMovementInput(request.body);
       const inventoryMovement = await options.inventoryRepository.createMovement(input);
+      await writeAuditLog(request, options, {
+        action: "inventory_movement.create",
+        entityType: "inventory_movement",
+        entityId: inventoryMovement.id,
+        afterJson: inventoryMovement,
+      });
       return reply.status(201).send({ inventoryMovement });
     } catch (error) {
       if (error instanceof InventoryMovementValidationError) {
