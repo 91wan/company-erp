@@ -62,17 +62,14 @@ type DashboardShellProps = {
 type WorkspaceKey = (typeof navigationItems)[number]["label"] | "系统设置";
 
 export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLogout }: DashboardShellProps) {
-  const isExternalProjectSiteOnly =
-    currentUser.roles.length === 1 && currentUser.roles[0] === "external_project_site";
+  const isExternalProjectSite = currentUser.roles.includes("external_project_site");
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
-    isExternalProjectSiteOnly ? "项目点" : "Dashboard",
+    isExternalProjectSite ? "项目点" : "Dashboard",
   );
-  const isProjectSiteOnly =
-    currentUser.roles.length === 1 &&
-    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_site");
-  const visibleNavigationItems = isExternalProjectSiteOnly
+  const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
+  const visibleNavigationItems = isExternalProjectSite
     ? navigationItems.filter((item) => item.label === "项目点")
-    : navigationItems;
+    : navigationItems.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea));
   const isReadOnly = !(
     canManage(currentUser.roles, "masterData") ||
     canManage(currentUser.roles, "procurement") ||
@@ -109,7 +106,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
             <>
               <InventoryWorkspace
                 canManage={canManage(currentUser.roles, "inventory")}
-                showBalances={!isProjectSiteOnly && canRead(currentUser.roles, "inventory")}
+                showBalances={!isProjectSiteScoped && canRead(currentUser.roles, "inventoryQuantity")}
               />
               <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
             </>
@@ -124,7 +121,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canManageSites={canManage(currentUser.roles, "projectSites")}
               canManageUsage={canManage(currentUser.roles, "projectUsageRequest")}
               canIssue={canManage(currentUser.roles, "inventory")}
-              usageOnly={isExternalProjectSiteOnly}
+              usageOnly={isExternalProjectSite}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
@@ -288,10 +285,8 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
 }
 
 function DashboardOverview({ currentUser, onNavigate }: { currentUser: AuthenticatedUserDto; onNavigate: NavigateToWorkspace }) {
-  const isProjectSiteOnly =
-    currentUser.roles.length === 1 &&
-    (currentUser.roles[0] === "project_site" || currentUser.roles[0] === "external_project_site");
-  const data = useDashboardLiveData(currentUser, isProjectSiteOnly);
+  const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
+  const data = useDashboardLiveData(currentUser, isProjectSiteScoped);
 
   return (
     <>

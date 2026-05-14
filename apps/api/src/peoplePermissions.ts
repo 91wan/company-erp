@@ -1,5 +1,6 @@
 import {
   MVP_ROLES,
+  USER_ROLE_ASSIGNMENT_POLICY,
   type BaseStatusCode,
   type CreateDepartmentInput,
   type CreateEmployeeInput,
@@ -161,6 +162,7 @@ export class EmployeeProjectSiteAssignmentValidationError extends Error {
 const employeeStatusCodes = new Set<EmployeeStatusCode>(["active", "resigned", "disabled"]);
 const userAccountStatusCodes = new Set<UserAccountStatusCode>(["active", "disabled", "locked"]);
 const roleCodes = new Set<MvpRoleCode>(MVP_ROLES.map((role) => role.code));
+const exclusiveScopedRoles = new Set<MvpRoleCode>(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles);
 const projectSiteRelationTypes = new Set<EmployeeProjectSiteRelationTypeCode>(["assigned", "manager", "support"]);
 
 function normalizeNullableString(value: unknown): string | null | undefined {
@@ -204,7 +206,11 @@ function normalizeRoles(value: unknown, issues: string[]): MvpRoleCode[] | undef
   }
   const roles = value.filter((role): role is MvpRoleCode => typeof role === "string" && roleCodes.has(role as MvpRoleCode));
   if (roles.length !== value.length) issues.push("roles contains unsupported values");
-  return Array.from(new Set(roles));
+  const uniqueRoles = Array.from(new Set(roles));
+  if (uniqueRoles.some((role) => exclusiveScopedRoles.has(role)) && uniqueRoles.length !== 1) {
+    issues.push("project_site and external_project_site roles must be assigned as the only role");
+  }
+  return uniqueRoles;
 }
 
 export function normalizeDepartmentInput(input: unknown, mode: "create"): CreateDepartmentInput;

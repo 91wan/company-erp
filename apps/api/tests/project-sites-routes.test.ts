@@ -20,6 +20,7 @@ import type {
   WarehouseDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { externalProjectSiteAccountSiteIds, scopedProjectSiteIds } from "../src/appRouteContext";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import { hashPassword } from "../src/password";
 import {
@@ -1196,7 +1197,7 @@ describe("project usage request API", () => {
     expect(usageList.json()).toEqual({ projectUsageRequests: [] });
   });
 
-  it("does not apply project-site scope to broader multi-role users", async () => {
+  it("rejects historical multi-role project-site users before they can read global project sites", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const firstSite = makeProjectSite();
     const secondSite = makeProjectSite({
@@ -1216,8 +1217,17 @@ describe("project usage request API", () => {
     const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
     await app.close();
 
-    expect(siteList.statusCode).toBe(200);
-    expect(siteList.json().projectSites).toHaveLength(2);
+    expect(cookie).toBe("");
+    expect(siteList.statusCode).toBe(401);
+    expect(siteList.json()).toEqual({ error: "AUTH_REQUIRED" });
+  });
+
+  it("derives project-site scopes from scoped roles even when a defensive caller receives extra roles", () => {
+    const assignedProjectSiteIds = ["11111111-1111-4111-8111-111111111111"];
+    const request = { currentUser: { roles: ["external_project_site", "viewer"], assignedProjectSiteIds } };
+
+    expect(scopedProjectSiteIds(request)).toEqual(assignedProjectSiteIds);
+    expect(externalProjectSiteAccountSiteIds(request)).toEqual(assignedProjectSiteIds);
   });
 
   it("allows operations to submit usage requests but blocks warehouse issue execution", async () => {

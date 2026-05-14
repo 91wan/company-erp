@@ -5,6 +5,7 @@ import type {
   UpdateCertificateRecordInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import { certificateFiltersForRequest, isOutsideCertificateScope } from "../src/appRouteContext";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import {
   CertificateConflictError,
@@ -569,5 +570,20 @@ describe("certificates API", () => {
     expect(hiddenDetail.statusCode).toBe(404);
     expect(projectSiteCreate.statusCode).toBe(403);
     expect(buyerList.json().certificates.map((item: CertificateRecordDto) => item.id)).toEqual(["supplier-cert"]);
+  });
+
+  it("keeps certificate scope defensive for project-site roles even if extra roles are present", () => {
+    const request = {
+      currentUser: {
+        roles: ["project_site", "viewer"],
+        assignedProjectSiteIds: [assignedProjectSiteId],
+      },
+    };
+
+    expect(certificateFiltersForRequest(request)).toEqual({
+      ownerTypes: ["project_site", "person"],
+      projectSiteIds: [assignedProjectSiteId],
+    });
+    expect(isOutsideCertificateScope(request, makeCertificate({ ownerProjectSiteId: unassignedProjectSiteId }))).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
+import { USER_ROLE_ASSIGNMENT_POLICY, type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
 import type { AppConfigRepository } from "./appConfig.js";
 import type { AuthenticatedRequest, AuthOptions, AuthRepository } from "./auth.js";
 import type { BusinessProjectRepository } from "./businessProjects.js";
@@ -52,20 +52,26 @@ export type BuildAppOptions = {
   marketOperationsHandoffRepository?: MarketOperationsHandoffRepository;
 };
 
+const SCOPED_PROJECT_SITE_ROLES = new Set<MvpRoleCode>(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles);
+
+function hasRole(user: { roles: readonly MvpRoleCode[] }, role: MvpRoleCode): boolean {
+  return user.roles.includes(role);
+}
+
+function hasScopedProjectSiteRole(user: { roles: readonly MvpRoleCode[] }): boolean {
+  return user.roles.some((role) => SCOPED_PROJECT_SITE_ROLES.has(role));
+}
+
 export function scopedProjectSiteIds(request: unknown): readonly string[] | null {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return null;
-  return user.roles.length === 1 && (user.roles[0] === "project_site" || user.roles[0] === "external_project_site")
-    ? [...(user.assignedProjectSiteIds ?? [])]
-    : null;
+  return hasScopedProjectSiteRole(user) ? [...(user.assignedProjectSiteIds ?? [])] : null;
 }
 
 export function externalProjectSiteAccountSiteIds(request: unknown): readonly string[] | null {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return null;
-  return user.roles.length === 1 && user.roles[0] === "external_project_site"
-    ? [...(user.assignedProjectSiteIds ?? [])]
-    : null;
+  return hasRole(user, "external_project_site") ? [...(user.assignedProjectSiteIds ?? [])] : null;
 }
 
 export function isOutsideProjectSiteScope(scope: readonly string[] | null, projectSiteId?: string | null): boolean {
@@ -105,7 +111,7 @@ export function redactPartyForResponse<T extends Record<string, unknown>>(party:
 export function certificateFiltersForRequest(request: unknown) {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user) return {};
-  if (user.roles.length === 1 && user.roles[0] === "project_site") {
+  if (hasRole(user, "project_site")) {
     return { ownerTypes: ["project_site" as const, "person" as const], projectSiteIds: [...(user.assignedProjectSiteIds ?? [])] };
   }
   if (user.roles.length === 1 && user.roles[0] === "procurement") {
@@ -124,7 +130,7 @@ export function isOutsideCertificateScope(
 ): boolean {
   const user = (request as AuthenticatedRequest).currentUser;
   if (!user || !certificate) return false;
-  if (user.roles.length === 1 && user.roles[0] === "project_site") {
+  if (hasRole(user, "project_site")) {
     const assigned = user.assignedProjectSiteIds ?? [];
     if (certificate.ownerType === "project_site") return !assigned.includes(certificate.ownerProjectSiteId ?? "");
     if (certificate.ownerType === "person") return !assigned.includes(certificate.ownerRosterPersonProjectSiteId ?? "");

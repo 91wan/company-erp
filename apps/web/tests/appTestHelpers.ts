@@ -190,7 +190,7 @@ export function mockShellFetch(
     if (url.includes("/api/project-usage-requests")) {
       return Promise.resolve(jsonResponse({ projectUsageRequests: data.projectUsageRequests ?? [projectUsageRequest] }));
     }
-    if (user?.roles.length === 1 && user.roles[0] === "project_site" && url.includes("/api/business-projects")) {
+    if ((user?.roles as readonly string[] | undefined)?.includes("project_site") && url.includes("/api/business-projects")) {
       return Promise.resolve(jsonResponse({ error: "FORBIDDEN" }, false, 403));
     }
     if (url.includes("/api/business-projects")) return Promise.resolve(jsonResponse({ businessProjects: [] }));

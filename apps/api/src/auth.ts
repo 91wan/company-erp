@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   canManage,
   canRead,
+  USER_ROLE_ASSIGNMENT_POLICY,
   type AuthenticatedUserDto,
   type EmployeeStatusCode,
   type MvpRoleCode,
@@ -17,6 +18,7 @@ const INSECURE_SESSION_SECRET_PLACEHOLDERS = new Set([
   "company-erp-local-dev-session-secret-change-me",
   "change-me-long-random-local-secret",
 ]);
+const exclusiveScopedRoles = new Set<MvpRoleCode>(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles);
 
 function loginRateLimitWindowMs(): number {
   const configured = Number(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS ?? 60 * 1000);
@@ -162,6 +164,7 @@ function toAuthenticatedUser(account: AuthAccountRecord): AuthenticatedUserDto {
 
 function accountCanLogin(account: AuthAccountRecord): boolean {
   if (account.status !== "active") return false;
+  if (account.roles.some((role) => exclusiveScopedRoles.has(role)) && account.roles.length !== 1) return false;
   return !account.employeeStatus || account.employeeStatus === "active";
 }
 
