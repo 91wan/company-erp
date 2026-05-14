@@ -14,7 +14,7 @@ import {
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
+import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -56,6 +56,8 @@ type RecordFormState = {
   purchaseQuantity: string;
   unit: string;
 };
+
+type PurchaseFormDrawer = "request" | "record" | null;
 
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
@@ -139,6 +141,9 @@ export function PurchaseWorkspace({
   const [recordSubmitState, setRecordSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [reviewState, setReviewState] = useState<"idle" | "saving" | "error">("idle");
   const [reviewRemark, setReviewRemark] = useState("");
+  const [openFormDrawer, setOpenFormDrawer] = useState<PurchaseFormDrawer>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState("");
+  const [selectedRecordId, setSelectedRecordId] = useState("");
   const [requestForm, setRequestForm] = useState<RequestFormState>({
     requestNo: "",
     requesterName: "",
@@ -254,6 +259,14 @@ export function PurchaseWorkspace({
     () => purchaseRequests.filter((request) => request.status === "pending_approval"),
     [purchaseRequests],
   );
+  const selectedRequest = useMemo(
+    () => purchaseRequests.find((request) => request.id === selectedRequestId) ?? null,
+    [purchaseRequests, selectedRequestId],
+  );
+  const selectedRecord = useMemo(
+    () => purchaseRecords.find((record) => record.id === selectedRecordId) ?? null,
+    [purchaseRecords, selectedRecordId],
+  );
 
   function replacePurchaseRequest(nextRequest: PurchaseRequestDto) {
     setPurchaseRequests((current) => current.map((request) => (request.id === nextRequest.id ? nextRequest : request)));
@@ -306,6 +319,7 @@ export function PurchaseWorkspace({
         expectedArrivalDate: "",
       });
       setRequestSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setRequestSubmitState("error");
     }
@@ -348,6 +362,7 @@ export function PurchaseWorkspace({
         unit: "",
       });
       setRecordSubmitState("idle");
+      setOpenFormDrawer(null);
     } catch {
       setRecordSubmitState("error");
     }
@@ -374,6 +389,13 @@ export function PurchaseWorkspace({
         <SummaryCard label="采购记录" value={purchaseRecords.length} detail="采购执行" tone="info" />
         <SummaryCard label="已下单" value={purchaseRecords.filter((record) => record.status === "ordered").length} detail="等待到货/入库" tone="success" />
       </div>
+
+      {canManage ? (
+        <div className="project-site-action-bar" aria-label="采购快捷操作">
+          <button type="button" onClick={() => setOpenFormDrawer("request")}>新增采购需求</button>
+          <button type="button" onClick={() => setOpenFormDrawer("record")}>新增采购记录</button>
+        </div>
+      ) : null}
 
       <SectionCard title="待审批" action={<Check aria-hidden="true" size={17} />}>
         {pendingApprovalRequests.length === 0 ? <StateMessage text="暂无待审批采购需求" /> : null}
@@ -427,7 +449,7 @@ export function PurchaseWorkspace({
         {reviewState === "error" ? <p className="form-error">审批操作失败</p> : null}
       </SectionCard>
 
-      <div className="people-section-grid">
+      <div className="project-site-list-layout">
         <SectionCard title="采购需求" action={<ClipboardList aria-hidden="true" size={17} />}>
           <Toolbar
             query={requestQuery}
@@ -446,11 +468,13 @@ export function PurchaseWorkspace({
               canManage={canManage}
               reviewState={reviewState}
               onSubmitRequest={(request) => handleRequestReview("submit", request)}
+              onSelectRequest={(request) => setSelectedRequestId(request.id)}
             />
           ) : null}
         </SectionCard>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit}>
+        <FormDrawer title="新增采购需求" open={openFormDrawer === "request"} onClose={() => setOpenFormDrawer(null)}>
+          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购需求</h3>
             <button type="submit" disabled={requestSubmitState === "saving"}>
@@ -487,10 +511,11 @@ export function PurchaseWorkspace({
             <input type="date" value={requestForm.expectedArrivalDate} onChange={(event) => setRequestForm((current) => ({ ...current, expectedArrivalDate: event.target.value }))} />
           </label>
           {requestSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div>
 
-      <div className="people-section-grid">
+      <div className="project-site-list-layout">
         <SectionCard title="采购执行" action={<PackageCheck aria-hidden="true" size={17} />}>
           <Toolbar
             query={recordQuery}
@@ -503,10 +528,11 @@ export function PurchaseWorkspace({
           {recordStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载采购记录..." /> : null}
           {recordStatus === "error" ? <StateMessage text="采购记录加载失败" /> : null}
           {recordStatus === "ready" && filteredRecords.length === 0 ? <StateMessage text="暂无采购记录" /> : null}
-          {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} /> : null}
+          {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} onSelectRecord={(record) => setSelectedRecordId(record.id)} /> : null}
         </SectionCard>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit}>
+        <FormDrawer title="新增采购记录" open={openFormDrawer === "record"} onClose={() => setOpenFormDrawer(null)}>
+          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购记录</h3>
             <button type="submit" disabled={recordSubmitState === "saving"}>
@@ -572,8 +598,17 @@ export function PurchaseWorkspace({
             <input required value={recordForm.unit} onChange={(event) => setRecordForm((current) => ({ ...current, unit: event.target.value }))} />
           </label>
           {recordSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
-        </form> : null}
+          </form> : null}
+        </FormDrawer>
       </div>
+
+      <DetailDrawer title="采购需求详情" open={Boolean(selectedRequest)} onClose={() => setSelectedRequestId("")}>
+        {selectedRequest ? <PurchaseRequestDetail request={selectedRequest} /> : null}
+      </DetailDrawer>
+
+      <DetailDrawer title="采购记录详情" open={Boolean(selectedRecord)} onClose={() => setSelectedRecordId("")}>
+        {selectedRecord ? <PurchaseRecordDetail record={selectedRecord} /> : null}
+      </DetailDrawer>
     </section>
   );
 }
@@ -623,11 +658,13 @@ function PurchaseRequestsTable({
   canManage,
   reviewState,
   onSubmitRequest,
+  onSelectRequest,
 }: {
   requests: PurchaseRequestDto[];
   canManage: boolean;
   reviewState: "idle" | "saving" | "error";
   onSubmitRequest: (request: PurchaseRequestDto) => void;
+  onSelectRequest: (request: PurchaseRequestDto) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -652,7 +689,7 @@ function PurchaseRequestsTable({
           {requests.map((request) => {
             const firstLine = request.lines[0];
             return (
-              <tr key={request.id}>
+              <tr key={request.id} tabIndex={0} onClick={() => onSelectRequest(request)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRequest(request); }}>
                 <td>{request.requestNo}</td>
                 <td>{request.requesterName}</td>
                 <td>{request.projectSiteName || request.departmentName}</td>
@@ -670,7 +707,7 @@ function PurchaseRequestsTable({
                 <td>{formatDateTime(request.updatedAt)}</td>
                 <td>
                   {canManage && request.status === "draft" ? (
-                    <button type="button" disabled={reviewState === "saving"} onClick={() => onSubmitRequest(request)}>
+                    <button type="button" disabled={reviewState === "saving"} onClick={(event) => { event.stopPropagation(); onSubmitRequest(request); }}>
                       提交 {request.requestNo}
                     </button>
                   ) : (
@@ -686,7 +723,7 @@ function PurchaseRequestsTable({
   );
 }
 
-function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
+function PurchaseRecordsTable({ records, onSelectRecord }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void }) {
   return (
     <div className="table-wrap">
       <table>
@@ -708,7 +745,7 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
             const firstLine = record.lines[0];
             const sourceText = record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || record.purchaseDescription || "未建供应商";
             return (
-              <tr key={record.id}>
+              <tr key={record.id} tabIndex={0} onClick={() => onSelectRecord(record)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRecord(record); }}>
                 <td>{record.purchaseNo}</td>
                 <td>{record.purchaserName}</td>
                 <td>{sourceTypeLabel.get(record.sourceType)}</td>
@@ -728,6 +765,50 @@ function PurchaseRecordsTable({ records }: { records: PurchaseRecordDto[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function PurchaseRequestDetail({ request }: { request: PurchaseRequestDto }) {
+  const firstLine = request.lines[0];
+  return (
+    <dl className="detail-grid">
+      <dt>需求编号</dt>
+      <dd>{request.requestNo}</dd>
+      <dt>申请人</dt>
+      <dd>{request.requesterName}</dd>
+      <dt>部门/项目点</dt>
+      <dd>{request.projectSiteName || request.departmentName || "-"}</dd>
+      <dt>物料</dt>
+      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>状态</dt>
+      <dd>{requestStatusLabel.get(request.status)}</dd>
+      <dt>审批信息</dt>
+      <dd>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "暂无"}</dd>
+      <dt>更新时间</dt>
+      <dd>{formatDateTime(request.updatedAt)}</dd>
+    </dl>
+  );
+}
+
+function PurchaseRecordDetail({ record }: { record: PurchaseRecordDto }) {
+  const firstLine = record.lines[0];
+  return (
+    <dl className="detail-grid">
+      <dt>采购单号</dt>
+      <dd>{record.purchaseNo}</dd>
+      <dt>采购人</dt>
+      <dd>{record.purchaserName}</dd>
+      <dt>来源</dt>
+      <dd>{sourceTypeLabel.get(record.sourceType)}</dd>
+      <dt>供应商/平台</dt>
+      <dd>{record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || "-"}</dd>
+      <dt>合同</dt>
+      <dd>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "未关联"}</dd>
+      <dt>物料</dt>
+      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>状态</dt>
+      <dd>{recordStatusLabel.get(record.status)}</dd>
+    </dl>
   );
 }
 
