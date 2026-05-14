@@ -465,6 +465,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^项目点$/ }));
     expect(screen.queryByRole("button", { name: "保存项目点" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     expect(screen.getByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "执行出库" })).not.toBeInTheDocument();
 
@@ -492,6 +493,7 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: /^基础资料$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^库存$/ })).not.toBeInTheDocument();
 
+    fireEvent.click(await screen.findByRole("button", { name: "新增领用申请" }));
     expect(await screen.findByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
     expect(screen.queryByText("项目点台账")).not.toBeInTheDocument();
     expect(screen.queryByText("投入合同")).not.toBeInTheDocument();

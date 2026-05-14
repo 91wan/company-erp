@@ -100,6 +100,7 @@ test("project-site scoped users can request usage while issue actions stay wareh
   await expect(page.getByRole("button", { name: "保存项目点" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "执行出库" })).toHaveCount(0);
 
+  await page.getByRole("button", { name: "新增领用申请" }).click();
   await page.getByLabel("领用申请单号").fill("DEMO-E2E-USAGE");
   await page.getByLabel("申请日期").fill("2026-05-13");
   await page.getByLabel("申请数量").fill("2");
@@ -120,6 +121,7 @@ test("warehouse-capable admin can issue usage and sees charge snapshot refresh",
   await page.goto("/");
   await page.getByRole("button", { name: "项目点", exact: true }).click();
 
+  await page.getByRole("button", { name: "出库登记" }).click();
   await page.getByLabel("出库单号").fill("DEMO-E2E-OUT");
   await page.getByLabel("领用时间").fill("2026-05-13");
   await page.getByLabel("出库数量").fill("2");
