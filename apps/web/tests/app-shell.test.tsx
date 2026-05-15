@@ -519,8 +519,9 @@ describe("Company ERP app shell", () => {
       expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
     }
 
-    expect(screen.getByRole("button", { name: "公司内部出库 后续开放" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
+    expect(screen.getByText("公司内部出库暂未开放；项目点领用出库请到项目点模块办理。")).toBeInTheDocument();
     expect(screen.getByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).toBeInTheDocument();
   });
 
@@ -591,7 +592,7 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByText("项目点台账")).not.toBeInTheDocument();
     expect(screen.queryByText("投入合同")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "项目点" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "月度经营报表 后续开放" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^现场人员\/健康证$/ }));
     expect(await screen.findByRole("heading", { name: "证照资质" })).toBeInTheDocument();
