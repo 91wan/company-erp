@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { readFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import {
   AttachmentConflictError,
   AttachmentValidationError,
@@ -45,6 +47,33 @@ async function isAttachmentOutsideScope(
   return true;
 }
 
+async function filterAttachmentsForScope<T extends { ownerEntityType: string; ownerEntityId?: string | null }>(
+  request: unknown,
+  options: BuildAppOptions,
+  attachments: T[],
+): Promise<T[]> {
+  const scope = scopedProjectSiteIds(request);
+  if (scope === null) return attachments;
+  const visible: T[] = [];
+  for (const attachment of attachments) {
+    if (!(await isAttachmentOutsideScope(request, options, attachment))) {
+      visible.push(attachment);
+    }
+  }
+  return visible;
+}
+
+function resolveAttachmentContentPath(storageKey: string): string {
+  createAttachmentDownloadRef({ id: "attachment", storageKey });
+  const root = resolve(process.env.NAS_ATTACHMENTS_ROOT?.trim() || "/attachments");
+  const filePath = resolve(root, storageKey);
+  const relativePath = relative(root, filePath);
+  if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    throw new AttachmentValidationError(["storageKey must be a safe relative storage key"]);
+  }
+  return filePath;
+}
+
 export function registerAttachmentRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/attachments", async (request, reply) => {
     if (!options.attachmentRepository) {
@@ -54,7 +83,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     try {
       const filters = normalizeAttachmentFilters(request.query as Record<string, unknown>);
       const attachments = await options.attachmentRepository.list(filters);
-      return { attachments };
+      return { attachments: await filterAttachmentsForScope(request, options, attachments) };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -71,7 +100,42 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     const { id } = request.params as { id: string };
     const attachment = await options.attachmentRepository.getById(id);
     if (!attachment) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
+    if (await isAttachmentOutsideScope(request, options, attachment)) {
+      return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
+    }
     return { attachment };
+  });
+
+  app.get("/api/attachments/:id/content", async (request, reply) => {
+    if (!options.attachmentRepository) {
+      return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const { id } = request.params as { id: string };
+    const attachment = await options.attachmentRepository.getById(id);
+    if (!attachment) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
+    if (await isAttachmentOutsideScope(request, options, attachment)) {
+      return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
+    }
+    try {
+      const contentPath = resolveAttachmentContentPath(attachment.storageKey);
+      const content = await readFile(contentPath);
+      if (attachment.fileType) reply.type(attachment.fileType);
+      return reply.send(content);
+    } catch (error) {
+      if (error instanceof AttachmentValidationError) {
+        return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        ((error as { code?: string }).code === "ENOENT" || (error as { code?: string }).code === "ENOTDIR")
+      ) {
+        return reply.status(404).send({ error: "ATTACHMENT_CONTENT_NOT_FOUND" });
+      }
+      throw error;
+    }
   });
 
   app.get("/api/attachments/:id/download-url", async (request, reply) => {
