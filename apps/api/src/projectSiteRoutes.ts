@@ -92,6 +92,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       }
       const input = normalizeProjectSiteInput(request.body, "create");
       const projectSite = await options.projectSiteRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "project_site.create",
+        entityType: "project_site",
+        entityId: projectSite.id,
+        afterJson: projectSite,
+      });
       return reply.status(201).send({ projectSite });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -115,8 +121,16 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSites", requiredLevel: "manage" });
       }
       const input = normalizeProjectSiteInput(request.body, "update");
+      const before = await options.projectSiteRepository.getById(id);
       const projectSite = await options.projectSiteRepository.update(id, input);
       if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "project_site.update",
+        entityType: "project_site",
+        entityId: projectSite.id,
+        beforeJson: before,
+        afterJson: projectSite,
+      });
       return { projectSite };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -345,7 +359,7 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSiteKitchenEquipment", requiredLevel: "manage" });
     }
     try {
-      const { id } = request.params as { id: string };
+    const { id } = request.params as { id: string };
       const input = normalizeProjectSiteKitchenEquipmentInput(request.body, "update");
       if (input.projectSiteId && isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
@@ -564,6 +578,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(400).send({ error: "PROJECT_USAGE_VALIDATION_FAILED", issues: ["project-site users can only create pending usage requests"] });
       }
       const projectUsageRequest = await options.projectUsageRequestRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "project_usage_request.create",
+        entityType: "project_usage_request",
+        entityId: projectUsageRequest.id,
+        afterJson: projectUsageRequest,
+      });
       return reply.status(201).send({ projectUsageRequest: redactProjectUsageRequestForResponse(request, projectUsageRequest) });
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {
@@ -581,16 +601,16 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       return reply.status(503).send({ error: "PROJECT_USAGE_REPOSITORY_NOT_CONFIGURED" });
     }
 
-    const { id } = request.params as { id: string };
+      const { id } = request.params as { id: string };
     try {
       if (externalProjectSiteAccountSiteIds(request) !== null) {
         return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectUsageRequest", requiredLevel: "manage" });
       }
       const input = normalizeProjectUsageRequestInput(request.body, "update");
       const scope = scopedProjectSiteIds(request);
+      const before = await options.projectUsageRequestRepository.getById(id);
       if (scope !== null) {
-        const current = await options.projectUsageRequestRepository.getById(id);
-        if (isOutsideProjectSiteScope(scope, current?.projectSiteId)) {
+        if (isOutsideProjectSiteScope(scope, before?.projectSiteId)) {
           return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
         }
         if (input.projectSiteId !== undefined && isOutsideProjectSiteScope(scope, input.projectSiteId)) {
@@ -602,6 +622,13 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       }
       const projectUsageRequest = await options.projectUsageRequestRepository.update(id, input);
       if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: input.status === "rejected" ? "project_usage_request.reject" : "project_usage_request.update",
+        entityType: "project_usage_request",
+        entityId: projectUsageRequest.id,
+        beforeJson: before,
+        afterJson: projectUsageRequest,
+      });
       return { projectUsageRequest: redactProjectUsageRequestForResponse(request, projectUsageRequest) };
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {

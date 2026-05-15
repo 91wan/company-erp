@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AuditLogDto,
   CreateProjectSiteInput,
   CreateProjectUsageRequestInput,
   IssueProjectUsageRequestInput,
@@ -20,6 +21,7 @@ import type {
   WarehouseDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import type { AuditLogRepository } from "../src/auditLogs";
 import { externalProjectSiteAccountSiteIds, scopedProjectSiteIds } from "../src/appRouteContext";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import { hashPassword } from "../src/password";
@@ -41,6 +43,32 @@ const rosterPersonId = "12121212-1212-4121-8121-121212121212";
 const insurancePolicyId = "13131313-1313-4131-8131-131313131313";
 const kitchenEquipmentId = "24242424-2424-4242-8242-242424242424";
 const kitchenEquipmentChangeRequestId = "25252525-2525-4252-8252-252525252525";
+
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: AuditLogDto[] = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log: AuditLogDto = {
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
 
 function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDto {
   return {
@@ -776,7 +804,11 @@ describe("project site API", () => {
   });
 
   it("creates and updates project sites and rejects duplicates or invalid service modes", async () => {
-    const app = await buildApp({ projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]) });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({
+      projectSiteRepository: createFakeProjectSiteRepository([makeProjectSite()]),
+      auditLogRepository,
+    });
 
     const created = await app.inject({
       method: "POST",
@@ -804,6 +836,7 @@ describe("project site API", () => {
       url: "/api/project-sites/11111111-1111-4111-8111-111111111111",
       payload: { status: "paused", remark: "暂停服务" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(created.statusCode).toBe(201);
@@ -814,6 +847,8 @@ describe("project site API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_SITE_CONFLICT", field: "siteCode" });
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toMatchObject({ projectSite: { status: "paused", remark: "暂停服务" } });
+    expect(logs.map((log) => log.action)).toEqual(["project_site.create", "project_site.update"]);
+    expect(logs.at(0)).toMatchObject({ entityType: "project_site", entityId: created.json().projectSite.id });
   });
 
   it("manages project-site compliance roster, insurance, payroll attachments, and summary", async () => {
@@ -933,7 +968,11 @@ describe("project usage request API", () => {
   });
 
   it("creates and updates usage requests and rejects invalid quantities or duplicates", async () => {
-    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({
+      projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]),
+      auditLogRepository,
+    });
 
     const created = await app.inject({
       method: "POST",
@@ -971,6 +1010,7 @@ describe("project usage request API", () => {
       url: "/api/project-usage-requests/55555555-5555-4555-8555-555555555555",
       payload: { status: "rejected", remark: "库存暂缓" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(created.statusCode).toBe(201);
@@ -983,10 +1023,19 @@ describe("project usage request API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_USAGE_CONFLICT", field: "requestNo" });
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toMatchObject({ projectUsageRequest: { status: "rejected", remark: "库存暂缓" } });
+    expect(logs.map((log) => log.action)).toEqual(["project_usage_request.create", "project_usage_request.reject"]);
+    expect(logs.at(-1)).toMatchObject({
+      entityType: "project_usage_request",
+      entityId: "55555555-5555-4555-8555-555555555555",
+    });
   });
 
   it("issues usage requests and blocks insufficient stock or duplicate outbound numbers", async () => {
-    const app = await buildApp({ projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]) });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({
+      projectUsageRequestRepository: createFakeUsageRepository([makeUsageRequest()]),
+      auditLogRepository,
+    });
 
     const partial = await app.inject({
       method: "POST",
@@ -1003,6 +1052,7 @@ describe("project usage request API", () => {
       url: "/api/project-usage-requests/55555555-5555-4555-8555-555555555555/issue",
       payload: { outboundNo: "OUT20260511002", movementDate: "2026-05-11", quantity: 30 },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(partial.statusCode).toBe(201);
@@ -1013,6 +1063,11 @@ describe("project usage request API", () => {
     expect(duplicate.json()).toEqual({ error: "PROJECT_USAGE_CONFLICT", field: "outboundNo" });
     expect(insufficient.statusCode).toBe(400);
     expect(insufficient.json().issues).toContain("insufficient stock for issue");
+    expect(logs.at(-1)).toMatchObject({
+      action: "project_usage_request.issue",
+      entityType: "project_usage_request",
+      entityId: "55555555-5555-4555-8555-555555555555",
+    });
   });
 
   it("records project usage charge snapshots when issuing requests", async () => {

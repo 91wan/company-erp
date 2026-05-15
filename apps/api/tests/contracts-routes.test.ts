@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AuditLogDto,
   ContractAttachmentDto,
   ContractDto,
   CreateContractAttachmentInput,
@@ -8,6 +9,7 @@ import type {
   UpdateContractInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import type { AuditLogRepository } from "../src/auditLogs";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import {
   ContractConflictError,
@@ -22,6 +24,32 @@ const contractId = "11111111-1111-4111-8111-111111111111";
 const attachmentId = "22222222-2222-4222-8222-222222222222";
 const assignedProjectSiteId = "44444444-4444-4444-8444-444444444444";
 const unassignedProjectSiteId = "55555555-5555-4555-8555-555555555555";
+
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: AuditLogDto[] = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log: AuditLogDto = {
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
 
 function makeContract(overrides: Partial<ContractDto> = {}): ContractDto {
   return {
@@ -529,7 +557,8 @@ describe("contracts API", () => {
 
   it("manages contract attachment path metadata", async () => {
     const repository = createFakeContractRepository([makeContract()], [makeAttachment()]);
-    const app = await buildApp({ contractRepository: repository });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ contractRepository: repository, auditLogRepository });
 
     const listResponse = await app.inject({ method: "GET", url: `/api/contracts/${contractId}/attachments` });
     const createResponse = await app.inject({
@@ -557,6 +586,7 @@ describe("contracts API", () => {
       url: "/api/contract-attachments/99999999-9999-4999-8999-999999999999",
       payload: { remark: "missing" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(listResponse.json()).toEqual({ contractAttachments: [makeAttachment()] });
@@ -565,5 +595,7 @@ describe("contracts API", () => {
     expect(updateResponse.json()).toMatchObject({ contractAttachment: { remark: "已归档" } });
     expect(invalidResponse.statusCode).toBe(400);
     expect(missingResponse.statusCode).toBe(404);
+    expect(logs.map((log) => log.action)).toEqual(["contract_attachment.create", "contract_attachment.update"]);
+    expect(JSON.stringify(logs)).not.toContain("secret");
   });
 });
