@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AttachmentRecordDto, CreateAttachmentRecordInput, UpdateAttachmentRecordInput } from "@company-erp/shared";
 import { buildApp } from "../src/app";
 import type { AttachmentRecordRepository } from "../src/attachments";
@@ -150,6 +153,10 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
 }
 
 describe("attachments API", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("requires attachment permissions for list/detail/create/update", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const app = await buildApp({
@@ -385,5 +392,159 @@ describe("attachments API", () => {
     expect(JSON.stringify(scopedDownload.json())).not.toContain("/volume1");
     expect(outOfScope.statusCode).toBe(404);
     expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+  });
+
+  it("scopes attachment metadata list and detail for external project-site accounts", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const siteId = "77777777-7777-4777-8777-777777777777";
+    const otherSiteId = "88888888-8888-4888-8888-888888888888";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [siteId],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([
+        makeAttachment({
+          id: "22222222-2222-4222-8222-222222222222",
+          attachmentCode: "ATT-SITE-001",
+          storageKey: "project-sites/site-license.pdf",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: siteId,
+        }),
+        makeAttachment({
+          id: "33333333-3333-4333-8333-333333333333",
+          attachmentCode: "ATT-SITE-OTHER",
+          storageKey: "project-sites/other-license.pdf",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: otherSiteId,
+        }),
+      ]),
+    });
+
+    const externalCookie = await loginCookie(app, "external-site");
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/attachments",
+      cookies: { company_erp_session: externalCookie },
+    });
+    const assignedDetail = await app.inject({
+      method: "GET",
+      url: "/api/attachments/22222222-2222-4222-8222-222222222222",
+      cookies: { company_erp_session: externalCookie },
+    });
+    const outOfScopeDetail = await app.inject({
+      method: "GET",
+      url: "/api/attachments/33333333-3333-4333-8333-333333333333",
+      cookies: { company_erp_session: externalCookie },
+    });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({
+      attachments: [expect.objectContaining({ attachmentCode: "ATT-SITE-001" })],
+    });
+    expect(assignedDetail.statusCode).toBe(200);
+    expect(assignedDetail.json()).toEqual({
+      attachment: expect.objectContaining({ attachmentCode: "ATT-SITE-001" }),
+    });
+    expect(outOfScopeDetail.statusCode).toBe(404);
+    expect(outOfScopeDetail.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+  });
+
+  it("serves scoped attachment content from safe storage keys without exposing root paths", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-attachments-"));
+    await mkdir(join(root, "project-sites"), { recursive: true });
+    await writeFile(join(root, "project-sites", "site-license.txt"), "DEMO attachment content");
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const siteId = "77777777-7777-4777-8777-777777777777";
+    const otherSiteId = "88888888-8888-4888-8888-888888888888";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [siteId],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([
+        makeAttachment({
+          id: "22222222-2222-4222-8222-222222222222",
+          attachmentCode: "ATT-SITE-001",
+          storageKey: "project-sites/site-license.txt",
+          fileType: "text/plain",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: siteId,
+        }),
+        makeAttachment({
+          id: "33333333-3333-4333-8333-333333333333",
+          attachmentCode: "ATT-SITE-OTHER",
+          storageKey: "project-sites/other-license.txt",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: otherSiteId,
+        }),
+        makeAttachment({
+          id: "44444444-4444-4444-8444-444444444444",
+          attachmentCode: "ATT-SITE-MISSING",
+          storageKey: "project-sites/missing-file.txt",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: siteId,
+        }),
+      ]),
+    });
+
+    try {
+      const adminCookie = await loginCookie(app, "admin");
+      const externalCookie = await loginCookie(app, "external-site");
+      const adminContent = await app.inject({
+        method: "GET",
+        url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+        cookies: { company_erp_session: adminCookie },
+      });
+      const scopedContent = await app.inject({
+        method: "GET",
+        url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+        cookies: { company_erp_session: externalCookie },
+      });
+      const outOfScope = await app.inject({
+        method: "GET",
+        url: "/api/attachments/33333333-3333-4333-8333-333333333333/content",
+        cookies: { company_erp_session: externalCookie },
+      });
+      const missingContent = await app.inject({
+        method: "GET",
+        url: "/api/attachments/44444444-4444-4444-8444-444444444444/content",
+        cookies: { company_erp_session: externalCookie },
+      });
+
+      expect(adminContent.statusCode).toBe(200);
+      expect(adminContent.payload).toBe("DEMO attachment content");
+      expect(scopedContent.statusCode).toBe(200);
+      expect(scopedContent.payload).toBe("DEMO attachment content");
+      expect(JSON.stringify(scopedContent.headers)).not.toContain(root);
+      expect(outOfScope.statusCode).toBe(404);
+      expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+      expect(missingContent.statusCode).toBe(404);
+      expect(missingContent.json()).toEqual({ error: "ATTACHMENT_CONTENT_NOT_FOUND" });
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
