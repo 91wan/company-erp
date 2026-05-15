@@ -44,7 +44,7 @@ export function ProjectSiteComplianceActionQueue({
                 {action.actionLabel}
               </button>
             ) : action.actionLabel ? (
-              <span className="form-helper">{action.actionLabel}</span>
+              <span className="form-helper">{action.targetSection ? "待后端支持" : action.actionLabel}</span>
             ) : null}
           </article>
         ))}
