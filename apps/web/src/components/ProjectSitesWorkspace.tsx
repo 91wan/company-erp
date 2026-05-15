@@ -7,6 +7,7 @@ import {
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
+  type AttachmentRecordDto,
   type BusinessProjectDto,
   type CreateProjectSiteKitchenEquipmentChangeRequestInput,
   type CreateProjectSiteKitchenEquipmentInput,
@@ -28,7 +29,7 @@ import {
   type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
+import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { FormDrawer, PageHeader } from "./ui";
 import {
   ExternalProjectSitePortal,
@@ -56,6 +57,7 @@ type ProjectSitesWorkspaceProps = {
   loadComplianceSummary?: (projectSiteId: string) => Promise<ProjectSiteComplianceSummaryDto>;
   loadKitchenEquipment?: () => Promise<ProjectSiteKitchenEquipmentDto[]>;
   loadKitchenEquipmentChangeRequests?: () => Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]>;
+  loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   createKitchenEquipment?: (input: CreateProjectSiteKitchenEquipmentInput) => Promise<ProjectSiteKitchenEquipmentDto>;
   createKitchenEquipmentChangeRequest?: (
     input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
@@ -322,6 +324,7 @@ export function ProjectSitesWorkspace({
   loadComplianceSummary = defaultLoadComplianceSummary,
   loadKitchenEquipment = defaultLoadKitchenEquipment,
   loadKitchenEquipmentChangeRequests = defaultLoadKitchenEquipmentChangeRequests,
+  loadUnifiedAttachments = getAttachments,
   createKitchenEquipment = defaultCreateKitchenEquipment,
   createKitchenEquipmentChangeRequest = defaultCreateKitchenEquipmentChangeRequest,
   reviewKitchenEquipmentChangeRequest = defaultReviewKitchenEquipmentChangeRequest,
@@ -1595,6 +1598,10 @@ export function ProjectSitesWorkspace({
           complianceSummary={selectedDetailSite ? complianceSummaries[selectedDetailSite.id] : undefined}
           usageRequests={selectedDetailSite ? usageRequests.filter((request) => request.projectSiteId === selectedDetailSite.id) : []}
           kitchenEquipment={selectedDetailSite ? kitchenEquipment.filter((item) => item.projectSiteId === selectedDetailSite.id) : []}
+          loadAttachments={loadUnifiedAttachments}
+          createAttachment={createAttachment}
+          getAttachmentDownloadUrl={getAttachmentDownloadUrl}
+          canManageAttachments={canEditSites}
           onClose={() => setSelectedDetailSiteId("")}
         />
       ) : null}
