@@ -395,7 +395,7 @@ export function CertificatesWorkspace({
         search={(
           <label className="table-search">
             <Search aria-hidden="true" size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索证照、归属对象、编号或附件路径" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索证照、归属对象、编号或附件引用" />
           </label>
         )}
         filters={(
@@ -573,12 +573,14 @@ export function CertificatesWorkspace({
                 <input value={form.certificateNumber} onChange={(event) => setForm({ ...form, certificateNumber: event.target.value })} />
               </label>
               <label>
-                附件路径
+                附件引用（历史兼容）
                 <input value={form.attachmentPath} onChange={(event) => setForm({ ...form, attachmentPath: event.target.value })} />
+                <small className="form-hint">正式附件请在证照详情的“统一附件”中登记；这里仅保留旧数据兼容引用。</small>
               </label>
               <label>
-                来源文件路径
+                来源文件引用（历史兼容）
                 <input value={form.sourceFilePath} onChange={(event) => setForm({ ...form, sourceFilePath: event.target.value })} />
+                <small className="form-hint">不要填写 NAS 绝对路径、URL 或本地文件路径。</small>
               </label>
               <label>
                 来源页码
@@ -622,8 +624,8 @@ export function CertificatesWorkspace({
               ownerEntityId={selectedCertificate.id}
               canManage={canManage}
               legacyPaths={[
-                { label: "附件路径", value: selectedCertificate.attachmentPath },
-                { label: "来源文件路径", value: selectedCertificate.sourceFilePath },
+                { label: "附件引用（历史路径）", value: selectedCertificate.attachmentPath },
+                { label: "来源文件引用（历史路径）", value: selectedCertificate.sourceFilePath },
               ]}
               loadAttachments={loadUnifiedAttachments}
               createAttachment={createAttachment}

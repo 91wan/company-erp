@@ -1,4 +1,4 @@
-import { FileText, Filter, Link, Paperclip, RefreshCw, Save, Search } from "lucide-react";
+import { FileText, Filter, RefreshCw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   CONTRACT_DIRECTIONS,
@@ -9,7 +9,6 @@ import {
   CONTRACT_SUBJECT_CATEGORIES,
   type AttachmentRecordDto,
   type BusinessProjectDto,
-  type ContractAttachmentDto,
   type ContractDirectionCode,
   type ContractDto,
   type ContractExpiryStateCode,
@@ -17,7 +16,6 @@ import {
   type ContractInvestmentCategoryCode,
   type ContractStatusCode,
   type ContractSubjectCategoryCode,
-  type CreateContractAttachmentInput,
   type CreateContractInput,
   type CreateAttachmentRecordInput,
   type PartyDto,
@@ -30,11 +28,6 @@ import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, Summary
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
   createContract?: (input: CreateContractInput) => Promise<ContractDto>;
-  loadContractAttachments?: (contractId: string) => Promise<ContractAttachmentDto[]>;
-  createContractAttachment?: (
-    contractId: string,
-    input: CreateContractAttachmentInput,
-  ) => Promise<ContractAttachmentDto>;
   loadParties?: () => Promise<PartyDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
@@ -64,16 +57,7 @@ type ContractFormState = {
   remark: string;
 };
 
-type AttachmentFormState = {
-  contractId: string;
-  fileName: string;
-  filePath: string;
-  fileType: string;
-  fileSize: string;
-  remark: string;
-};
-
-type ContractFormDrawer = "contract" | "attachment" | null;
+type ContractFormDrawer = "contract" | null;
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
 const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
@@ -94,27 +78,6 @@ async function defaultCreateContract(input: CreateContractInput): Promise<Contra
   return payload.contract;
 }
 
-async function defaultLoadContractAttachments(contractId: string): Promise<ContractAttachmentDto[]> {
-  const payload = await requestJson<{ contractAttachments: ContractAttachmentDto[] }>(
-    `${apiBaseUrl}/api/contracts/${contractId}/attachments`,
-  );
-  return payload.contractAttachments;
-}
-
-async function defaultCreateContractAttachment(
-  contractId: string,
-  input: CreateContractAttachmentInput,
-): Promise<ContractAttachmentDto> {
-  const payload = await requestJson<{ contractAttachment: ContractAttachmentDto }>(
-    `${apiBaseUrl}/api/contracts/${contractId}/attachments`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.contractAttachment;
-}
-
 async function defaultLoadParties(): Promise<PartyDto[]> {
   const payload = await requestJson<{ parties: PartyDto[] }>(`${apiBaseUrl}/api/parties`);
   return payload.parties;
@@ -133,8 +96,6 @@ async function defaultLoadBusinessProjects(): Promise<BusinessProjectDto[]> {
 export function ContractsWorkspace({
   loadContracts = defaultLoadContracts,
   createContract = defaultCreateContract,
-  loadContractAttachments = defaultLoadContractAttachments,
-  createContractAttachment = defaultCreateContractAttachment,
   loadParties = defaultLoadParties,
   loadProjectSites = defaultLoadProjectSites,
   loadBusinessProjects = defaultLoadBusinessProjects,
@@ -144,20 +105,16 @@ export function ContractsWorkspace({
   canManage = true,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
-  const [attachments, setAttachments] = useState<ContractAttachmentDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [projectSites, setProjectSites] = useState<ProjectSiteDto[]>([]);
   const [businessProjects, setBusinessProjects] = useState<BusinessProjectDto[]>([]);
   const [contractStatus, setContractStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [attachmentStatus, setAttachmentStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContractStatusCode>("all");
   const [expiryFilter, setExpiryFilter] = useState<"all" | ContractExpiryStateCode>("all");
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [attachmentSubmitState, setAttachmentSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
-  const [attachmentSubmitError, setAttachmentSubmitError] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
   const [selectedContractId, setSelectedContractId] = useState("");
   const [contractForm, setContractForm] = useState<ContractFormState>({
@@ -179,14 +136,6 @@ export function ContractsWorkspace({
     attachmentRef: "",
     remark: "",
   });
-  const [attachmentForm, setAttachmentForm] = useState<AttachmentFormState>({
-    contractId: "",
-    fileName: "",
-    filePath: "",
-    fileType: "",
-    fileSize: "",
-    remark: "",
-  });
 
   useEffect(() => {
     let mounted = true;
@@ -196,7 +145,6 @@ export function ContractsWorkspace({
         if (!mounted) return;
         setContracts(nextContracts);
         setContractStatus("ready");
-        setAttachmentForm((current) => ({ ...current, contractId: current.contractId || nextContracts[0]?.id || "" }));
       })
       .catch(() => {
         if (!mounted) return;
@@ -236,30 +184,6 @@ export function ContractsWorkspace({
       mounted = false;
     };
   }, [canManage, loadBusinessProjects, loadParties, loadProjectSites]);
-
-  useEffect(() => {
-    if (!attachmentForm.contractId) {
-      setAttachments([]);
-      setAttachmentStatus("idle");
-      return;
-    }
-
-    let mounted = true;
-    setAttachmentStatus("loading");
-    loadContractAttachments(attachmentForm.contractId)
-      .then((nextAttachments) => {
-        if (!mounted) return;
-        setAttachments(nextAttachments ?? []);
-        setAttachmentStatus("ready");
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setAttachmentStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [attachmentForm.contractId, loadContractAttachments]);
 
   const filteredContracts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -317,7 +241,6 @@ export function ContractsWorkspace({
         remark: contractForm.remark || null,
       });
       setContracts((current) => [created, ...current.filter((contract) => contract.id !== created.id)]);
-      setAttachmentForm((current) => ({ ...current, contractId: created.id }));
       setContractForm({
         contractNo: "",
         contractName: "",
@@ -342,37 +265,6 @@ export function ContractsWorkspace({
     } catch (error) {
       setContractSubmitError(formatApiError(error, "合同保存失败，请检查编号、日期或金额。"));
       setContractSubmitState("error");
-    }
-  }
-
-  async function handleAttachmentSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!attachmentForm.contractId) return;
-    setAttachmentSubmitState("saving");
-    setAttachmentSubmitError("");
-
-    try {
-      const created = await createContractAttachment(attachmentForm.contractId, {
-        fileName: attachmentForm.fileName,
-        filePath: attachmentForm.filePath,
-        fileType: attachmentForm.fileType || null,
-        fileSize: attachmentForm.fileSize ? Number(attachmentForm.fileSize) : null,
-        remark: attachmentForm.remark || null,
-      });
-      setAttachments((current) => [created, ...current.filter((attachment) => attachment.id !== created.id)]);
-      setAttachmentForm((current) => ({
-        ...current,
-        fileName: "",
-        filePath: "",
-        fileType: "",
-        fileSize: "",
-        remark: "",
-      }));
-      setAttachmentSubmitState("saved");
-      setOpenFormDrawer(null);
-    } catch (error) {
-      setAttachmentSubmitError(formatApiError(error, "附件路径保存失败，请检查合同和路径。"));
-      setAttachmentSubmitState("error");
     }
   }
 
@@ -403,7 +295,6 @@ export function ContractsWorkspace({
       {canManage ? (
         <div className="project-site-action-bar" aria-label="合同快捷操作">
           <button type="button" onClick={() => setOpenFormDrawer("contract")}>新增合同</button>
-          <button type="button" onClick={() => setOpenFormDrawer("attachment")}>登记附件路径</button>
         </div>
       ) : null}
 
@@ -547,8 +438,9 @@ export function ContractsWorkspace({
             <input type="number" min="0" step="0.01" value={contractForm.budgetAmount} onChange={(event) => setContractForm((current) => ({ ...current, budgetAmount: event.target.value }))} />
           </label>
           <label>
-            <span>主附件路径</span>
+            <span>主附件引用（历史兼容）</span>
             <input value={contractForm.attachmentRef} onChange={(event) => setContractForm((current) => ({ ...current, attachmentRef: event.target.value }))} />
+            <small className="form-hint">正式附件请在合同详情的“统一附件”中登记；这里仅保留历史兼容引用。</small>
           </label>
           <label>
             <span>备注</span>
@@ -556,60 +448,6 @@ export function ContractsWorkspace({
           </label>
           {contractSubmitState === "saved" ? <p className="form-success">合同已保存。</p> : null}
           {contractSubmitState === "error" ? <p className="form-error">{contractSubmitError || "合同保存失败，请检查编号、日期或金额。"}</p> : null}
-          </form> : null}
-        </FormDrawer>
-      </div>
-
-      <div className="project-site-list-layout">
-        <SectionCard title="附件路径" action={<Paperclip aria-hidden="true" size={17} />}>
-          {attachmentStatus === "idle" ? <StateMessage text="请选择合同查看附件路径" /> : null}
-          {attachmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载附件路径..." /> : null}
-          {attachmentStatus === "error" ? <StateMessage text="附件路径加载失败" /> : null}
-          {attachmentStatus === "ready" && attachments.length === 0 ? <StateMessage text="暂无附件路径" /> : null}
-          {attachmentStatus === "ready" && attachments.length > 0 ? <AttachmentsTable attachments={attachments} /> : null}
-        </SectionCard>
-
-        <FormDrawer title="登记附件路径" open={openFormDrawer === "attachment"} onClose={() => setOpenFormDrawer(null)}>
-          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAttachmentSubmit} noValidate>
-          <div className="panel-header">
-            <h3>登记附件路径</h3>
-            <button type="submit" disabled={attachmentSubmitState === "saving" || contracts.length === 0}>
-              <Link aria-hidden="true" size={15} />
-              保存附件路径
-            </button>
-          </div>
-          <label>
-            <span>选择合同</span>
-            <select value={attachmentForm.contractId} onChange={(event) => setAttachmentForm((current) => ({ ...current, contractId: event.target.value }))}>
-              {contracts.map((contract) => (
-                <option key={contract.id} value={contract.id}>
-                  {contract.contractNo} {contract.contractName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>文件名称</span>
-            <input required value={attachmentForm.fileName} onChange={(event) => setAttachmentForm((current) => ({ ...current, fileName: event.target.value }))} />
-          </label>
-          <label>
-            <span>附件路径</span>
-            <input required value={attachmentForm.filePath} onChange={(event) => setAttachmentForm((current) => ({ ...current, filePath: event.target.value }))} />
-          </label>
-          <label>
-            <span>文件类型</span>
-            <input value={attachmentForm.fileType} onChange={(event) => setAttachmentForm((current) => ({ ...current, fileType: event.target.value }))} />
-          </label>
-          <label>
-            <span>文件大小</span>
-            <input type="number" min="0" value={attachmentForm.fileSize} onChange={(event) => setAttachmentForm((current) => ({ ...current, fileSize: event.target.value }))} />
-          </label>
-          <label>
-            <span>备注</span>
-            <input value={attachmentForm.remark} onChange={(event) => setAttachmentForm((current) => ({ ...current, remark: event.target.value }))} />
-          </label>
-          {attachmentSubmitState === "saved" ? <p className="form-success">附件路径已保存。</p> : null}
-          {attachmentSubmitState === "error" ? <p className="form-error">{attachmentSubmitError || "附件路径保存失败，请检查合同和路径。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>
@@ -623,7 +461,7 @@ export function ContractsWorkspace({
               ownerEntityType="contract"
               ownerEntityId={selectedContract.id}
               canManage={canManage}
-              legacyPaths={[{ label: "主附件路径", value: selectedContract.attachmentRef }]}
+              legacyPaths={[{ label: "主附件引用（历史路径）", value: selectedContract.attachmentRef }]}
               loadAttachments={loadUnifiedAttachments}
               createAttachment={createUnifiedAttachment}
               getAttachmentDownloadUrl={getUnifiedAttachmentDownloadUrl}
@@ -761,37 +599,6 @@ function ContractDetail({ contract }: { contract: ContractDto }) {
       <dt>附件</dt>
       <dd>{contract.attachmentRef ?? "暂无主附件引用"}</dd>
     </dl>
-  );
-}
-
-function AttachmentsTable({ attachments }: { attachments: ContractAttachmentDto[] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>文件名称</th>
-            <th>附件路径</th>
-            <th>类型</th>
-            <th>大小</th>
-            <th>登记人</th>
-            <th>登记时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          {attachments.map((attachment) => (
-            <tr key={attachment.id}>
-              <td>{attachment.fileName}</td>
-              <td>{attachment.filePath}</td>
-              <td>{attachment.fileType ?? "-"}</td>
-              <td>{attachment.fileSize ? `${attachment.fileSize} B` : "-"}</td>
-              <td>{attachment.uploadedBy ?? "-"}</td>
-              <td>{formatDateTime(attachment.uploadedAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
