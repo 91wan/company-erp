@@ -94,6 +94,27 @@ test("admin can reach every headquarters workspace with stable page headers", as
   await expectHealthyShell(page, issues);
 });
 
+test("admin can inspect audit logs and unified attachments in system settings", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  await mockCompanyErpApi(page, { user: adminUser });
+
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "系统设置", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "系统设置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "审计日志" })).toBeVisible();
+  await expect(page.getByText("certificate.create")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "附件管理" })).toBeVisible();
+  await expect(page.getByText("DEMO 合同附件")).toBeVisible();
+  await expect(page.getByText("contracts/demo-contract.pdf")).toBeVisible();
+
+  const downloadRequest = page.waitForRequest(/\/api\/attachments\/fafafafa-fafa-4afa-8afa-fafafafafafa\/download-url$/);
+  await page.getByRole("button", { name: "下载/打开 DEMO 合同附件" }).click();
+  await downloadRequest;
+  await expect(page.getByText("/volume1")).toHaveCount(0);
+  await expectHealthyShell(page, issues);
+});
+
 test("drawers open and close without blocking workspace navigation", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: adminUser });
@@ -191,8 +212,11 @@ test("external project-site accounts render only scoped project-site compliance 
   await page.goto("/");
 
   await expect(page.getByText("site-manager").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "我的项目点" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "现场人员/健康证" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "现场人员/健康证", exact: true })).toBeVisible();
+  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByText("健康证阻断")).toBeVisible();
+  await expect(page.getByRole("button", { name: "处理健康证阻断" })).toBeVisible();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
@@ -210,9 +234,11 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByText("成本")).toHaveCount(0);
   await expect(page.getByText("库存金额")).toHaveCount(0);
   await expect(page.getByText("其他项目点")).toHaveCount(0);
+  await expect(page.getByText("审计日志")).toHaveCount(0);
+  await expect(page.getByText("附件管理")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
 
-  await page.getByRole("button", { name: "现场人员/健康证" }).click();
+  await page.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存证照" })).toBeVisible();
   const ownerTypeSelect = page.getByLabel("归属对象");
