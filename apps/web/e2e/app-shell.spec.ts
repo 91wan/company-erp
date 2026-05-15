@@ -8,6 +8,13 @@ import {
   viewerUser,
 } from "./mockApi";
 
+async function expectWorkspaceHeading(page: import("@playwright/test").Page, navLabel: string, heading: string) {
+  await page.getByRole("button", { name: navLabel, exact: true }).click();
+  await expect(page.locator("h2").filter({ hasText: heading })).toBeVisible();
+  await expect(page.locator("vite-error-overlay")).toHaveCount(0);
+  await expect(page.locator("#root")).not.toBeEmpty();
+}
+
 test("anonymous visitors see the login screen with configured company name", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: null, companyName: "DEMO Company ERP" });
@@ -52,6 +59,70 @@ test("admin can navigate from dashboard cards and sidebar to real workspaces", a
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
 
   await page.getByRole("button", { name: "系统设置" }).click();
+  await expect(page.getByRole("heading", { name: "系统设置" })).toBeVisible();
+  await expectHealthyShell(page, issues);
+});
+
+test("admin can reach every headquarters workspace with stable page headers", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  await mockCompanyErpApi(page, { user: adminUser });
+
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
+  await expect(page.getByText("欢迎回来，Admin")).toHaveCount(0);
+  await expect(page.getByText("Admin!")).toHaveCount(0);
+
+  const workspaces: Array<[string, string]> = [
+    ["采购", "采购管理"],
+    ["库存", "库存管理"],
+    ["项目点", "项目点"],
+    ["业务项目", "业务项目"],
+    ["合同", "合同台账"],
+    ["证照资质", "证照资质"],
+    ["项目点合规", "项目点"],
+    ["人员权限", "人员权限"],
+    ["基础资料", "往来单位"],
+    ["Excel 导入", "Excel 导入"],
+    ["系统设置", "系统设置"],
+  ];
+
+  for (const [navLabel, heading] of workspaces) {
+    await expectWorkspaceHeading(page, navLabel, heading);
+  }
+
+  await expectHealthyShell(page, issues);
+});
+
+test("drawers open and close without blocking workspace navigation", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  await mockCompanyErpApi(page, { user: adminUser });
+
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "采购", exact: true }).click();
+  await page.getByRole("cell", { name: "DEMO-PR-001", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "采购需求详情" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("heading", { name: "采购需求详情" })).toHaveCount(0);
+  await page.getByRole("button", { name: "新增采购需求" }).click();
+  await expect(page.getByRole("button", { name: "保存采购需求" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("button", { name: "保存采购需求" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "库存", exact: true }).click();
+  await page.getByRole("cell", { name: "DEMO-IN-001", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "库存流水详情" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("heading", { name: "库存流水详情" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("cell", { name: "DEMO-HT-001", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "合同详情" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByRole("heading", { name: "合同详情" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "系统设置", exact: true }).click();
   await expect(page.getByRole("heading", { name: "系统设置" })).toBeVisible();
   await expectHealthyShell(page, issues);
 });
@@ -114,7 +185,16 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByRole("button", { name: "保存领用申请" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "总览" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "基础资料" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "采购", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "库存", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "合同", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "人员权限", exact: true })).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);
+  await expect(page.getByText("采购价")).toHaveCount(0);
+  await expect(page.getByText("采购参考价")).toHaveCount(0);
+  await expect(page.getByText("成本")).toHaveCount(0);
+  await expect(page.getByText("库存金额")).toHaveCount(0);
+  await expect(page.getByText("其他项目点")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
 
   await page.getByRole("button", { name: "现场人员/健康证" }).click();
@@ -156,5 +236,42 @@ test("dashboard and tables stay scrollable across browser viewports", async ({ p
   expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(tableMetrics.clientWidth);
   expect(tableMetrics.tableWidth).toBeGreaterThan(0);
   expect(tableMetrics.overflowX).toBe("auto");
+  await expectHealthyShell(page, issues);
+});
+
+test("wide desktop and tablet widths keep the shell and tables usable", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  await mockCompanyErpApi(page, { user: adminUser });
+
+  for (const viewport of [
+    { width: 1920, height: 1080 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
+
+    const shellMetrics = await page.locator(".erp-main").evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      overflow: window.getComputedStyle(element).overflow,
+    }));
+    expect(shellMetrics.clientWidth).toBeGreaterThan(0);
+    expect(shellMetrics.clientHeight).toBeGreaterThan(0);
+
+    await page.getByRole("button", { name: "人员权限", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "人员权限" })).toBeVisible();
+    const tableWrapCount = await page.locator(".table-wrap").count();
+    expect(tableWrapCount).toBeGreaterThan(0);
+    const tableMetrics = await page.locator(".table-wrap").first().evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflowX: window.getComputedStyle(element).overflowX,
+    }));
+    expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(tableMetrics.clientWidth);
+    expect(["auto", "visible"]).toContain(tableMetrics.overflowX);
+    await expect(page.locator("vite-error-overlay")).toHaveCount(0);
+  }
+
   await expectHealthyShell(page, issues);
 });

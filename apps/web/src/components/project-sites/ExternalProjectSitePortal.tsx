@@ -17,7 +17,7 @@ export function ExternalProjectSitePortal({
       <PageHeader
         eyebrow="项目点门户"
         title="我的项目点"
-        subtitle="这里只展示当前绑定项目点的资料提交、物料领用和总部审核状态。项目点账号不能维护总部主数据、查看成本金额或操作其他项目点。"
+        subtitle="这里只展示当前绑定项目点的资料提交、物料领用和总部审核状态。项目点账号不能维护总部主数据、查看内部金额或操作非绑定资料。"
       />
       <div className="portal-summary-grid">
         <SummaryCard label="我的项目点" value={visibleProjectSiteCount} detail="由后台账号绑定" tone="info" />
