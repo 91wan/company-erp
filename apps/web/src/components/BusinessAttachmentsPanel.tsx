@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { AttachmentRecordDto, CreateAttachmentRecordInput } from "@company-erp/shared";
 import {
+  ApiRequestError,
   apiBaseUrl,
   createAttachment as defaultCreateAttachment,
   formatApiError,
@@ -81,8 +82,8 @@ export function BusinessAttachmentsPanel({
       if (!downloadRef.startsWith("/") || downloadRef.startsWith("//")) throw new Error("Unsafe download reference");
       const baseUrl = apiBaseUrl || window.location.origin;
       window.open(new URL(downloadRef, baseUrl).toString(), "_blank", "noopener,noreferrer");
-    } catch {
-      setDownloadError("附件内容不可用，请检查权限或文件是否已登记到服务器。");
+    } catch (error) {
+      setDownloadError(formatAttachmentDownloadError(error));
     }
   }
 
@@ -193,4 +194,14 @@ export function BusinessAttachmentsPanel({
       ) : null}
     </SectionCard>
   );
+}
+
+function formatAttachmentDownloadError(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.errorCode === "ATTACHMENT_NOT_FOUND") return "附件不存在或不在当前权限范围内。";
+    if (error.errorCode === "ATTACHMENT_CONTENT_NOT_FOUND") return "附件内容不存在，请联系管理员重新登记。";
+    if (error.status === 401) return "请登录后再下载附件。";
+    if (error.status === 403) return "无权限下载该附件。";
+  }
+  return "附件内容不可用，请检查权限或文件是否已登记到服务器。";
 }
