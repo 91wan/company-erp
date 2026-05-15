@@ -973,9 +973,10 @@ export function ProjectSitesWorkspace({
         <button type="button" disabled={false}>厨房设备</button>
         <button type="button" aria-current={usageOnly ? "page" : undefined}>领用申请</button>
         {!usageOnly ? <button type="button" disabled={!canIssueUsage}>总部出库</button> : null}
-        <button type="button" disabled>月度经营报表 后续开放</button>
-        {!usageOnly ? <button type="button" disabled>现场库存 后续开放</button> : null}
       </div>
+      {!usageOnly ? (
+        <p className="form-hint">月度经营报表、现场库存尚未开放；当前只展示可办理的项目点台账、领用、厨房设备和总部出库入口。</p>
+      ) : null}
 
       <div className="project-site-action-bar" aria-label="项目点快捷操作">
         {!usageOnly && canEditSites ? <button type="button" onClick={() => setOpenFormDrawer("site")}>新增项目点</button> : null}

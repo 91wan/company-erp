@@ -321,8 +321,9 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("入库登记").length).toBeGreaterThan(0);
     expect(screen.getAllByText("库存流水").length).toBeGreaterThan(0);
     expect(screen.getAllByText("当前库存查询").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "公司内部出库 后续开放" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
+    expect(screen.getByText("公司内部出库暂未开放；项目点领用出库请到项目点模块办理。")).toBeInTheDocument();
     expect(within(screen.getByLabelText("流水类型")).queryByRole("option", { name: "出库" })).not.toBeInTheDocument();
     expect(await screen.findByText("RK20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
@@ -494,6 +495,32 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "提交上报" }));
 
     expect(createChangeRequest).toHaveBeenCalledWith(expect.not.objectContaining({ attachmentPath: expect.anything() }));
+  });
+
+  it("does not render unavailable project-site roadmap items as disabled action buttons", async () => {
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        createProjectSite={() => Promise.resolve(projectSite)}
+        createUsageRequest={() => Promise.resolve(projectUsageRequest)}
+        issueUsageRequest={() => Promise.resolve(projectUsageRequest)}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+        loadKitchenEquipment={() => Promise.resolve([projectSiteKitchenEquipment])}
+        createKitchenEquipment={() => Promise.resolve(projectSiteKitchenEquipment)}
+        loadKitchenEquipmentChangeRequests={() => Promise.resolve([projectSiteKitchenEquipmentChangeRequest])}
+        createKitchenEquipmentChangeRequest={() => Promise.resolve(projectSiteKitchenEquipmentChangeRequest)}
+        reviewKitchenEquipmentChangeRequest={() => Promise.resolve(projectSiteKitchenEquipmentChangeRequest)}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "项目点" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "月度经营报表 后续开放" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "现场库存 后续开放" })).not.toBeInTheDocument();
+    expect(screen.getByText("月度经营报表、现场库存尚未开放；当前只展示可办理的项目点台账、领用、厨房设备和总部出库入口。")).toBeInTheDocument();
   });
 
   it("shows unified business attachment references in project-site details", async () => {

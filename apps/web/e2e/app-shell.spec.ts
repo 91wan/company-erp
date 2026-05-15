@@ -333,7 +333,7 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByText("其他项目点")).toHaveCount(0);
   await expect(page.getByText("审计日志")).toHaveCount(0);
   await expect(page.getByText("附件管理")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
