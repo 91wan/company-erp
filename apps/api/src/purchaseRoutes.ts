@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { BuildAppOptions } from "./appRouteContext.js";
-import { isOutsideProjectSiteScope, scopedProjectSiteIds } from "./appRouteContext.js";
+import { isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog } from "./appRouteContext.js";
 import {
   PurchaseRecordConflictError,
   PurchaseRecordValidationError,
@@ -59,6 +59,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
     try {
       const input = normalizePurchaseRequestInput(request.body, "create");
       const purchaseRequest = await options.purchaseRequestRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "purchase_request.create",
+        entityType: "purchase_request",
+        entityId: purchaseRequest.id,
+        afterJson: purchaseRequest,
+      });
       return reply.status(201).send({ purchaseRequest });
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
@@ -80,8 +86,16 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const input = normalizePurchaseRequestInput(request.body, "update");
+      const before = await options.purchaseRequestRepository.getById(id);
       const purchaseRequest = await options.purchaseRequestRepository.update(id, input);
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "purchase_request.update",
+        entityType: "purchase_request",
+        entityId: purchaseRequest.id,
+        beforeJson: before,
+        afterJson: purchaseRequest,
+      });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
@@ -103,6 +117,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       const { id } = request.params as { id: string };
       const purchaseRequest = await options.purchaseRequestRepository.submit(id, "draft");
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "purchase_request.submit",
+        entityType: "purchase_request",
+        entityId: purchaseRequest.id,
+        afterJson: purchaseRequest,
+      });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestStateConflictError) {
@@ -123,6 +143,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       const input = normalizePurchaseRequestReviewInput(request.body, "approve");
       const purchaseRequest = await options.purchaseRequestRepository.approve(id, "pending_approval", input);
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "purchase_request.approve",
+        entityType: "purchase_request",
+        entityId: purchaseRequest.id,
+        afterJson: purchaseRequest,
+      });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
@@ -146,6 +172,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       const input = normalizePurchaseRequestReviewInput(request.body, "reject");
       const purchaseRequest = await options.purchaseRequestRepository.reject(id, "pending_approval", input);
       if (!purchaseRequest) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "purchase_request.reject",
+        entityType: "purchase_request",
+        entityId: purchaseRequest.id,
+        afterJson: purchaseRequest,
+      });
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
@@ -217,6 +249,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       if (input.purchaseRequestId && options.purchaseRequestRepository) {
         await options.purchaseRequestRepository.markPurchasing(input.purchaseRequestId);
       }
+      await writeAuditLog(request, options, {
+        action: "purchase_record.create",
+        entityType: "purchase_record",
+        entityId: purchaseRecord.id,
+        afterJson: purchaseRecord,
+      });
       return reply.status(201).send({ purchaseRecord });
     } catch (error) {
       if (error instanceof PurchaseRecordValidationError) {
@@ -238,8 +276,16 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const input = normalizePurchaseRecordInput(request.body, "update");
+      const before = await options.purchaseRecordRepository.getById(id);
       const purchaseRecord = await options.purchaseRecordRepository.update(id, input);
       if (!purchaseRecord) return reply.status(404).send({ error: "PURCHASE_RECORD_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "purchase_record.update",
+        entityType: "purchase_record",
+        entityId: purchaseRecord.id,
+        beforeJson: before,
+        afterJson: purchaseRecord,
+      });
       return { purchaseRecord };
     } catch (error) {
       if (error instanceof PurchaseRecordValidationError) {

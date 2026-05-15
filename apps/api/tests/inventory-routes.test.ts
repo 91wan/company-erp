@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AuditLogDto,
   CreateInventoryMovementInput,
   InventoryBalanceDto,
   InventoryMovementDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import type { AuditLogRepository } from "../src/auditLogs";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import {
   InventoryMovementConflictError,
@@ -15,6 +17,32 @@ import { hashPassword } from "../src/password";
 const now = "2026-05-11T12:00:00.000Z";
 const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const unassignedProjectSiteId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: AuditLogDto[] = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log: AuditLogDto = {
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
 
 function makeMovement(overrides: Partial<InventoryMovementDto> = {}): InventoryMovementDto {
   return {
@@ -285,7 +313,8 @@ describe("inventory movements API", () => {
   });
 
   it("creates a positive inbound movement", async () => {
-    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository() });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository(), auditLogRepository });
 
     const response = await app.inject({
       method: "POST",
@@ -302,6 +331,7 @@ describe("inventory movements API", () => {
         purchaseRecordLineId: "44444444-4444-4444-8444-444444444444",
       },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(response.statusCode).toBe(201);
@@ -312,6 +342,11 @@ describe("inventory movements API", () => {
         quantity: 8,
         purchaseRecordLineId: "44444444-4444-4444-8444-444444444444",
       },
+    });
+    expect(logs.at(-1)).toMatchObject({
+      action: "inventory_movement.create",
+      entityType: "inventory_movement",
+      entityId: response.json().inventoryMovement.id,
     });
   });
 

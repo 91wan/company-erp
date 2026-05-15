@@ -263,6 +263,12 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     try {
       const input = normalizeContractAttachmentInput(request.body, "create");
       const contractAttachment = await options.contractRepository.createAttachment(id, input);
+      await writeAuditLog(request, options, {
+        action: "contract_attachment.create",
+        entityType: "contract_attachment",
+        entityId: contractAttachment.id,
+        afterJson: contractAttachment,
+      });
       return reply.status(201).send({ contractAttachment });
     } catch (error) {
       if (error instanceof ContractValidationError) {
@@ -282,6 +288,12 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       const input = normalizeContractAttachmentInput(request.body, "update");
       const contractAttachment = await options.contractRepository.updateAttachment(id, input);
       if (!contractAttachment) return reply.status(404).send({ error: "CONTRACT_ATTACHMENT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "contract_attachment.update",
+        entityType: "contract_attachment",
+        entityId: contractAttachment.id,
+        afterJson: contractAttachment,
+      });
       return { contractAttachment };
     } catch (error) {
       if (error instanceof ContractValidationError) {

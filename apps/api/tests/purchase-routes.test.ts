@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { PurchaseRecordDto, PurchaseRequestDto } from "@company-erp/shared";
+import type { AuditLogDto, PurchaseRecordDto, PurchaseRequestDto } from "@company-erp/shared";
 import { buildApp } from "../src/app";
+import type { AuditLogRepository } from "../src/auditLogs";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
 import { hashPassword } from "../src/password";
 import {
@@ -14,6 +15,32 @@ import {
 const now = "2026-05-11T11:00:00.000Z";
 const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const unassignedProjectSiteId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: AuditLogDto[] = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log: AuditLogDto = {
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
 
 function makePurchaseRequest(overrides: Partial<PurchaseRequestDto> = {}): PurchaseRequestDto {
   return {
@@ -362,7 +389,8 @@ describe("purchase requests API", () => {
 
   it("lists, reads, creates, updates, and reviews purchase requests", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest()]);
-    const app = await buildApp({ purchaseRequestRepository: repository });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ purchaseRequestRepository: repository, auditLogRepository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -396,6 +424,7 @@ describe("purchase requests API", () => {
       url: `/api/purchase-requests/${createResponse.json().purchaseRequest.id}/approve`,
       payload: { reviewedByName: "采购主管", reviewRemark: "同意采购" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(listResponse.json()).toEqual({ purchaseRequests: [makePurchaseRequest()] });
@@ -408,6 +437,16 @@ describe("purchase requests API", () => {
     expect(submitResponse.json()).toMatchObject({ purchaseRequest: { status: "pending_approval" } });
     expect(approveResponse.json()).toMatchObject({
       purchaseRequest: { status: "pending_purchase", reviewedByName: "采购主管", reviewRemark: "同意采购" },
+    });
+    expect(logs.map((log) => log.action)).toEqual([
+      "purchase_request.create",
+      "purchase_request.update",
+      "purchase_request.submit",
+      "purchase_request.approve",
+    ]);
+    expect(logs.at(-1)).toMatchObject({
+      entityType: "purchase_request",
+      entityId: createResponse.json().purchaseRequest.id,
     });
   });
 
@@ -497,7 +536,8 @@ describe("purchase requests API", () => {
 
   it("rejects pending approval purchase requests with a required remark", async () => {
     const repository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_approval" })]);
-    const app = await buildApp({ purchaseRequestRepository: repository });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ purchaseRequestRepository: repository, auditLogRepository });
 
     const missingRemarkResponse = await app.inject({
       method: "POST",
@@ -509,6 +549,7 @@ describe("purchase requests API", () => {
       url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/reject",
       payload: { reviewedByName: "采购主管", reviewRemark: "资料不完整" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(missingRemarkResponse.statusCode).toBe(400);
@@ -518,6 +559,11 @@ describe("purchase requests API", () => {
     });
     expect(rejectResponse.json()).toMatchObject({
       purchaseRequest: { status: "rejected", reviewedByName: "采购主管", reviewRemark: "资料不完整" },
+    });
+    expect(logs.at(-1)).toMatchObject({
+      action: "purchase_request.reject",
+      entityType: "purchase_request",
+      entityId: "11111111-1111-4111-8111-111111111111",
     });
   });
 
@@ -662,7 +708,8 @@ describe("purchase records API", () => {
   it("lists, reads, creates, updates records, and moves linked approved requests to purchasing", async () => {
     const purchaseRequestRepository = createFakePurchaseRequestRepository([makePurchaseRequest({ status: "pending_purchase" })]);
     const purchaseRecordRepository = createFakePurchaseRecordRepository([makePurchaseRecord()]);
-    const app = await buildApp({ purchaseRequestRepository, purchaseRecordRepository });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ purchaseRequestRepository, purchaseRecordRepository, auditLogRepository });
 
     const listResponse = await app.inject({
       method: "GET",
@@ -693,6 +740,7 @@ describe("purchase records API", () => {
       url: `/api/purchase-records/${createResponse.json().purchaseRecord.id}`,
       payload: { status: "ordered" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(listResponse.json()).toEqual({ purchaseRecords: [makePurchaseRecord()] });
@@ -707,6 +755,8 @@ describe("purchase records API", () => {
     });
     expect(requestAfterCreate?.status).toBe("purchasing");
     expect(updateResponse.json()).toMatchObject({ purchaseRecord: { status: "ordered" } });
+    expect(logs.map((log) => log.action)).toEqual(["purchase_record.create", "purchase_record.update"]);
+    expect(logs.at(0)).toMatchObject({ entityType: "purchase_record", entityId: createResponse.json().purchaseRecord.id });
   });
 
   it("blocks purchase records linked to unapproved purchase requests", async () => {
