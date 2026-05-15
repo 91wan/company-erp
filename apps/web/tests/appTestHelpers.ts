@@ -96,6 +96,7 @@ export const defaultAppVersion: AppVersionDto = {
 type MockShellData = {
   auditLogs?: AuditLogDto[];
   attachments?: AttachmentRecordDto[];
+  attachmentDownloadFailures?: string[];
   purchaseRequests?: PurchaseRequestDto[];
   purchaseRecords?: PurchaseRecordDto[];
   inventoryMovements?: InventoryMovementDto[];
@@ -149,6 +150,19 @@ export function mockShellFetch(
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
     if (url.includes("/api/audit-logs")) return Promise.resolve(jsonResponse({ auditLogs: data.auditLogs ?? [] }));
+    if (pathname.match(/^\/api\/attachments\/[^/]+\/download-url$/) && method === "GET") {
+      const attachmentId = pathname.split("/")[3];
+      if (data.attachmentDownloadFailures?.includes(attachmentId)) {
+        return Promise.resolve(jsonResponse({ error: "ATTACHMENT_CONTENT_NOT_FOUND" }, false, 404));
+      }
+      return Promise.resolve(jsonResponse({
+        attachmentDownload: {
+          attachmentId,
+          storageKey: attachmentRecord.storageKey,
+          downloadRef: `/api/attachments/${attachmentId}/content`,
+        },
+      }));
+    }
     if (url.includes("/api/attachments") && method === "POST") {
       const payload = init?.body ? JSON.parse(String(init.body)) : {};
       if (String(payload.storageKey ?? "").startsWith("/") || String(payload.storageKey ?? "").includes("..")) {

@@ -52,7 +52,16 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
-import { apiBaseUrl, createAttachment, getAppVersion, getAttachments, getAuditLogs, requestJson, updateAppConfig } from "../apiClient";
+import {
+  apiBaseUrl,
+  createAttachment,
+  getAppVersion,
+  getAttachmentDownloadUrl,
+  getAttachments,
+  getAuditLogs,
+  requestJson,
+  updateAppConfig,
+} from "../apiClient";
 import {
   DataTable,
   EmptyState,
@@ -1022,6 +1031,8 @@ function SystemSettingsWorkspace({
     remark: "",
   });
   const [attachmentSaveStatus, setAttachmentSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [attachmentDownloadError, setAttachmentDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -1125,6 +1136,22 @@ function SystemSettingsWorkspace({
       setAttachmentSaveStatus("success");
     } catch {
       setAttachmentSaveStatus("error");
+    }
+  }
+
+  async function handleAttachmentDownload(attachment: AttachmentRecordDto) {
+    setDownloadingAttachmentId(attachment.id);
+    setAttachmentDownloadError(null);
+    try {
+      const downloadRef = await getAttachmentDownloadUrl(attachment.id);
+      if (!downloadRef.startsWith("/") || downloadRef.startsWith("//")) {
+        throw new Error("Unsafe attachment download reference");
+      }
+      window.open(new URL(downloadRef, apiBaseUrl).toString(), "_blank", "noopener,noreferrer");
+    } catch {
+      setAttachmentDownloadError("附件内容不可用，请检查权限或文件是否已登记到服务器。");
+    } finally {
+      setDownloadingAttachmentId(null);
     }
   }
 
@@ -1315,6 +1342,7 @@ function SystemSettingsWorkspace({
           {attachmentStatus === "success" && attachments.length === 0 ? <p className="form-hint">暂无附件元数据。</p> : null}
           {attachmentStatus === "success" && attachments.length > 0 ? (
             <div className="table-scroll">
+              {attachmentDownloadError ? <p className="form-error">{attachmentDownloadError}</p> : null}
               <table>
                 <thead>
                   <tr>
@@ -1323,6 +1351,7 @@ function SystemSettingsWorkspace({
                     <th>Storage Key</th>
                     <th>归属</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1335,6 +1364,17 @@ function SystemSettingsWorkspace({
                         {attachment.ownerModule}/{attachment.ownerEntityType}
                       </td>
                       <td>{attachment.status === "active" ? "启用" : "停用"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="inline-action"
+                          onClick={() => void handleAttachmentDownload(attachment)}
+                          disabled={downloadingAttachmentId === attachment.id}
+                          aria-label={`下载/打开 ${attachment.displayName}`}
+                        >
+                          {downloadingAttachmentId === attachment.id ? "获取中" : "下载/打开"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

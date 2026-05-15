@@ -174,6 +174,7 @@ describe("Company ERP app shell", () => {
   });
 
   it("shows and creates attachment metadata from system settings for attachment managers", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     mockShellFetch(adminUser, { companyName: "Company ERP" }, defaultAppVersion, {
       attachments: [attachmentRecord],
     });
@@ -184,6 +185,14 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByRole("heading", { name: "附件管理" })).toBeInTheDocument();
     expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        "http://localhost:3001/api/attachments/cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd/content",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
 
     fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-002" } });
     fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "DEMO 证照附件" } });
@@ -194,6 +203,22 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("附件引用已登记。")).toBeInTheDocument();
     expect(screen.getByText("certificates/demo-certificate.jpg")).toBeInTheDocument();
+  });
+
+  it("shows a clear attachment content error when download metadata cannot be resolved", async () => {
+    mockShellFetch(adminUser, { companyName: "Company ERP" }, defaultAppVersion, {
+      attachments: [attachmentRecord],
+      attachmentDownloadFailures: [attachmentRecord.id],
+    });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^系统设置$/ }));
+    expect(await screen.findByRole("heading", { name: "附件管理" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+
+    expect(await screen.findByText("附件内容不可用，请检查权限或文件是否已登记到服务器。")).toBeInTheDocument();
   });
 
   it("shows attachment format failures and hides attachment metadata from viewers", async () => {
