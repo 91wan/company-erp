@@ -236,7 +236,6 @@ export function ContractsWorkspace({
         endDate: contractForm.endDate || null,
         amount: contractForm.amount ? Number(contractForm.amount) : null,
         budgetAmount: contractForm.budgetAmount ? Number(contractForm.budgetAmount) : null,
-        attachmentRef: contractForm.attachmentRef || null,
         status: contractForm.status,
         remark: contractForm.remark || null,
       });
@@ -437,11 +436,7 @@ export function ContractsWorkspace({
             <span>预算金额</span>
             <input type="number" min="0" step="0.01" value={contractForm.budgetAmount} onChange={(event) => setContractForm((current) => ({ ...current, budgetAmount: event.target.value }))} />
           </label>
-          <label>
-            <span>主附件引用（历史兼容）</span>
-            <input value={contractForm.attachmentRef} onChange={(event) => setContractForm((current) => ({ ...current, attachmentRef: event.target.value }))} />
-            <small className="form-hint">正式附件请在合同详情的“统一附件”中登记；这里仅保留历史兼容引用。</small>
-          </label>
+          <p className="form-hint">正式附件请在合同保存后进入详情的“统一附件”登记；历史主附件引用仅在详情中只读展示。</p>
           <label>
             <span>备注</span>
             <input value={contractForm.remark} onChange={(event) => setContractForm((current) => ({ ...current, remark: event.target.value }))} />
