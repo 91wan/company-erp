@@ -123,7 +123,6 @@ type KitchenEquipmentFormState = {
   companyAssetTag: string;
   sourceContractId: string;
   lastCheckedDate: string;
-  attachmentPath: string;
   remark: string;
 };
 
@@ -135,7 +134,6 @@ type KitchenEquipmentChangeFormState = {
   proposedQuantity: string;
   proposedLocation: string;
   proposedStatus: "" | ProjectSiteKitchenEquipmentStatusCode;
-  attachmentPath: string;
   description: string;
 };
 
@@ -420,7 +418,6 @@ export function ProjectSitesWorkspace({
     companyAssetTag: "",
     sourceContractId: "",
     lastCheckedDate: "",
-    attachmentPath: "",
     remark: "",
   });
   const [kitchenEquipmentChangeForm, setKitchenEquipmentChangeForm] = useState<KitchenEquipmentChangeFormState>({
@@ -431,7 +428,6 @@ export function ProjectSitesWorkspace({
     proposedQuantity: "",
     proposedLocation: "",
     proposedStatus: "",
-    attachmentPath: "",
     description: "",
   });
 
@@ -873,7 +869,6 @@ export function ProjectSitesWorkspace({
         companyAssetTag: "",
         sourceContractId: "",
         lastCheckedDate: "",
-        attachmentPath: "",
         remark: "",
       }));
       setKitchenEquipmentSubmitState("idle");
@@ -906,7 +901,6 @@ export function ProjectSitesWorkspace({
         proposedQuantity: "",
         proposedLocation: "",
         proposedStatus: "",
-        attachmentPath: "",
         description: "",
       }));
       setKitchenEquipmentChangeSubmitState("idle");
