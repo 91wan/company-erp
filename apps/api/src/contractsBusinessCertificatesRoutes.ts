@@ -114,6 +114,12 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     try {
       const input = normalizeBusinessProjectInput(request.body, "create");
       const businessProject = await options.businessProjectRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "business_project.create",
+        entityType: "business_project",
+        entityId: businessProject.id,
+        afterJson: businessProject,
+      });
       return reply.status(201).send({ businessProject });
     } catch (error) {
       if (error instanceof BusinessProjectValidationError) {
@@ -134,8 +140,16 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
     const { id } = request.params as { id: string };
     try {
       const input = normalizeBusinessProjectInput(request.body, "update");
+      const before = await options.businessProjectRepository.getById(id);
       const businessProject = await options.businessProjectRepository.update(id, input);
       if (!businessProject) return reply.status(404).send({ error: "BUSINESS_PROJECT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "business_project.update",
+        entityType: "business_project",
+        entityId: businessProject.id,
+        beforeJson: before,
+        afterJson: businessProject,
+      });
       return { businessProject };
     } catch (error) {
       if (error instanceof BusinessProjectValidationError) {

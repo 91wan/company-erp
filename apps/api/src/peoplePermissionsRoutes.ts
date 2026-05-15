@@ -39,6 +39,12 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const input = normalizeDepartmentInput(request.body, "create");
       const department = await options.departmentRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "department.create",
+        entityType: "department",
+        entityId: department.id,
+        afterJson: department,
+      });
       return reply.status(201).send({ department });
     } catch (error) {
       if (error instanceof DepartmentValidationError) {
@@ -59,8 +65,16 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     const { id } = request.params as { id: string };
     try {
       const input = normalizeDepartmentInput(request.body, "update");
+      const before = await options.departmentRepository.getById(id);
       const department = await options.departmentRepository.update(id, input);
       if (!department) return reply.status(404).send({ error: "DEPARTMENT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "department.update",
+        entityType: "department",
+        entityId: department.id,
+        beforeJson: before,
+        afterJson: department,
+      });
       return { department };
     } catch (error) {
       if (error instanceof DepartmentValidationError) {
@@ -109,6 +123,12 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const input = normalizeEmployeeInput(request.body, "create");
       const employee = await options.employeeRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "employee.create",
+        entityType: "employee",
+        entityId: employee.id,
+        afterJson: employee,
+      });
       return reply.status(201).send({ employee });
     } catch (error) {
       if (error instanceof EmployeeValidationError) {
@@ -129,8 +149,16 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     const { id } = request.params as { id: string };
     try {
       const input = normalizeEmployeeInput(request.body, "update");
+      const before = await options.employeeRepository.getById(id);
       const employee = await options.employeeRepository.update(id, input);
       if (!employee) return reply.status(404).send({ error: "EMPLOYEE_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "employee.update",
+        entityType: "employee",
+        entityId: employee.id,
+        beforeJson: before,
+        afterJson: employee,
+      });
       return { employee };
     } catch (error) {
       if (error instanceof EmployeeValidationError) {
@@ -207,6 +235,12 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const input = normalizeProjectSiteAssignmentInput(request.body, "create");
       const projectSiteAssignment = await options.projectSiteAssignmentRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "project_site_assignment.create",
+        entityType: "project_site_assignment",
+        entityId: projectSiteAssignment.id,
+        afterJson: projectSiteAssignment,
+      });
       return reply.status(201).send({ projectSiteAssignment });
     } catch (error) {
       if (error instanceof EmployeeProjectSiteAssignmentValidationError) {
@@ -227,8 +261,16 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     const { id } = request.params as { id: string };
     try {
       const input = normalizeProjectSiteAssignmentInput(request.body, "update");
+      const before = await options.projectSiteAssignmentRepository.getById(id);
       const projectSiteAssignment = await options.projectSiteAssignmentRepository.update(id, input);
       if (!projectSiteAssignment) return reply.status(404).send({ error: "PROJECT_SITE_ASSIGNMENT_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "project_site_assignment.update",
+        entityType: "project_site_assignment",
+        entityId: projectSiteAssignment.id,
+        beforeJson: before,
+        afterJson: projectSiteAssignment,
+      });
       return { projectSiteAssignment };
     } catch (error) {
       if (error instanceof EmployeeProjectSiteAssignmentValidationError) {

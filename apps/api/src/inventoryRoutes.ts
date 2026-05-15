@@ -112,12 +112,22 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
     }
   });
 
-  app.post("/api/replenishment-suggestions/generate", async (_request, reply) => {
+  app.post("/api/replenishment-suggestions/generate", async (request, reply) => {
     if (!options.replenishmentSuggestionRepository) {
       return reply.status(503).send({ error: "REPLENISHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
 
     const result = await options.replenishmentSuggestionRepository.generate();
+    await writeAuditLog(request, options, {
+      action: "replenishment_suggestion.generate",
+      entityType: "replenishment_suggestion",
+      entityId: null,
+      afterJson: {
+        createdCount: result.created.length,
+        existingOpenCount: result.existingOpen.length,
+        skippedCount: result.skipped,
+      },
+    });
     return reply.status(result.created.length > 0 ? 201 : 200).send({ result });
   });
 
@@ -131,6 +141,12 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
       const input = normalizeUpdateReplenishmentSuggestionInput(request.body);
       const replenishmentSuggestion = await options.replenishmentSuggestionRepository.update(id, input);
       if (!replenishmentSuggestion) return reply.status(404).send({ error: "REPLENISHMENT_SUGGESTION_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "replenishment_suggestion.update",
+        entityType: "replenishment_suggestion",
+        entityId: replenishmentSuggestion.id,
+        afterJson: replenishmentSuggestion,
+      });
       return { replenishmentSuggestion };
     } catch (error) {
       if (error instanceof ReplenishmentSuggestionValidationError) {
@@ -150,6 +166,15 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
       const input = normalizeConvertReplenishmentSuggestionInput(request.body);
       const result = await options.replenishmentSuggestionRepository.convertToPurchaseRequest(id, input);
       if (!result) return reply.status(404).send({ error: "REPLENISHMENT_SUGGESTION_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "replenishment_suggestion.convert_to_purchase_request",
+        entityType: "replenishment_suggestion",
+        entityId: result.suggestion.id,
+        afterJson: {
+          replenishmentSuggestion: result.suggestion,
+          purchaseRequest: result.purchaseRequest,
+        },
+      });
       return reply.status(201).send({
         replenishmentSuggestion: result.suggestion,
         purchaseRequest: result.purchaseRequest,

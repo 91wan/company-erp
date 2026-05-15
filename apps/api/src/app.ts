@@ -222,7 +222,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   }
 
   registerAuth(app, options.authRepository, options.auth);
-  registerAppCoreRoutes(app, { appConfigRepository: options.appConfigRepository });
+  registerAppCoreRoutes(app, options);
   registerAuditLogRoutes(app, options);
   registerAttachmentRoutes(app, options);
   registerImportJobRoutes(app, options);

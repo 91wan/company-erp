@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
+import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { MarketOperationsHandoffConflictError, MarketOperationsHandoffValidationError, normalizeMarketOperationsHandoffFilters, normalizeMarketOperationsHandoffInput } from "./marketOperationsHandoffs.js";
 
 export function registerMarketOperationsRoutes(app: FastifyInstance, options: BuildAppOptions) {
@@ -39,6 +39,12 @@ export function registerMarketOperationsRoutes(app: FastifyInstance, options: Bu
     try {
       const input = normalizeMarketOperationsHandoffInput(request.body, "create");
       const marketOperationsHandoff = await options.marketOperationsHandoffRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "market_operations_handoff.create",
+        entityType: "market_operations_handoff",
+        entityId: marketOperationsHandoff.id,
+        afterJson: marketOperationsHandoff,
+      });
       return reply.status(201).send({ marketOperationsHandoff });
     } catch (error) {
       if (error instanceof MarketOperationsHandoffValidationError) {
@@ -59,8 +65,16 @@ export function registerMarketOperationsRoutes(app: FastifyInstance, options: Bu
     const { id } = request.params as { id: string };
     try {
       const input = normalizeMarketOperationsHandoffInput(request.body, "update");
+      const before = await options.marketOperationsHandoffRepository.getById(id);
       const marketOperationsHandoff = await options.marketOperationsHandoffRepository.update(id, input);
       if (!marketOperationsHandoff) return reply.status(404).send({ error: "MARKET_OPERATIONS_HANDOFF_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "market_operations_handoff.update",
+        entityType: "market_operations_handoff",
+        entityId: marketOperationsHandoff.id,
+        beforeJson: before,
+        afterJson: marketOperationsHandoff,
+      });
       return { marketOperationsHandoff };
     } catch (error) {
       if (error instanceof MarketOperationsHandoffValidationError) {

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
+import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ImportJobValidationError, normalizeImportJobFilters, normalizeImportTemplateType } from "./importJobs.js";
 
 export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppOptions) {
@@ -83,6 +83,20 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
     try {
       const importJob = await options.importJobRepository.confirm(id);
       if (!importJob) return reply.status(404).send({ error: "IMPORT_JOB_NOT_FOUND" });
+      await writeAuditLog(request, options, {
+        action: "import_job.confirm",
+        entityType: "import_job",
+        entityId: importJob.id,
+        afterJson: {
+          id: importJob.id,
+          templateType: importJob.templateType,
+          status: importJob.status,
+          totalRows: importJob.totalRows,
+          validRows: importJob.validRows,
+          errorRows: importJob.errorRows,
+          skippedRows: importJob.skippedRows,
+        },
+      });
       return { importJob };
     } catch (error) {
       if (error instanceof ImportJobValidationError) {
