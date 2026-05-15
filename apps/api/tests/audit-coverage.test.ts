@@ -18,8 +18,12 @@ const auditedMutationRoutes = [
   ["peoplePermissionsRoutes.ts", "patch", "/api/employees/:id"],
   ["peoplePermissionsRoutes.ts", "post", "/api/project-site-assignments"],
   ["peoplePermissionsRoutes.ts", "patch", "/api/project-site-assignments/:id"],
+  ["attachmentRoutes.ts", "post", "/api/attachments"],
+  ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "post", "/api/business-projects"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/business-projects/:id"],
+  ["contractsBusinessCertificatesRoutes.ts", "post", "/api/contracts/:id/attachments"],
+  ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
   ["marketOperationsRoutes.ts", "post", "/api/market-operations-handoffs"],
   ["marketOperationsRoutes.ts", "patch", "/api/market-operations-handoffs/:id"],
   ["inventoryRoutes.ts", "post", "/api/replenishment-suggestions/generate"],
@@ -27,6 +31,13 @@ const auditedMutationRoutes = [
   ["inventoryRoutes.ts", "post", "/api/replenishment-suggestions/:id/convert-to-purchase-request"],
   ["importJobRoutes.ts", "post", "/api/import-jobs/:id/confirm"],
 ] as const;
+
+const requiredAttachmentAuditRoutes: ReadonlyArray<(typeof auditedMutationRoutes)[number]> = [
+  ["attachmentRoutes.ts", "post", "/api/attachments"],
+  ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
+  ["contractsBusinessCertificatesRoutes.ts", "post", "/api/contracts/:id/attachments"],
+  ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
+];
 
 function routeHandlerSource(fileName: string, method: string, path: string): string {
   const source = readFileSync(resolve(routeRoot, fileName), "utf8");
@@ -38,6 +49,10 @@ function routeHandlerSource(fileName: string, method: string, path: string): str
 }
 
 describe("audit log mutation coverage", () => {
+  it.each(requiredAttachmentAuditRoutes)("%s %s %s stays in the audit coverage gate", (fileName, method, path) => {
+    expect(auditedMutationRoutes).toContainEqual([fileName, method, path]);
+  });
+
   it.each(auditedMutationRoutes)("%s %s %s writes an audit log", (fileName, method, path) => {
     expect(routeHandlerSource(fileName, method, path)).toContain("writeAuditLog(");
   });

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { expectHealthyShell, trackBrowserIssues } from "./browserAssertions";
 import {
   adminUser,
+  createMockCompanyErpApi,
   externalProjectSiteUser,
   mockCompanyErpApi,
   projectSiteUser,
@@ -112,6 +113,42 @@ test("admin can inspect audit logs and unified attachments in system settings", 
   await page.getByRole("button", { name: "下载/打开 DEMO 合同附件" }).click();
   await downloadRequest;
   await expect(page.getByText("/volume1")).toHaveCount(0);
+  await expectHealthyShell(page, issues);
+});
+
+test("business contract details use unified attachments instead of legacy contract attachment paths", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const requestedUrls: string[] = [];
+  page.on("request", (request) => {
+    requestedUrls.push(request.url());
+  });
+  await createMockCompanyErpApi(page, { user: adminUser });
+
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("cell", { name: "DEMO-HT-001", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "合同详情" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "登记附件路径" })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      requestedUrls.some((url) => {
+        const parsed = new URL(url);
+        return (
+          parsed.pathname === "/api/attachments" &&
+          parsed.searchParams.get("ownerModule") === "contracts" &&
+          parsed.searchParams.get("ownerEntityType") === "contract"
+        );
+      }),
+    )
+    .toBe(true);
+  expect(
+    requestedUrls.some((url) => {
+      const parsed = new URL(url);
+      return /^\/api\/contracts\/[^/]+\/attachments$/.test(parsed.pathname);
+    }),
+  ).toBe(false);
   await expectHealthyShell(page, issues);
 });
 
