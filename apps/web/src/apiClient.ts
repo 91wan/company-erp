@@ -64,6 +64,13 @@ export async function getAttachments(): Promise<AttachmentRecordDto[]> {
   return payload.attachments;
 }
 
+export async function getAttachmentDownloadUrl(id: string): Promise<string> {
+  const payload = await requestJson<{ attachmentDownload: { downloadRef: string } }>(
+    `${apiBaseUrl}/api/attachments/${id}/download-url`,
+  );
+  return payload.attachmentDownload.downloadRef;
+}
+
 export async function createAttachment(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto> {
   const payload = await requestJson<{ attachment: AttachmentRecordDto }>(`${apiBaseUrl}/api/attachments`, {
     method: "POST",

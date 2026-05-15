@@ -1897,6 +1897,7 @@ tbody tr.clickable-row {
 }
 
 .inline-actions button,
+.inline-action,
 .table-wrap td > button {
   display: inline-flex;
   align-items: center;
@@ -1913,6 +1914,7 @@ tbody tr.clickable-row {
 }
 
 .inline-actions button:disabled,
+.inline-action:disabled,
 .table-wrap td > button:disabled {
   opacity: 0.55;
 }
