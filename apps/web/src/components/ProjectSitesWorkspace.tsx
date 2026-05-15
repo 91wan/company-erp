@@ -72,6 +72,7 @@ type ProjectSitesWorkspaceProps = {
   canIssue?: boolean;
   usageOnly?: boolean;
   portalSection?: ExternalProjectSitePortalSection;
+  onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
 };
 
 type UsageWarehouseOption = {
@@ -334,6 +335,7 @@ export function ProjectSitesWorkspace({
   canIssue,
   usageOnly = false,
   portalSection = "overview",
+  onPortalSectionChange,
 }: ProjectSitesWorkspaceProps) {
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
@@ -940,6 +942,7 @@ export function ProjectSitesWorkspace({
           pendingUsageCount={pendingUsageCount}
           equipmentCount={filteredKitchenEquipment.length}
           pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+          onSelectSection={onPortalSectionChange}
         />
       ) : (
         <PageHeader

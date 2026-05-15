@@ -161,6 +161,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canIssue={canManage(currentUser.roles, "inventory")}
               usageOnly={isExternalProjectSite}
               portalSection={activePortalSection}
+              onPortalSectionChange={setActivePortalSection}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}

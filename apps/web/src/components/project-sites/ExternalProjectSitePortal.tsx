@@ -1,6 +1,7 @@
 import { ClipboardCheck, FileText, ShieldCheck, Users } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { PageHeader, SummaryCard, ComplianceChecklist } from "../ui";
+import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
 import { StatusBadge } from "./projectSiteUi";
 
@@ -41,6 +42,7 @@ export function ExternalProjectSitePortal({
   pendingUsageCount,
   equipmentCount,
   pendingEquipmentChangeCount,
+  onSelectSection,
 }: {
   section?: ExternalProjectSitePortalSection;
   sites: ProjectSiteDto[];
@@ -49,6 +51,7 @@ export function ExternalProjectSitePortal({
   pendingUsageCount: number;
   equipmentCount: number;
   pendingEquipmentChangeCount: number;
+  onSelectSection?: (section: ExternalProjectSitePortalSection) => void;
 }) {
   const activeCopy = sectionCopy[section];
   const primarySite = sites[0] ?? null;
@@ -99,6 +102,14 @@ export function ExternalProjectSitePortal({
         )}
         {pendingUsageCount === 0 ? <p className="form-helper">暂无可见领用申请。</p> : null}
       </section>
+
+      {primarySite ? (
+        <ProjectSiteComplianceActionQueue
+          site={primarySite}
+          summary={primarySummary}
+          onSelectSection={onSelectSection}
+        />
+      ) : null}
 
       <ComplianceChecklist
         items={[
