@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { BuildAppOptions } from "./appRouteContext.js";
-import { redactPartyForResponse } from "./appRouteContext.js";
+import { redactPartyForResponse, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { MaterialConflictError, MaterialValidationError, WarehouseConflictError, WarehouseValidationError, normalizeMaterialFilters, normalizeMaterialInput, normalizeWarehouseFilters, normalizeWarehouseInput } from "./materialsWarehouses.js";
 import { PartyConflictError, PartyValidationError, normalizePartyFilters, normalizePartyInput } from "./parties.js";
 
@@ -48,6 +47,12 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
     try {
       const input = normalizePartyInput(request.body, "create");
       const party = await options.partyRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "party.create",
+        entityType: "party",
+        entityId: party.id,
+        afterJson: party,
+      });
       return reply.status(201).send({ party: redactPartyForResponse(party as unknown as Record<string, unknown>) });
     } catch (error) {
       if (error instanceof PartyValidationError) {
@@ -77,12 +82,20 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
 
     try {
       const input = normalizePartyInput(request.body, "update");
+      const before = await options.partyRepository.getById(id);
       const party = await options.partyRepository.update(id, input);
 
       if (!party) {
         return reply.status(404).send({ error: "PARTY_NOT_FOUND" });
       }
 
+      await writeAuditLog(request, options, {
+        action: "party.update",
+        entityType: "party",
+        entityId: party.id,
+        beforeJson: before,
+        afterJson: party,
+      });
       return { party: redactPartyForResponse(party as unknown as Record<string, unknown>) };
     } catch (error) {
       if (error instanceof PartyValidationError) {
@@ -143,6 +156,12 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
     try {
       const input = normalizeMaterialInput(request.body, "create");
       const material = await options.materialRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "material.create",
+        entityType: "material",
+        entityId: material.id,
+        afterJson: material,
+      });
       return reply.status(201).send({ material });
     } catch (error) {
       if (error instanceof MaterialValidationError) {
@@ -164,13 +183,13 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
 
     try {
       const input = normalizeMaterialInput(request.body, "update");
+      const before = await options.materialRepository.getById(id);
+      if (!before) return reply.status(404).send({ error: "MATERIAL_NOT_FOUND" });
       if (input.purchaseReferencePrice !== undefined || input.projectSiteSalePrice !== undefined) {
-        const current = await options.materialRepository.getById(id);
-        if (!current) return reply.status(404).send({ error: "MATERIAL_NOT_FOUND" });
         const purchaseReferencePrice =
-          input.purchaseReferencePrice !== undefined ? input.purchaseReferencePrice : current.purchaseReferencePrice;
+          input.purchaseReferencePrice !== undefined ? input.purchaseReferencePrice : before.purchaseReferencePrice;
         const projectSiteSalePrice =
-          input.projectSiteSalePrice !== undefined ? input.projectSiteSalePrice : current.projectSiteSalePrice;
+          input.projectSiteSalePrice !== undefined ? input.projectSiteSalePrice : before.projectSiteSalePrice;
         if (
           typeof purchaseReferencePrice === "number" &&
           typeof projectSiteSalePrice === "number" &&
@@ -187,6 +206,13 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
         return reply.status(404).send({ error: "MATERIAL_NOT_FOUND" });
       }
 
+      await writeAuditLog(request, options, {
+        action: "material.update",
+        entityType: "material",
+        entityId: material.id,
+        beforeJson: before,
+        afterJson: material,
+      });
       return { material };
     } catch (error) {
       if (error instanceof MaterialValidationError) {
@@ -239,6 +265,12 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
     try {
       const input = normalizeWarehouseInput(request.body, "create");
       const warehouse = await options.warehouseRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "warehouse.create",
+        entityType: "warehouse",
+        entityId: warehouse.id,
+        afterJson: warehouse,
+      });
       return reply.status(201).send({ warehouse });
     } catch (error) {
       if (error instanceof WarehouseValidationError) {
@@ -260,12 +292,20 @@ export function registerMasterDataRoutes(app: FastifyInstance, options: BuildApp
 
     try {
       const input = normalizeWarehouseInput(request.body, "update");
+      const before = await options.warehouseRepository.getById(id);
       const warehouse = await options.warehouseRepository.update(id, input);
 
       if (!warehouse) {
         return reply.status(404).send({ error: "WAREHOUSE_NOT_FOUND" });
       }
 
+      await writeAuditLog(request, options, {
+        action: "warehouse.update",
+        entityType: "warehouse",
+        entityId: warehouse.id,
+        beforeJson: before,
+        afterJson: warehouse,
+      });
       return { warehouse };
     } catch (error) {
       if (error instanceof WarehouseValidationError) {

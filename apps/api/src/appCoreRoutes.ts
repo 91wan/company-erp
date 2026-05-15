@@ -10,15 +10,11 @@ import {
   AppConfigValidationError,
   createMemoryAppConfigRepository,
   normalizeAppConfigInput,
-  type AppConfigRepository,
 } from "./appConfig.js";
+import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { getAppVersion } from "./appVersion.js";
 
-type AppCoreRoutesOptions = {
-  appConfigRepository?: AppConfigRepository;
-};
-
-export function registerAppCoreRoutes(app: FastifyInstance, options: AppCoreRoutesOptions = {}) {
+export function registerAppCoreRoutes(app: FastifyInstance, options: BuildAppOptions = {}) {
   const appConfigRepository = options.appConfigRepository ?? createMemoryAppConfigRepository();
 
   app.get("/health", async () => ({
@@ -59,7 +55,15 @@ export function registerAppCoreRoutes(app: FastifyInstance, options: AppCoreRout
   app.patch("/api/app-config", async (request, reply) => {
     try {
       const input = normalizeAppConfigInput(request.body);
+      const before = await appConfigRepository.get();
       const appConfig = await appConfigRepository.update(input);
+      await writeAuditLog(request, options, {
+        action: "app_config.update",
+        entityType: "app_config",
+        entityId: "system",
+        beforeJson: before,
+        afterJson: appConfig,
+      });
       return { appConfig };
     } catch (error) {
       if (error instanceof AppConfigValidationError) {

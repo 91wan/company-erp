@@ -229,4 +229,31 @@ describe("audit logs API", () => {
     expect(failed.statusCode).toBe(500);
     expect(failed.json()).toEqual({ error: "AUDIT_LOG_WRITE_FAILED" });
   });
+
+  it("fails closed when app config audit logging is unavailable", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      auditLogRepository: {
+        async list() {
+          return [];
+        },
+        async create() {
+          throw new Error("audit unavailable");
+        },
+      },
+    });
+    const cookie = await loginCookie(app);
+    const failed = await app.inject({
+      method: "PATCH",
+      url: "/api/app-config",
+      cookies: { company_erp_session: cookie },
+      payload: { companyName: "Company ERP Demo" },
+    });
+    await app.close();
+
+    expect(failed.statusCode).toBe(500);
+    expect(failed.json()).toEqual({ error: "AUDIT_LOG_WRITE_FAILED" });
+  });
 });
