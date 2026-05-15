@@ -5,6 +5,7 @@ import {
   CERTIFICATE_OWNER_TYPES,
   CERTIFICATE_TYPES,
   CERTIFICATE_VALIDITY_TYPES,
+  type AttachmentRecordDto,
   type CertificateComputedStatusCode,
   type CertificateOwnerTypeCode,
   type CertificateRecordDto,
@@ -16,7 +17,8 @@ import {
   type ProjectSiteDto,
   type ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
+import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
+import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import {
   DataTable,
   DetailDrawer,
@@ -36,6 +38,7 @@ type CertificatesWorkspaceProps = {
   loadRosterPeople?: () => Promise<ProjectSiteRosterPersonDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadParties?: () => Promise<PartyDto[]>;
+  loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   canManage?: boolean;
   allowedOwnerTypes?: readonly CertificateOwnerTypeCode[];
   allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
@@ -152,6 +155,7 @@ export function CertificatesWorkspace({
   loadRosterPeople = defaultLoadRosterPeople,
   loadProjectSites = defaultLoadProjectSites,
   loadParties = defaultLoadParties,
+  loadUnifiedAttachments = getAttachments,
   canManage = true,
   allowedOwnerTypes,
   allowedPersonOwnerSources,
@@ -597,20 +601,35 @@ export function CertificatesWorkspace({
         onClose={() => setSelectedCertificateId("")}
       >
         {selectedCertificate ? (
-          <dl className="detail-list">
-            <dt>归属对象</dt>
-            <dd>{ownerLabel.get(selectedCertificate.ownerType)} / {selectedCertificate.ownerNameSnapshot}</dd>
-            <dt>适用项目点</dt>
-            <dd>{selectedCertificate.ownerProjectSiteName ?? rosterProjectSiteName(selectedCertificate, rosterPeople) ?? "待后端支持"}</dd>
-            <dt>到期/复核</dt>
-            <dd>{selectedCertificate.expiryDate ?? selectedCertificate.nextReviewDate ?? "-"}</dd>
-            <dt>人员匹配</dt>
-            <dd>{healthMatchLabel(selectedCertificate)}</dd>
-            <dt>附件引用</dt>
-            <dd>{selectedCertificate.attachmentPath ?? "暂无附件引用"}</dd>
-            <dt>审核状态</dt>
-            <dd>{selectedCertificate.confirmedAt ? `已确认：${selectedCertificate.confirmedByEmployeeName ?? "-"}` : "待审核"}</dd>
-          </dl>
+          <>
+            <dl className="detail-list">
+              <dt>归属对象</dt>
+              <dd>{ownerLabel.get(selectedCertificate.ownerType)} / {selectedCertificate.ownerNameSnapshot}</dd>
+              <dt>适用项目点</dt>
+              <dd>{selectedCertificate.ownerProjectSiteName ?? rosterProjectSiteName(selectedCertificate, rosterPeople) ?? "待后端支持"}</dd>
+              <dt>到期/复核</dt>
+              <dd>{selectedCertificate.expiryDate ?? selectedCertificate.nextReviewDate ?? "-"}</dd>
+              <dt>人员匹配</dt>
+              <dd>{healthMatchLabel(selectedCertificate)}</dd>
+              <dt>附件引用</dt>
+              <dd>{selectedCertificate.attachmentPath ?? "暂无附件引用"}</dd>
+              <dt>审核状态</dt>
+              <dd>{selectedCertificate.confirmedAt ? `已确认：${selectedCertificate.confirmedByEmployeeName ?? "-"}` : "待审核"}</dd>
+            </dl>
+            <BusinessAttachmentsPanel
+              ownerModule="certificates"
+              ownerEntityType="certificate"
+              ownerEntityId={selectedCertificate.id}
+              canManage={canManage}
+              legacyPaths={[
+                { label: "附件路径", value: selectedCertificate.attachmentPath },
+                { label: "来源文件路径", value: selectedCertificate.sourceFilePath },
+              ]}
+              loadAttachments={loadUnifiedAttachments}
+              createAttachment={createAttachment}
+              getAttachmentDownloadUrl={getAttachmentDownloadUrl}
+            />
+          </>
         ) : null}
       </DetailDrawer>
     </section>

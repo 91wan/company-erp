@@ -1,20 +1,25 @@
 import { useState } from "react";
 import type {
+  AttachmentRecordDto,
+  CreateAttachmentRecordInput,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteDto,
   ProjectSiteKitchenEquipmentDto,
   ProjectUsageRequestDto,
 } from "@company-erp/shared";
+import type { AttachmentFilters } from "../../apiClient";
+import { BusinessAttachmentsPanel } from "../BusinessAttachmentsPanel";
 import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState } from "../ui";
 import { complianceRiskLabel } from "./ProjectSiteCompliancePanel";
 import { formatMoney } from "./projectSiteUi";
 
-type DetailTab = "overview" | "usage" | "equipment";
+type DetailTab = "overview" | "usage" | "equipment" | "attachments";
 
 const detailTabs: { key: DetailTab; label: string }[] = [
   { key: "overview", label: "合规摘要" },
   { key: "usage", label: "物料领用" },
   { key: "equipment", label: "厨房设备" },
+  { key: "attachments", label: "统一附件" },
 ];
 
 export function ProjectSiteDetailDrawer({
@@ -22,12 +27,20 @@ export function ProjectSiteDetailDrawer({
   complianceSummary,
   usageRequests,
   kitchenEquipment,
+  loadAttachments,
+  createAttachment,
+  getAttachmentDownloadUrl,
+  canManageAttachments = false,
   onClose,
 }: {
   site: ProjectSiteDto | null;
   complianceSummary?: ProjectSiteComplianceSummaryDto;
   usageRequests: ProjectUsageRequestDto[];
   kitchenEquipment: ProjectSiteKitchenEquipmentDto[];
+  loadAttachments: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
+  createAttachment: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
+  getAttachmentDownloadUrl: (id: string) => Promise<string>;
+  canManageAttachments?: boolean;
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
@@ -125,6 +138,18 @@ export function ProjectSiteDetailDrawer({
               item.status,
             ])}
             emptyState={<EmptyState title="暂无厨房设备" description="该项目点暂无厨房设备台账。" />}
+          />
+        ) : null}
+
+        {activeTab === "attachments" ? (
+          <BusinessAttachmentsPanel
+            ownerModule="project-sites"
+            ownerEntityType="project_site"
+            ownerEntityId={site.id}
+            canManage={canManageAttachments}
+            loadAttachments={loadAttachments}
+            createAttachment={createAttachment}
+            getAttachmentDownloadUrl={getAttachmentDownloadUrl}
           />
         ) : null}
 

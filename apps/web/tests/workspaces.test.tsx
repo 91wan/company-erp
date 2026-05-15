@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { GenerateReplenishmentSuggestionsResult, ImportJobDto, InventoryBalanceDto } from "@company-erp/shared";
 import {
@@ -13,6 +13,7 @@ import {
   ProjectSitesWorkspace,
   PurchaseWorkspace,
   ReplenishmentSuggestionsWorkspace,
+  attachmentRecord,
   businessProject,
   businessProjectSummary,
   certificate,
@@ -457,6 +458,37 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
   });
 
+  it("shows unified business attachment references in project-site details", async () => {
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        loadUnifiedAttachments={() =>
+          Promise.resolve([
+            {
+              ...attachmentRecord,
+              ownerModule: "project-sites",
+              ownerEntityType: "project_site",
+              ownerEntityId: projectSite.id,
+            },
+          ])
+        }
+      />,
+    );
+
+    await screen.findByText("SITE-WX-001");
+    fireEvent.click(screen.getByText("SITE-WX-001"));
+    fireEvent.click(screen.getByRole("tab", { name: "统一附件" }));
+
+    expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
+    expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
+  });
+
   it("renders project-site compliance pack summary", async () => {
     render(
       <ProjectSitesWorkspace
@@ -794,6 +826,36 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("HT20260511001.pdf")).toBeInTheDocument();
   });
 
+  it("shows unified business attachment references in contract details", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract])}
+        loadContractAttachments={() => Promise.resolve([contractAttachment])}
+        loadUnifiedAttachments={() => Promise.resolve([attachmentRecord])}
+        getUnifiedAttachmentDownloadUrl={() => Promise.resolve(`/api/attachments/${attachmentRecord.id}/content`)}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+      />,
+    );
+
+    await screen.findByText("HT20260511001");
+    fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+
+    expect(await screen.findByText("统一附件")).toBeInTheDocument();
+    expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
+    expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith(
+      "http://localhost:3001/api/attachments/cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd/content",
+      "_blank",
+      "noopener,noreferrer",
+    ));
+    openSpy.mockRestore();
+  });
+
   it("renders contract empty and error states", async () => {
     const { rerender } = render(
       <ContractsWorkspace
@@ -966,7 +1028,37 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("CERT0001"));
-    expect(screen.getByText("certificates/test-CERT0001.pdf")).toBeInTheDocument();
+    expect(screen.getAllByText("certificates/test-CERT0001.pdf").length).toBeGreaterThan(0);
+  });
+
+  it("shows unified business attachment references in certificate details", async () => {
+    render(
+      <CertificatesWorkspace
+        canManage={false}
+        loadCertificates={() => Promise.resolve([certificate])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadParties={() => Promise.resolve([party])}
+        loadUnifiedAttachments={() =>
+          Promise.resolve([
+            {
+              ...attachmentRecord,
+              ownerModule: "certificates",
+              ownerEntityType: "certificate",
+              ownerEntityId: certificate.id,
+            },
+          ])
+        }
+      />,
+    );
+
+    expect(await screen.findByText("CERT0001")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("CERT0001"));
+
+    expect(await screen.findByText("统一附件")).toBeInTheDocument();
+    expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
+    expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
+    expect(screen.getAllByText("certificates/test-CERT0001.pdf").length).toBeGreaterThan(0);
   });
 
   it("renders certificate empty and error states", async () => {

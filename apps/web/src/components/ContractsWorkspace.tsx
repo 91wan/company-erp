@@ -7,6 +7,7 @@ import {
   CONTRACT_INVESTMENT_CATEGORIES,
   CONTRACT_STATUSES,
   CONTRACT_SUBJECT_CATEGORIES,
+  type AttachmentRecordDto,
   type BusinessProjectDto,
   type ContractAttachmentDto,
   type ContractDirectionCode,
@@ -18,10 +19,12 @@ import {
   type ContractSubjectCategoryCode,
   type CreateContractAttachmentInput,
   type CreateContractInput,
+  type CreateAttachmentRecordInput,
   type PartyDto,
   type ProjectSiteDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
+import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
+import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type ContractsWorkspaceProps = {
@@ -35,6 +38,9 @@ type ContractsWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
+  loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
+  createUnifiedAttachment?: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
+  getUnifiedAttachmentDownloadUrl?: (id: string) => Promise<string>;
   canManage?: boolean;
 };
 
@@ -132,6 +138,9 @@ export function ContractsWorkspace({
   loadParties = defaultLoadParties,
   loadProjectSites = defaultLoadProjectSites,
   loadBusinessProjects = defaultLoadBusinessProjects,
+  loadUnifiedAttachments = getAttachments,
+  createUnifiedAttachment = createAttachment,
+  getUnifiedAttachmentDownloadUrl = getAttachmentDownloadUrl,
   canManage = true,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
@@ -606,7 +615,21 @@ export function ContractsWorkspace({
       </div>
 
       <DetailDrawer title="合同详情" open={Boolean(selectedContract)} onClose={() => setSelectedContractId("")}>
-        {selectedContract ? <ContractDetail contract={selectedContract} /> : null}
+        {selectedContract ? (
+          <>
+            <ContractDetail contract={selectedContract} />
+            <BusinessAttachmentsPanel
+              ownerModule="contracts"
+              ownerEntityType="contract"
+              ownerEntityId={selectedContract.id}
+              canManage={canManage}
+              legacyPaths={[{ label: "主附件路径", value: selectedContract.attachmentRef }]}
+              loadAttachments={loadUnifiedAttachments}
+              createAttachment={createUnifiedAttachment}
+              getAttachmentDownloadUrl={getUnifiedAttachmentDownloadUrl}
+            />
+          </>
+        ) : null}
       </DetailDrawer>
     </section>
   );

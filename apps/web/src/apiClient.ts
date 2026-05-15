@@ -98,8 +98,22 @@ export async function getAuditLogs(): Promise<AuditLogDto[]> {
   return payload.auditLogs;
 }
 
-export async function getAttachments(): Promise<AttachmentRecordDto[]> {
-  const payload = await requestJson<{ attachments: AttachmentRecordDto[] }>(`${apiBaseUrl}/api/attachments?limit=20`);
+export type AttachmentFilters = {
+  ownerModule?: string;
+  ownerEntityType?: string;
+  ownerEntityId?: string;
+  limit?: number;
+};
+
+export async function getAttachments(filters: AttachmentFilters = {}): Promise<AttachmentRecordDto[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters.limit ?? 20));
+  for (const key of ["ownerModule", "ownerEntityType", "ownerEntityId"] as const) {
+    if (filters[key]) params.set(key, filters[key]);
+  }
+  const payload = await requestJson<{ attachments: AttachmentRecordDto[] }>(
+    `${apiBaseUrl}/api/attachments?${params.toString()}`,
+  );
   return payload.attachments;
 }
 
