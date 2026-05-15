@@ -1,12 +1,10 @@
 import {
   LogOut,
-  ChevronLeft,
   ChevronsRight,
   ClipboardCheck,
   Database,
   MapPin,
   PackageCheck,
-  Search,
   Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -215,9 +213,6 @@ function Sidebar({
       <div className="sidebar-brand">
         <span className="app-icon">财</span>
         <h1>{companyName}</h1>
-        <button className="sidebar-collapse" type="button" aria-label="折叠侧边栏">
-          <ChevronLeft aria-hidden="true" size={16} />
-        </button>
       </div>
 
       <nav className="sidebar-nav">
@@ -424,11 +419,10 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
 function TopBar({ currentUser, onLogout }: { currentUser: AuthenticatedUserDto; onLogout: () => Promise<void> | void }) {
   return (
     <header className="topbar">
-      <label className="global-search">
-        <Search aria-hidden="true" size={18} />
-        <input placeholder="搜索菜单、功能、物料、供应商、单据号..." />
-        <kbd>⌘ K</kbd>
-      </label>
+      <div className="topbar-context" aria-label="工作台说明">
+        <strong>角色工作台</strong>
+        <span>待办、风险与审核入口按当前权限展示</span>
+      </div>
 
       <div className="topbar-actions">
         <div className="connection-card">

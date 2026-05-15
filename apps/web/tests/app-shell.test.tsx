@@ -76,13 +76,32 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "无锡餐服 ERP" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^总览$/ })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByPlaceholderText("搜索菜单、功能、物料、供应商、单据号...")).toBeInTheDocument();
+    expect(screen.getByLabelText("工作台说明")).toHaveTextContent("角色工作台");
     expect(screen.getByText("数据库已连接")).toBeInTheDocument();
     expect(screen.getAllByText("admin").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "折叠侧边栏" })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("搜索菜单、功能、物料、供应商、单据号...")).not.toBeInTheDocument();
+    expect(screen.queryByText("⌘ K")).not.toBeInTheDocument();
 
     for (const label of ["总览", "基础资料", "采购", "库存", "合同", "业务项目", "项目点", "项目点合规", "人员权限", "Excel 导入", "系统设置"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
+  });
+
+  it("uses accessible drawers that support focus and Escape close", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^采购$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "新增采购需求" }));
+
+    const drawer = await screen.findByRole("dialog", { name: "新增采购需求" });
+    expect(drawer).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "新增采购需求" })).not.toBeInTheDocument();
   });
 
   it("saves the company name from system settings", async () => {
