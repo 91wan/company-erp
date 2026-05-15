@@ -161,7 +161,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canIssue={canManage(currentUser.roles, "inventory")}
               usageOnly={isExternalProjectSite}
               portalSection={activePortalSection}
-              onPortalSectionChange={setActivePortalSection}
+              onPortalSectionChange={(section) => {
+                setActivePortalSection(section);
+                setActiveWorkspace(workspaceForExternalPortalSection(section));
+              }}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
@@ -182,6 +185,11 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
       </section>
     </main>
   );
+}
+
+function workspaceForExternalPortalSection(section: ExternalProjectSitePortalSection): WorkspaceKey {
+  if (section === "rosterHealth" || section === "foodLicense") return "证照资质";
+  return "项目点";
 }
 
 function buildVisibleNavigationGroups(currentUser: AuthenticatedUserDto, isExternalProjectSite: boolean): NavigationGroup[] {
