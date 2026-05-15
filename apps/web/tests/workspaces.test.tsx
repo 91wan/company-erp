@@ -1025,6 +1025,16 @@ describe("Company ERP workspace components", () => {
 
   it("creates contract records without reopening legacy attachment registration", async () => {
     const createdContract = { ...contract, id: "18181818-1818-4181-8181-181818181818", contractNo: "HT20260511002", contractName: "采购框架合同" };
+    const createContract = vi.fn((input) =>
+      Promise.resolve({
+        ...createdContract,
+        contractForm: input.contractForm,
+        subjectCategory: input.subjectCategory,
+        investmentCategory: input.investmentCategory ?? null,
+        businessProjectId: input.businessProjectId ?? null,
+        businessProjectName: input.businessProjectId ? businessProject.projectName : null,
+      }),
+    );
 
     render(
       <ContractsWorkspace
@@ -1032,22 +1042,14 @@ describe("Company ERP workspace components", () => {
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadBusinessProjects={() => Promise.resolve([businessProject])}
-        createContract={(input) =>
-          Promise.resolve({
-            ...createdContract,
-            contractForm: input.contractForm,
-            subjectCategory: input.subjectCategory,
-            investmentCategory: input.investmentCategory ?? null,
-            businessProjectId: input.businessProjectId ?? null,
-            businessProjectName: input.businessProjectId ? businessProject.projectName : null,
-          })
-        }
+        createContract={createContract}
       />,
     );
 
     await screen.findByText("暂无合同资料");
     expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
+    expect(screen.queryByText("主附件引用（历史兼容）")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("合同编号"), { target: { value: "HT20260511002" } });
     fireEvent.change(screen.getByLabelText("合同名称"), { target: { value: "采购框架合同" } });
     fireEvent.change(screen.getByLabelText("相对方"), { target: { value: party.id } });
@@ -1065,6 +1067,8 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("结束日期"), { target: { value: "2027-05-10" } });
     fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
 
+    await waitFor(() => expect(createContract).toHaveBeenCalled());
+    expect(Object.prototype.hasOwnProperty.call(createContract.mock.calls[0][0], "attachmentRef")).toBe(false);
     expect(await screen.findByText("HT20260511002")).toBeInTheDocument();
     expect(screen.getAllByText("框架合同").length).toBeGreaterThan(0);
     expect(screen.getAllByText("食材").length).toBeGreaterThan(0);
@@ -1224,6 +1228,7 @@ describe("Company ERP workspace components", () => {
       nextReviewDate: "2026-12-01",
       computedStatus: "valid" as const,
     };
+    const createCertificate = vi.fn().mockResolvedValue(createdCertificate);
 
     const { rerender } = render(
       <CertificatesWorkspace
@@ -1231,11 +1236,13 @@ describe("Company ERP workspace components", () => {
         loadEmployees={() => Promise.resolve([employee])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadParties={() => Promise.resolve([party])}
-        createCertificate={() => Promise.resolve(createdCertificate)}
+        createCertificate={createCertificate}
       />,
     );
 
     await screen.findByText("暂无证照资料");
+    expect(screen.queryByText("附件引用（历史兼容）")).not.toBeInTheDocument();
+    expect(screen.queryByText("来源文件引用（历史兼容）")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0003" } });
     fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "供应商营业执照" } });
     fireEvent.change(screen.getByLabelText("证照类型"), { target: { value: "business_license" } });
@@ -1245,6 +1252,9 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("下次复核日期"), { target: { value: "2026-12-01" } });
     fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
 
+    await waitFor(() => expect(createCertificate).toHaveBeenCalled());
+    expect(Object.prototype.hasOwnProperty.call(createCertificate.mock.calls[0][0], "attachmentPath")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(createCertificate.mock.calls[0][0], "sourceFilePath")).toBe(false);
     expect(await screen.findByText("CERT0003")).toBeInTheDocument();
 
     rerender(

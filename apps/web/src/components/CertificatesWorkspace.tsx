@@ -342,9 +342,6 @@ export function CertificatesWorkspace({
         nextReviewDate: form.validityType === "fixed_expiry" ? null : form.nextReviewDate || null,
         reminderDays: form.reminderDays ? Number(form.reminderDays) : 30,
         isComplianceCritical: true,
-        attachmentPath: form.attachmentPath || null,
-        sourceFilePath: form.sourceFilePath || null,
-        sourcePageNo: form.sourcePageNo ? Number(form.sourcePageNo) : null,
         responsibleEmployeeId: form.responsibleEmployeeId || null,
         remark: form.remark || null,
       });
@@ -572,20 +569,7 @@ export function CertificatesWorkspace({
                 证照编号
                 <input value={form.certificateNumber} onChange={(event) => setForm({ ...form, certificateNumber: event.target.value })} />
               </label>
-              <label>
-                附件引用（历史兼容）
-                <input value={form.attachmentPath} onChange={(event) => setForm({ ...form, attachmentPath: event.target.value })} />
-                <small className="form-hint">正式附件请在证照详情的“统一附件”中登记；这里仅保留旧数据兼容引用。</small>
-              </label>
-              <label>
-                来源文件引用（历史兼容）
-                <input value={form.sourceFilePath} onChange={(event) => setForm({ ...form, sourceFilePath: event.target.value })} />
-                <small className="form-hint">不要填写 NAS 绝对路径、URL 或本地文件路径。</small>
-              </label>
-              <label>
-                来源页码
-                <input type="number" min="0" value={form.sourcePageNo} onChange={(event) => setForm({ ...form, sourcePageNo: event.target.value })} />
-              </label>
+              <p className="form-hint">正式附件请在证照保存后进入详情的“统一附件”登记；历史附件路径和来源文件仅在详情中只读展示。</p>
               <button type="submit" disabled={submitState === "saving"}>
                 <Save aria-hidden="true" size={16} />
                 保存证照
