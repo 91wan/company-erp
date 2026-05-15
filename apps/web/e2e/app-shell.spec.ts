@@ -152,6 +152,57 @@ test("business contract details use unified attachments instead of legacy contra
   await expectHealthyShell(page, issues);
 });
 
+test("certificate and project-site details request unified attachments with owner context", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const requestedUrls: string[] = [];
+  page.on("request", (request) => {
+    requestedUrls.push(request.url());
+  });
+  await createMockCompanyErpApi(page, { user: adminUser });
+
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "证照资质", exact: true }).click();
+  await page.locator("tr.clickable-row", { hasText: "DEMO-CERT-001" }).click();
+  await expect(page.getByRole("heading", { name: /DEMO-CERT-001/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
+  await expect
+    .poll(() =>
+      requestedUrls.some((url) => {
+        const parsed = new URL(url);
+        return (
+          parsed.pathname === "/api/attachments" &&
+          parsed.searchParams.get("ownerModule") === "certificates" &&
+          parsed.searchParams.get("ownerEntityType") === "certificate"
+        );
+      }),
+    )
+    .toBe(true);
+
+  await page.getByRole("button", { name: "关闭" }).click();
+  await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.locator("tr.clickable-row", { hasText: "DEMO-SITE-001" }).click();
+  await expect(page.getByRole("heading", { name: "DEMO-SITE-001 DEMO 项目点" })).toBeVisible();
+  await page.getByRole("tab", { name: "统一附件" }).click();
+  await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
+  await expect
+    .poll(() =>
+      requestedUrls.some((url) => {
+        const parsed = new URL(url);
+        return (
+          parsed.pathname === "/api/attachments" &&
+          parsed.searchParams.get("ownerModule") === "project-sites" &&
+          parsed.searchParams.get("ownerEntityType") === "project_site"
+        );
+      }),
+    )
+    .toBe(true);
+
+  expect(requestedUrls.some((url) => new URL(url).pathname.includes("/attachments/legacy"))).toBe(false);
+  await expect(page.getByText("/volume1")).toHaveCount(0);
+  await expectHealthyShell(page, issues);
+});
+
 test("drawers open and close without blocking workspace navigation", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: adminUser });
