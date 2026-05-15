@@ -24,6 +24,7 @@ export type NavigationItem = {
   icon: LucideIcon;
   permissionArea?: PermissionAreaCode;
   active?: boolean;
+  portalSection?: "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll";
 };
 
 export type NavigationGroup = {
@@ -76,12 +77,12 @@ export const navigationGroups: NavigationGroup[] = [
 export const navigationItems: NavigationItem[] = navigationGroups.flatMap((group) => group.items);
 
 export const externalProjectSiteNavigationItems: NavigationItem[] = [
-  { label: "我的项目点", workspace: "项目点", icon: MapPin, permissionArea: "projectUsage" },
-  { label: "物料领用", workspace: "项目点", icon: Truck, permissionArea: "projectUsage" },
-  { label: "现场人员/健康证", workspace: "证照资质", icon: Users, permissionArea: "certificates" },
-  { label: "食品经营许可证", workspace: "证照资质", icon: ShieldCheck, permissionArea: "certificates" },
-  { label: "雇主责任险", workspace: "项目点", icon: ClipboardCheck, permissionArea: "projectUsage" },
-  { label: "工资表", workspace: "项目点", icon: FileText, permissionArea: "projectUsage" },
+  { label: "我的项目点", workspace: "项目点", icon: MapPin, permissionArea: "projectUsage", portalSection: "overview" },
+  { label: "物料领用", workspace: "项目点", icon: Truck, permissionArea: "projectUsage", portalSection: "usage" },
+  { label: "现场人员/健康证", workspace: "证照资质", icon: Users, permissionArea: "certificates", portalSection: "rosterHealth" },
+  { label: "食品经营许可证", workspace: "证照资质", icon: ShieldCheck, permissionArea: "certificates", portalSection: "foodLicense" },
+  { label: "雇主责任险", workspace: "项目点", icon: ClipboardCheck, permissionArea: "projectUsage", portalSection: "insurance" },
+  { label: "工资表", workspace: "项目点", icon: FileText, permissionArea: "projectUsage", portalSection: "payroll" },
 ];
 
 export const workflowSteps = [

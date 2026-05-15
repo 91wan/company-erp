@@ -9,27 +9,12 @@ import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState } from "../ui"
 import { complianceRiskLabel } from "./ProjectSiteCompliancePanel";
 import { formatMoney } from "./projectSiteUi";
 
-type DetailTab =
-  | "overview"
-  | "roster"
-  | "health"
-  | "food"
-  | "insurance"
-  | "payroll"
-  | "usage"
-  | "equipment"
-  | "account";
+type DetailTab = "overview" | "usage" | "equipment";
 
 const detailTabs: { key: DetailTab; label: string }[] = [
-  { key: "overview", label: "概览" },
-  { key: "roster", label: "现场人员" },
-  { key: "health", label: "健康证" },
-  { key: "food", label: "食品经营许可证" },
-  { key: "insurance", label: "雇主责任险" },
-  { key: "payroll", label: "工资表" },
+  { key: "overview", label: "合规摘要" },
   { key: "usage", label: "物料领用" },
   { key: "equipment", label: "厨房设备" },
-  { key: "account", label: "项目点账号" },
 ];
 
 export function ProjectSiteDetailDrawer({
@@ -143,12 +128,6 @@ export function ProjectSiteDetailDrawer({
           />
         ) : null}
 
-        {["roster", "health", "food", "insurance", "payroll", "account"].includes(activeTab) ? (
-          <EmptyState
-            title="待后端明细接口支持"
-            description="当前抽屉先展示项目点维度摘要；明细资料仍在项目点和证照工作区维护。"
-          />
-        ) : null}
       </div>
     </DetailDrawer>
   );

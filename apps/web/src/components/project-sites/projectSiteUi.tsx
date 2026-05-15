@@ -68,8 +68,15 @@ export function StateMessage({ icon, text }: { icon: ReactNode; text: string }) 
   );
 }
 
-export function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray"; children: ReactNode }) {
-  const className = tone === "green" ? "status-badge green" : tone === "orange" ? "status-badge amber" : "status-badge gray";
+export function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray" | "red"; children: ReactNode }) {
+  const className =
+    tone === "green"
+      ? "status-badge green"
+      : tone === "orange"
+        ? "status-badge amber"
+        : tone === "red"
+          ? "status-badge red"
+          : "status-badge gray";
   return <span className={className}>{children}</span>;
 }
 
