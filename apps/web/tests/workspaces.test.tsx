@@ -1181,6 +1181,8 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("CERT0001"));
+    expect(screen.queryByText("附件引用")).not.toBeInTheDocument();
+    expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
     expect(screen.getAllByText("certificates/test-CERT0001.pdf").length).toBeGreaterThan(0);
   });
 
