@@ -609,8 +609,8 @@ describe("Company ERP workspace components", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "处理健康证阻断" }));
     expect(onPortalSectionChange).toHaveBeenCalledWith("rosterHealth");
-    fireEvent.click(screen.getByRole("button", { name: "处理雇主责任险覆盖异常" }));
-    expect(onPortalSectionChange).toHaveBeenCalledWith("insurance");
+    expect(screen.queryByRole("button", { name: "处理雇主责任险覆盖异常" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("待后端支持").length).toBeGreaterThan(0);
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {
