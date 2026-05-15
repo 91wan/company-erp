@@ -18,7 +18,6 @@ import {
   businessProjectSummary,
   certificate,
   contract,
-  contractAttachment,
   department,
   employee,
   expiredCertificate,
@@ -855,11 +854,10 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("出库失败，请检查库存余额、单号或申请状态。")).toBeInTheDocument();
   });
 
-  it("renders contract ledger and attachment path data", async () => {
+  it("renders contract ledger without promoting legacy attachment paths", async () => {
     render(
       <ContractsWorkspace
         loadContracts={() => Promise.resolve([contract, expiredContract])}
-        loadContractAttachments={() => Promise.resolve([contractAttachment])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadBusinessProjects={() => Promise.resolve([businessProject])}
@@ -868,7 +866,8 @@ describe("Company ERP workspace components", () => {
 
     expect(screen.getAllByRole("heading", { name: "合同台账" }).length).toBeGreaterThan(0);
     expect(screen.getByText("新增合同")).toBeInTheDocument();
-    expect(screen.getAllByText("附件路径").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "登记附件路径" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "附件路径" })).not.toBeInTheDocument();
     expect(await screen.findByText("HT20260511001")).toBeInTheDocument();
     expect(screen.getByText("无锡项目点服务合同")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
@@ -880,7 +879,10 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
     const directionSelect = screen.getByLabelText("合同方向") as HTMLSelectElement;
     expect(Array.from(directionSelect.options).map((option) => option.textContent)).not.toContain("框架合同");
-    expect(await screen.findByText("HT20260511001.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    expect(await screen.findByText("统一附件")).toBeInTheDocument();
+    expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
+    expect(screen.getByText("主附件引用（历史路径）")).toBeInTheDocument();
   });
 
   it("shows unified business attachment references in contract details", async () => {
@@ -888,7 +890,6 @@ describe("Company ERP workspace components", () => {
     render(
       <ContractsWorkspace
         loadContracts={() => Promise.resolve([contract])}
-        loadContractAttachments={() => Promise.resolve([contractAttachment])}
         loadUnifiedAttachments={() => Promise.resolve([attachmentRecord])}
         getUnifiedAttachmentDownloadUrl={() => Promise.resolve(`/api/attachments/${attachmentRecord.id}/content`)}
         loadParties={() => Promise.resolve([party])}
@@ -917,7 +918,6 @@ describe("Company ERP workspace components", () => {
     const { rerender } = render(
       <ContractsWorkspace
         loadContracts={() => Promise.resolve([])}
-        loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([])}
         loadBusinessProjects={() => Promise.resolve([])}
@@ -931,7 +931,6 @@ describe("Company ERP workspace components", () => {
     rerender(
       <ContractsWorkspace
         loadContracts={() => Promise.reject(new Error("offline"))}
-        loadContractAttachments={() => Promise.reject(new Error("offline"))}
         loadParties={() => Promise.reject(new Error("offline"))}
         loadProjectSites={() => Promise.reject(new Error("offline"))}
         loadBusinessProjects={() => Promise.reject(new Error("offline"))}
@@ -942,14 +941,12 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("往来方、业务项目或项目点接口暂不可用，暂不能新增合同。")).toBeInTheDocument();
   });
 
-  it("creates contract and attachment metadata", async () => {
+  it("creates contract records without reopening legacy attachment registration", async () => {
     const createdContract = { ...contract, id: "18181818-1818-4181-8181-181818181818", contractNo: "HT20260511002", contractName: "采购框架合同" };
-    const createdAttachment = { ...contractAttachment, id: "19191919-1919-4191-8191-191919191919", contractId: createdContract.id, fileName: "supplement.pdf" };
 
     render(
       <ContractsWorkspace
         loadContracts={() => Promise.resolve([])}
-        loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadBusinessProjects={() => Promise.resolve([businessProject])}
@@ -963,7 +960,6 @@ describe("Company ERP workspace components", () => {
             businessProjectName: input.businessProjectId ? businessProject.projectName : null,
           })
         }
-        createContractAttachment={() => Promise.resolve(createdAttachment)}
       />,
     );
 
@@ -994,25 +990,17 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("扬中中央厨房")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511002" }));
     expect(screen.getByRole("heading", { name: "合同详情" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    fireEvent.click(screen.getByRole("button", { name: "登记附件路径" }));
-    fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
-    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "contracts/test-supplement.pdf" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
-
-    expect(await screen.findByText("supplement.pdf")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "登记附件路径" })).not.toBeInTheDocument();
   });
 
-  it("shows contract and attachment creation failures", async () => {
+  it("shows contract creation failures without exposing legacy attachment registration", async () => {
     render(
       <ContractsWorkspace
         loadContracts={() => Promise.resolve([contract])}
-        loadContractAttachments={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([party])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadBusinessProjects={() => Promise.resolve([businessProject])}
         createContract={() => Promise.reject(new Error("duplicate contract"))}
-        createContractAttachment={() => Promise.reject(new Error("bad path"))}
       />,
     );
 
@@ -1025,12 +1013,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存合同" }));
     expect(await screen.findByText("合同保存失败，请检查编号、日期或金额。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "登记附件路径" }));
-    fireEvent.change(screen.getByLabelText("文件名称"), { target: { value: "supplement.pdf" } });
-    fireEvent.change(screen.getByLabelText("附件路径"), { target: { value: "contracts/test-supplement.pdf" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存附件路径" }));
-
-    expect(await screen.findByText("附件路径保存失败，请检查合同和路径。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "登记附件路径" })).not.toBeInTheDocument();
   });
 
   it("renders and creates business projects with investment summary", async () => {
