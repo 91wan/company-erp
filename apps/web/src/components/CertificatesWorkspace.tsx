@@ -392,7 +392,7 @@ export function CertificatesWorkspace({
         search={(
           <label className="table-search">
             <Search aria-hidden="true" size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索证照、归属对象、编号或附件引用" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索证照、归属对象或证照编号" />
           </label>
         )}
         filters={(
@@ -597,8 +597,6 @@ export function CertificatesWorkspace({
               <dd>{selectedCertificate.expiryDate ?? selectedCertificate.nextReviewDate ?? "-"}</dd>
               <dt>人员匹配</dt>
               <dd>{healthMatchLabel(selectedCertificate)}</dd>
-              <dt>附件引用</dt>
-              <dd>{selectedCertificate.attachmentPath ?? "暂无附件引用"}</dd>
               <dt>审核状态</dt>
               <dd>{selectedCertificate.confirmedAt ? `已确认：${selectedCertificate.confirmedByEmployeeName ?? "-"}` : "待审核"}</dd>
             </dl>
