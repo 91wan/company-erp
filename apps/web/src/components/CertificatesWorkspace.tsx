@@ -62,9 +62,6 @@ type CertificateFormState = {
   expiryDate: string;
   nextReviewDate: string;
   reminderDays: string;
-  attachmentPath: string;
-  sourceFilePath: string;
-  sourcePageNo: string;
   responsibleEmployeeId: string;
   remark: string;
 };
@@ -140,9 +137,6 @@ function createEmptyForm(
   expiryDate: "",
   nextReviewDate: "",
   reminderDays: "30",
-  attachmentPath: "",
-  sourceFilePath: "",
-  sourcePageNo: "",
   responsibleEmployeeId: "",
   remark: "",
   };
