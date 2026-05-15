@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import type { ImportJobDto, ImportJobSummaryDto, ImportTemplateTypeCode } from "@company-erp/shared";
 import type { AuthAccountRecord, AuthRepository } from "../src/auth";
+import type { AuditLogRepository } from "../src/auditLogs";
 import { ImportJobValidationError, type ImportJobPreviewInput, type ImportJobRepository } from "../src/importJobs";
 import { hashPassword } from "../src/password";
 
@@ -167,6 +168,32 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
+function createFakeAuditLogRepository(): AuditLogRepository {
+  const logs: Awaited<ReturnType<AuditLogRepository["list"]>> = [];
+  return {
+    async list(filters) {
+      return logs.filter((log) => !filters.action || log.action === filters.action);
+    },
+    async create(input) {
+      const log = {
+        id: `99999999-9999-4999-8999-${String(logs.length + 1).padStart(12, "0")}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+      logs.push(log);
+      return log;
+    },
+  };
+}
+
 async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username: string, password = "ChangeMe123!") {
   const response = await app.inject({
     method: "POST",
@@ -202,10 +229,12 @@ describe("import jobs API", () => {
 
   it("previews a multipart xlsx upload and returns row-level statuses", async () => {
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "晨光贸易有限公司", "启用"]]);
-    const app = await buildApp({ importJobRepository: createFakeRepository() });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ importJobRepository: createFakeRepository(), auditLogRepository });
     const multipart = multipartPayload({ templateType: "parties", file, fileName: "suppliers.xlsx" });
 
     const response = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...multipart });
+    const auditLogs = await auditLogRepository.list({ action: "import_job.preview" });
     await app.close();
 
     expect(response.statusCode).toBe(201);
@@ -216,6 +245,18 @@ describe("import jobs API", () => {
         rows: [{ status: "valid" }, { status: "skipped" }],
       },
     });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      action: "import_job.preview",
+      entityType: "import_job",
+      entityId: "55555555-5555-4555-8555-555555555555",
+      afterJson: expect.objectContaining({
+        templateType: "parties",
+        originalFileName: "suppliers.xlsx",
+        status: "previewed",
+      }),
+    });
+    expect(JSON.stringify(auditLogs[0])).not.toContain("fileBuffer");
   });
 
   it("rejects unsupported template types and missing files", async () => {

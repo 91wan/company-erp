@@ -62,6 +62,22 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
         originalFileName,
         fileBuffer,
       });
+      await writeAuditLog(request, options, {
+        action: "import_job.preview",
+        entityType: "import_job",
+        entityId: importJob.id,
+        afterJson: {
+          id: importJob.id,
+          templateType: importJob.templateType,
+          originalFileName: importJob.originalFileName,
+          status: importJob.status,
+          totalRows: importJob.totalRows,
+          validRows: importJob.validRows,
+          warningRows: importJob.warningRows,
+          errorRows: importJob.errorRows,
+          skippedRows: importJob.skippedRows,
+        },
+      });
       return reply.status(201).send({ importJob });
     } catch (error) {
       if (error instanceof ImportJobValidationError) {
