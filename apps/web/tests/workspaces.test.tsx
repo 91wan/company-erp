@@ -549,6 +549,9 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("食品经营许可证预警")).toBeInTheDocument();
     expect(screen.getByText("雇主责任险覆盖异常")).toBeInTheDocument();
     expect(screen.getByText("工资表待审核")).toBeInTheDocument();
+    expect(screen.queryByText("处理现场人员/健康证")).not.toBeInTheDocument();
+    expect(screen.queryByText("处理食品经营许可证")).not.toBeInTheDocument();
+    expect(screen.getAllByText("待后端支持").length).toBeGreaterThan(0);
   });
 
   it("renders project-site compliance pack summary", async () => {
