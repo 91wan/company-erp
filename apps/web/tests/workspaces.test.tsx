@@ -457,6 +457,45 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
   });
 
+  it("keeps project-site kitchen equipment forms out of the legacy attachment path workflow", async () => {
+    const createKitchenEquipment = vi.fn().mockResolvedValue(projectSiteKitchenEquipment);
+    const createChangeRequest = vi.fn().mockResolvedValue(projectSiteKitchenEquipmentChangeRequest);
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        loadKitchenEquipment={() => Promise.resolve([projectSiteKitchenEquipment])}
+        createKitchenEquipment={createKitchenEquipment}
+        createKitchenEquipmentChangeRequest={createChangeRequest}
+      />,
+    );
+
+    await screen.findByText("SITE-WX-001");
+    fireEvent.click(screen.getByRole("button", { name: "新增厨房设备" }));
+    expect(screen.queryByText("附件引用（历史兼容）")).not.toBeInTheDocument();
+    expect(screen.queryByText("不要填写 NAS 绝对路径")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("设备名称"), { target: { value: "单头大锅灶" } });
+    fireEvent.change(screen.getByLabelText("数量"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存设备" }));
+
+    expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
+    expect(createKitchenEquipment).toHaveBeenCalledWith(expect.not.objectContaining({ attachmentPath: expect.anything() }));
+
+    fireEvent.click(screen.getByRole("button", { name: "上报设备变更" }));
+    expect(screen.queryByText("照片/附件引用（历史兼容）")).not.toBeInTheDocument();
+    expect(screen.queryByText("不要填写 NAS 绝对路径")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("设备名称"), { target: { value: "六门冰柜" } });
+    fireEvent.change(screen.getByLabelText("说明"), { target: { value: "门封条损坏" } });
+    fireEvent.click(screen.getByRole("button", { name: "提交上报" }));
+
+    expect(createChangeRequest).toHaveBeenCalledWith(expect.not.objectContaining({ attachmentPath: expect.anything() }));
+  });
+
   it("shows unified business attachment references in project-site details", async () => {
     render(
       <ProjectSitesWorkspace

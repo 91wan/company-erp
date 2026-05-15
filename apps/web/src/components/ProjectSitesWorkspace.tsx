@@ -852,7 +852,6 @@ export function ProjectSitesWorkspace({
         companyAssetTag: kitchenEquipmentForm.companyAssetTag || null,
         sourceContractId: kitchenEquipmentForm.sourceContractId || null,
         lastCheckedDate: kitchenEquipmentForm.lastCheckedDate || null,
-        attachmentPath: kitchenEquipmentForm.attachmentPath || null,
         remark: kitchenEquipmentForm.remark || null,
       });
       setKitchenEquipment((current) => [created, ...current.filter((item) => item.id !== created.id)]);
@@ -899,7 +898,6 @@ export function ProjectSitesWorkspace({
         proposedQuantity: kitchenEquipmentChangeForm.proposedQuantity ? Number(kitchenEquipmentChangeForm.proposedQuantity) : null,
         proposedLocation: kitchenEquipmentChangeForm.proposedLocation || null,
         proposedStatus: kitchenEquipmentChangeForm.proposedStatus || null,
-        attachmentPath: kitchenEquipmentChangeForm.attachmentPath || null,
         description: kitchenEquipmentChangeForm.description || null,
       });
       setKitchenEquipmentChangeRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
@@ -1099,11 +1097,6 @@ export function ProjectSitesWorkspace({
             <span>最近核对</span>
             <input type="date" value={kitchenEquipmentForm.lastCheckedDate} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, lastCheckedDate: event.target.value })} />
           </label>
-          <label className="wide">
-            <span>附件引用（历史兼容）</span>
-            <input value={kitchenEquipmentForm.attachmentPath} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, attachmentPath: event.target.value })} />
-            <small className="form-hint">正式附件请在项目点详情的“统一附件”中登记；这里仅保留旧数据兼容引用。</small>
-          </label>
           {kitchenEquipmentSubmitState === "error" ? <p className="form-error">{kitchenEquipmentSubmitError || "厨房设备保存失败，请检查必填项或项目点。"}</p> : null}
         </form>
         ) : null}
@@ -1185,11 +1178,6 @@ export function ProjectSitesWorkspace({
               <option key={status.code} value={status.code}>{status.label}</option>
             ))}
           </select>
-        </label>
-        <label className="wide">
-          <span>照片/附件引用（历史兼容）</span>
-          <input value={kitchenEquipmentChangeForm.attachmentPath} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, attachmentPath: event.target.value })} />
-          <small className="form-hint">不要填写 NAS 绝对路径、URL 或本地文件路径；正式附件后续通过统一附件闭环登记。</small>
         </label>
         <label className="wide">
           <span>说明</span>
