@@ -28,7 +28,7 @@ import {
   type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { FormDrawer, PageHeader } from "./ui";
 import {
   ExternalProjectSitePortal,
@@ -359,6 +359,11 @@ export function ProjectSitesWorkspace({
   const [issueSubmitState, setIssueSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [kitchenEquipmentSubmitState, setKitchenEquipmentSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [kitchenEquipmentChangeSubmitState, setKitchenEquipmentChangeSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [siteSubmitError, setSiteSubmitError] = useState("");
+  const [usageSubmitError, setUsageSubmitError] = useState("");
+  const [issueSubmitError, setIssueSubmitError] = useState("");
+  const [kitchenEquipmentSubmitError, setKitchenEquipmentSubmitError] = useState("");
+  const [kitchenEquipmentChangeSubmitError, setKitchenEquipmentChangeSubmitError] = useState("");
   const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [siteForm, setSiteForm] = useState<SiteFormState>({
@@ -701,6 +706,7 @@ export function ProjectSitesWorkspace({
   async function handleCreateSite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSiteSubmitState("saving");
+    setSiteSubmitError("");
 
     try {
       const created = await createProjectSite({
@@ -740,7 +746,8 @@ export function ProjectSitesWorkspace({
       });
       setSiteSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setSiteSubmitError(formatApiError(error, "项目点保存失败，请检查编码是否重复或服务模式规则。"));
       setSiteSubmitState("error");
     }
   }
@@ -748,6 +755,7 @@ export function ProjectSitesWorkspace({
   async function handleCreateUsageRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setUsageSubmitState("saving");
+    setUsageSubmitError("");
 
     try {
       const created = await createUsageRequest({
@@ -778,7 +786,8 @@ export function ProjectSitesWorkspace({
       }));
       setUsageSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setUsageSubmitError(formatApiError(error, "领用申请保存失败，请检查必填项或单号是否重复。"));
       setUsageSubmitState("error");
     }
   }
@@ -786,6 +795,7 @@ export function ProjectSitesWorkspace({
   async function handleIssueUsageRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIssueSubmitState("saving");
+    setIssueSubmitError("");
 
     try {
       const issued = await issueUsageRequest(issueForm.requestId, {
@@ -806,7 +816,8 @@ export function ProjectSitesWorkspace({
       }));
       setIssueSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setIssueSubmitError(formatApiError(error, "出库失败，请检查库存余额、单号或申请状态。"));
       setIssueSubmitState("error");
     }
   }
@@ -814,6 +825,7 @@ export function ProjectSitesWorkspace({
   async function handleCreateKitchenEquipment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setKitchenEquipmentSubmitState("saving");
+    setKitchenEquipmentSubmitError("");
     try {
       const created = await createKitchenEquipment({
         projectSiteId: kitchenEquipmentForm.projectSiteId,
@@ -854,7 +866,8 @@ export function ProjectSitesWorkspace({
       }));
       setKitchenEquipmentSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setKitchenEquipmentSubmitError(formatApiError(error, "厨房设备保存失败，请检查必填项或项目点。"));
       setKitchenEquipmentSubmitState("error");
     }
   }
@@ -862,6 +875,7 @@ export function ProjectSitesWorkspace({
   async function handleCreateKitchenEquipmentChangeRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setKitchenEquipmentChangeSubmitState("saving");
+    setKitchenEquipmentChangeSubmitError("");
     try {
       const selectedEquipment = kitchenEquipment.find((item) => item.id === kitchenEquipmentChangeForm.equipmentId);
       const created = await createKitchenEquipmentChangeRequest({
@@ -885,7 +899,8 @@ export function ProjectSitesWorkspace({
         description: "",
       }));
       setKitchenEquipmentChangeSubmitState("idle");
-    } catch {
+    } catch (error) {
+      setKitchenEquipmentChangeSubmitError(formatApiError(error, "设备变更上报失败，请检查设备名称或项目点。"));
       setKitchenEquipmentChangeSubmitState("error");
     }
   }
@@ -1074,7 +1089,7 @@ export function ProjectSitesWorkspace({
             <span>附件路径</span>
             <input value={kitchenEquipmentForm.attachmentPath} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, attachmentPath: event.target.value })} />
           </label>
-          {kitchenEquipmentSubmitState === "error" ? <p className="form-error">厨房设备保存失败，请检查必填项或项目点。</p> : null}
+          {kitchenEquipmentSubmitState === "error" ? <p className="form-error">{kitchenEquipmentSubmitError || "厨房设备保存失败，请检查必填项或项目点。"}</p> : null}
         </form>
         ) : null}
       </FormDrawer>
@@ -1164,7 +1179,7 @@ export function ProjectSitesWorkspace({
           <span>说明</span>
           <textarea value={kitchenEquipmentChangeForm.description} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, description: event.target.value })} />
         </label>
-        {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">设备变更上报失败，请检查设备名称或项目点。</p> : null}
+        {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">{kitchenEquipmentChangeSubmitError || "设备变更上报失败，请检查设备名称或项目点。"}</p> : null}
         </form>
       </FormDrawer>
 
@@ -1328,7 +1343,7 @@ export function ProjectSitesWorkspace({
             />
           </label>
           {masterStatus === "error" ? <p className="form-error">基础资料或业务项目接口暂不可用，项目点可先保存文本字段。</p> : null}
-          {siteSubmitState === "error" ? <p className="form-error">项目点保存失败，请检查编码是否重复或服务模式规则。</p> : null}
+          {siteSubmitState === "error" ? <p className="form-error">{siteSubmitError || "项目点保存失败，请检查编码是否重复或服务模式规则。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div> : null}
@@ -1478,7 +1493,7 @@ export function ProjectSitesWorkspace({
               {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
             </p>
           ) : null}
-          {usageSubmitState === "error" ? <p className="form-error">领用申请保存失败，请检查必填项或单号是否重复。</p> : null}
+          {usageSubmitState === "error" ? <p className="form-error">{usageSubmitError || "领用申请保存失败，请检查必填项或单号是否重复。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>
@@ -1546,7 +1561,7 @@ export function ProjectSitesWorkspace({
             出库成功后会按物料当前项目点收费价生成金额快照；后续调价不会回写历史流水。
           </p>
         ) : null}
-        {issueSubmitState === "error" ? <p className="form-error">出库失败，请检查库存余额、单号或申请状态。</p> : null}
+        {issueSubmitState === "error" ? <p className="form-error">{issueSubmitError || "出库失败，请检查库存余额、单号或申请状态。"}</p> : null}
         </form> : null}
       </FormDrawer>
 

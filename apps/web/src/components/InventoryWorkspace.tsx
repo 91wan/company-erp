@@ -10,7 +10,7 @@ import {
   type MaterialDto,
   type WarehouseDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { DataTable, DetailDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
 
 type InventoryWorkspaceProps = {
@@ -101,6 +101,7 @@ export function InventoryWorkspace({
   const [selectedMovementId, setSelectedMovementId] = useState("");
   const [selectedBalanceKey, setSelectedBalanceKey] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<MovementFormState>({
     movementNo: "",
     movementDate: "",
@@ -226,6 +227,7 @@ export function InventoryWorkspace({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitState("saving");
+    setSubmitError("");
 
     try {
       const created = await createInventoryMovement({
@@ -263,7 +265,8 @@ export function InventoryWorkspace({
         remark: "",
       }));
       setSubmitState("idle");
-    } catch {
+    } catch (error) {
+      setSubmitError(formatApiError(error, "入库登记失败，请检查必填项或单号是否重复。"));
       setSubmitState("error");
     }
   }
@@ -476,7 +479,7 @@ export function InventoryWorkspace({
             <input value={form.remark} onChange={(event) => setForm({ ...form, remark: event.target.value })} />
           </label>
           {masterStatus === "error" ? <p className="form-error">物料或仓库接口暂不可用，暂不能登记入库。</p> : null}
-          {submitState === "error" ? <p className="form-error">入库登记失败，请检查必填项或单号是否重复。</p> : null}
+          {submitState === "error" ? <p className="form-error">{submitError || "入库登记失败，请检查必填项或单号是否重复。"}</p> : null}
         </form> : null}
       </div>
 

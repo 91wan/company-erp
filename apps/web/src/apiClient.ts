@@ -12,6 +12,17 @@ import type {
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 let csrfToken: string | null = null;
 
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly errorCode: string | null,
+    public readonly issues: string[],
+  ) {
+    super(errorCode ?? `Request failed with ${status}`);
+    this.name = "ApiRequestError";
+  }
+}
+
 function rememberCsrfToken(nextToken: string | null | undefined): void {
   if (nextToken) csrfToken = nextToken;
 }
@@ -32,10 +43,38 @@ export async function requestJson<TPayload>(url: string, init?: RequestInit): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed with ${response.status}`);
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    const errorPayload = typeof payload === "object" && payload !== null ? payload as { error?: unknown; issues?: unknown } : {};
+    const issues = Array.isArray(errorPayload.issues)
+      ? errorPayload.issues.filter((issue): issue is string => typeof issue === "string").map(sanitizeIssueText)
+      : [];
+    throw new ApiRequestError(
+      response.status,
+      typeof errorPayload.error === "string" ? errorPayload.error : null,
+      issues,
+    );
   }
 
   return (await response.json()) as TPayload;
+}
+
+function sanitizeIssueText(issue: string): string {
+  return issue
+    .replace(/\b(password|passwordHash|secret|cookie|identityNo|identityNoEncrypted)\s*[:=]\s*[^,，;；\s]+/gi, "$1=[已隐藏]")
+    .replace(/\b\d{17}[\dXx]\b/g, "身份证号已隐藏")
+    .replace(/\b\d{15}\b/g, "身份证号已隐藏");
+}
+
+export function formatApiError(error: unknown, fallback: string): string {
+  if (error instanceof ApiRequestError && error.issues.length > 0) {
+    return error.issues.join("；");
+  }
+  return fallback;
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUserDto | null> {
