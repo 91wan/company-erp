@@ -100,13 +100,27 @@ test("drawers open and close without blocking workspace navigation", async ({ pa
 
   await page.goto("/");
 
+  await expect(page.getByRole("button", { name: "折叠侧边栏" })).toHaveCount(0);
+  await expect(page.getByPlaceholder("搜索菜单、功能、物料、供应商、单据号...")).toHaveCount(0);
+  await expect(page.getByText("⌘ K")).toHaveCount(0);
+
   await page.getByRole("button", { name: "采购", exact: true }).click();
   await page.getByRole("cell", { name: "DEMO-PR-001", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "采购需求详情" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "采购需求详情" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "采购需求详情" })).toHaveCount(0);
+  await page.getByRole("cell", { name: "DEMO-PR-001", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "采购需求详情" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
-  await expect(page.getByRole("heading", { name: "采购需求详情" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "采购需求详情" })).toHaveCount(0);
   await page.getByRole("button", { name: "新增采购需求" }).click();
   await expect(page.getByRole("button", { name: "保存采购需求" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭" })).toBeFocused();
+  await page.getByRole("button", { name: "库存", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "新增采购需求" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "采购", exact: true }).click();
+  await page.getByRole("button", { name: "新增采购需求" }).click();
   await page.getByRole("button", { name: "关闭" }).click();
   await expect(page.getByRole("button", { name: "保存采购需求" })).toHaveCount(0);
 

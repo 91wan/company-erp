@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "rejected" | "disabled" | "notApplicable";
@@ -189,12 +190,36 @@ export function FormDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    previouslyFocusedElement.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElement.current?.focus();
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <aside className="ui-drawer" aria-label={title}>
+    <aside className="ui-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="ui-drawer-header">
-        <h3>{title}</h3>
-        <button type="button" onClick={onClose}>关闭</button>
+        <h3 id={titleId}>{title}</h3>
+        <button ref={closeButtonRef} type="button" onClick={onClose}>关闭</button>
       </div>
       {children}
     </aside>

@@ -82,7 +82,7 @@ button:disabled {
 
 .sidebar-brand {
   display: grid;
-  grid-template-columns: 32px 1fr 28px;
+  grid-template-columns: 32px 1fr;
   align-items: center;
   gap: 12px;
   padding: 0 14px 26px;
@@ -108,16 +108,6 @@ button:disabled {
   font-weight: 760;
   line-height: 1.1;
   letter-spacing: 0;
-}
-
-.sidebar-collapse {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: #667085;
-  background: transparent;
 }
 
 .sidebar-nav {
@@ -565,43 +555,29 @@ button:disabled {
   backdrop-filter: blur(24px);
 }
 
-.global-search {
+.topbar-context {
   display: grid;
-  grid-template-columns: 22px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  height: 42px;
-  padding: 0 10px 0 14px;
+  align-content: center;
+  gap: 3px;
+  min-height: 42px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  color: #98a2b3;
+  color: #475467;
   background: rgb(255 255 255 / 84%);
   box-shadow: var(--shadow-sm);
 }
 
-.global-search input {
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  color: var(--text);
-  background: transparent;
+.topbar-context strong {
+  color: #111827;
   font-size: 14px;
+  font-weight: 760;
+  letter-spacing: 0;
 }
 
-.global-search input::placeholder {
-  color: #98a2b3;
-}
-
-kbd {
-  min-width: 34px;
-  padding: 3px 7px;
-  border: 1px solid #d6dbe5;
-  border-radius: 7px;
+.topbar-context span {
   color: #667085;
-  background: #f7f8fb;
   font-size: 12px;
-  font-family: inherit;
-  text-align: center;
 }
 
 .topbar-actions {
@@ -2029,6 +2005,17 @@ tbody tr.clickable-row {
   .erp-main {
     grid-template-rows: auto minmax(0, 1fr);
     min-height: auto;
+  }
+
+  .ui-drawer {
+    position: relative;
+    width: auto;
+    height: auto;
+    max-height: none;
+    margin: 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 18px 44px rgb(16 24 40 / 12%);
   }
 
   .topbar {
