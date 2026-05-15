@@ -1527,8 +1527,10 @@ describe("project usage request API", () => {
 
 describe("project-site kitchen equipment API", () => {
   it("lets headquarters maintain project-site kitchen equipment without inventory movement", async () => {
+    const auditLogRepository = createFakeAuditLogRepository();
     const app = await buildApp({
       projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
+      auditLogRepository,
     });
 
     const list = await app.inject({ method: "GET", url: "/api/project-site-kitchen-equipment?projectSiteId=11111111-1111-4111-8111-111111111111" });
@@ -1543,13 +1545,15 @@ describe("project-site kitchen equipment API", () => {
         unit: "台",
         location: "热厨区",
         sourceContractId: "33333333-3333-4333-8333-333333333333",
+        attachmentPath: "/volume1/company-erp/attachments/equipment/stove.jpg",
       },
     });
     const updated = await app.inject({
       method: "PATCH",
       url: `/api/project-site-kitchen-equipment/${kitchenEquipmentId}`,
-      payload: { status: "damaged", location: "待维修区" },
+      payload: { status: "damaged", location: "待维修区", attachmentPath: "/volume1/company-erp/attachments/equipment/damaged.jpg" },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(list.statusCode).toBe(200);
@@ -1564,6 +1568,45 @@ describe("project-site kitchen equipment API", () => {
     expect(updated.json()).toMatchObject({
       kitchenEquipment: { id: kitchenEquipmentId, status: "damaged", location: "待维修区" },
     });
+    expect(logs.map((log) => log.action)).toEqual([
+      "project_site_kitchen_equipment.create",
+      "project_site_kitchen_equipment.update",
+    ]);
+    expect(logs.at(0)).toMatchObject({
+      entityType: "project_site_kitchen_equipment",
+      entityId: created.json().kitchenEquipment.id,
+    });
+    expect(JSON.stringify(logs)).not.toContain("/volume1");
+    expect(JSON.stringify(logs)).not.toMatch(/password|secret|cookie|[0-9]{17}[\dXx]/);
+  });
+
+  it("fails closed when kitchen equipment audit logging is unavailable", async () => {
+    const app = await buildApp({
+      projectSiteKitchenEquipmentRepository: createFakeKitchenEquipmentRepository(),
+      auditLogRepository: {
+        async list() {
+          return [];
+        },
+        async create() {
+          throw new Error("audit unavailable");
+        },
+      },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/project-site-kitchen-equipment",
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        equipmentName: "单头大锅灶",
+        quantity: 1,
+        unit: "台",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "AUDIT_LOG_WRITE_FAILED" });
   });
 
   it("scopes external project-site accounts to assigned-site equipment and pending change requests", async () => {
@@ -1640,7 +1683,8 @@ describe("project-site kitchen equipment API", () => {
 
   it("applies approved equipment change requests and keeps rejected requests as history only", async () => {
     const repository = createFakeKitchenEquipmentRepository();
-    const app = await buildApp({ projectSiteKitchenEquipmentRepository: repository });
+    const auditLogRepository = createFakeAuditLogRepository();
+    const app = await buildApp({ projectSiteKitchenEquipmentRepository: repository, auditLogRepository });
 
     const approved = await app.inject({
       method: "POST",
@@ -1658,6 +1702,7 @@ describe("project-site kitchen equipment API", () => {
         proposedQuantity: 1,
         proposedLocation: "备餐间",
         proposedStatus: "in_use",
+        attachmentPath: "/volume1/company-erp/attachments/equipment/disinfection.jpg",
       },
     });
     const rejected = await app.inject({
@@ -1666,6 +1711,7 @@ describe("project-site kitchen equipment API", () => {
       payload: { reviewStatus: "rejected", reviewRemark: "重复上报" },
     });
     const afterRejected = await app.inject({ method: "GET", url: "/api/project-site-kitchen-equipment" });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(approved.statusCode).toBe(200);
@@ -1680,5 +1726,20 @@ describe("project-site kitchen equipment API", () => {
     expect(rejected.statusCode).toBe(200);
     expect(rejected.json()).toMatchObject({ kitchenEquipmentChangeRequest: { reviewStatus: "rejected" } });
     expect(JSON.stringify(afterRejected.json())).not.toContain("双门消毒柜");
+    expect(logs.map((log) => log.action)).toEqual([
+      "project_site_kitchen_equipment_change_request.review",
+      "project_site_kitchen_equipment_change_request.create",
+      "project_site_kitchen_equipment_change_request.review",
+    ]);
+    expect(logs.map((log) => log.entityType)).toEqual([
+      "project_site_kitchen_equipment_change_request",
+      "project_site_kitchen_equipment_change_request",
+      "project_site_kitchen_equipment_change_request",
+    ]);
+    expect(logs.at(1)).toMatchObject({
+      entityId: addRequest.json().kitchenEquipmentChangeRequest.id,
+    });
+    expect(JSON.stringify(logs)).not.toContain("/volume1");
+    expect(JSON.stringify(logs)).not.toMatch(/password|secret|cookie|[0-9]{17}[\dXx]/);
   });
 });

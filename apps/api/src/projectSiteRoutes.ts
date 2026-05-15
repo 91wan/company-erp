@@ -1,7 +1,37 @@
 import type { FastifyInstance } from "fastify";
+import type { ProjectSiteKitchenEquipmentChangeRequestDto, ProjectSiteKitchenEquipmentDto } from "@company-erp/shared";
 import type { AuthenticatedRequest } from "./auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
+
+function kitchenEquipmentAuditSnapshot(equipment: ProjectSiteKitchenEquipmentDto) {
+  return {
+    projectSiteId: equipment.projectSiteId,
+    equipmentName: equipment.equipmentName,
+    equipmentCategory: equipment.equipmentCategory,
+    quantity: equipment.quantity,
+    unit: equipment.unit,
+    location: equipment.location,
+    status: equipment.status,
+    companyAssetTag: equipment.companyAssetTag,
+    sourceContractId: equipment.sourceContractId,
+  };
+}
+
+function kitchenEquipmentChangeRequestAuditSnapshot(request: ProjectSiteKitchenEquipmentChangeRequestDto) {
+  return {
+    projectSiteId: request.projectSiteId,
+    equipmentId: request.equipmentId,
+    equipmentName: request.equipmentName,
+    changeType: request.changeType,
+    proposedQuantity: request.proposedQuantity,
+    proposedLocation: request.proposedLocation,
+    proposedStatus: request.proposedStatus,
+    reviewStatus: request.reviewStatus,
+    reviewedByEmployeeId: request.reviewedByEmployeeId,
+    submittedByAccountId: request.submittedByAccountId,
+  };
+}
 
 async function coveredPersonScopeFailure(
   request: unknown,
@@ -342,6 +372,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
       const kitchenEquipment = await options.projectSiteKitchenEquipmentRepository.createEquipment(input);
+      await writeAuditLog(request, options, {
+        action: "project_site_kitchen_equipment.create",
+        entityType: "project_site_kitchen_equipment",
+        entityId: kitchenEquipment.id,
+        afterJson: kitchenEquipmentAuditSnapshot(kitchenEquipment),
+      });
       return reply.status(201).send({ kitchenEquipment });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -369,6 +405,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), kitchenEquipment.projectSiteId)) {
         return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_NOT_FOUND" });
       }
+      await writeAuditLog(request, options, {
+        action: "project_site_kitchen_equipment.update",
+        entityType: "project_site_kitchen_equipment",
+        entityId: kitchenEquipment.id,
+        afterJson: kitchenEquipmentAuditSnapshot(kitchenEquipment),
+      });
       return { kitchenEquipment };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -425,6 +467,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
       const kitchenEquipmentChangeRequest = await options.projectSiteKitchenEquipmentRepository.createChangeRequest(scopedInput);
+      await writeAuditLog(request, options, {
+        action: "project_site_kitchen_equipment_change_request.create",
+        entityType: "project_site_kitchen_equipment_change_request",
+        entityId: kitchenEquipmentChangeRequest.id,
+        afterJson: kitchenEquipmentChangeRequestAuditSnapshot(kitchenEquipmentChangeRequest),
+      });
       return reply.status(201).send({ kitchenEquipmentChangeRequest });
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -456,6 +504,12 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), kitchenEquipmentChangeRequest.projectSiteId)) {
         return reply.status(404).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_REQUEST_NOT_FOUND" });
       }
+      await writeAuditLog(request, options, {
+        action: "project_site_kitchen_equipment_change_request.review",
+        entityType: "project_site_kitchen_equipment_change_request",
+        entityId: kitchenEquipmentChangeRequest.id,
+        afterJson: kitchenEquipmentChangeRequestAuditSnapshot(kitchenEquipmentChangeRequest),
+      });
       return { kitchenEquipmentChangeRequest };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {

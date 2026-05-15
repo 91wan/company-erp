@@ -20,6 +20,10 @@ const auditedMutationRoutes = [
   ["peoplePermissionsRoutes.ts", "patch", "/api/project-site-assignments/:id"],
   ["attachmentRoutes.ts", "post", "/api/attachments"],
   ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment"],
+  ["projectSiteRoutes.ts", "patch", "/api/project-site-kitchen-equipment/:id"],
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment-change-requests"],
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment-change-requests/:id/review"],
   ["contractsBusinessCertificatesRoutes.ts", "post", "/api/business-projects"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/business-projects/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "post", "/api/contracts/:id/attachments"],
@@ -32,11 +36,20 @@ const auditedMutationRoutes = [
   ["importJobRoutes.ts", "post", "/api/import-jobs/:id/confirm"],
 ] as const;
 
-const requiredAttachmentAuditRoutes: ReadonlyArray<(typeof auditedMutationRoutes)[number]> = [
+type AuditRoute = readonly [string, string, string];
+
+const requiredAttachmentAuditRoutes: ReadonlyArray<AuditRoute> = [
   ["attachmentRoutes.ts", "post", "/api/attachments"],
   ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "post", "/api/contracts/:id/attachments"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
+];
+
+const requiredProjectSiteEquipmentAuditRoutes: ReadonlyArray<AuditRoute> = [
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment"],
+  ["projectSiteRoutes.ts", "patch", "/api/project-site-kitchen-equipment/:id"],
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment-change-requests"],
+  ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment-change-requests/:id/review"],
 ];
 
 function routeHandlerSource(fileName: string, method: string, path: string): string {
@@ -50,6 +63,10 @@ function routeHandlerSource(fileName: string, method: string, path: string): str
 
 describe("audit log mutation coverage", () => {
   it.each(requiredAttachmentAuditRoutes)("%s %s %s stays in the audit coverage gate", (fileName, method, path) => {
+    expect(auditedMutationRoutes).toContainEqual([fileName, method, path]);
+  });
+
+  it.each(requiredProjectSiteEquipmentAuditRoutes)("%s %s %s stays in the audit coverage gate", (fileName, method, path) => {
     expect(auditedMutationRoutes).toContainEqual([fileName, method, path]);
   });
 
