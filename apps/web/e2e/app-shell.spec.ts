@@ -189,6 +189,7 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByRole("button", { name: "库存", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "合同", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "人员权限", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "系统设置", exact: true })).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);
   await expect(page.getByText("采购价")).toHaveCount(0);
   await expect(page.getByText("采购参考价")).toHaveCount(0);

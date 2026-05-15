@@ -495,6 +495,8 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       return fulfill(route, {
         complianceSummary: {
           projectSiteId: demoProjectSite.id,
+          projectSiteName: demoProjectSite.siteName,
+          payrollAgencyRequired: demoProjectSite.payrollAgencyRequired,
           activeRosterCount: 0,
           missingHealthCertificateCount: 0,
           expiringHealthCertificateCount: 0,
@@ -506,6 +508,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
           payrollCurrentMonthStatus: "not_required",
           blockingIssueCount: 0,
           warningIssueCount: 0,
+          generatedAt: "2026-05-13T12:00:00.000Z",
         },
       });
     }

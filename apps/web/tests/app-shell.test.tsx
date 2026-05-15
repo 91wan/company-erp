@@ -13,6 +13,7 @@ import {
   inventoryMovement,
   jsonResponse,
   mockShellFetch,
+  projectSiteComplianceSummary,
   projectUsageRequest,
   projectSiteUser,
   purchaseRecord,
@@ -368,10 +369,10 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /今日待办\s+1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /红色风险\s+2/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /红色风险\s+3/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /临期提醒\s+0/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /低库存物料\s+1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /待审核资料\s+0/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /待审核资料\s+1/ })).toBeInTheDocument();
 
     expect(screen.getByText(/PR-LIVE-APPROVAL/)).toBeInTheDocument();
     expect(screen.getByText(/实时申请人/)).toBeInTheDocument();
@@ -382,6 +383,49 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText(/HT-LIVE-EXPIRED/)).toBeInTheDocument();
     expect(screen.getByText(/CERT-LIVE-EXPIRED/)).toBeInTheDocument();
     expect(screen.getAllByText(/实时过期健康证/).length).toBeGreaterThan(0);
+  });
+
+  it("separates certificate warning, pending review, and project-site compliance risk on the dashboard", async () => {
+    mockShellFetch(adminUser, undefined, undefined, {
+      purchaseRequests: [],
+      projectUsageRequests: [],
+      contracts: [],
+      inventoryBalances: [],
+      certificates: [
+        {
+          ...expiredCertificate,
+          id: "cert-warning-confirmed",
+          certificateCode: "CERT-WARNING-CONFIRMED",
+          certificateName: "已确认临期证照",
+          computedStatus: "expiring_soon",
+          confirmedAt: "2026-05-13T10:00:00.000Z",
+        },
+        {
+          ...expiredCertificate,
+          id: "cert-pending-review",
+          certificateCode: "CERT-PENDING-REVIEW",
+          certificateName: "待总部确认资料",
+          computedStatus: "valid",
+          confirmedAt: null,
+        },
+      ],
+      complianceSummaries: {
+        [projectSiteComplianceSummary.projectSiteId]: {
+          ...projectSiteComplianceSummary,
+          blockingIssueCount: 2,
+          warningIssueCount: 1,
+        },
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /红色风险\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /临期提醒\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /待审核资料\s+1/ })).toBeInTheDocument();
+    expect(screen.getAllByText("项目点合规").length).toBeGreaterThan(0);
+    expect(screen.getByText("阻断 2")).toBeInTheDocument();
   });
 
   it("keeps the dashboard usable when one live summary source fails", async () => {
@@ -492,6 +536,7 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: /^总览$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^基础资料$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^库存$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^系统设置$/ })).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole("button", { name: "新增领用申请" }));
     expect(await screen.findByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
