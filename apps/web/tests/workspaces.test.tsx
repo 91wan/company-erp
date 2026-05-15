@@ -489,6 +489,30 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
   });
 
+  it("shows compliance task queue in project-site detail overview", async () => {
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([{ ...projectSite, payrollAgencyRequired: true }])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+      />,
+    );
+
+    await screen.findByText("SITE-WX-001");
+    fireEvent.click(screen.getByText("SITE-WX-001"));
+
+    expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
+    expect(screen.getByText("健康证阻断")).toBeInTheDocument();
+    expect(screen.getByText("食品经营许可证预警")).toBeInTheDocument();
+    expect(screen.getByText("雇主责任险覆盖异常")).toBeInTheDocument();
+    expect(screen.getByText("工资表待审核")).toBeInTheDocument();
+  });
+
   it("renders project-site compliance pack summary", async () => {
     render(
       <ProjectSitesWorkspace
@@ -555,6 +579,39 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     expect(await screen.findByText("红色风险")).toBeInTheDocument();
     expect(screen.getByText(/暂无可见领用申请/)).toBeInTheDocument();
+  });
+
+  it("shows actionable compliance tasks in the external project-site portal", async () => {
+    const onPortalSectionChange = vi.fn();
+    render(
+      <ProjectSitesWorkspace
+        usageOnly
+        portalSection="overview"
+        onPortalSectionChange={onPortalSectionChange}
+        loadProjectSites={() => Promise.resolve([{ ...projectSite, payrollAgencyRequired: true }])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+        loadUsageOptions={() =>
+          Promise.resolve({
+            defaultWarehouse: { id: warehouse.id, warehouseCode: warehouse.warehouseCode, warehouseName: warehouse.warehouseName },
+            materials: [{ id: material.id, materialCode: material.materialCode, materialName: material.materialName, unit: "套" }],
+          })
+        }
+        loadKitchenEquipment={() => Promise.resolve([])}
+        loadKitchenEquipmentChangeRequests={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
+    expect(await screen.findByText("健康证阻断")).toBeInTheDocument();
+    expect(screen.getByText("食品经营许可证预警")).toBeInTheDocument();
+    expect(screen.getByText("雇主责任险覆盖异常")).toBeInTheDocument();
+    expect(screen.getByText("工资表待审核")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "处理健康证阻断" }));
+    expect(onPortalSectionChange).toHaveBeenCalledWith("rosterHealth");
+    fireEvent.click(screen.getByRole("button", { name: "处理雇主责任险覆盖异常" }));
+    expect(onPortalSectionChange).toHaveBeenCalledWith("insurance");
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {
