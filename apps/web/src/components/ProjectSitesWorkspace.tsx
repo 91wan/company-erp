@@ -366,6 +366,7 @@ export function ProjectSitesWorkspace({
   const [kitchenEquipmentChangeSubmitError, setKitchenEquipmentChangeSubmitError] = useState("");
   const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
+  const [pendingIssueConfirm, setPendingIssueConfirm] = useState(false);
   const [siteForm, setSiteForm] = useState<SiteFormState>({
     siteCode: "",
     siteName: "",
@@ -794,6 +795,11 @@ export function ProjectSitesWorkspace({
 
   async function handleIssueUsageRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!pendingIssueConfirm) {
+      setIssueSubmitError("");
+      setPendingIssueConfirm(true);
+      return;
+    }
     setIssueSubmitState("saving");
     setIssueSubmitError("");
 
@@ -815,10 +821,12 @@ export function ProjectSitesWorkspace({
         receivedByName: "",
       }));
       setIssueSubmitState("idle");
+      setPendingIssueConfirm(false);
       setOpenFormDrawer(null);
     } catch (error) {
       setIssueSubmitError(formatApiError(error, "出库失败，请检查库存余额、单号或申请状态。"));
       setIssueSubmitState("error");
+      setPendingIssueConfirm(false);
     }
   }
 
@@ -1498,17 +1506,33 @@ export function ProjectSitesWorkspace({
         </FormDrawer>
       </div>
 
-      <FormDrawer title="出库登记" open={openFormDrawer === "issue"} onClose={() => setOpenFormDrawer(null)}>
+      <FormDrawer
+        title="出库登记"
+        open={openFormDrawer === "issue"}
+        onClose={() => {
+          setPendingIssueConfirm(false);
+          setOpenFormDrawer(null);
+        }}
+      >
         {canIssueUsage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单" noValidate>
         <div className="panel-header people-panel-title">
           <h3>
             <PackageMinus aria-hidden="true" size={16} />
             出库登记
           </h3>
-          <button type="submit" disabled={issueSubmitState === "saving" || usageRequests.length === 0}>
-            <Save aria-hidden="true" size={15} />
-            执行出库
-          </button>
+          <div className="inline-actions">
+            <button type="submit" disabled={issueSubmitState === "saving" || usageRequests.length === 0 || pendingIssueConfirm}>
+              <Save aria-hidden="true" size={15} />
+              执行出库
+            </button>
+            {pendingIssueConfirm ? (
+              <div className="inline-confirm-actions" aria-label="确认执行出库">
+                <span>确认执行本次出库？</span>
+                <button type="submit" disabled={issueSubmitState === "saving"}>确认出库</button>
+                <button type="button" onClick={() => setPendingIssueConfirm(false)}>取消</button>
+              </div>
+            ) : null}
+          </div>
         </div>
         <label>
           <span>领用申请</span>
