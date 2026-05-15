@@ -24,6 +24,8 @@ import {
   type ContractDto,
   type InventoryBalanceDto,
   type InventoryMovementDto,
+  type ProjectSiteComplianceSummaryDto,
+  type ProjectSiteDto,
   type ProjectUsageRequestDto,
   type PurchaseRecordDto,
   type PurchaseRequestDto,
@@ -108,7 +110,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           }
           setActiveWorkspace(item.workspace as WorkspaceKey);
         }}
-        onSelectSettings={() => setActiveWorkspace("系统设置")}
+        onSelectSettings={isExternalProjectSite ? undefined : () => setActiveWorkspace("系统设置")}
       />
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
@@ -206,7 +208,7 @@ function Sidebar({
   externalMode: boolean;
   activePortalSection: ExternalProjectSitePortalSection;
   onSelectItem: (item: NavigationItem) => void;
-  onSelectSettings: () => void;
+  onSelectSettings?: () => void;
 }) {
   return (
     <aside className="erp-sidebar" aria-label="ERP modules">
@@ -235,17 +237,19 @@ function Sidebar({
         ))}
       </nav>
 
-      <button
-        type="button"
-        className={activeWorkspace === "系统设置" ? "nav-item sidebar-settings active" : "nav-item sidebar-settings"}
-        aria-current={activeWorkspace === "系统设置" ? "page" : undefined}
-        onClick={onSelectSettings}
-      >
-        <SettingsIcon aria-hidden="true" size={20} strokeWidth={1.9} />
-        <span>系统设置</span>
-        {externalMode ? <small>账号</small> : null}
-        <ChevronsRight aria-hidden="true" size={16} className="settings-chevron" />
-      </button>
+      {onSelectSettings ? (
+        <button
+          type="button"
+          className={activeWorkspace === "系统设置" ? "nav-item sidebar-settings active" : "nav-item sidebar-settings"}
+          aria-current={activeWorkspace === "系统设置" ? "page" : undefined}
+          onClick={onSelectSettings}
+        >
+          <SettingsIcon aria-hidden="true" size={20} strokeWidth={1.9} />
+          <span>系统设置</span>
+          {externalMode ? <small>账号</small> : null}
+          <ChevronsRight aria-hidden="true" size={16} className="settings-chevron" />
+        </button>
+      ) : null}
     </aside>
   );
 }
@@ -290,6 +294,8 @@ type DashboardLiveData = {
   projectUsageRequests: LoadState<ProjectUsageRequestDto[]>;
   contracts: LoadState<ContractDto[]>;
   certificates: LoadState<CertificateRecordDto[]>;
+  projectSites: LoadState<ProjectSiteDto[]>;
+  projectSiteComplianceSummaries: LoadState<ProjectSiteComplianceSummaryDto[]>;
   appVersion: LoadState<AppVersionDto | null>;
 };
 
@@ -301,6 +307,8 @@ const emptyDashboardData: DashboardLiveData = {
   projectUsageRequests: { status: "loading", data: [] },
   contracts: { status: "loading", data: [] },
   certificates: { status: "loading", data: [] },
+  projectSites: { status: "loading", data: [] },
+  projectSiteComplianceSummaries: { status: "loading", data: [] },
   appVersion: { status: "loading", data: null },
 };
 
@@ -308,6 +316,24 @@ async function loadDashboardResource<T>(path: string, key: string): Promise<Load
   try {
     const payload = await requestJson<Record<string, T[]>>(`${apiBaseUrl}${path}`);
     return { status: "success", data: Array.isArray(payload[key]) ? payload[key] : [] };
+  } catch {
+    return { status: "error", data: [] };
+  }
+}
+
+async function loadProjectSiteComplianceSummaries(projectSites: LoadState<ProjectSiteDto[]>): Promise<LoadState<ProjectSiteComplianceSummaryDto[]>> {
+  if (projectSites.status === "error") return { status: "error", data: [] };
+
+  try {
+    const summaries = await Promise.all(
+      projectSites.data.map(async (site) => {
+        const payload = await requestJson<{ complianceSummary: ProjectSiteComplianceSummaryDto }>(
+          `${apiBaseUrl}/api/project-sites/${site.id}/compliance-summary`,
+        );
+        return payload.complianceSummary;
+      }),
+    );
+    return { status: "success", data: summaries };
   } catch {
     return { status: "error", data: [] };
   }
@@ -329,6 +355,7 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         projectUsageRequests,
         contracts,
         certificates,
+        projectSites,
         appVersion,
       ] = await Promise.all([
         loadDashboardResource<PurchaseRequestDto>("/api/purchase-requests", "purchaseRequests"),
@@ -340,10 +367,12 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         loadDashboardResource<ProjectUsageRequestDto>("/api/project-usage-requests", "projectUsageRequests"),
         loadDashboardResource<ContractDto>("/api/contracts", "contracts"),
         loadDashboardResource<CertificateRecordDto>("/api/certificates", "certificates"),
+        loadDashboardResource<ProjectSiteDto>("/api/project-sites", "projectSites"),
         getAppVersion()
           .then((version): LoadState<AppVersionDto | null> => ({ status: "success", data: version }))
           .catch((): LoadState<AppVersionDto | null> => ({ status: "error", data: null })),
       ]);
+      const projectSiteComplianceSummaries = await loadProjectSiteComplianceSummaries(projectSites);
 
       if (!mounted) return;
       setData({
@@ -354,6 +383,8 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         projectUsageRequests,
         contracts,
         certificates,
+        projectSites,
+        projectSiteComplianceSummaries,
         appVersion,
       });
     }
@@ -538,13 +569,17 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
   const pendingUsageCount = data.projectUsageRequests.data.filter((request) => request.status === "pending").length;
   const expiredCertificateCount = data.certificates.data.filter((certificate) => certificate.computedStatus === "expired").length;
   const expiredContractCount = data.contracts.data.filter((contract) => contract.expiryState === "expired").length;
+  const blockingComplianceSiteCount = data.projectSiteComplianceSummaries.data.filter((summary) => summary.blockingIssueCount > 0).length;
   const warningCertificateCount = data.certificates.data.filter((certificate) =>
     ["expiring_soon", "review_due", "review_due_soon"].includes(certificate.computedStatus),
   ).length;
   const warningContractCount = data.contracts.data.filter((contract) => contract.expiryState === "expiring_soon").length;
+  const pendingCertificateReviewCount = data.certificates.data.filter(
+    (certificate) => certificate.isComplianceCritical && !certificate.confirmedAt && !certificate.isDisabled,
+  ).length;
   const lowStockCount = data.inventoryBalances.data.filter((balance) => balance.isLowStock).length;
   const todoCount = pendingApprovalCount + pendingUsageCount;
-  const dangerCount = expiredCertificateCount + expiredContractCount;
+  const dangerCount = expiredCertificateCount + expiredContractCount + blockingComplianceSiteCount;
   const warningCount = warningCertificateCount + warningContractCount;
 
   return [
@@ -558,7 +593,9 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
     {
       label: "红色风险",
       value: String(dangerCount),
-      detail: data.contracts.status === "error" || data.certificates.status === "error" ? "数据暂不可用" : "已过期合同/证照",
+      detail: data.contracts.status === "error" || data.certificates.status === "error" || data.projectSiteComplianceSummaries.status === "error"
+        ? "数据暂不可用"
+        : "已过期合同/证照与项目点合规",
       tone: "orange",
       icon: PackageCheck,
     },
@@ -578,8 +615,8 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
     },
     {
       label: "待审核资料",
-      value: String(warningCertificateCount),
-      detail: data.certificates.status === "error" ? "数据暂不可用" : "证照临期或待复核",
+      value: String(pendingCertificateReviewCount),
+      detail: data.certificates.status === "error" ? "数据暂不可用" : "证照未总部确认",
       tone: "cyan",
       icon: MapPin,
     },
@@ -725,12 +762,25 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "库存",
       tone: "warning",
     }));
-  const rows = [...certificateRisks, ...contractRisks, ...lowStocks].slice(0, 8);
+  const projectSiteComplianceRisks: QueueItem[] = data.projectSiteComplianceSummaries.data
+    .filter((summary) => summary.blockingIssueCount > 0 || summary.warningIssueCount > 0)
+    .slice(0, 3)
+    .map((summary) => ({
+      title: summary.projectSiteName,
+      category: "项目点合规",
+      owner: "项目点合规摘要",
+      status: summary.blockingIssueCount > 0 ? `阻断 ${summary.blockingIssueCount}` : `预警 ${summary.warningIssueCount}`,
+      updatedAt: formatDateTime(summary.generatedAt),
+      target: "项目点",
+      tone: summary.blockingIssueCount > 0 ? "danger" : "warning",
+    }));
+  const rows = [...certificateRisks, ...contractRisks, ...projectSiteComplianceRisks, ...lowStocks].slice(0, 8);
 
   return (
     <SectionCard title="风险队列" badge={<UiStatusBadge tone={rows.some((row) => row.tone === "danger") ? "danger" : "warning"}>{rows.length} 项</UiStatusBadge>} action={<button type="button" onClick={() => onNavigate("证照资质")}>查看风险</button>}>
       {data.certificates.status === "error" ? <PanelStateMessage text="证照风险数据暂不可用" /> : null}
       {data.contracts.status === "error" ? <PanelStateMessage text="合同风险数据暂不可用" /> : null}
+      {data.projectSiteComplianceSummaries.status === "error" ? <PanelStateMessage text="项目点合规风险数据暂不可用" /> : null}
       {data.inventoryBalances.status === "error" ? <PanelStateMessage text="库存风险数据暂不可用" /> : null}
       <DataTable
         headers={["风险", "类型", "归属", "状态", "时间"]}
