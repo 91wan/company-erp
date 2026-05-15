@@ -1,4 +1,5 @@
 import { ClipboardList, RefreshCw, Wrench } from "lucide-react";
+import { useState } from "react";
 import type {
   ProjectSiteKitchenEquipmentChangeRequestDto,
   ProjectSiteKitchenEquipmentDto,
@@ -24,6 +25,11 @@ export function ProjectSiteKitchenEquipmentPanel({
   complianceReviewStatusLabel: Map<string, string>;
   onReviewChangeRequest: (id: string, reviewStatus: "approved" | "rejected") => void;
 }) {
+  const [pendingReview, setPendingReview] = useState<{
+    id: string;
+    reviewStatus: "approved" | "rejected";
+  } | null>(null);
+
   return (
     <>
       <section className="dashboard-panel table-panel" aria-label="项目点厨房设备">
@@ -91,12 +97,30 @@ export function ProjectSiteKitchenEquipmentPanel({
                 : [
                     request.reviewStatus === "pending" ? (
                       <div className="table-actions" key={request.id}>
-                        <button type="button" onClick={() => onReviewChangeRequest(request.id, "approved")}>
+                        <button type="button" onClick={() => setPendingReview({ id: request.id, reviewStatus: "approved" })}>
                           通过
                         </button>
-                        <button type="button" onClick={() => onReviewChangeRequest(request.id, "rejected")}>
+                        <button type="button" onClick={() => setPendingReview({ id: request.id, reviewStatus: "rejected" })}>
                           驳回
                         </button>
+                        {pendingReview?.id === request.id ? (
+                          <div
+                            className="inline-confirm-actions"
+                            aria-label={`确认${pendingReview.reviewStatus === "approved" ? "通过" : "驳回"} ${request.equipmentName}`}
+                          >
+                            <span>确认{pendingReview.reviewStatus === "approved" ? "通过" : "驳回"}？</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onReviewChangeRequest(request.id, pendingReview.reviewStatus);
+                                setPendingReview(null);
+                              }}
+                            >
+                              确认{pendingReview.reviewStatus === "approved" ? "通过" : "驳回"}
+                            </button>
+                            <button type="button" onClick={() => setPendingReview(null)}>取消</button>
+                          </div>
+                        ) : null}
                       </div>
                     ) : "-",
                   ]),

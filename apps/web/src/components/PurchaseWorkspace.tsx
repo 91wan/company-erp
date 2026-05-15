@@ -144,6 +144,10 @@ export function PurchaseWorkspace({
   const [recordSubmitError, setRecordSubmitError] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [reviewRemark, setReviewRemark] = useState("");
+  const [pendingReviewAction, setPendingReviewAction] = useState<{
+    action: "approve" | "reject";
+    requestId: string;
+  } | null>(null);
   const [openFormDrawer, setOpenFormDrawer] = useState<PurchaseFormDrawer>(null);
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
@@ -289,6 +293,7 @@ export function PurchaseWorkspace({
       replacePurchaseRequest(updated);
       setReviewRemark("");
       setReviewState("idle");
+      setPendingReviewAction(null);
     } catch (error) {
       setReviewError(formatApiError(error, "审批操作失败"));
       setReviewState("error");
@@ -435,14 +440,40 @@ export function PurchaseWorkspace({
                       <td>
                         {canManage ? (
                           <div className="inline-actions">
-                            <button type="button" disabled={reviewState === "saving"} onClick={() => handleRequestReview("approve", request)}>
+                            <button
+                              type="button"
+                              disabled={reviewState === "saving"}
+                              onClick={() => setPendingReviewAction({ action: "approve", requestId: request.id })}
+                            >
                               <Check aria-hidden="true" size={14} />
                               审批通过 {request.requestNo}
                             </button>
-                            <button type="button" disabled={reviewState === "saving"} onClick={() => handleRequestReview("reject", request)}>
+                            <button
+                              type="button"
+                              disabled={reviewState === "saving"}
+                              onClick={() => setPendingReviewAction({ action: "reject", requestId: request.id })}
+                            >
                               <X aria-hidden="true" size={14} />
                               驳回 {request.requestNo}
                             </button>
+                            {pendingReviewAction?.requestId === request.id ? (
+                              <div
+                                className="inline-confirm-actions"
+                                aria-label={`确认${pendingReviewAction.action === "approve" ? "审批通过" : "驳回"} ${request.requestNo}`}
+                              >
+                                <span>
+                                  确认{pendingReviewAction.action === "approve" ? "审批通过" : "驳回"} {request.requestNo}？
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={reviewState === "saving"}
+                                  onClick={() => handleRequestReview(pendingReviewAction.action, request)}
+                                >
+                                  确认{pendingReviewAction.action === "approve" ? "审批通过" : "驳回"}
+                                </button>
+                                <button type="button" onClick={() => setPendingReviewAction(null)}>取消</button>
+                              </div>
+                            ) : null}
                           </div>
                         ) : (
                           "只读"

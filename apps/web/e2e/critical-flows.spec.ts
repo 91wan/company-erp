@@ -130,6 +130,8 @@ test("warehouse-capable admin can issue usage and sees charge snapshot refresh",
   await page.getByLabel("经办人").fill("DEMO 仓管");
   await page.getByLabel("领用人").fill("DEMO 领用人");
   await page.getByRole("button", { name: "执行出库" }).click();
+  await expect(page.getByText("确认执行本次出库？")).toBeVisible();
+  await page.getByRole("button", { name: "确认出库" }).click();
 
   await expect(page.getByText("DEMO 领用人")).toBeVisible();
   await expect(page.getByText("¥196.00")).toBeVisible();

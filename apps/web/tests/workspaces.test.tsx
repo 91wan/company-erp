@@ -576,6 +576,40 @@ describe("Company ERP workspace components", () => {
     );
   });
 
+  it("requires confirmation before reviewing kitchen equipment change requests", async () => {
+    const reviewedRequest = {
+      ...projectSiteKitchenEquipmentChangeRequest,
+      reviewStatus: "approved" as const,
+    };
+    const reviewKitchenEquipmentChangeRequest = vi.fn(() => Promise.resolve(reviewedRequest));
+
+    render(
+      <ProjectSitesWorkspace
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
+        loadParties={() => Promise.resolve([party])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
+        loadKitchenEquipment={() => Promise.resolve([projectSiteKitchenEquipment])}
+        loadKitchenEquipmentChangeRequests={() => Promise.resolve([projectSiteKitchenEquipmentChangeRequest])}
+        reviewKitchenEquipmentChangeRequest={reviewKitchenEquipmentChangeRequest}
+      />,
+    );
+
+    expect(await screen.findByText("压缩机异响，需要维修")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "通过" }));
+    expect(reviewKitchenEquipmentChangeRequest).not.toHaveBeenCalled();
+    expect(screen.getByText("确认通过？")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByText("确认通过？")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "通过" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认通过" }));
+
+    expect(reviewKitchenEquipmentChangeRequest).toHaveBeenCalledWith(projectSiteKitchenEquipmentChangeRequest.id, { reviewStatus: "approved" });
+  });
+
   it("renders project site empty and error states", async () => {
     const { rerender } = render(
       <ProjectSitesWorkspace
@@ -671,6 +705,7 @@ describe("Company ERP workspace components", () => {
       lastReceivedByName: "项目点领用人",
       status: "issued" as const,
     };
+    const issueUsageRequest = vi.fn(() => Promise.resolve(issuedRequest));
     const { rerender } = render(
       <ProjectSitesWorkspace
         loadProjectSites={() => Promise.resolve([projectSite])}
@@ -680,7 +715,7 @@ describe("Company ERP workspace components", () => {
         loadWarehouses={() => Promise.resolve([warehouse])}
         loadBusinessProjects={() => Promise.resolve([businessProject])}
         loadInvestmentSummary={() => Promise.resolve(projectSiteInvestmentSummary)}
-        issueUsageRequest={() => Promise.resolve(issuedRequest)}
+        issueUsageRequest={issueUsageRequest}
       />,
     );
 
@@ -693,7 +728,14 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("领用人"), { target: { value: "项目点领用人" } });
     fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
+    expect(issueUsageRequest).not.toHaveBeenCalled();
+    expect(screen.getByText("确认执行本次出库？")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByText("确认执行本次出库？")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认出库" }));
 
+    expect(issueUsageRequest).toHaveBeenCalledWith(projectUsageRequest.id, expect.objectContaining({ outboundNo: "OUT20260511001", quantity: 10 }));
     expect((await screen.findAllByText("已出库")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("10 套")).length).toBeGreaterThan(0);
     expect(await screen.findByText("¥980.00")).toBeInTheDocument();
@@ -719,6 +761,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("领用时间"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "执行出库" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认出库" }));
 
     expect(await screen.findByText("出库失败，请检查库存余额、单号或申请状态。")).toBeInTheDocument();
   });
@@ -1242,11 +1285,20 @@ describe("Company ERP workspace components", () => {
 
     fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "同意采购" } });
     fireEvent.click(screen.getByRole("button", { name: "审批通过 PR-PENDING" }));
+    expect(approvePurchaseRequest).not.toHaveBeenCalled();
+    expect(screen.getByText("确认审批通过 PR-PENDING？")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByText("确认审批通过 PR-PENDING？")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "审批通过 PR-PENDING" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认审批通过" }));
     expect(await screen.findByText((content) => content.includes("同意采购"))).toBeInTheDocument();
     expect(approvePurchaseRequest).toHaveBeenCalledWith("request-pending", { reviewedByName: "", reviewRemark: "同意采购" });
 
     fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "资料不完整" } });
     fireEvent.click(screen.getByRole("button", { name: "驳回 PR-REJECT" }));
+    expect(rejectPurchaseRequest).not.toHaveBeenCalled();
+    expect(screen.getByText("确认驳回 PR-REJECT？")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认驳回" }));
     expect(await screen.findByText("已驳回")).toBeInTheDocument();
     expect(rejectPurchaseRequest).toHaveBeenCalledWith("request-pending-reject", { reviewedByName: "", reviewRemark: "资料不完整" });
   });
@@ -1277,6 +1329,7 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByRole("button", { name: "审批通过 PR20260511001" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "审批通过 PR20260511001" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认审批通过" }));
     expect(await screen.findByText("审批操作失败")).toBeInTheDocument();
   });
 
