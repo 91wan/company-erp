@@ -1981,6 +1981,7 @@ tbody tr.clickable-row {
   .dashboard-grid-primary,
   .dashboard-grid-secondary,
   .parties-layout,
+  .people-section-grid,
   .replenishment-card,
   .inventory-grid {
     grid-template-columns: 1fr;
