@@ -57,10 +57,14 @@ export function ProjectSiteCompliancePanel({
                     summary?.payrollCurrentMonthStatus ??
                     "缺失"}
                 </StatusBadge>
-              ) : "不需要",
+              ) : (
+                <StatusBadge key={`${site.id}-payroll-not-required`} tone="gray">
+                  不需要
+                </StatusBadge>
+              ),
               summary ? (
                 <span>
-                  <StatusBadge tone={summary.blockingIssueCount > 0 ? "orange" : summary.warningIssueCount > 0 ? "orange" : "green"}>
+                  <StatusBadge tone={summary.blockingIssueCount > 0 ? "red" : summary.warningIssueCount > 0 ? "orange" : "green"}>
                     {complianceRiskLabel(summary)}
                   </StatusBadge>{" "}
                   {summary.blockingIssueCount} 阻断 / {summary.warningIssueCount} 提醒
@@ -74,11 +78,13 @@ export function ProjectSiteCompliancePanel({
   );
 }
 
-export function complianceStatusTone(status: string): "green" | "orange" | "gray" {
-  if (status === "valid" || status === "approved" || status === "not_required" || status === "not_applicable") {
-    return "green";
+export function complianceStatusTone(status: string): "green" | "orange" | "gray" | "red" {
+  if (["blocking", "red", "missing", "expired", "rejected"].includes(status)) return "red";
+  if (["warning", "expiring", "expiring_soon", "pending", "review_due", "review_due_soon"].includes(status)) {
+    return "orange";
   }
-  if (status === "expiring_soon" || status === "pending" || status === "review_due_soon") return "orange";
+  if (status === "valid" || status === "approved") return "green";
+  if (status === "not_required" || status === "not_applicable") return "gray";
   return "gray";
 }
 

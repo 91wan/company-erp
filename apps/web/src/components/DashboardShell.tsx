@@ -47,6 +47,7 @@ import { PurchaseWorkspace } from "./PurchaseWorkspace";
 import { InventoryWorkspace } from "./InventoryWorkspace";
 import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWorkspace";
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
+import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
 import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
@@ -79,6 +80,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
     isExternalProjectSite ? "项目点" : "总览",
   );
+  const [activePortalSection, setActivePortalSection] = useState<ExternalProjectSitePortalSection>("overview");
   const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
   const visibleNavigationGroups = buildVisibleNavigationGroups(currentUser, isExternalProjectSite);
   const isReadOnly = !(
@@ -99,7 +101,14 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
         activeWorkspace={activeWorkspace}
         groups={visibleNavigationGroups}
         externalMode={isExternalProjectSite}
-        onSelectWorkspace={setActiveWorkspace}
+        activePortalSection={activePortalSection}
+        onSelectItem={(item) => {
+          if (isExternalProjectSite && item.portalSection) {
+            setActivePortalSection(item.portalSection);
+          }
+          setActiveWorkspace(item.workspace as WorkspaceKey);
+        }}
+        onSelectSettings={() => setActiveWorkspace("系统设置")}
       />
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
@@ -132,6 +141,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canManage={canManage(currentUser.roles, "certificates")}
               allowedOwnerTypes={isProjectSiteScoped ? SCOPED_CERTIFICATE_OWNER_TYPES : undefined}
               allowedPersonOwnerSources={isProjectSiteScoped ? SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES : undefined}
+              portalSection={isExternalProjectSite ? activePortalSection : undefined}
             />
           ) : null}
           {activeWorkspace === "项目点" ? (
@@ -140,6 +150,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canManageUsage={canManage(currentUser.roles, "projectUsageRequest")}
               canIssue={canManage(currentUser.roles, "inventory")}
               usageOnly={isExternalProjectSite}
+              portalSection={activePortalSection}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
@@ -185,13 +196,17 @@ function Sidebar({
   activeWorkspace,
   groups,
   externalMode,
-  onSelectWorkspace,
+  activePortalSection,
+  onSelectItem,
+  onSelectSettings,
 }: {
   companyName: string;
   activeWorkspace: WorkspaceKey;
   groups: NavigationGroup[];
   externalMode: boolean;
-  onSelectWorkspace: (workspace: WorkspaceKey) => void;
+  activePortalSection: ExternalProjectSitePortalSection;
+  onSelectItem: (item: NavigationItem) => void;
+  onSelectSettings: () => void;
 }) {
   return (
     <aside className="erp-sidebar" aria-label="ERP modules">
@@ -212,7 +227,8 @@ function Sidebar({
                 key={`${group.label}-${item.label}`}
                 item={item}
                 activeWorkspace={activeWorkspace}
-                onSelectWorkspace={onSelectWorkspace}
+                activePortalSection={activePortalSection}
+                onSelectItem={onSelectItem}
               />
             ))}
           </div>
@@ -223,7 +239,7 @@ function Sidebar({
         type="button"
         className={activeWorkspace === "系统设置" ? "nav-item sidebar-settings active" : "nav-item sidebar-settings"}
         aria-current={activeWorkspace === "系统设置" ? "page" : undefined}
-        onClick={() => onSelectWorkspace("系统设置")}
+        onClick={onSelectSettings}
       >
         <SettingsIcon aria-hidden="true" size={20} strokeWidth={1.9} />
         <span>系统设置</span>
@@ -237,23 +253,21 @@ function Sidebar({
 function SidebarItem({
   item,
   activeWorkspace,
-  onSelectWorkspace,
+  activePortalSection,
+  onSelectItem,
 }: {
   item: NavigationItem;
   activeWorkspace: WorkspaceKey;
-  onSelectWorkspace: (workspace: WorkspaceKey) => void;
+  activePortalSection: ExternalProjectSitePortalSection;
+  onSelectItem: (item: NavigationItem) => void;
 }) {
-  const isDuplicatePortalTarget = item.workspace === "项目点" || item.workspace === "证照资质";
-  const isPrimaryPortalItem =
-    (item.workspace === "项目点" && item.label === "我的项目点") ||
-    (item.workspace === "证照资质" && item.label === "现场人员/健康证");
-  const isActive = item.workspace === activeWorkspace && (!isDuplicatePortalTarget || isPrimaryPortalItem);
+  const isActive = item.workspace === activeWorkspace && (!item.portalSection || item.portalSection === activePortalSection);
   return (
     <button
       type="button"
       className={isActive ? "nav-item active" : "nav-item"}
       aria-current={isActive ? "page" : undefined}
-      onClick={() => onSelectWorkspace(item.workspace as WorkspaceKey)}
+      onClick={() => onSelectItem(item)}
     >
       <item.icon aria-hidden="true" size={20} strokeWidth={1.9} />
       <span>{item.label}</span>

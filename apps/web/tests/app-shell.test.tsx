@@ -502,12 +502,24 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^现场人员\/健康证$/ }));
     expect(await screen.findByRole("heading", { name: "证照资质" })).toBeInTheDocument();
+    expect(screen.getByText("现场人员/健康证提交")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存证照" })).toBeInTheDocument();
     expect(screen.getByLabelText("归属对象")).toHaveDisplayValue("人员");
     expect(screen.getByLabelText("人员来源")).toHaveDisplayValue("项目点现场人员");
     expect(screen.queryByText("公司员工")).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "供应商" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "公司主体" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^食品经营许可证$/ }));
+    expect(screen.getByText("食品经营许可证提交")).toBeInTheDocument();
+    expect(screen.getByLabelText("归属对象")).toHaveDisplayValue("项目点");
+
+    fireEvent.click(screen.getByRole("button", { name: /^物料领用$/ }));
+    expect((await screen.findAllByText("物料领用申请")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /^雇主责任险$/ }));
+    expect((await screen.findAllByText("雇主责任险提交")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /^工资表$/ }));
+    expect((await screen.findAllByText("工资表提交")).length).toBeGreaterThan(0);
 
     const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(calledUrls.some((url) => url.includes("/api/project-usage-options"))).toBe(true);

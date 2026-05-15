@@ -30,7 +30,10 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
 import { FormDrawer, PageHeader } from "./ui";
-import { ExternalProjectSitePortal } from "./project-sites/ExternalProjectSitePortal";
+import {
+  ExternalProjectSitePortal,
+  type ExternalProjectSitePortalSection,
+} from "./project-sites/ExternalProjectSitePortal";
 import { ProjectSiteCompliancePanel } from "./project-sites/ProjectSiteCompliancePanel";
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
@@ -66,6 +69,7 @@ type ProjectSitesWorkspaceProps = {
   canManageUsage?: boolean;
   canIssue?: boolean;
   usageOnly?: boolean;
+  portalSection?: ExternalProjectSitePortalSection;
 };
 
 type UsageWarehouseOption = {
@@ -326,6 +330,7 @@ export function ProjectSitesWorkspace({
   canManageUsage,
   canIssue,
   usageOnly = false,
+  portalSection = "overview",
 }: ProjectSitesWorkspaceProps) {
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
@@ -420,12 +425,6 @@ export function ProjectSitesWorkspace({
   });
 
   useEffect(() => {
-    if (usageOnly) {
-      setSites([]);
-      setSiteStatus("ready");
-      setSelectedInvestmentSiteId("");
-      return;
-    }
     let mounted = true;
     setSiteStatus("loading");
     loadProjectSites()
@@ -436,7 +435,7 @@ export function ProjectSitesWorkspace({
         setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
         setKitchenEquipmentForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
         setKitchenEquipmentChangeForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-        setSelectedInvestmentSiteId((current) => current || nextSites[0]?.id || "");
+        setSelectedInvestmentSiteId((current) => (usageOnly ? "" : current || nextSites[0]?.id || ""));
       })
       .catch(() => {
         if (!mounted) return;
@@ -559,11 +558,6 @@ export function ProjectSitesWorkspace({
   }, [loadInvestmentSummary, selectedInvestmentSiteId, usageOnly]);
 
   useEffect(() => {
-    if (usageOnly) {
-      setComplianceSummaries({});
-      setComplianceStatus("idle");
-      return;
-    }
     if (sites.length === 0) {
       setComplianceSummaries({});
       setComplianceStatus(siteStatus === "ready" ? "ready" : "idle");
@@ -575,7 +569,7 @@ export function ProjectSitesWorkspace({
     Promise.all(sites.map((site) => loadComplianceSummary(site.id).then((summary) => [site.id, summary] as const)))
       .then((entries) => {
         if (!mounted) return;
-        setComplianceSummaries(Object.fromEntries(entries));
+        setComplianceSummaries(Object.fromEntries(entries.filter((entry) => Boolean(entry[1]))));
         setComplianceStatus("ready");
       })
       .catch(() => {
@@ -682,11 +676,11 @@ export function ProjectSitesWorkspace({
   const totalRequestedQuantity = usageRequests.reduce((sum, request) => sum + request.requestedQuantity, 0);
   const totalIssuedQuantity = usageRequests.reduce((sum, request) => sum + request.issuedQuantity, 0);
   const pendingKitchenEquipmentChangeCount = kitchenEquipmentChangeRequests.filter((request) => request.reviewStatus === "pending").length;
-  const complianceBlockingIssueCount = Object.values(complianceSummaries).reduce(
+  const complianceBlockingIssueCount = Object.values(complianceSummaries).filter(Boolean).reduce(
     (sum, summary) => sum + summary.blockingIssueCount,
     0,
   );
-  const complianceWarningIssueCount = Object.values(complianceSummaries).reduce(
+  const complianceWarningIssueCount = Object.values(complianceSummaries).filter(Boolean).reduce(
     (sum, summary) => sum + summary.warningIssueCount,
     0,
   );
@@ -913,7 +907,10 @@ export function ProjectSitesWorkspace({
     <section className="project-sites-workspace" aria-label="项目点">
       {usageOnly ? (
         <ExternalProjectSitePortal
-          visibleProjectSiteCount={new Set(usageRequests.map((request) => request.projectSiteId)).size}
+          section={portalSection}
+          sites={sites}
+          complianceSummaries={complianceSummaries}
+          visibleProjectSiteCount={sites.length}
           pendingUsageCount={pendingUsageCount}
           equipmentCount={filteredKitchenEquipment.length}
           pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
@@ -969,7 +966,7 @@ export function ProjectSitesWorkspace({
       <div className="party-summary people-summary" aria-label="项目点指标摘要">
         <article>
           <span>{usageOnly ? "可见项目点" : "项目点总数"}</span>
-          <strong>{usageOnly ? new Set(usageRequests.map((request) => request.projectSiteId)).size : sites.length}</strong>
+          <strong>{sites.length}</strong>
         </article>
         {!usageOnly ? <article>
           <span>服务中</span>
@@ -1213,6 +1210,9 @@ export function ProjectSitesWorkspace({
           status={siteStatus}
           serviceModeLabel={serviceModeLabel}
           siteStatusLabel={siteStatusLabel}
+          complianceSummaries={complianceSummaries}
+          complianceComputedStatusLabel={complianceComputedStatusLabel}
+          complianceReviewStatusLabel={complianceReviewStatusLabel}
           onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
         />
 

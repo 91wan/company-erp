@@ -43,6 +43,7 @@ import {
   userAccount,
   warehouse,
 } from "./appTestHelpers";
+import { complianceStatusTone } from "../src/components/project-sites/ProjectSiteCompliancePanel";
 
 describe("Company ERP workspace components", () => {
   it("renders populated counterparty master data", async () => {
@@ -442,9 +443,11 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("科技园一期项目点").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("SITE-WX-001"));
     expect(await screen.findByRole("heading", { name: "SITE-WX-001 科技园一期项目点" })).toBeInTheDocument();
-    for (const tab of ["概览", "现场人员", "健康证", "食品经营许可证", "雇主责任险", "工资表", "物料领用", "厨房设备", "项目点账号"]) {
+    for (const tab of ["合规摘要", "物料领用", "厨房设备"]) {
       expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("tab", { name: "健康证" })).not.toBeInTheDocument();
+    expect(screen.queryByText("待后端明细接口支持")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     expect(screen.getByText("投入合同")).toBeInTheDocument();
     expect(await screen.findByText("装修/改造")).toBeInTheDocument();
@@ -469,16 +472,56 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByText("合规资料")).toBeInTheDocument();
     expect(screen.getByText("项目点现场人员名单")).toBeInTheDocument();
-    expect(screen.getByText("雇主责任险")).toBeInTheDocument();
+    expect(screen.getAllByText("雇主责任险").length).toBeGreaterThan(0);
     expect(screen.getByText("人员健康证")).toBeInTheDocument();
     expect(screen.getByText("食品经营许可证")).toBeInTheDocument();
-    expect(screen.getByText("工资表")).toBeInTheDocument();
+    expect(screen.getAllByText("工资表").length).toBeGreaterThan(0);
     expect(await screen.findByText("12 人")).toBeInTheDocument();
-    expect(screen.getByText("缺 1 / 临期 2 / 过期 1")).toBeInTheDocument();
-    expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
-    expect(screen.getByText("即将到期")).toBeInTheDocument();
-    expect(screen.getByText("待审核")).toBeInTheDocument();
-    expect(screen.getByText("红色风险")).toBeInTheDocument();
+    expect(screen.getAllByText("缺 1 / 临期 2 / 过期 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("未覆盖 1 / 临期 1 / 过期 0").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("待审核").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("红色风险").length).toBeGreaterThan(0);
+  });
+
+  it("maps project-site compliance states to red, orange, green, and gray risk tones", () => {
+    for (const status of ["blocking", "red", "missing", "expired", "rejected"]) {
+      expect(complianceStatusTone(status)).toBe("red");
+    }
+    for (const status of ["warning", "expiring", "expiring_soon", "pending", "review_due_soon"]) {
+      expect(complianceStatusTone(status)).toBe("orange");
+    }
+    for (const status of ["valid", "approved"]) {
+      expect(complianceStatusTone(status)).toBe("green");
+    }
+    for (const status of ["not_required", "not_applicable"]) {
+      expect(complianceStatusTone(status)).toBe("gray");
+    }
+  });
+
+  it("shows the bound external project site even when there are no usage requests", async () => {
+    render(
+      <ProjectSitesWorkspace
+        usageOnly
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadUsageRequests={() => Promise.resolve([])}
+        loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+        loadUsageOptions={() =>
+          Promise.resolve({
+            defaultWarehouse: { id: warehouse.id, warehouseCode: warehouse.warehouseCode, warehouseName: warehouse.warehouseName },
+            materials: [{ id: material.id, materialCode: material.materialCode, materialName: material.materialName, unit: "套" }],
+          })
+        }
+        loadKitchenEquipment={() => Promise.resolve([])}
+        loadKitchenEquipmentChangeRequests={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByText("科技园一期项目点")).toBeInTheDocument();
+    expect(screen.getAllByText("我的项目点").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+    expect(await screen.findByText("红色风险")).toBeInTheDocument();
+    expect(screen.getByText(/暂无可见领用申请/)).toBeInTheDocument();
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {

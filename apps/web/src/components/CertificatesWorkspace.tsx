@@ -27,6 +27,7 @@ import {
   SummaryCard,
   Toolbar,
 } from "./ui";
+import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
 
 type CertificatesWorkspaceProps = {
   loadCertificates?: () => Promise<CertificateRecordDto[]>;
@@ -38,6 +39,7 @@ type CertificatesWorkspaceProps = {
   canManage?: boolean;
   allowedOwnerTypes?: readonly CertificateOwnerTypeCode[];
   allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
+  portalSection?: ExternalProjectSitePortalSection;
 };
 
 type CertificateFormState = {
@@ -67,6 +69,17 @@ type CertificateFormState = {
 const typeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
 const ownerLabel = new Map(CERTIFICATE_OWNER_TYPES.map((item) => [item.code, item.label]));
 const statusLabel = new Map(CERTIFICATE_COMPUTED_STATUSES.map((item) => [item.code, item.label]));
+
+const certificatePortalCopy: Partial<Record<ExternalProjectSitePortalSection, { title: string; description: string }>> = {
+  rosterHealth: {
+    title: "现场人员/健康证提交",
+    description: "健康证应绑定实际在项目点工作的现场人员，提交后等待总部复核。",
+  },
+  foodLicense: {
+    title: "食品经营许可证提交",
+    description: "食品经营许可证按绑定项目点提交；不开放供应商或公司主体证照路径给项目点账号。",
+  },
+};
 
 async function defaultLoadCertificates(): Promise<CertificateRecordDto[]> {
   const payload = await requestJson<{ certificates: CertificateRecordDto[] }>(`${apiBaseUrl}/api/certificates`);
@@ -142,6 +155,7 @@ export function CertificatesWorkspace({
   canManage = true,
   allowedOwnerTypes,
   allowedPersonOwnerSources,
+  portalSection,
 }: CertificatesWorkspaceProps) {
   const ownerTypeOptions = useMemo(
     () => CERTIFICATE_OWNER_TYPES.filter((item) => !allowedOwnerTypes || allowedOwnerTypes.includes(item.code)),
@@ -151,7 +165,9 @@ export function CertificatesWorkspace({
     () => (allowedPersonOwnerSources ?? ["employee", "roster"]) as readonly CertificateFormState["ownerPersonSource"][],
     [allowedPersonOwnerSources],
   );
-  const defaultOwnerType = ownerTypeOptions[0]?.code ?? "company";
+  const portalOwnerType: CertificateOwnerTypeCode | undefined =
+    portalSection === "foodLicense" ? "project_site" : portalSection === "rosterHealth" ? "person" : undefined;
+  const defaultOwnerType = ownerTypeOptions.find((item) => item.code === portalOwnerType)?.code ?? ownerTypeOptions[0]?.code ?? "company";
   const defaultPersonOwnerSource = personOwnerSourceOptions[0] ?? "employee";
   const shouldLoadEmployees = ownerTypeOptions.some((item) => item.code === "person") && personOwnerSourceOptions.includes("employee");
   const shouldLoadRosterPeople = ownerTypeOptions.some((item) => item.code === "person") && personOwnerSourceOptions.includes("roster");
@@ -169,6 +185,30 @@ export function CertificatesWorkspace({
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [form, setForm] = useState<CertificateFormState>(() => createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
+
+  useEffect(() => {
+    if (!portalOwnerType || !ownerTypeOptions.some((item) => item.code === portalOwnerType)) return;
+    setForm((current) => {
+      const nextCertificateType: CertificateTypeCode = portalOwnerType === "person" ? "person_health_cert" : "food_operation_license";
+      if (
+        current.ownerType === portalOwnerType &&
+        current.certificateType === nextCertificateType &&
+        (portalOwnerType !== "person" || current.ownerPersonSource === defaultPersonOwnerSource)
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        certificateType: nextCertificateType,
+        ownerType: portalOwnerType,
+        ownerPersonSource: portalOwnerType === "person" ? defaultPersonOwnerSource : current.ownerPersonSource,
+        ownerEmployeeId: "",
+        ownerRosterPersonId: "",
+        ownerProjectSiteId: "",
+        ownerPartyId: "",
+      };
+    });
+  }, [defaultPersonOwnerSource, ownerTypeOptions, portalOwnerType]);
 
   useEffect(() => {
     const ownerTypeAllowed = ownerTypeOptions.some((item) => item.code === form.ownerType);
@@ -320,6 +360,7 @@ export function CertificatesWorkspace({
     certificate.isComplianceCritical && !certificate.confirmedAt && !certificate.isDisabled
   ).length;
   const selectedCertificate = filteredCertificates.find((certificate) => certificate.id === selectedCertificateId) ?? null;
+  const portalCopy = portalSection ? certificatePortalCopy[portalSection] : undefined;
 
   return (
     <section className="workspace-section" aria-label="证照资质">
@@ -328,6 +369,12 @@ export function CertificatesWorkspace({
         title="证照资质"
         subtitle="按风险、到期、复核和总部确认状态管理营业执照、食品经营许可证、人员健康证、供应商资质和项目点许可证。"
       />
+
+      {portalCopy ? (
+        <SectionCard title={portalCopy.title} badge="项目点账号入口">
+          <p className="form-helper">{portalCopy.description}</p>
+        </SectionCard>
+      ) : null}
 
       <div className="summary-grid">
         <SummaryCard label="有效证照" value={validCount} detail="当前有效" tone="success" />
