@@ -914,6 +914,46 @@ describe("Company ERP workspace components", () => {
     openSpy.mockRestore();
   });
 
+  it("shows scoped attachment metadata errors without exposing paths", async () => {
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract])}
+        loadUnifiedAttachments={() => Promise.resolve([attachmentRecord])}
+        getUnifiedAttachmentDownloadUrl={() => Promise.reject(new ApiRequestError(404, "ATTACHMENT_NOT_FOUND", []))}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+      />,
+    );
+
+    await screen.findByText("HT20260511001");
+    fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    fireEvent.click(await screen.findByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+
+    expect(await screen.findByText("附件不存在或不在当前权限范围内。")).toBeInTheDocument();
+    expect(screen.queryByText(/\/volume1|Users\/|attachments\/real/i)).not.toBeInTheDocument();
+  });
+
+  it("shows missing attachment content errors without exposing paths", async () => {
+    render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract])}
+        loadUnifiedAttachments={() => Promise.resolve([attachmentRecord])}
+        getUnifiedAttachmentDownloadUrl={() => Promise.reject(new ApiRequestError(404, "ATTACHMENT_CONTENT_NOT_FOUND", []))}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+      />,
+    );
+
+    await screen.findByText("HT20260511001");
+    fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    fireEvent.click(await screen.findByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+
+    expect(await screen.findByText("附件内容不存在，请联系管理员重新登记。")).toBeInTheDocument();
+    expect(screen.queryByText(/\/volume1|Users\/|attachments\/real/i)).not.toBeInTheDocument();
+  });
+
   it("renders contract empty and error states", async () => {
     const { rerender } = render(
       <ContractsWorkspace
