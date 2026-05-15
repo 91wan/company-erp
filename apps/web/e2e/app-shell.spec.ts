@@ -268,6 +268,11 @@ test("viewer sessions are read-only in browser-rendered workspaces", async ({ pa
 
   await page.getByRole("button", { name: "合同" }).click();
   await expect(page.getByRole("button", { name: "保存合同" })).toHaveCount(0);
+  await expect(page.getByText("审计日志")).toHaveCount(0);
+  await expect(page.getByText("附件管理")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "执行出库" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "审批通过" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "确认出库" })).toHaveCount(0);
   await expectHealthyShell(page, issues);
 });
 
