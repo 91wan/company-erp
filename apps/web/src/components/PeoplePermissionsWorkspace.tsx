@@ -21,7 +21,7 @@ import {
   type UpdateExternalProjectSiteAccountInput,
   type UserAccountDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { PageHeader, StatusBadge, SummaryCard } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
@@ -183,6 +183,11 @@ export function PeoplePermissionsWorkspace({
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [externalAccountSubmit, setExternalAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [assignmentSubmit, setAssignmentSubmit] = useState<"idle" | "saving" | "error">("idle");
+  const [departmentSubmitError, setDepartmentSubmitError] = useState("");
+  const [employeeSubmitError, setEmployeeSubmitError] = useState("");
+  const [accountSubmitError, setAccountSubmitError] = useState("");
+  const [externalAccountSubmitError, setExternalAccountSubmitError] = useState("");
+  const [assignmentSubmitError, setAssignmentSubmitError] = useState("");
   const [pendingDeactivateExternalAccountId, setPendingDeactivateExternalAccountId] = useState("");
   const [departmentForm, setDepartmentForm] = useState<CreateDepartmentInput>({
     departmentCode: "",
@@ -372,12 +377,14 @@ export function PeoplePermissionsWorkspace({
   async function handleDepartmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDepartmentSubmit("saving");
+    setDepartmentSubmitError("");
     try {
       const created = await createDepartment(departmentForm);
       setDepartments((current) => [created, ...current.filter((department) => department.id !== created.id)]);
       setDepartmentForm({ departmentCode: "", name: "", status: "enabled" });
       setDepartmentSubmit("idle");
-    } catch {
+    } catch (error) {
+      setDepartmentSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setDepartmentSubmit("error");
     }
   }
@@ -385,6 +392,7 @@ export function PeoplePermissionsWorkspace({
   async function handleEmployeeSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setEmployeeSubmit("saving");
+    setEmployeeSubmitError("");
     try {
       const created = await createEmployee(employeeForm);
       setEmployees((current) => [created, ...current.filter((employee) => employee.id !== created.id)]);
@@ -395,7 +403,8 @@ export function PeoplePermissionsWorkspace({
         employmentStatus: "active",
       });
       setEmployeeSubmit("idle");
-    } catch {
+    } catch (error) {
+      setEmployeeSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setEmployeeSubmit("error");
     }
   }
@@ -403,6 +412,7 @@ export function PeoplePermissionsWorkspace({
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAccountSubmit("saving");
+    setAccountSubmitError("");
     try {
       const created = await createUserAccount(accountForm);
       setUserAccounts((current) => [created, ...current.filter((account) => account.id !== created.id)]);
@@ -414,7 +424,8 @@ export function PeoplePermissionsWorkspace({
         roles: ["viewer"],
       });
       setAccountSubmit("idle");
-    } catch {
+    } catch (error) {
+      setAccountSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setAccountSubmit("error");
     }
   }
@@ -422,6 +433,7 @@ export function PeoplePermissionsWorkspace({
   async function handleExternalAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setExternalAccountSubmit("saving");
+    setExternalAccountSubmitError("");
     try {
       const created = await createExternalProjectSiteAccount(externalAccountForm);
       setExternalProjectSiteAccounts((current) => [
@@ -437,13 +449,15 @@ export function PeoplePermissionsWorkspace({
         status: "active",
       });
       setExternalAccountSubmit("idle");
-    } catch {
+    } catch (error) {
+      setExternalAccountSubmitError(formatApiError(error, "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"));
       setExternalAccountSubmit("error");
     }
   }
 
   async function deactivateExternalAccount(account: ExternalProjectSiteAccountDto) {
     setExternalAccountSubmit("saving");
+    setExternalAccountSubmitError("");
     try {
       const updated = await updateExternalProjectSiteAccount(account.id, {
         status: "disabled",
@@ -454,7 +468,8 @@ export function PeoplePermissionsWorkspace({
         ...current.filter((candidate) => candidate.id !== updated.id),
       ]);
       setExternalAccountSubmit("idle");
-    } catch {
+    } catch (error) {
+      setExternalAccountSubmitError(formatApiError(error, "停用失败，请检查项目点账号状态。"));
       setExternalAccountSubmit("error");
     }
   }
@@ -462,6 +477,7 @@ export function PeoplePermissionsWorkspace({
   async function handleAssignmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAssignmentSubmit("saving");
+    setAssignmentSubmitError("");
     try {
       const created = await createProjectSiteAssignment(assignmentForm);
       setProjectSiteAssignments((current) => [
@@ -475,7 +491,8 @@ export function PeoplePermissionsWorkspace({
         isPrimary: false,
       }));
       setAssignmentSubmit("idle");
-    } catch {
+    } catch (error) {
+      setAssignmentSubmitError(formatApiError(error, "保存失败，请检查是否重复分配或项目点是否有效。"));
       setAssignmentSubmit("error");
     }
   }
@@ -532,7 +549,7 @@ export function PeoplePermissionsWorkspace({
             <span>部门名称</span>
             <input required value={departmentForm.name} onChange={(event) => setDepartmentForm((current) => ({ ...current, name: event.target.value }))} />
           </label>
-          {departmentSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
+          {departmentSubmit === "error" ? <p className="form-error">{departmentSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
 
@@ -636,7 +653,7 @@ export function PeoplePermissionsWorkspace({
               }
             />
           </label>
-          {externalAccountSubmit === "error" ? <p className="form-error">保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。</p> : null}
+          {externalAccountSubmit === "error" ? <p className="form-error">{externalAccountSubmitError || "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"}</p> : null}
         </form> : null}
       </section>
 
@@ -669,7 +686,7 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
-          {employeeSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
+          {employeeSubmit === "error" ? <p className="form-error">{employeeSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
 
@@ -712,7 +729,7 @@ export function PeoplePermissionsWorkspace({
               </label>
             ))}
           </fieldset>
-          {accountSubmit === "error" ? <p className="form-error">保存失败，请检查唯一编码或稍后重试。</p> : null}
+          {accountSubmit === "error" ? <p className="form-error">{accountSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
 
@@ -792,7 +809,7 @@ export function PeoplePermissionsWorkspace({
             />
             <span>设为主项目点</span>
           </label>
-          {assignmentSubmit === "error" ? <p className="form-error">保存失败，请检查是否重复分配或项目点是否有效。</p> : null}
+          {assignmentSubmit === "error" ? <p className="form-error">{assignmentSubmitError || "保存失败，请检查是否重复分配或项目点是否有效。"}</p> : null}
         </form> : null}
       </section>
 

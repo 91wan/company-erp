@@ -21,7 +21,7 @@ import {
   type PartyDto,
   type ProjectSiteDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type ContractsWorkspaceProps = {
@@ -147,6 +147,8 @@ export function ContractsWorkspace({
   const [expiryFilter, setExpiryFilter] = useState<"all" | ContractExpiryStateCode>("all");
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [attachmentSubmitState, setAttachmentSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [contractSubmitError, setContractSubmitError] = useState("");
+  const [attachmentSubmitError, setAttachmentSubmitError] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
   const [selectedContractId, setSelectedContractId] = useState("");
   const [contractForm, setContractForm] = useState<ContractFormState>({
@@ -283,6 +285,7 @@ export function ContractsWorkspace({
   async function handleContractSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setContractSubmitState("saving");
+    setContractSubmitError("");
 
     try {
       const created = await createContract({
@@ -327,7 +330,8 @@ export function ContractsWorkspace({
       });
       setContractSubmitState("saved");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setContractSubmitError(formatApiError(error, "合同保存失败，请检查编号、日期或金额。"));
       setContractSubmitState("error");
     }
   }
@@ -336,6 +340,7 @@ export function ContractsWorkspace({
     event.preventDefault();
     if (!attachmentForm.contractId) return;
     setAttachmentSubmitState("saving");
+    setAttachmentSubmitError("");
 
     try {
       const created = await createContractAttachment(attachmentForm.contractId, {
@@ -356,7 +361,8 @@ export function ContractsWorkspace({
       }));
       setAttachmentSubmitState("saved");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setAttachmentSubmitError(formatApiError(error, "附件路径保存失败，请检查合同和路径。"));
       setAttachmentSubmitState("error");
     }
   }
@@ -540,7 +546,7 @@ export function ContractsWorkspace({
             <input value={contractForm.remark} onChange={(event) => setContractForm((current) => ({ ...current, remark: event.target.value }))} />
           </label>
           {contractSubmitState === "saved" ? <p className="form-success">合同已保存。</p> : null}
-          {contractSubmitState === "error" ? <p className="form-error">合同保存失败，请检查编号、日期或金额。</p> : null}
+          {contractSubmitState === "error" ? <p className="form-error">{contractSubmitError || "合同保存失败，请检查编号、日期或金额。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>
@@ -594,7 +600,7 @@ export function ContractsWorkspace({
             <input value={attachmentForm.remark} onChange={(event) => setAttachmentForm((current) => ({ ...current, remark: event.target.value }))} />
           </label>
           {attachmentSubmitState === "saved" ? <p className="form-success">附件路径已保存。</p> : null}
-          {attachmentSubmitState === "error" ? <p className="form-error">附件路径保存失败，请检查合同和路径。</p> : null}
+          {attachmentSubmitState === "error" ? <p className="form-error">{attachmentSubmitError || "附件路径保存失败，请检查合同和路径。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>

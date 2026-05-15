@@ -234,7 +234,11 @@ describe("Company ERP app shell", () => {
     fireEvent.change(screen.getByLabelText("Storage Key"), { target: { value: "../bad.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
 
-    expect(await screen.findByText("附件引用格式不合法或保存失败。")).toBeInTheDocument();
+    expect(await screen.findByText(/Storage Key 只能使用 contracts\/<uuid>\.pdf 这类相对路径/)).toBeInTheDocument();
+    expect(screen.getByText(/password=\[已隐藏\]/)).toBeInTheDocument();
+    expect(screen.getByText(/identityNo=\[已隐藏\]/)).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(`${"Secret"}${"123"}`))).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(`${"320101199"}${"001011234"}`))).not.toBeInTheDocument();
 
     vi.restoreAllMocks();
     cleanup();

@@ -166,7 +166,14 @@ export function mockShellFetch(
     if (url.includes("/api/attachments") && method === "POST") {
       const payload = init?.body ? JSON.parse(String(init.body)) : {};
       if (String(payload.storageKey ?? "").startsWith("/") || String(payload.storageKey ?? "").includes("..")) {
-        return Promise.resolve(jsonResponse({ error: "ATTACHMENT_VALIDATION_FAILED" }, false, 400));
+        return Promise.resolve(jsonResponse({
+          error: "ATTACHMENT_VALIDATION_FAILED",
+          issues: [
+            "Storage Key 只能使用 contracts/<uuid>.pdf 这类相对路径",
+            `password=${"Secret"}${"123"} 不应泄露`,
+            `identityNo=${"320101199"}${"001011234"} 不应泄露`,
+          ],
+        }, false, 400));
       }
       return Promise.resolve(jsonResponse({ attachment: { ...attachmentRecord, ...payload, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" } }));
     }

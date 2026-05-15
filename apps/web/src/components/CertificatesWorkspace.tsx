@@ -16,7 +16,7 @@ import {
   type ProjectSiteDto,
   type ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import {
   DataTable,
   DetailDrawer,
@@ -183,6 +183,7 @@ export function CertificatesWorkspace({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CertificateComputedStatusCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<CertificateFormState>(() => createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
 
@@ -317,6 +318,7 @@ export function CertificatesWorkspace({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitState("saving");
+    setSubmitError("");
 
     try {
       const created = await createCertificate({
@@ -345,7 +347,8 @@ export function CertificatesWorkspace({
       setCertificates((current) => [created, ...current.filter((certificate) => certificate.id !== created.id)]);
       setForm(createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
       setSubmitState("saved");
-    } catch {
+    } catch (error) {
+      setSubmitError(formatApiError(error, "证照保存失败，请检查编码、归属对象或日期。"));
       setSubmitState("error");
     }
   }
@@ -582,7 +585,7 @@ export function CertificatesWorkspace({
                 保存证照
               </button>
               {submitState === "saved" ? <StateLine text="证照已保存" /> : null}
-              {submitState === "error" ? <StateLine text="证照保存失败，请检查编码、归属对象或日期。" tone="danger" /> : null}
+              {submitState === "error" ? <StateLine text={submitError || "证照保存失败，请检查编码、归属对象或日期。"} tone="danger" /> : null}
             </form>
           </section>
         ) : null}

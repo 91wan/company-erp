@@ -55,6 +55,7 @@ import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import {
   apiBaseUrl,
   createAttachment,
+  formatApiError,
   getAppVersion,
   getAttachmentDownloadUrl,
   getAttachments,
@@ -1031,6 +1032,8 @@ function SystemSettingsWorkspace({
     remark: "",
   });
   const [attachmentSaveStatus, setAttachmentSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [settingsError, setSettingsError] = useState("");
+  const [attachmentSaveError, setAttachmentSaveError] = useState("");
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const [attachmentDownloadError, setAttachmentDownloadError] = useState<string | null>(null);
 
@@ -1099,12 +1102,14 @@ function SystemSettingsWorkspace({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus("saving");
+    setSettingsError("");
     try {
       const appConfig = await updateAppConfig({ companyName: nextCompanyName });
       onCompanyNameChange(appConfig);
       setNextCompanyName(appConfig.companyName);
       setStatus("success");
-    } catch {
+    } catch (error) {
+      setSettingsError(formatApiError(error, "保存失败，请检查权限或公司名称。"));
       setStatus("error");
     }
   }
@@ -1112,6 +1117,7 @@ function SystemSettingsWorkspace({
   async function handleAttachmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAttachmentSaveStatus("saving");
+    setAttachmentSaveError("");
     try {
       const attachment = await createAttachment({
         attachmentCode: attachmentForm.attachmentCode,
@@ -1134,7 +1140,8 @@ function SystemSettingsWorkspace({
       });
       setAttachmentStatus("success");
       setAttachmentSaveStatus("success");
-    } catch {
+    } catch (error) {
+      setAttachmentSaveError(formatApiError(error, "附件引用格式不合法或保存失败。"));
       setAttachmentSaveStatus("error");
     }
   }
@@ -1189,7 +1196,7 @@ function SystemSettingsWorkspace({
         </label>
 
         {status === "success" ? <p className="form-success">系统设置已保存。</p> : null}
-        {status === "error" ? <p className="form-error">保存失败，请检查权限或公司名称。</p> : null}
+        {status === "error" ? <p className="form-error">{settingsError || "保存失败，请检查权限或公司名称。"}</p> : null}
         {!canManage ? <p className="form-hint">当前账号没有 systemSettings.manage 权限，不能修改公司名称。</p> : null}
       </form>
 
@@ -1331,7 +1338,7 @@ function SystemSettingsWorkspace({
                 {attachmentSaveStatus === "saving" ? "登记中" : "登记附件引用"}
               </button>
               {attachmentSaveStatus === "success" ? <p className="form-success">附件引用已登记。</p> : null}
-              {attachmentSaveStatus === "error" ? <p className="form-error">附件引用格式不合法或保存失败。</p> : null}
+              {attachmentSaveStatus === "error" ? <p className="form-error">{attachmentSaveError || "附件引用格式不合法或保存失败。"}</p> : null}
             </form>
           ) : (
             <p className="form-hint">当前账号只能查看附件元数据，不能登记或修改附件引用。</p>

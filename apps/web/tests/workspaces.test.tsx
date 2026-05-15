@@ -43,6 +43,7 @@ import {
   userAccount,
   warehouse,
 } from "./appTestHelpers";
+import { ApiRequestError } from "../src/apiClient";
 import { complianceStatusTone } from "../src/components/project-sites/ProjectSiteCompliancePanel";
 
 describe("Company ERP workspace components", () => {
@@ -1285,8 +1286,8 @@ describe("Company ERP workspace components", () => {
         loadPurchaseRequests={() => Promise.resolve([])}
         loadPurchaseRecords={() => Promise.resolve([])}
         loadContracts={() => Promise.resolve([])}
-        createPurchaseRequest={() => Promise.reject(new Error("duplicate request"))}
-        createPurchaseRecord={() => Promise.reject(new Error("duplicate record"))}
+        createPurchaseRequest={() => Promise.reject(new ApiRequestError(400, "PURCHASE_REQUEST_VALIDATION_FAILED", ["采购需求编号已存在"]))}
+        createPurchaseRecord={() => Promise.reject(new ApiRequestError(400, "PURCHASE_RECORD_VALIDATION_FAILED", ["采购单号已存在"]))}
       />,
     );
 
@@ -1299,7 +1300,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("需求数量"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("需求单位"), { target: { value: "箱" } });
     fireEvent.click(screen.getByRole("button", { name: "保存采购需求" }));
-    expect(await screen.findByText("保存失败，请检查单号是否重复或稍后重试。")).toBeInTheDocument();
+    expect(await screen.findByText("采购需求编号已存在")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "新增采购记录" }));
     fireEvent.change(screen.getByLabelText("采购单号"), { target: { value: "PO20260511002" } });
@@ -1312,7 +1313,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("采购单位"), { target: { value: "箱" } });
     fireEvent.click(screen.getByRole("button", { name: "保存采购记录" }));
 
-    expect(await screen.findByText("保存失败，请检查单号是否重复或稍后重试。")).toBeInTheDocument();
+    expect(await screen.findByText("采购单号已存在")).toBeInTheDocument();
   });
 
   it("renders people permissions empty and error states", async () => {
@@ -1423,10 +1424,10 @@ describe("Company ERP workspace components", () => {
         loadExternalProjectSiteAccounts={() => Promise.resolve([])}
         loadProjectSites={() => Promise.resolve([projectSite])}
         loadProjectSiteAssignments={() => Promise.resolve([])}
-        createDepartment={() => Promise.reject(new Error("duplicate department"))}
-        createEmployee={() => Promise.reject(new Error("duplicate employee"))}
-        createUserAccount={() => Promise.reject(new Error("duplicate account"))}
-        createProjectSiteAssignment={() => Promise.reject(new Error("duplicate assignment"))}
+        createDepartment={() => Promise.reject(new ApiRequestError(400, "DEPARTMENT_VALIDATION_FAILED", ["部门编码已存在"]))}
+        createEmployee={() => Promise.reject(new ApiRequestError(400, "EMPLOYEE_VALIDATION_FAILED", ["员工编号已存在"]))}
+        createUserAccount={() => Promise.reject(new ApiRequestError(400, "USER_ACCOUNT_VALIDATION_FAILED", ["登录账号已存在"]))}
+        createProjectSiteAssignment={() => Promise.reject(new ApiRequestError(400, "ASSIGNMENT_VALIDATION_FAILED", ["该员工已分配到该项目点"]))}
       />,
     );
 
@@ -1450,7 +1451,9 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
-    expect(await screen.findAllByText("保存失败，请检查唯一编码或稍后重试。")).toHaveLength(3);
-    expect(await screen.findByText("保存失败，请检查是否重复分配或项目点是否有效。")).toBeInTheDocument();
+    expect(await screen.findByText("部门编码已存在")).toBeInTheDocument();
+    expect(await screen.findByText("员工编号已存在")).toBeInTheDocument();
+    expect(await screen.findByText("登录账号已存在")).toBeInTheDocument();
+    expect(await screen.findByText("该员工已分配到该项目点")).toBeInTheDocument();
   });
 });

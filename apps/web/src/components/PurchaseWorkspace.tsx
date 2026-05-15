@@ -13,7 +13,7 @@ import {
   type PurchaseRequestStatusCode,
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../apiClient";
+import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
 type PurchaseWorkspaceProps = {
@@ -140,6 +140,9 @@ export function PurchaseWorkspace({
   const [requestSubmitState, setRequestSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [recordSubmitState, setRecordSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [reviewState, setReviewState] = useState<"idle" | "saving" | "error">("idle");
+  const [requestSubmitError, setRequestSubmitError] = useState("");
+  const [recordSubmitError, setRecordSubmitError] = useState("");
+  const [reviewError, setReviewError] = useState("");
   const [reviewRemark, setReviewRemark] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<PurchaseFormDrawer>(null);
   const [selectedRequestId, setSelectedRequestId] = useState("");
@@ -274,6 +277,7 @@ export function PurchaseWorkspace({
 
   async function handleRequestReview(action: "submit" | "approve" | "reject", target: PurchaseRequestDto) {
     setReviewState("saving");
+    setReviewError("");
     try {
       const payload = { reviewedByName: "", reviewRemark: reviewRemark || null };
       const updated =
@@ -285,7 +289,8 @@ export function PurchaseWorkspace({
       replacePurchaseRequest(updated);
       setReviewRemark("");
       setReviewState("idle");
-    } catch {
+    } catch (error) {
+      setReviewError(formatApiError(error, "审批操作失败"));
       setReviewState("error");
     }
   }
@@ -293,6 +298,7 @@ export function PurchaseWorkspace({
   async function handleRequestSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRequestSubmitState("saving");
+    setRequestSubmitError("");
 
     try {
       const created = await createPurchaseRequest({
@@ -320,7 +326,8 @@ export function PurchaseWorkspace({
       });
       setRequestSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setRequestSubmitError(formatApiError(error, "保存失败，请检查单号是否重复或稍后重试。"));
       setRequestSubmitState("error");
     }
   }
@@ -328,6 +335,7 @@ export function PurchaseWorkspace({
   async function handleRecordSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRecordSubmitState("saving");
+    setRecordSubmitError("");
 
     try {
       const created = await createPurchaseRecord({
@@ -363,7 +371,8 @@ export function PurchaseWorkspace({
       });
       setRecordSubmitState("idle");
       setOpenFormDrawer(null);
-    } catch {
+    } catch (error) {
+      setRecordSubmitError(formatApiError(error, "保存失败，请检查单号是否重复或稍后重试。"));
       setRecordSubmitState("error");
     }
   }
@@ -446,7 +455,7 @@ export function PurchaseWorkspace({
             </div>
           </>
         ) : null}
-        {reviewState === "error" ? <p className="form-error">审批操作失败</p> : null}
+        {reviewState === "error" ? <p className="form-error">{reviewError || "审批操作失败"}</p> : null}
       </SectionCard>
 
       <div className="project-site-list-layout">
@@ -510,7 +519,7 @@ export function PurchaseWorkspace({
             <span>期望到货日期</span>
             <input type="date" value={requestForm.expectedArrivalDate} onChange={(event) => setRequestForm((current) => ({ ...current, expectedArrivalDate: event.target.value }))} />
           </label>
-          {requestSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
+          {requestSubmitState === "error" ? <p className="form-error">{requestSubmitError || "保存失败，请检查单号是否重复或稍后重试。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>
@@ -597,7 +606,7 @@ export function PurchaseWorkspace({
             <span>采购单位</span>
             <input required value={recordForm.unit} onChange={(event) => setRecordForm((current) => ({ ...current, unit: event.target.value }))} />
           </label>
-          {recordSubmitState === "error" ? <p className="form-error">保存失败，请检查单号是否重复或稍后重试。</p> : null}
+          {recordSubmitState === "error" ? <p className="form-error">{recordSubmitError || "保存失败，请检查单号是否重复或稍后重试。"}</p> : null}
           </form> : null}
         </FormDrawer>
       </div>
