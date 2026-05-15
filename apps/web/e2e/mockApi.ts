@@ -497,17 +497,17 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
           projectSiteId: demoProjectSite.id,
           projectSiteName: demoProjectSite.siteName,
           payrollAgencyRequired: demoProjectSite.payrollAgencyRequired,
-          activeRosterCount: 0,
-          missingHealthCertificateCount: 0,
-          expiringHealthCertificateCount: 0,
+          activeRosterCount: 12,
+          missingHealthCertificateCount: 1,
+          expiringHealthCertificateCount: 2,
           expiredHealthCertificateCount: 0,
-          insuranceUncoveredActiveRosterCount: 0,
-          insuranceExpiringSoonCount: 0,
+          insuranceUncoveredActiveRosterCount: 1,
+          insuranceExpiringSoonCount: 1,
           insuranceExpiredCount: 0,
-          foodOperationLicenseStatus: "valid",
+          foodOperationLicenseStatus: "expiring_soon",
           payrollCurrentMonthStatus: "not_required",
-          blockingIssueCount: 0,
-          warningIssueCount: 0,
+          blockingIssueCount: 2,
+          warningIssueCount: 3,
           generatedAt: "2026-05-13T12:00:00.000Z",
         },
       });
@@ -810,6 +810,11 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     if (path.match(/^\/api\/import-jobs\/[^/]+$/) && method === "GET") {
       const id = path.split("/")[3];
       return fulfill(route, { importJob: state.importJobs.find((job) => job.id === id) ?? createImportJob(id, "previewed", 0) });
+    }
+
+    if (path.match(/^\/api\/attachments\/[^/]+\/download-url$/) && method === "GET") {
+      const id = path.split("/")[3];
+      return fulfill(route, { downloadRef: `/api/attachments/${id}/content` });
     }
 
     return fulfill(route, responseForCollection(path, state));
