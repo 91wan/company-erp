@@ -22,6 +22,7 @@ type BusinessAttachmentsPanelProps = {
   ownerEntityId: string | null | undefined;
   canManage?: boolean;
   legacyPaths?: LegacyAttachmentPath[];
+  allowManualRegistration?: boolean;
   loadAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   createAttachment?: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
   getAttachmentDownloadUrl?: (id: string) => Promise<string>;
@@ -33,6 +34,7 @@ export function BusinessAttachmentsPanel({
   ownerEntityId,
   canManage = false,
   legacyPaths = [],
+  allowManualRegistration = false,
   loadAttachments = defaultGetAttachments,
   createAttachment = defaultCreateAttachment,
   getAttachmentDownloadUrl = defaultGetAttachmentDownloadUrl,
@@ -113,11 +115,18 @@ export function BusinessAttachmentsPanel({
   }
 
   return (
-    <SectionCard title="统一附件" badge={<StatusBadge tone={canManage ? "success" : "disabled"}>{canManage ? "可登记" : "只读"}</StatusBadge>}>
-      <p className="form-hint">统一附件使用后端登记的 storage key 和鉴权下载接口；历史路径只作为兼容字段展示。</p>
+    <SectionCard
+      title="统一附件"
+      badge={<StatusBadge tone={canManage ? "success" : "disabled"}>{canManage && allowManualRegistration ? "可登记" : "只读"}</StatusBadge>}
+    >
+      <p className="form-hint">统一附件使用后端登记的附件引用和鉴权下载接口；历史路径只作为兼容字段展示。</p>
       {downloadError ? <p className="form-error">{downloadError}</p> : null}
 
-      {canManage && ownerEntityId ? (
+      {canManage && ownerEntityId && !allowManualRegistration ? (
+        <p className="form-hint">业务页面仅查看和下载统一附件。新增或修改 storage key 请在系统设置的附件管理中登记，避免业务用户填写服务器路径。</p>
+      ) : null}
+
+      {canManage && ownerEntityId && allowManualRegistration ? (
         <form className="party-form settings-form" onSubmit={handleSubmit}>
           <div className="form-grid">
             <label>
@@ -153,7 +162,6 @@ export function BusinessAttachmentsPanel({
               <tr>
                 <th>附件编号</th>
                 <th>名称</th>
-                <th>Storage Key</th>
                 <th>状态</th>
                 <th>操作</th>
               </tr>
@@ -163,7 +171,6 @@ export function BusinessAttachmentsPanel({
                 <tr key={attachment.id}>
                   <td>{attachment.attachmentCode}</td>
                   <td>{attachment.displayName}</td>
-                  <td>{attachment.storageKey}</td>
                   <td>{attachment.status === "active" ? "启用" : "停用"}</td>
                   <td>
                     <button type="button" className="inline-action" onClick={() => void handleDownload(attachment)} aria-label={`下载/打开 ${attachment.displayName}`}>
