@@ -1,4 +1,4 @@
-import { ClipboardList, Filter, MapPin, PackageMinus, RefreshCw, Save, Search, Wrench } from "lucide-react";
+import { ClipboardList, Filter, MapPin, RefreshCw, Save, Search, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
@@ -49,6 +49,10 @@ import {
   ProjectUsageRequestFormDrawer,
   type ProjectUsageRequestFormState,
 } from "./project-sites/ProjectUsageRequestFormDrawer";
+import {
+  ProjectUsageIssueFormDrawer,
+  type ProjectUsageIssueFormState,
+} from "./project-sites/ProjectUsageIssueFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
@@ -122,14 +126,7 @@ type KitchenEquipmentChangeFormState = {
   description: string;
 };
 
-type IssueFormState = {
-  requestId: string;
-  outboundNo: string;
-  movementDate: string;
-  quantity: string;
-  handledBy: string;
-  receivedByName: string;
-};
+type IssueFormState = ProjectUsageIssueFormState;
 
 type ProjectSiteFormDrawer = "site" | "usage" | "issue" | "equipment" | "equipmentChange" | null;
 
@@ -1256,88 +1253,22 @@ export function ProjectSitesWorkspace({
         />
       </div>
 
-      <FormDrawer
-        title="出库登记"
+      <ProjectUsageIssueFormDrawer
         open={openFormDrawer === "issue"}
+        canIssueUsage={canIssueUsage}
+        form={issueForm}
+        usageRequests={usageRequests}
+        pendingIssueConfirm={pendingIssueConfirm}
+        submitState={issueSubmitState}
+        submitError={issueSubmitError}
+        onChange={setIssueForm}
+        onCancelConfirm={() => setPendingIssueConfirm(false)}
         onClose={() => {
           setPendingIssueConfirm(false);
           setOpenFormDrawer(null);
         }}
-      >
-        {canIssueUsage ? <form className="dashboard-panel party-form project-issue-form" onSubmit={handleIssueUsageRequest} aria-label="出库登记表单" noValidate>
-        <div className="panel-header people-panel-title">
-          <h3>
-            <PackageMinus aria-hidden="true" size={16} />
-            出库登记
-          </h3>
-          <div className="inline-actions">
-            <button type="submit" disabled={issueSubmitState === "saving" || usageRequests.length === 0 || pendingIssueConfirm}>
-              <Save aria-hidden="true" size={15} />
-              执行出库
-            </button>
-            {pendingIssueConfirm ? (
-              <div className="inline-confirm-actions" aria-label="确认执行出库">
-                <span>确认执行本次出库？</span>
-                <button type="submit" disabled={issueSubmitState === "saving"}>确认出库</button>
-                <button type="button" onClick={() => setPendingIssueConfirm(false)}>取消</button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <label>
-          <span>领用申请</span>
-          <select value={issueForm.requestId} onChange={(event) => setIssueForm({ ...issueForm, requestId: event.target.value })}>
-            <option value="">选择领用申请</option>
-            {usageRequests
-              .filter((request) => request.status === "pending" || request.status === "partially_issued")
-              .map((request) => (
-                <option key={request.id} value={request.id}>
-                  {request.requestNo} {request.projectSiteName}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          <span>出库单号</span>
-          <input value={issueForm.outboundNo} onChange={(event) => setIssueForm({ ...issueForm, outboundNo: event.target.value })} />
-        </label>
-        <label>
-          <span>领用时间</span>
-          <input
-            type="date"
-            value={issueForm.movementDate}
-            onChange={(event) => setIssueForm({ ...issueForm, movementDate: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>出库数量</span>
-          <input
-            type="number"
-            min="0"
-            step="0.001"
-            value={issueForm.quantity}
-            onChange={(event) => setIssueForm({ ...issueForm, quantity: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>经办人</span>
-          <input value={issueForm.handledBy} onChange={(event) => setIssueForm({ ...issueForm, handledBy: event.target.value })} />
-        </label>
-        <label>
-          <span>领用人</span>
-          <input
-            value={issueForm.receivedByName}
-            onChange={(event) => setIssueForm({ ...issueForm, receivedByName: event.target.value })}
-          />
-        </label>
-        {issueForm.requestId ? (
-          <p className="form-helper">
-            出库成功后会按物料当前项目点收费价生成金额快照；后续调价不会回写历史流水。
-          </p>
-        ) : null}
-        {issueSubmitState === "error" ? <p className="form-error">{issueSubmitError || "出库失败，请检查库存余额、单号或申请状态。"}</p> : null}
-        </form> : null}
-      </FormDrawer>
+        onSubmit={handleIssueUsageRequest}
+      />
 
       {!usageOnly ? (
         <ProjectSiteDetailDrawer
