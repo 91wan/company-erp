@@ -1,7 +1,7 @@
 import { MapPin, RefreshCw } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { StatusBadge, type StatusTone } from "../ui";
-import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
+import { complianceRiskLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
 import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
 
 function dated(value: string | null | undefined) {

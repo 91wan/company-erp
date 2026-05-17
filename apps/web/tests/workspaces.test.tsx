@@ -45,7 +45,7 @@ import {
   warehouse,
 } from "./appTestHelpers";
 import { ApiRequestError } from "../src/apiClient";
-import { complianceStatusTone } from "../src/components/project-sites/ProjectSiteCompliancePanel";
+import { complianceStatusTone } from "../src/components/project-sites/projectSiteComplianceStatus";
 
 describe("Company ERP workspace components", () => {
   it("renders populated counterparty master data", async () => {

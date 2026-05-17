@@ -2,7 +2,7 @@ import { ClipboardCheck, FileText, ShieldCheck, Users } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { PageHeader, SummaryCard, ComplianceChecklist, StatusBadge } from "../ui";
 import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
-import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
+import { complianceRiskLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
 
 export type ExternalProjectSitePortalSection = "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll";
 
