@@ -1269,6 +1269,54 @@ tbody tr.clickable-row {
   max-width: 760px;
 }
 
+.settings-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin: 12px 0;
+}
+
+.settings-filter-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-filter-grid label > span {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-filter-grid input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: end;
+}
+
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 720;
+}
+
 .version-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
