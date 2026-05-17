@@ -20,6 +20,8 @@ import {
   type AuthenticatedUserDto,
   type CertificateRecordDto,
   type ContractDto,
+  type DashboardSummaryDto,
+  type DashboardSummaryItemDto,
   type InventoryBalanceDto,
   type InventoryMovementDto,
   type ProjectSiteComplianceSummaryDto,
@@ -57,6 +59,7 @@ import {
   createAttachment,
   formatApiError,
   getAppVersion,
+  getDashboardSummary,
   getAttachmentDownloadUrl,
   getAttachments,
   getAuditLogs,
@@ -301,6 +304,7 @@ type LoadState<T> =
   | { status: "error"; data: T };
 
 type DashboardLiveData = {
+  dashboardSummary: LoadState<DashboardSummaryDto | null>;
   purchaseRequests: LoadState<PurchaseRequestDto[]>;
   purchaseRecords: LoadState<PurchaseRecordDto[]>;
   inventoryMovements: LoadState<InventoryMovementDto[]>;
@@ -314,6 +318,7 @@ type DashboardLiveData = {
 };
 
 const emptyDashboardData: DashboardLiveData = {
+  dashboardSummary: { status: "loading", data: null },
   purchaseRequests: { status: "loading", data: [] },
   purchaseRecords: { status: "loading", data: [] },
   inventoryMovements: { status: "loading", data: [] },
@@ -361,6 +366,34 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
     setData(emptyDashboardData);
 
     async function load() {
+      const appVersionPromise = getAppVersion()
+        .then((version): LoadState<AppVersionDto | null> => ({ status: "success", data: version }))
+        .catch((): LoadState<AppVersionDto | null> => ({ status: "error", data: null }));
+
+      const summary = await getDashboardSummary()
+        .then((dashboardSummary): LoadState<DashboardSummaryDto | null> => ({ status: "success", data: dashboardSummary }))
+        .catch((): LoadState<DashboardSummaryDto | null> => ({ status: "error", data: null }));
+
+      if (summary.status === "success") {
+        const appVersion = await appVersionPromise;
+        if (!mounted) return;
+        setData({
+          ...emptyDashboardData,
+          dashboardSummary: summary,
+          purchaseRequests: { status: "success", data: [] },
+          purchaseRecords: { status: "success", data: [] },
+          inventoryMovements: { status: "success", data: [] },
+          inventoryBalances: { status: "success", data: [] },
+          projectUsageRequests: { status: "success", data: [] },
+          contracts: { status: "success", data: [] },
+          certificates: { status: "success", data: [] },
+          projectSites: { status: "success", data: [] },
+          projectSiteComplianceSummaries: { status: "success", data: [] },
+          appVersion,
+        });
+        return;
+      }
+
       const [
         purchaseRequests,
         purchaseRecords,
@@ -382,14 +415,13 @@ function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOn
         loadDashboardResource<ContractDto>("/api/contracts", "contracts"),
         loadDashboardResource<CertificateRecordDto>("/api/certificates", "certificates"),
         loadDashboardResource<ProjectSiteDto>("/api/project-sites", "projectSites"),
-        getAppVersion()
-          .then((version): LoadState<AppVersionDto | null> => ({ status: "success", data: version }))
-          .catch((): LoadState<AppVersionDto | null> => ({ status: "error", data: null })),
+        appVersionPromise,
       ]);
       const projectSiteComplianceSummaries = await loadProjectSiteComplianceSummaries(projectSites);
 
       if (!mounted) return;
       setData({
+        dashboardSummary: summary,
         purchaseRequests,
         purchaseRecords,
         inventoryMovements,
@@ -428,7 +460,7 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
       </section>
       <section className="dashboard-grid dashboard-grid-secondary">
         <QuickEntryPanel onNavigate={onNavigate} />
-        <LowStockPanel inventoryBalances={data.inventoryBalances} onNavigate={onNavigate} />
+        <LowStockPanel dashboardSummary={dashboardSummary(data)} inventoryBalances={data.inventoryBalances} onNavigate={onNavigate} />
         <SystemStatusPanel appVersion={data.appVersion} onNavigate={onNavigate} />
       </section>
     </>
@@ -578,6 +610,48 @@ function PanelStateMessage({ text }: { text: string }) {
 }
 
 function buildMetrics(data: DashboardLiveData): MetricCardType[] {
+  const summary = dashboardSummary(data);
+  if (summary) {
+    const unavailable = new Set(summary.unavailableSections);
+    return [
+      {
+        label: "今日待办",
+        value: String(summary.todoCount),
+        detail: unavailable.has("purchaseRequests") || unavailable.has("projectUsageRequests") ? "数据暂不可用" : "采购审批与领用处理",
+        tone: "blue",
+        icon: ClipboardCheck,
+      },
+      {
+        label: "红色风险",
+        value: String(summary.redRiskCount),
+        detail: unavailable.has("certificates") || unavailable.has("contracts") || unavailable.has("projectSiteCompliance") ? "数据暂不可用" : "证照、合同、项目点合规与低库存",
+        tone: "orange",
+        icon: PackageCheck,
+      },
+      {
+        label: "临期提醒",
+        value: String(summary.warningCount),
+        detail: unavailable.has("certificates") || unavailable.has("contracts") ? "数据暂不可用" : "合同/证照/合规预警",
+        tone: "purple",
+        icon: Truck,
+      },
+      {
+        label: "低库存物料",
+        value: String(summary.lowStockCount),
+        detail: unavailable.has("inventory") ? "数据暂不可用" : "低于安全库存",
+        tone: "orange",
+        icon: PackageCheck,
+      },
+      {
+        label: "待审核资料",
+        value: String(summary.pendingReviewCount),
+        detail: unavailable.has("certificates") ? "数据暂不可用" : "审批、领用和证照确认",
+        tone: "cyan",
+        icon: MapPin,
+      },
+    ];
+  }
+
   const pendingApprovalCount = data.purchaseRequests.data.filter((request) => request.status === "pending_approval").length;
   const pendingUsageCount = data.projectUsageRequests.data.filter((request) => request.status === "pending").length;
   const expiredCertificateCount = data.certificates.data.filter((certificate) => certificate.computedStatus === "expired").length;
@@ -678,8 +752,27 @@ type QueueItem = {
   tone?: "info" | "success" | "warning" | "danger" | "rejected" | "notApplicable";
 };
 
+function dashboardSummary(data: DashboardLiveData): DashboardSummaryDto | null {
+  return data.dashboardSummary.status === "success" ? data.dashboardSummary.data : null;
+}
+
+function summaryItemToQueueItem(item: DashboardSummaryItemDto, category: string): QueueItem {
+  return {
+    title: item.title,
+    category,
+    owner: item.subtitle ?? "-",
+    status: item.statusLabel ?? "-",
+    updatedAt: formatDateTime(item.updatedAt),
+    target: dashboardTarget(item.targetWorkspace),
+    tone: item.tone === "neutral" || item.tone === "disabled" ? "info" : item.tone,
+  };
+}
+
 function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
-  const pendingRequests: QueueItem[] = sortByUpdatedAt(data.purchaseRequests.data)
+  const summary = dashboardSummary(data);
+  const pendingRequests: QueueItem[] = summary
+    ? summary.procurementTodos.map((entry) => summaryItemToQueueItem(entry, "采购待审批"))
+    : sortByUpdatedAt(data.purchaseRequests.data)
     .filter((request) => request.status === "pending_approval")
     .slice(0, 4)
     .map((request) => ({
@@ -691,7 +784,9 @@ function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "采购",
       tone: "info",
     }));
-  const pendingUsage: QueueItem[] = sortByUpdatedAt(data.projectUsageRequests.data)
+  const pendingUsage: QueueItem[] = summary
+    ? summary.projectUsageTodos.map((entry) => summaryItemToQueueItem(entry, "项目点领用待处理"))
+    : sortByUpdatedAt(data.projectUsageRequests.data)
     .filter((request) => request.status === "pending")
     .slice(0, 4)
     .map((request) => ({
@@ -703,7 +798,9 @@ function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "项目点",
       tone: "warning",
     }));
-  const certificateReviews: QueueItem[] = sortByUpdatedAt(data.certificates.data)
+  const certificateReviews: QueueItem[] = summary
+    ? summary.certificateRisks.filter((entry) => entry.tone === "info").map((entry) => summaryItemToQueueItem(entry, "证照待复核"))
+    : sortByUpdatedAt(data.certificates.data)
     .filter((certificate) => certificate.computedStatus === "review_due" || certificate.computedStatus === "review_due_soon")
     .slice(0, 3)
     .map((certificate) => ({
@@ -739,7 +836,10 @@ function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
 }
 
 function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
-  const certificateRisks: QueueItem[] = sortByUpdatedAt(data.certificates.data)
+  const summary = dashboardSummary(data);
+  const certificateRisks: QueueItem[] = summary
+    ? summary.certificateRisks.filter((entry) => entry.tone !== "info").map((entry) => summaryItemToQueueItem(entry, "证照风险"))
+    : sortByUpdatedAt(data.certificates.data)
     .filter((certificate) => certificate.computedStatus === "expired" || certificate.computedStatus === "expiring_soon")
     .slice(0, 4)
     .map((certificate) => ({
@@ -751,7 +851,9 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "证照资质",
       tone: certificate.computedStatus === "expired" ? "danger" : "warning",
     }));
-  const contractRisks: QueueItem[] = sortByUpdatedAt(data.contracts.data)
+  const contractRisks: QueueItem[] = summary
+    ? summary.contractRisks.map((entry) => summaryItemToQueueItem(entry, "合同风险"))
+    : sortByUpdatedAt(data.contracts.data)
     .filter((contract) => contract.expiryState === "expired" || contract.expiryState === "expiring_soon")
     .slice(0, 3)
     .map((contract) => ({
@@ -763,7 +865,9 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "合同",
       tone: contract.expiryState === "expired" ? "danger" : "warning",
     }));
-  const lowStocks: QueueItem[] = data.inventoryBalances.data
+  const lowStocks: QueueItem[] = summary
+    ? summary.lowStockItems.map((entry) => summaryItemToQueueItem(entry, "低库存"))
+    : data.inventoryBalances.data
     .filter((balance) => balance.isLowStock)
     .slice(0, 3)
     .map((balance) => ({
@@ -775,7 +879,9 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       target: "库存",
       tone: "warning",
     }));
-  const projectSiteComplianceRisks: QueueItem[] = data.projectSiteComplianceSummaries.data
+  const projectSiteComplianceRisks: QueueItem[] = summary
+    ? summary.projectSiteComplianceRisks.map((entry) => summaryItemToQueueItem(entry, "项目点合规"))
+    : data.projectSiteComplianceSummaries.data
     .filter((summary) => summary.blockingIssueCount > 0 || summary.warningIssueCount > 0)
     .slice(0, 3)
     .map((summary) => ({
@@ -812,6 +918,21 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
 }
 
 function RecentActivityPanel({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
+  const summary = dashboardSummary(data);
+  if (summary) {
+    const rows = summary.recentActivities.map((entry) => summaryItemToQueueItem(entry, entry.statusLabel ?? "最近动态"));
+    return (
+      <SectionCard title="最近动态" action={<button type="button" onClick={() => onNavigate("系统设置")}>系统状态</button>}>
+        <DataTable
+          headers={["动态", "类型", "归属", "状态", "时间"]}
+          rows={rows.map((item) => [item.title, item.category, item.owner, item.status, item.updatedAt])}
+          emptyState={<EmptyState title="暂无动态" description="近期业务记录为空，或当前账号无可读模块。" />}
+          onRowClick={(index) => onNavigate(rows[index].target)}
+        />
+      </SectionCard>
+    );
+  }
+
   const inbound = data.inventoryMovements.data
     .filter((movement) => ["opening", "inbound", "adjustment_in"].includes(movement.movementType))
     .map((movement) => ({
@@ -893,12 +1014,36 @@ function QuickEntryPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
 }
 
 function LowStockPanel({
+  dashboardSummary,
   inventoryBalances,
   onNavigate,
 }: {
+  dashboardSummary: DashboardSummaryDto | null;
   inventoryBalances: LoadState<InventoryBalanceDto[]>;
   onNavigate: NavigateToWorkspace;
 }) {
+  if (dashboardSummary) {
+    const rows = dashboardSummary.lowStockItems.slice(0, 5);
+    return (
+      <section className="dashboard-panel table-panel">
+        <PanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
+        {dashboardSummary.unavailableSections.includes("inventory") ? <PanelStateMessage text="低库存数据暂不可用" /> : null}
+        {!dashboardSummary.unavailableSections.includes("inventory") && rows.length === 0 ? <PanelStateMessage text="暂无低库存物料" /> : null}
+        <ResponsiveTable
+          headers={["物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
+          onRowClick={() => onNavigate("库存")}
+          rows={rows.map((row) => [
+            row.title,
+            row.subtitle ?? "-",
+            "-",
+            "-",
+            <StatusBadge key={`${row.id}-status`} status={row.statusLabel ?? "低库存"} />,
+          ])}
+        />
+      </section>
+    );
+  }
+
   const rows = inventoryBalances.data.filter((balance) => balance.isLowStock).slice(0, 5);
   return (
     <section className="dashboard-panel table-panel">

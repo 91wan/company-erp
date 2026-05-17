@@ -8,6 +8,7 @@ import { registerAppCoreRoutes } from "./appCoreRoutes.js";
 import { registerAttachmentRoutes } from "./attachmentRoutes.js";
 import { registerAuth } from "./auth.js";
 import { registerContractsBusinessCertificatesRoutes } from "./contractsBusinessCertificatesRoutes.js";
+import { registerDashboardRoutes } from "./dashboardRoutes.js";
 import { registerImportJobRoutes } from "./importJobRoutes.js";
 import { registerInventoryRoutes } from "./inventoryRoutes.js";
 import { registerMarketOperationsRoutes } from "./marketOperationsRoutes.js";
@@ -223,6 +224,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   registerAuth(app, options.authRepository, options.auth);
   registerAppCoreRoutes(app, options);
+  registerDashboardRoutes(app, options);
   registerAuditLogRoutes(app, options);
   registerAttachmentRoutes(app, options);
   registerImportJobRoutes(app, options);

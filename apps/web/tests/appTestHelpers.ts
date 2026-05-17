@@ -20,6 +20,7 @@ import type {
   CertificateRecordDto,
   ContractAttachmentDto,
   ContractDto,
+  DashboardSummaryDto,
   ImportJobDto,
   InventoryMovementDto,
   InventoryBalanceDto,
@@ -93,6 +94,94 @@ export const defaultAppVersion: AppVersionDto = {
   environment: "nas",
 };
 
+export const defaultDashboardSummary: DashboardSummaryDto = {
+  todoCount: 2,
+  redRiskCount: 2,
+  warningCount: 1,
+  pendingReviewCount: 2,
+  lowStockCount: 1,
+  procurementTodos: [
+    {
+      id: "purchase_request:summary-pr",
+      entityType: "purchase_request",
+      entityId: "summary-pr",
+      title: "PR-SUMMARY-001",
+      subtitle: "汇总申请人",
+      statusLabel: "待审批",
+      tone: "info",
+      targetWorkspace: "采购",
+      updatedAt: "2026-05-13T08:30:00.000Z",
+    },
+  ],
+  projectUsageTodos: [
+    {
+      id: "project_usage_request:summary-usage",
+      entityType: "project_usage_request",
+      entityId: "summary-usage",
+      title: "USE-SUMMARY-001",
+      subtitle: "无锡项目点 · 一次性餐盒",
+      statusLabel: "待处理",
+      tone: "info",
+      targetWorkspace: "项目点",
+      updatedAt: "2026-05-13T09:00:00.000Z",
+    },
+  ],
+  certificateRisks: [
+    {
+      id: "certificate:summary-cert",
+      entityType: "certificate",
+      entityId: "summary-cert",
+      title: "CERT-SUMMARY-001",
+      subtitle: "临期健康证",
+      statusLabel: "即将到期",
+      tone: "warning",
+      targetWorkspace: "证照资质",
+      updatedAt: "2026-05-13T09:10:00.000Z",
+    },
+  ],
+  contractRisks: [],
+  projectSiteComplianceRisks: [
+    {
+      id: "project_site_compliance:summary-site",
+      entityType: "project_site_compliance",
+      entityId: "summary-site",
+      title: "无锡项目点",
+      subtitle: "阻断 2 · 预警 1",
+      statusLabel: "红色风险",
+      tone: "danger",
+      targetWorkspace: "项目点",
+      updatedAt: "2026-05-13T09:20:00.000Z",
+    },
+  ],
+  lowStockItems: [
+    {
+      id: "inventory_balance:summary-low",
+      entityType: "inventory_balance",
+      entityId: "summary-low",
+      title: "MAT-SUMMARY-LOW",
+      subtitle: "一次性餐盒 · 总部仓",
+      statusLabel: "低库存",
+      tone: "danger",
+      targetWorkspace: "库存",
+      updatedAt: "2026-05-13T09:30:00.000Z",
+    },
+  ],
+  recentActivities: [
+    {
+      id: "purchase_record:summary-po",
+      entityType: "purchase_record",
+      entityId: "summary-po",
+      title: "PO-SUMMARY-001",
+      subtitle: "最近采购",
+      statusLabel: "最近采购",
+      tone: "neutral",
+      targetWorkspace: "采购",
+      updatedAt: "2026-05-13T09:40:00.000Z",
+    },
+  ],
+  unavailableSections: [],
+};
+
 type MockShellData = {
   auditLogs?: AuditLogDto[];
   attachments?: AttachmentRecordDto[];
@@ -102,6 +191,7 @@ type MockShellData = {
   inventoryMovements?: InventoryMovementDto[];
   inventoryBalances?: InventoryBalanceDto[];
   projectUsageRequests?: ProjectUsageRequestDto[];
+  dashboardSummary?: DashboardSummaryDto | "error";
   projectSites?: ProjectSiteDto[];
   complianceSummaries?: Record<string, ProjectSiteComplianceSummaryDto>;
   contracts?: ContractDto[];
@@ -149,6 +239,11 @@ export function mockShellFetch(
     if (url.endsWith("/api/auth/me")) return Promise.resolve(jsonResponse({ user }));
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
+    if (url.endsWith("/api/dashboard/summary")) {
+      if (data.dashboardSummary === undefined) return Promise.resolve(jsonResponse({ error: "DASHBOARD_SUMMARY_UNAVAILABLE" }, false, 500));
+      if (data.dashboardSummary === "error") return Promise.resolve(jsonResponse({ error: "DASHBOARD_SUMMARY_UNAVAILABLE" }, false, 500));
+      return Promise.resolve(jsonResponse({ dashboardSummary: data.dashboardSummary }));
+    }
     if (url.includes("/api/audit-logs")) return Promise.resolve(jsonResponse({ auditLogs: data.auditLogs ?? [] }));
     if (pathname.match(/^\/api\/attachments\/[^/]+\/download-url$/) && method === "GET") {
       const attachmentId = pathname.split("/")[3];

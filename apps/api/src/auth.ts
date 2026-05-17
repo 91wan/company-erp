@@ -346,6 +346,9 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/app-config")) {
     return { area: "systemSettings", requiredLevel };
   }
+  if (pathname.startsWith("/api/dashboard")) {
+    return { area: "dashboard", requiredLevel: "read" };
+  }
   if (pathname.startsWith("/api/parties") || pathname.startsWith("/api/materials") || pathname.startsWith("/api/warehouses")) {
     return { area: "masterData", requiredLevel };
   }
