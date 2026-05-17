@@ -47,6 +47,7 @@ import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { DashboardHeader, dashboardTarget } from "./dashboard/DashboardHeader";
+import { DashboardMetricStrip } from "./dashboard/DashboardMetricStrip";
 import { Sidebar } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -365,7 +366,7 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
   return (
     <>
       <DashboardHeader currentUser={currentUser} onNavigate={onNavigate} />
-      <OperationsMetricStrip data={data} onNavigate={onNavigate} />
+      <DashboardMetricStrip metrics={buildMetrics(data)} onNavigate={onNavigate} />
       <section className="dashboard-grid dashboard-grid-primary operations-console-grid">
         <TodoQueuePanel data={data} onNavigate={onNavigate} />
         <RiskQueuePanel data={data} onNavigate={onNavigate} />
@@ -538,26 +539,6 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
       icon: MapPin,
     },
   ];
-}
-
-function OperationsMetricStrip({ data, onNavigate }: { data: DashboardLiveData; onNavigate: NavigateToWorkspace }) {
-  const metricCards = buildMetrics(data);
-  return (
-    <section className="metric-strip" aria-label="运营指标">
-      {metricCards.map((metric) => (
-        <button type="button" className="metric-card metric-card-action" key={metric.label} onClick={() => onNavigate(dashboardTarget(metric.label))}>
-          <span className={`metric-icon ${metric.tone}`}>
-            <metric.icon aria-hidden="true" size={26} strokeWidth={1.9} />
-          </span>
-          <div>
-            <h3>{metric.label}</h3>
-            <strong>{metric.value}</strong>
-            <p>{metric.detail}</p>
-          </div>
-        </button>
-      ))}
-    </section>
-  );
 }
 
 function PanelHeader({ title, badge, onNavigate }: { title: string; badge?: string; onNavigate: () => void }) {
