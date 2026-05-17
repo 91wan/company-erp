@@ -68,18 +68,6 @@ export function StateMessage({ icon, text }: { icon: ReactNode; text: string }) 
   );
 }
 
-export function StatusBadge({ tone, children }: { tone: "green" | "orange" | "gray" | "red"; children: ReactNode }) {
-  const className =
-    tone === "green"
-      ? "status-badge green"
-      : tone === "orange"
-        ? "status-badge amber"
-        : tone === "red"
-          ? "status-badge red"
-          : "status-badge gray";
-  return <span className={className}>{children}</span>;
-}
-
 export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
   return `¥${value.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

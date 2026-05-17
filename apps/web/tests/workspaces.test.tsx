@@ -619,24 +619,24 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getByText("不需要")).toBeInTheDocument();
-    expect(screen.getByText("红色风险")).toHaveClass("red");
+    expect(screen.getByText("红色风险")).toHaveClass("danger");
 
     fireEvent.click(screen.getByRole("button", { name: "查看详情" }));
     expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
   });
 
-  it("maps project-site compliance states to red, orange, green, and gray risk tones", () => {
+  it("maps project-site compliance states to unified danger, warning, success, and not-applicable tones", () => {
     for (const status of ["blocking", "red", "missing", "expired", "rejected", "review_due"]) {
-      expect(complianceStatusTone(status)).toBe("red");
+      expect(complianceStatusTone(status)).toBe("danger");
     }
     for (const status of ["warning", "expiring", "expiring_soon", "pending", "review_due_soon"]) {
-      expect(complianceStatusTone(status)).toBe("orange");
+      expect(complianceStatusTone(status)).toBe("warning");
     }
     for (const status of ["valid", "approved"]) {
-      expect(complianceStatusTone(status)).toBe("green");
+      expect(complianceStatusTone(status)).toBe("success");
     }
     for (const status of ["not_required", "not_applicable"]) {
-      expect(complianceStatusTone(status)).toBe("gray");
+      expect(complianceStatusTone(status)).toBe("notApplicable");
     }
   });
 

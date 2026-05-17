@@ -1,6 +1,7 @@
 import { ClipboardList, RefreshCw } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
-import { PanelTitle, ResponsiveTable, StateMessage, StatusBadge } from "./projectSiteUi";
+import { StatusBadge, type StatusTone } from "../ui";
+import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
 
 export function ProjectSiteCompliancePanel({
   sites,
@@ -58,13 +59,13 @@ export function ProjectSiteCompliancePanel({
                     "缺失"}
                 </StatusBadge>
               ) : (
-                <StatusBadge key={`${site.id}-payroll-not-required`} tone="gray">
+                <StatusBadge key={`${site.id}-payroll-not-required`} tone="notApplicable">
                   不需要
                 </StatusBadge>
               ),
               summary ? (
                 <span>
-                  <StatusBadge tone={summary.blockingIssueCount > 0 ? "red" : summary.warningIssueCount > 0 ? "orange" : "green"}>
+                  <StatusBadge tone={summary.blockingIssueCount > 0 ? "danger" : summary.warningIssueCount > 0 ? "warning" : "success"}>
                     {complianceRiskLabel(summary)}
                   </StatusBadge>{" "}
                   {summary.blockingIssueCount} 阻断 / {summary.warningIssueCount} 提醒
@@ -78,14 +79,14 @@ export function ProjectSiteCompliancePanel({
   );
 }
 
-export function complianceStatusTone(status: string): "green" | "orange" | "gray" | "red" {
-  if (["blocking", "red", "missing", "expired", "rejected", "review_due"].includes(status)) return "red";
+export function complianceStatusTone(status: string): StatusTone {
+  if (["blocking", "red", "missing", "expired", "rejected", "review_due"].includes(status)) return "danger";
   if (["warning", "expiring", "expiring_soon", "pending", "review_due_soon"].includes(status)) {
-    return "orange";
+    return "warning";
   }
-  if (status === "valid" || status === "approved") return "green";
-  if (status === "not_required" || status === "not_applicable") return "gray";
-  return "gray";
+  if (status === "valid" || status === "approved") return "success";
+  if (status === "not_required" || status === "not_applicable") return "notApplicable";
+  return "neutral";
 }
 
 export function complianceRiskLabel(summary: ProjectSiteComplianceSummaryDto): "红色风险" | "黄色预警" | "绿色正常" {

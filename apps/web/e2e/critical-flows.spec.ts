@@ -135,7 +135,7 @@ test("warehouse-capable admin can issue usage and sees charge snapshot refresh",
 
   await expect(page.getByText("DEMO 领用人")).toBeVisible();
   await expect(page.getByText("¥196.00")).toBeVisible();
-  await expect(page.locator("span.status-badge.green").filter({ hasText: "已出库" })).toBeVisible();
+  await expect(page.locator("span.ui-status-badge.success").filter({ hasText: "已出库" })).toBeVisible();
   await expectHealthyShell(page, issues);
 });
 

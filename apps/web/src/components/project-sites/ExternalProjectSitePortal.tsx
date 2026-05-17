@@ -1,9 +1,8 @@
 import { ClipboardCheck, FileText, ShieldCheck, Users } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
-import { PageHeader, SummaryCard, ComplianceChecklist } from "../ui";
+import { PageHeader, SummaryCard, ComplianceChecklist, StatusBadge } from "../ui";
 import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
-import { StatusBadge } from "./projectSiteUi";
 
 export type ExternalProjectSitePortalSection = "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll";
 
@@ -99,7 +98,7 @@ export function ExternalProjectSitePortal({
         <div className="panel-header people-panel-title">
           <h3>{activeCopy.title}</h3>
           {primarySummary ? (
-            <StatusBadge tone={primarySummary.blockingIssueCount > 0 ? "red" : primarySummary.warningIssueCount > 0 ? "orange" : "green"}>
+            <StatusBadge tone={primarySummary.blockingIssueCount > 0 ? "danger" : primarySummary.warningIssueCount > 0 ? "warning" : "success"}>
               {complianceRiskLabel(primarySummary)}
             </StatusBadge>
           ) : null}
@@ -130,7 +129,7 @@ export function ExternalProjectSitePortal({
           <div className="external-portal-task-strip" aria-label="项目点任务摘要">
             {complianceActions.map((action) => (
               <article key={action.title}>
-                <StatusBadge tone={action.tone === "danger" ? "red" : action.tone === "warning" ? "orange" : action.tone === "success" ? "green" : "gray"}>
+                <StatusBadge tone={action.tone === "danger" ? "danger" : action.tone === "warning" ? "warning" : action.tone === "success" ? "success" : "neutral"}>
                   {action.tone === "danger" ? "阻断" : action.tone === "warning" ? "预警" : action.tone === "success" ? "正常" : "待处理"}
                 </StatusBadge>
                 <strong>{action.title}</strong>
@@ -139,7 +138,7 @@ export function ExternalProjectSitePortal({
             ))}
             {pendingUsageCount > 0 ? (
               <article>
-                <StatusBadge tone="orange">待处理</StatusBadge>
+                <StatusBadge tone="warning">待处理</StatusBadge>
                 <strong>物料领用申请状态</strong>
                 <span>{pendingUsageCount} 条领用申请等待总部或仓库处理。</span>
               </article>
@@ -202,7 +201,7 @@ function SectionGuidance({
     return (
       <div className="external-portal-task-strip" aria-label="物料领用处理">
         <article>
-          <StatusBadge tone={pendingUsageCount > 0 ? "orange" : "green"}>{pendingUsageCount > 0 ? "待处理" : "无待处理"}</StatusBadge>
+          <StatusBadge tone={pendingUsageCount > 0 ? "warning" : "success"}>{pendingUsageCount > 0 ? "待处理" : "无待处理"}</StatusBadge>
           <strong>物料领用申请</strong>
           <span>领用申请列表和新增入口在本页下方；项目点账号不选择其他项目点，也不填写仓库出库参数。</span>
         </article>
@@ -213,7 +212,7 @@ function SectionGuidance({
   return (
     <div className="external-portal-task-strip" aria-label="合规资料处理">
       <article>
-        <StatusBadge tone="gray">待后端支持</StatusBadge>
+        <StatusBadge tone="notApplicable">待后端支持</StatusBadge>
         <strong>{sectionCopy[section].title}</strong>
         <span>当前仅展示合规摘要任务；明细维护和审核流程待总部系统开放明细维护，附件由总部登记或后续上传接口支持。</span>
       </article>

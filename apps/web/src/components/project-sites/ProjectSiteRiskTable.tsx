@@ -1,7 +1,8 @@
 import { MapPin, RefreshCw } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
+import { StatusBadge, type StatusTone } from "../ui";
 import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
-import { PanelTitle, ResponsiveTable, StateMessage, StatusBadge } from "./projectSiteUi";
+import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
 
 function dated(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
@@ -11,18 +12,18 @@ function healthCertificateStatus(summary: ProjectSiteComplianceSummaryDto) {
   if (summary.missingHealthCertificateCount > 0 || summary.expiredHealthCertificateCount > 0) {
     return {
       label: `缺失 ${summary.missingHealthCertificateCount} / 临期 ${summary.expiringHealthCertificateCount} / 过期 ${summary.expiredHealthCertificateCount}`,
-      tone: "red" as const,
+      tone: "danger" as StatusTone,
     };
   }
   if (summary.expiringHealthCertificateCount > 0) {
     return {
       label: `临期 ${summary.expiringHealthCertificateCount}`,
-      tone: "orange" as const,
+      tone: "warning" as StatusTone,
     };
   }
   return {
     label: "正常",
-    tone: "green" as const,
+    tone: "success" as StatusTone,
   };
 }
 
@@ -30,18 +31,18 @@ function insuranceStatus(summary: ProjectSiteComplianceSummaryDto) {
   if (summary.insuranceUncoveredActiveRosterCount > 0 || summary.insuranceExpiredCount > 0) {
     return {
       label: `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} / 临期 ${summary.insuranceExpiringSoonCount} / 过期 ${summary.insuranceExpiredCount}`,
-      tone: "red" as const,
+      tone: "danger" as StatusTone,
     };
   }
   if (summary.insuranceExpiringSoonCount > 0) {
     return {
       label: `临期 ${summary.insuranceExpiringSoonCount}`,
-      tone: "orange" as const,
+      tone: "warning" as StatusTone,
     };
   }
   return {
     label: "正常",
-    tone: "green" as const,
+    tone: "success" as StatusTone,
   };
 }
 
@@ -104,11 +105,11 @@ export function ProjectSiteRiskTable({
               site.primaryManagerEmployeeName ?? site.subcontractorContactName ?? "-",
               siteStatusLabel.get(site.status) ?? site.status,
               summary ? (
-                <StatusBadge key={`${site.id}-risk`} tone={summary.blockingIssueCount > 0 ? "red" : summary.warningIssueCount > 0 ? "orange" : "green"}>
+                <StatusBadge key={`${site.id}-risk`} tone={summary.blockingIssueCount > 0 ? "danger" : summary.warningIssueCount > 0 ? "warning" : "success"}>
                   {complianceRiskLabel(summary)}
                 </StatusBadge>
               ) : (
-                <StatusBadge key={`${site.id}-risk-unavailable`} tone="orange">
+                <StatusBadge key={`${site.id}-risk-unavailable`} tone="warning">
                   数据暂不可用
                 </StatusBadge>
               ),
@@ -142,7 +143,7 @@ export function ProjectSiteRiskTable({
                       "缺失"}
                   </StatusBadge>
                 ) : (
-                  <StatusBadge key={`${site.id}-payroll-not-required`} tone="gray">
+                  <StatusBadge key={`${site.id}-payroll-not-required`} tone="notApplicable">
                     不需要
                   </StatusBadge>
                 )

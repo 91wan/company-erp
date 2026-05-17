@@ -1,7 +1,8 @@
 import { MapPin, RefreshCw } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
+import { StatusBadge } from "../ui";
 import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
-import { PanelTitle, ResponsiveTable, StateMessage, StatusBadge } from "./projectSiteUi";
+import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
 
 export function ProjectSiteList({
   sites,
@@ -81,14 +82,14 @@ export function ProjectSiteList({
                 "数据暂不可用"
               ),
               summary ? (
-                <StatusBadge
-                  key={`${site.id}-risk`}
-                  tone={summary.blockingIssueCount > 0 ? "red" : summary.warningIssueCount > 0 ? "orange" : "green"}
-                >
+                  <StatusBadge
+                    key={`${site.id}-risk`}
+                    tone={summary.blockingIssueCount > 0 ? "danger" : summary.warningIssueCount > 0 ? "warning" : "success"}
+                  >
                   {complianceRiskLabel(summary)}
                 </StatusBadge>
               ) : (
-                <StatusBadge key={`${site.id}-risk-empty`} tone={site.status === "active" ? "orange" : "gray"}>
+                <StatusBadge key={`${site.id}-risk-empty`} tone={site.status === "active" ? "warning" : "notApplicable"}>
                   {siteStatusLabel.get(site.status) ?? site.status}
                 </StatusBadge>
               ),
