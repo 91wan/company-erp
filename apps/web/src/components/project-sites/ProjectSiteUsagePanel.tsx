@@ -1,6 +1,7 @@
 import { ClipboardList, RefreshCw } from "lucide-react";
 import type { ProjectUsageRequestDto } from "@company-erp/shared";
-import { PanelTitle, ResponsiveTable, StateMessage, StatusBadge, formatMoney } from "./projectSiteUi";
+import { StatusBadge } from "../ui";
+import { PanelTitle, ResponsiveTable, StateMessage, formatMoney } from "./projectSiteUi";
 
 export function ProjectSiteUsagePanel({
   usageRequests,
@@ -47,7 +48,7 @@ export function ProjectSiteUsagePanel({
             request.lastReceivedByName ?? "-",
             request.lastIssuedAt ?? "-",
             request.warehouseCode,
-            <StatusBadge key={`${request.id}-status`} tone={request.status === "issued" ? "green" : "orange"}>
+            <StatusBadge key={`${request.id}-status`} tone={request.status === "issued" ? "success" : "warning"}>
               {usageStatusLabel.get(request.status) ?? request.status}
             </StatusBadge>,
             request.expectedDate ?? "-",
