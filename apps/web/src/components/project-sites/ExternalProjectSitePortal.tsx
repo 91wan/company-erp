@@ -174,7 +174,7 @@ export function ExternalProjectSitePortal({
           },
           {
             title: "雇主责任险与工资表",
-            description: "保险和工资表提交后需等待总部审核，不以附件上传作为自动合规。",
+            description: "雇主责任险和工资表提交后需等待总部审核，不以附件上传作为自动合规。",
             tone: "info",
             action: <FileText aria-hidden="true" size={18} />,
           },

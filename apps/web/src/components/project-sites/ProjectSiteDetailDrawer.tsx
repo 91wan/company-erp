@@ -93,7 +93,7 @@ export function ProjectSiteDetailDrawer({
                   title: "雇主责任险",
                   description: complianceSummary
                     ? `未覆盖 ${complianceSummary.insuranceUncoveredActiveRosterCount} 人，临期 ${complianceSummary.insuranceExpiringSoonCount}，过期 ${complianceSummary.insuranceExpiredCount}。`
-                    : "保险覆盖状态暂不可用。",
+                    : "雇主责任险覆盖状态暂不可用。",
                   tone: complianceSummary && complianceSummary.insuranceUncoveredActiveRosterCount === 0 && complianceSummary.insuranceExpiredCount === 0 ? "success" : "warning",
                 },
                 {

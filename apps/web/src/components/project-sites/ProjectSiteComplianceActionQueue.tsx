@@ -157,7 +157,7 @@ export function buildProjectSiteComplianceActions(
   if (actions.length === 0) {
     actions.push({
       title: "暂无待处理合规任务",
-      description: "当前接口返回的现场人员、健康证、许可证、保险和工资表状态均无阻断项。",
+      description: "当前接口返回的项目点现场人员、健康证、食品经营许可证、雇主责任险和工资表状态均无阻断项。",
       tone: "success",
     });
   }
