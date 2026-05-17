@@ -62,6 +62,28 @@ type PurchaseFormDrawer = "request" | "record" | null;
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
 const sourceTypeLabel = new Map(PURCHASE_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
+const emptyRequestForm: RequestFormState = {
+  requestNo: "",
+  requesterName: "",
+  departmentName: "",
+  materialName: "",
+  requestedQuantity: "",
+  unit: "",
+  expectedArrivalDate: "",
+};
+const emptyRecordForm: RecordFormState = {
+  purchaseNo: "",
+  purchaserName: "",
+  sourceType: "platform",
+  purchasePlatform: "",
+  supplierNameText: "",
+  purchaseDescription: "",
+  contractId: "",
+  purchaseDate: "",
+  materialName: "",
+  purchaseQuantity: "",
+  unit: "",
+};
 
 async function defaultLoadPurchaseRequests(): Promise<PurchaseRequestDto[]> {
   const payload = await requestJson<{ purchaseRequests: PurchaseRequestDto[] }>(`${apiBaseUrl}/api/purchase-requests`);
@@ -152,26 +174,10 @@ export function PurchaseWorkspace({
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
   const [requestForm, setRequestForm] = useState<RequestFormState>({
-    requestNo: "",
-    requesterName: "",
-    departmentName: "",
-    materialName: "",
-    requestedQuantity: "",
-    unit: "",
-    expectedArrivalDate: "",
+    ...emptyRequestForm,
   });
   const [recordForm, setRecordForm] = useState<RecordFormState>({
-    purchaseNo: "",
-    purchaserName: "",
-    sourceType: "platform",
-    purchasePlatform: "",
-    supplierNameText: "",
-    purchaseDescription: "",
-    contractId: "",
-    purchaseDate: "",
-    materialName: "",
-    purchaseQuantity: "",
-    unit: "",
+    ...emptyRecordForm,
   });
 
   useEffect(() => {
@@ -273,6 +279,12 @@ export function PurchaseWorkspace({
   const selectedRecord = useMemo(
     () => purchaseRecords.find((record) => record.id === selectedRecordId) ?? null,
     [purchaseRecords, selectedRecordId],
+  );
+  const requestFormDirty = Object.entries(requestForm).some(
+    ([key, value]) => value !== emptyRequestForm[key as keyof RequestFormState],
+  );
+  const recordFormDirty = Object.entries(recordForm).some(
+    ([key, value]) => value !== emptyRecordForm[key as keyof RecordFormState],
   );
 
   function replacePurchaseRequest(nextRequest: PurchaseRequestDto) {
@@ -513,7 +525,12 @@ export function PurchaseWorkspace({
           ) : null}
         </SectionCard>
 
-        <FormDrawer title="新增采购需求" open={openFormDrawer === "request"} onClose={() => setOpenFormDrawer(null)}>
+        <FormDrawer
+          title="新增采购需求"
+          open={openFormDrawer === "request"}
+          dirty={requestFormDirty && requestSubmitState !== "saving"}
+          onClose={() => setOpenFormDrawer(null)}
+        >
           {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购需求</h3>
@@ -571,7 +588,12 @@ export function PurchaseWorkspace({
           {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} onSelectRecord={(record) => setSelectedRecordId(record.id)} /> : null}
         </SectionCard>
 
-        <FormDrawer title="新增采购记录" open={openFormDrawer === "record"} onClose={() => setOpenFormDrawer(null)}>
+        <FormDrawer
+          title="新增采购记录"
+          open={openFormDrawer === "record"}
+          dirty={recordFormDirty && recordSubmitState !== "saving"}
+          onClose={() => setOpenFormDrawer(null)}
+        >
           {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购记录</h3>

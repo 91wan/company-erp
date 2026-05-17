@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "rejected" | "disabled" | "notApplicable";
@@ -183,16 +183,30 @@ export function FormDrawer({
   title,
   open,
   onClose,
+  dirty = false,
   children,
 }: {
   title: string;
   open: boolean;
   onClose: () => void;
+  dirty?: boolean;
   children: ReactNode;
 }) {
   const titleId = useId();
+  const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const discardButtonRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  const [closeConfirmationVisible, setCloseConfirmationVisible] = useState(false);
+
+  function requestClose() {
+    if (dirty && !closeConfirmationVisible) {
+      setCloseConfirmationVisible(true);
+      window.requestAnimationFrame(() => discardButtonRef.current?.focus());
+      return;
+    }
+    onClose();
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -203,7 +217,29 @@ export function FormDrawer({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        requestClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const drawer = drawerRef.current;
+      if (!drawer) return;
+      const focusableElements = Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusableElements.length === 0) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
@@ -212,17 +248,45 @@ export function FormDrawer({
       document.removeEventListener("keydown", handleKeyDown);
       previouslyFocusedElement.current?.focus();
     };
-  }, [open, onClose]);
+  }, [closeConfirmationVisible, dirty, onClose, open]);
+
+  useEffect(() => {
+    if (!open) setCloseConfirmationVisible(false);
+  }, [open]);
 
   if (!open) return null;
   return (
-    <aside className="ui-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="ui-drawer-header">
-        <h3 id={titleId}>{title}</h3>
-        <button ref={closeButtonRef} type="button" onClick={onClose}>关闭</button>
-      </div>
-      {children}
-    </aside>
+    <>
+      <button type="button" className="ui-drawer-backdrop" aria-label={`${title} 背景遮罩`} onClick={requestClose} />
+      <aside ref={drawerRef} className="ui-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="ui-drawer-header">
+          <h3 id={titleId}>{title}</h3>
+          <button ref={closeButtonRef} type="button" aria-label="关闭" onClick={requestClose}>关闭</button>
+        </div>
+        {closeConfirmationVisible ? (
+          <div className="ui-drawer-confirm" role="alert">
+            <strong>表单有未保存内容</strong>
+            <p>关闭后当前填写内容不会保存。</p>
+            <div>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => {
+                  setCloseConfirmationVisible(false);
+                  closeButtonRef.current?.focus();
+                }}
+              >
+                继续编辑
+              </button>
+              <button ref={discardButtonRef} type="button" className="table-action danger" onClick={onClose}>
+                放弃关闭
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {children}
+      </aside>
+    </>
   );
 }
 

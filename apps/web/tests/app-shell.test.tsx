@@ -101,7 +101,29 @@ describe("Company ERP app shell", () => {
     expect(drawer).toHaveAttribute("aria-modal", "true");
     expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
 
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(screen.getByLabelText("期望到货日期")).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
+
     fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "新增采购需求" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "新增采购需求" }));
+    expect(await screen.findByRole("dialog", { name: "新增采购需求" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增采购需求 背景遮罩" }));
+    expect(screen.queryByRole("dialog", { name: "新增采购需求" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "新增采购需求" }));
+    expect(await screen.findByRole("dialog", { name: "新增采购需求" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("申请人"), { target: { value: "王申请" } });
+    fireEvent.click(screen.getByRole("button", { name: "新增采购需求 背景遮罩" }));
+    expect(screen.getByText("表单有未保存内容")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "新增采购需求" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "继续编辑" }));
+    expect(screen.queryByText("表单有未保存内容")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增采购需求 背景遮罩" }));
+    fireEvent.click(screen.getByRole("button", { name: "放弃关闭" }));
     expect(screen.queryByRole("dialog", { name: "新增采购需求" })).not.toBeInTheDocument();
   });
 
