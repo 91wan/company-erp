@@ -11,7 +11,7 @@ import type { AttachmentFilters } from "../../apiClient";
 import { BusinessAttachmentsPanel } from "../BusinessAttachmentsPanel";
 import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState } from "../ui";
 import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
-import { complianceRiskLabel } from "./ProjectSiteCompliancePanel";
+import { complianceRiskLabel } from "./projectSiteComplianceStatus";
 import { formatMoney } from "./projectSiteUi";
 
 type DetailTab = "overview" | "usage" | "equipment" | "attachments";
