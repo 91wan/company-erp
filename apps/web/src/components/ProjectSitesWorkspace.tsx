@@ -45,6 +45,10 @@ import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKit
 import { ProjectSiteModuleIntro } from "./project-sites/ProjectSiteModuleIntro";
 import { ProjectSiteRiskTable } from "./project-sites/ProjectSiteRiskTable";
 import { ProjectSiteSummaryCards } from "./project-sites/ProjectSiteSummaryCards";
+import {
+  ProjectUsageRequestFormDrawer,
+  type ProjectUsageRequestFormState,
+} from "./project-sites/ProjectUsageRequestFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
@@ -90,19 +94,7 @@ type UsageWarehouseOption = {
 };
 
 type SiteFormState = ProjectSiteCreateFormState;
-
-type UsageFormState = {
-  requestNo: string;
-  requestDate: string;
-  projectSiteId: string;
-  warehouseId: string;
-  materialId: string;
-  requestedQuantity: string;
-  unit: string;
-  purpose: string;
-  requestedBy: string;
-  expectedDate: string;
-};
+type UsageFormState = ProjectUsageRequestFormState;
 
 type KitchenEquipmentFormState = {
   projectSiteId: string;
@@ -1246,107 +1238,22 @@ export function ProjectSitesWorkspace({
           usageStatusLabel={usageStatusLabel}
         />
 
-        <FormDrawer title="新增领用申请" open={openFormDrawer === "usage"} onClose={() => setOpenFormDrawer(null)}>
-          {canCreateUsage ? <form className="dashboard-panel party-form" onSubmit={handleCreateUsageRequest} aria-label="新增领用申请表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <ClipboardList aria-hidden="true" size={16} />
-              新增领用申请
-            </h3>
-            <button
-              type="submit"
-              disabled={usageSubmitState === "saving" || masterStatus !== "ready" || (!usageOnly && sites.length === 0)}
-            >
-              <Save aria-hidden="true" size={15} />
-              保存领用申请
-            </button>
-          </div>
-          <label>
-            <span>领用申请单号</span>
-            <input value={usageForm.requestNo} onChange={(event) => setUsageForm({ ...usageForm, requestNo: event.target.value })} />
-          </label>
-          <label>
-            <span>申请日期</span>
-            <input
-              type="date"
-              value={usageForm.requestDate}
-              onChange={(event) => setUsageForm({ ...usageForm, requestDate: event.target.value })}
-            />
-          </label>
-          {!usageOnly ? <label>
-            <span>项目点</span>
-            <select
-              value={usageForm.projectSiteId}
-              onChange={(event) => setUsageForm({ ...usageForm, projectSiteId: event.target.value })}
-            >
-              <option value="">选择项目点</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.siteCode} {site.siteName}
-                </option>
-              ))}
-            </select>
-          </label> : null}
-          {!usageOnly ? <label>
-            <span>仓库</span>
-            <select value={usageForm.warehouseId} onChange={(event) => setUsageForm({ ...usageForm, warehouseId: event.target.value })}>
-              <option value="">选择仓库</option>
-              {warehouses.map((warehouse) => (
-                <option key={warehouse.id} value={warehouse.id}>
-                  {warehouse.warehouseCode} {warehouse.warehouseName}
-                </option>
-              ))}
-            </select>
-          </label> : null}
-          <label>
-            <span>物料</span>
-            <select value={usageForm.materialId} onChange={(event) => updateSelectedMaterial(event.target.value)}>
-              <option value="">选择物料</option>
-              {materials.map((material) => (
-                <option key={material.id} value={material.id}>
-                  {material.materialCode} {material.materialName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>申请数量</span>
-            <input
-              type="number"
-              min="0"
-              step="0.001"
-              value={usageForm.requestedQuantity}
-              onChange={(event) => setUsageForm({ ...usageForm, requestedQuantity: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>单位</span>
-            <input value={usageForm.unit} onChange={(event) => setUsageForm({ ...usageForm, unit: event.target.value })} />
-          </label>
-          <label>
-            <span>期望日期</span>
-            <input
-              type="date"
-              value={usageForm.expectedDate}
-              onChange={(event) => setUsageForm({ ...usageForm, expectedDate: event.target.value })}
-            />
-          </label>
-          {!usageOnly ? <label>
-            <span>申请人</span>
-            <input value={usageForm.requestedBy} onChange={(event) => setUsageForm({ ...usageForm, requestedBy: event.target.value })} />
-          </label> : null}
-          <label>
-            <span>用途</span>
-            <input value={usageForm.purpose} onChange={(event) => setUsageForm({ ...usageForm, purpose: event.target.value })} />
-          </label>
-          {masterStatus === "error" ? (
-            <p className="form-error">
-              {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
-            </p>
-          ) : null}
-          {usageSubmitState === "error" ? <p className="form-error">{usageSubmitError || "领用申请保存失败，请检查必填项或单号是否重复。"}</p> : null}
-          </form> : null}
-        </FormDrawer>
+        <ProjectUsageRequestFormDrawer
+          open={openFormDrawer === "usage"}
+          canCreateUsage={canCreateUsage}
+          usageOnly={usageOnly}
+          form={usageForm}
+          sites={sites}
+          warehouses={warehouses}
+          materials={materials}
+          masterStatus={masterStatus}
+          submitState={usageSubmitState}
+          submitError={usageSubmitError}
+          onChange={setUsageForm}
+          onMaterialChange={updateSelectedMaterial}
+          onClose={() => setOpenFormDrawer(null)}
+          onSubmit={handleCreateUsageRequest}
+        />
       </div>
 
       <FormDrawer
