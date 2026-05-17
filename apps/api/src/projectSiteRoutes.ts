@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import type { ProjectSiteKitchenEquipmentChangeRequestDto, ProjectSiteKitchenEquipmentDto } from "@company-erp/shared";
+import type {
+  AttachmentRecordDto,
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
+  ProjectSiteKitchenEquipmentChangeRequestDto,
+  ProjectSiteKitchenEquipmentDto,
+  ProjectSitePayrollSubmissionDto,
+} from "@company-erp/shared";
 import type { AuthenticatedRequest } from "./auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
@@ -31,6 +37,47 @@ function kitchenEquipmentChangeRequestAuditSnapshot(request: ProjectSiteKitchenE
     reviewedByEmployeeId: request.reviewedByEmployeeId,
     submittedByAccountId: request.submittedByAccountId,
   };
+}
+
+async function relatedProjectSiteAttachments(
+  options: BuildAppOptions,
+  ownerEntityType: string,
+  ownerEntityId: string,
+): Promise<AttachmentRecordDto[] | undefined> {
+  if (!options.attachmentRepository) return undefined;
+  return options.attachmentRepository.list({ ownerModule: "project-sites", ownerEntityType, ownerEntityId, limit: 20 });
+}
+
+async function withPolicyAttachments(
+  options: BuildAppOptions,
+  policy: ProjectSiteEmployerLiabilityInsurancePolicyDto,
+): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto> {
+  const relatedAttachments = await relatedProjectSiteAttachments(options, "employer_liability_insurance_policy", policy.id);
+  return relatedAttachments ? { ...policy, relatedAttachments } : policy;
+}
+
+async function withPayrollAttachments(
+  options: BuildAppOptions,
+  submission: ProjectSitePayrollSubmissionDto,
+): Promise<ProjectSitePayrollSubmissionDto> {
+  const relatedAttachments = await relatedProjectSiteAttachments(options, "payroll_submission", submission.id);
+  return relatedAttachments ? { ...submission, relatedAttachments } : submission;
+}
+
+async function withKitchenEquipmentAttachments(
+  options: BuildAppOptions,
+  equipment: ProjectSiteKitchenEquipmentDto,
+): Promise<ProjectSiteKitchenEquipmentDto> {
+  const relatedAttachments = await relatedProjectSiteAttachments(options, "kitchen_equipment", equipment.id);
+  return relatedAttachments ? { ...equipment, relatedAttachments } : equipment;
+}
+
+async function withKitchenEquipmentChangeRequestAttachments(
+  options: BuildAppOptions,
+  request: ProjectSiteKitchenEquipmentChangeRequestDto,
+): Promise<ProjectSiteKitchenEquipmentChangeRequestDto> {
+  const relatedAttachments = await relatedProjectSiteAttachments(options, "kitchen_equipment_change_request", request.id);
+  return relatedAttachments ? { ...request, relatedAttachments } : request;
 }
 
 async function coveredPersonScopeFailure(
@@ -232,7 +279,7 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
     };
     if (isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { insurancePolicies: [] };
     const insurancePolicies = await options.projectSiteComplianceRepository.listInsurancePolicies(filters);
-    return { insurancePolicies };
+    return { insurancePolicies: await Promise.all(insurancePolicies.map((policy) => withPolicyAttachments(options, policy))) };
   });
 
   app.post("/api/employer-liability-insurance-policies", async (request, reply) => {
@@ -296,7 +343,7 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
     };
     if (isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { payrollSubmissions: [] };
     const payrollSubmissions = await options.projectSiteComplianceRepository.listPayrollSubmissions(filters);
-    return { payrollSubmissions };
+    return { payrollSubmissions: await Promise.all(payrollSubmissions.map((submission) => withPayrollAttachments(options, submission))) };
   });
 
   app.post("/api/project-site-payroll-submissions", async (request, reply) => {
@@ -350,7 +397,7 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       };
       if (filters.projectSiteId && isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { kitchenEquipment: [] };
       const kitchenEquipment = await options.projectSiteKitchenEquipmentRepository.listEquipment(filters);
-      return { kitchenEquipment };
+      return { kitchenEquipment: await Promise.all(kitchenEquipment.map((equipment) => withKitchenEquipmentAttachments(options, equipment))) };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
         return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });
@@ -435,7 +482,11 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return { kitchenEquipmentChangeRequests: [] };
       }
       const kitchenEquipmentChangeRequests = await options.projectSiteKitchenEquipmentRepository.listChangeRequests(filters);
-      return { kitchenEquipmentChangeRequests };
+      return {
+        kitchenEquipmentChangeRequests: await Promise.all(
+          kitchenEquipmentChangeRequests.map((request) => withKitchenEquipmentChangeRequestAttachments(options, request)),
+        ),
+      };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
         return reply.status(400).send({ error: "PROJECT_SITE_KITCHEN_EQUIPMENT_VALIDATION_FAILED", issues: error.issues });

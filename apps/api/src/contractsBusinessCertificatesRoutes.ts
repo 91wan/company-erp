@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
+import type { AttachmentRecordDto, CertificateRecordDto, ContractDto, CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
 import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "./businessProjects.js";
 import {
@@ -22,6 +22,26 @@ type CertificateOwnerScopeInput = Pick<
   CreateCertificateRecordInput | UpdateCertificateRecordInput,
   "ownerType" | "ownerEmployeeId" | "ownerRosterPersonId" | "ownerProjectSiteId" | "ownerPartyId"
 >;
+
+async function relatedAttachmentsFor(
+  options: BuildAppOptions,
+  ownerModule: string,
+  ownerEntityType: string,
+  ownerEntityId: string,
+): Promise<AttachmentRecordDto[] | undefined> {
+  if (!options.attachmentRepository) return undefined;
+  return options.attachmentRepository.list({ ownerModule, ownerEntityType, ownerEntityId, limit: 20 });
+}
+
+async function withContractAttachments(options: BuildAppOptions, contract: ContractDto): Promise<ContractDto> {
+  const relatedAttachments = await relatedAttachmentsFor(options, "contracts", "contract", contract.id);
+  return relatedAttachments ? { ...contract, relatedAttachments } : contract;
+}
+
+async function withCertificateAttachments(options: BuildAppOptions, certificate: CertificateRecordDto): Promise<CertificateRecordDto> {
+  const relatedAttachments = await relatedAttachmentsFor(options, "certificates", "certificate", certificate.id);
+  return relatedAttachments ? { ...certificate, relatedAttachments } : certificate;
+}
 
 async function certificateOwnerScopeFailure(
   request: unknown,
@@ -69,7 +89,7 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const contracts = await options.contractRepository.list(filters);
-      return { contracts };
+      return { contracts: await Promise.all(contracts.map((contract) => withContractAttachments(options, contract))) };
     } catch (error) {
       if (error instanceof ContractValidationError) {
         return reply.status(400).send({ error: "CONTRACT_VALIDATION_FAILED", issues: error.issues });
@@ -184,7 +204,7 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
     }
     if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
-    return { contract };
+    return { contract: await withContractAttachments(options, contract) };
   });
 
   app.post("/api/contracts", async (request, reply) => {
@@ -332,7 +352,7 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         ...scopeFilters,
       };
       const certificates = await options.certificateRepository.list(filters);
-      return { certificates };
+      return { certificates: await Promise.all(certificates.map((certificate) => withCertificateAttachments(options, certificate))) };
     } catch (error) {
       if (error instanceof CertificateValidationError) {
         return reply.status(400).send({ error: "CERTIFICATE_VALIDATION_FAILED", issues: error.issues });
@@ -352,7 +372,7 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
       return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
     }
     if (!certificate) return reply.status(404).send({ error: "CERTIFICATE_NOT_FOUND" });
-    return { certificate };
+    return { certificate: await withCertificateAttachments(options, certificate) };
   });
 
   app.post("/api/certificates", async (request, reply) => {

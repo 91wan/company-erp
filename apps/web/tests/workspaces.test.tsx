@@ -552,7 +552,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("tab", { name: "统一附件" }));
 
     expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
-    expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("contracts/demo-contract.pdf")).not.toBeInTheDocument();
   });
 
   it("shows compliance task queue in project-site detail overview", async () => {
@@ -1031,6 +1031,8 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("统一附件")).toBeInTheDocument();
     expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
     expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Storage Key")).not.toBeInTheDocument();
+    expect(screen.queryByText("contracts/demo-contract.pdf")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }));
 
     await waitFor(() => expect(openSpy).toHaveBeenCalledWith(

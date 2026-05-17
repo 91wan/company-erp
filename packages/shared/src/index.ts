@@ -854,6 +854,7 @@ export type ContractDto = {
   budgetAmount?: number | null;
   currency: string;
   attachmentRef?: string | null;
+  relatedAttachments?: AttachmentRecordDto[];
   status: ContractStatusCode;
   expiryState: ContractExpiryStateCode;
   remark?: string | null;
@@ -994,6 +995,7 @@ export type CertificateRecordDto = {
   isComplianceCritical: boolean;
   attachmentPath?: string | null;
   sourceFilePath?: string | null;
+  relatedAttachments?: AttachmentRecordDto[];
   sourcePageNo?: number | null;
   responsibleEmployeeId?: string | null;
   responsibleEmployeeName?: string | null;
@@ -1183,6 +1185,7 @@ export type ProjectSiteEmployerLiabilityInsurancePolicyDto = {
   startDate: string;
   endDate: string;
   attachmentPath?: string | null;
+  relatedAttachments?: AttachmentRecordDto[];
   reviewStatus: ProjectSiteComplianceReviewStatusCode;
   reviewedByEmployeeId?: string | null;
   reviewedByEmployeeName?: string | null;
@@ -1210,6 +1213,7 @@ export type ProjectSitePayrollSubmissionDto = {
   projectSiteName?: string | null;
   payrollMonth: string;
   attachmentPath: string;
+  relatedAttachments?: AttachmentRecordDto[];
   submittedBy?: string | null;
   submittedAt: string;
   reviewStatus: ProjectSiteComplianceReviewStatusCode;
@@ -1256,6 +1260,7 @@ export type ProjectSiteKitchenEquipmentDto = {
   sourceContractName?: string | null;
   lastCheckedDate?: string | null;
   attachmentPath?: string | null;
+  relatedAttachments?: AttachmentRecordDto[];
   remark?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1290,6 +1295,7 @@ export type ProjectSiteKitchenEquipmentChangeRequestDto = {
   proposedLocation?: string | null;
   proposedStatus?: ProjectSiteKitchenEquipmentStatusCode | null;
   attachmentPath?: string | null;
+  relatedAttachments?: AttachmentRecordDto[];
   description?: string | null;
   submittedByAccountId?: string | null;
   submittedByNameSnapshot?: string | null;
