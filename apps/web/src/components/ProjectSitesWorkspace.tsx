@@ -36,6 +36,10 @@ import {
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
 import { ProjectSiteActionBar } from "./project-sites/ProjectSiteActionBar";
+import {
+  ProjectSiteCreateFormDrawer,
+  type ProjectSiteCreateFormState,
+} from "./project-sites/ProjectSiteCreateFormDrawer";
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
 import { ProjectSiteModuleIntro } from "./project-sites/ProjectSiteModuleIntro";
@@ -85,22 +89,7 @@ type UsageWarehouseOption = {
   warehouseName: string;
 };
 
-type SiteFormState = {
-  siteCode: string;
-  siteName: string;
-  clientPartyId: string;
-  operatorPartyId: string;
-  serviceMode: CreateProjectSiteInput["serviceMode"];
-  subcontractorPartyId: string;
-  region: string;
-  siteAddress: string;
-  serviceType: string;
-  businessProjectId: string;
-  primaryManagerEmployeeId: string;
-  clientContactName: string;
-  clientContactPhone: string;
-  remark: string;
-};
+type SiteFormState = ProjectSiteCreateFormState;
 
 type UsageFormState = {
   requestNo: string;
@@ -1193,121 +1182,21 @@ export function ProjectSitesWorkspace({
           onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
         />
 
-        <FormDrawer title="新增项目点" open={openFormDrawer === "site"} onClose={() => setOpenFormDrawer(null)}>
-          {canEditSites ? <form className="dashboard-panel party-form" onSubmit={handleCreateSite} aria-label="新增项目点表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <MapPin aria-hidden="true" size={16} />
-              新增项目点
-            </h3>
-            <button type="submit" disabled={siteSubmitState === "saving"}>
-              <Save aria-hidden="true" size={15} />
-              保存项目点
-            </button>
-          </div>
-          <label>
-            <span>项目点编码</span>
-            <input value={siteForm.siteCode} onChange={(event) => setSiteForm({ ...siteForm, siteCode: event.target.value })} />
-          </label>
-          <label>
-            <span>项目点名称</span>
-            <input value={siteForm.siteName} onChange={(event) => setSiteForm({ ...siteForm, siteName: event.target.value })} />
-          </label>
-          <label>
-            <span>客户/服务单位</span>
-            <select
-              value={siteForm.clientPartyId}
-              onChange={(event) => setSiteForm({ ...siteForm, clientPartyId: event.target.value })}
-            >
-              <option value="">选择客户</option>
-              {clientParties.map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.partyName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>我方主体</span>
-            <select
-              value={siteForm.operatorPartyId}
-              onChange={(event) => setSiteForm({ ...siteForm, operatorPartyId: event.target.value })}
-            >
-              <option value="">选择我方主体</option>
-              {operatorParties.map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.partyName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>服务模式</span>
-            <select
-              value={siteForm.serviceMode}
-              onChange={(event) =>
-                setSiteForm({
-                  ...siteForm,
-                  serviceMode: event.target.value as SiteFormState["serviceMode"],
-                  subcontractorPartyId: event.target.value === "direct" ? "" : siteForm.subcontractorPartyId,
-                })
-              }
-            >
-              {PROJECT_SITE_SERVICE_MODES.map((mode) => (
-                <option key={mode.code} value={mode.code}>
-                  {mode.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>外包方</span>
-            <select
-              value={siteForm.subcontractorPartyId}
-              disabled={siteForm.serviceMode !== "subcontracted"}
-              onChange={(event) => setSiteForm({ ...siteForm, subcontractorPartyId: event.target.value })}
-            >
-              <option value="">选择外包方</option>
-              {subcontractorParties.map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.partyName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>区域</span>
-            <input value={siteForm.region} onChange={(event) => setSiteForm({ ...siteForm, region: event.target.value })} />
-          </label>
-          <label>
-            <span>地址</span>
-            <input value={siteForm.siteAddress} onChange={(event) => setSiteForm({ ...siteForm, siteAddress: event.target.value })} />
-          </label>
-          <label>
-            <span>业务项目</span>
-            <select
-              value={siteForm.businessProjectId}
-              onChange={(event) => setSiteForm({ ...siteForm, businessProjectId: event.target.value })}
-            >
-              <option value="">不关联业务项目</option>
-              {businessProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.projectCode} {project.projectName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>客户联系人</span>
-            <input
-              value={siteForm.clientContactName}
-              onChange={(event) => setSiteForm({ ...siteForm, clientContactName: event.target.value })}
-            />
-          </label>
-          {masterStatus === "error" ? <p className="form-error">基础资料或业务项目接口暂不可用，项目点可先保存文本字段。</p> : null}
-          {siteSubmitState === "error" ? <p className="form-error">{siteSubmitError || "项目点保存失败，请检查编码是否重复或服务模式规则。"}</p> : null}
-          </form> : null}
-        </FormDrawer>
+        <ProjectSiteCreateFormDrawer
+          open={openFormDrawer === "site"}
+          canEditSites={canEditSites}
+          form={siteForm}
+          clientParties={clientParties}
+          operatorParties={operatorParties}
+          subcontractorParties={subcontractorParties}
+          businessProjects={businessProjects}
+          masterStatus={masterStatus}
+          submitState={siteSubmitState}
+          submitError={siteSubmitError}
+          onChange={setSiteForm}
+          onClose={() => setOpenFormDrawer(null)}
+          onSubmit={handleCreateSite}
+        />
       </div> : null}
 
       {!usageOnly ? <section className="dashboard-panel table-panel">
