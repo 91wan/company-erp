@@ -80,6 +80,18 @@ import {
   defaultLoadWarehouses,
   defaultReviewKitchenEquipmentChangeRequest,
 } from "./project-sites/projectSiteApi";
+import {
+  createInitialIssueForm,
+  createInitialKitchenEquipmentChangeForm,
+  createInitialKitchenEquipmentForm,
+  createInitialSiteForm,
+  createInitialUsageForm,
+  resetIssueFormAfterIssue,
+  resetKitchenEquipmentChangeFormAfterCreate,
+  resetKitchenEquipmentFormAfterCreate,
+  resetSiteFormAfterCreate,
+  resetUsageFormAfterCreate,
+} from "./project-sites/projectSiteFormState";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -220,66 +232,13 @@ export function ProjectSitesWorkspace({
   const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [pendingIssueConfirm, setPendingIssueConfirm] = useState(false);
-  const [siteForm, setSiteForm] = useState<SiteFormState>({
-    siteCode: "",
-    siteName: "",
-    clientPartyId: "",
-    operatorPartyId: "",
-    serviceMode: "direct",
-    subcontractorPartyId: "",
-    region: "",
-    siteAddress: "",
-    serviceType: "",
-    businessProjectId: "",
-    primaryManagerEmployeeId: "",
-    clientContactName: "",
-    clientContactPhone: "",
-    remark: "",
-  });
-  const [usageForm, setUsageForm] = useState<UsageFormState>({
-    requestNo: "",
-    requestDate: "",
-    projectSiteId: "",
-    warehouseId: "",
-    materialId: "",
-    requestedQuantity: "",
-    unit: "",
-    purpose: "",
-    requestedBy: "",
-    expectedDate: "",
-  });
-  const [issueForm, setIssueForm] = useState<IssueFormState>({
-    requestId: "",
-    outboundNo: "",
-    movementDate: "",
-    quantity: "",
-    handledBy: "",
-    receivedByName: "",
-  });
-  const [kitchenEquipmentForm, setKitchenEquipmentForm] = useState<KitchenEquipmentFormState>({
-    projectSiteId: "",
-    equipmentName: "",
-    equipmentCategory: "",
-    specification: "",
-    quantity: "",
-    unit: "台",
-    location: "",
-    status: "in_use",
-    companyAssetTag: "",
-    sourceContractId: "",
-    lastCheckedDate: "",
-    remark: "",
-  });
-  const [kitchenEquipmentChangeForm, setKitchenEquipmentChangeForm] = useState<KitchenEquipmentChangeFormState>({
-    projectSiteId: "",
-    equipmentId: "",
-    equipmentName: "",
-    changeType: "status_change",
-    proposedQuantity: "",
-    proposedLocation: "",
-    proposedStatus: "",
-    description: "",
-  });
+  const [siteForm, setSiteForm] = useState<SiteFormState>(createInitialSiteForm);
+  const [usageForm, setUsageForm] = useState<UsageFormState>(createInitialUsageForm);
+  const [issueForm, setIssueForm] = useState<IssueFormState>(createInitialIssueForm);
+  const [kitchenEquipmentForm, setKitchenEquipmentForm] = useState<KitchenEquipmentFormState>(createInitialKitchenEquipmentForm);
+  const [kitchenEquipmentChangeForm, setKitchenEquipmentChangeForm] = useState<KitchenEquipmentChangeFormState>(
+    createInitialKitchenEquipmentChangeForm,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -576,22 +535,7 @@ export function ProjectSitesWorkspace({
       setSites((current) => [created, ...current.filter((site) => site.id !== created.id)]);
       setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || created.id }));
       setSelectedInvestmentSiteId((current) => current || created.id);
-      setSiteForm({
-        siteCode: "",
-        siteName: "",
-        clientPartyId: "",
-        operatorPartyId: "",
-        serviceMode: "direct",
-        subcontractorPartyId: "",
-        region: "",
-        siteAddress: "",
-        serviceType: "",
-        businessProjectId: "",
-        primaryManagerEmployeeId: "",
-        clientContactName: "",
-        clientContactPhone: "",
-        remark: "",
-      });
+      setSiteForm(resetSiteFormAfterCreate());
       setSiteSubmitState("idle");
       setOpenFormDrawer(null);
     } catch (error) {
@@ -620,18 +564,7 @@ export function ProjectSitesWorkspace({
       });
       setUsageRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
       setIssueForm((current) => ({ ...current, requestId: current.requestId || created.id }));
-      setUsageForm((current) => ({
-        requestNo: "",
-        requestDate: "",
-        projectSiteId: current.projectSiteId,
-        warehouseId: current.warehouseId,
-        materialId: current.materialId,
-        requestedQuantity: "",
-        unit: current.unit,
-        purpose: "",
-        requestedBy: "",
-        expectedDate: "",
-      }));
+      setUsageForm(resetUsageFormAfterCreate);
       setUsageSubmitState("idle");
       setOpenFormDrawer(null);
     } catch (error) {
@@ -659,14 +592,7 @@ export function ProjectSitesWorkspace({
         receivedByName: issueForm.receivedByName || null,
       });
       setUsageRequests((current) => [issued, ...current.filter((request) => request.id !== issued.id)]);
-      setIssueForm((current) => ({
-        requestId: current.requestId,
-        outboundNo: "",
-        movementDate: "",
-        quantity: "",
-        handledBy: current.handledBy,
-        receivedByName: "",
-      }));
+      setIssueForm(resetIssueFormAfterIssue);
       setIssueSubmitState("idle");
       setPendingIssueConfirm(false);
       setOpenFormDrawer(null);
@@ -703,20 +629,7 @@ export function ProjectSitesWorkspace({
         equipmentId: current.equipmentId || created.id,
         equipmentName: current.equipmentName || created.equipmentName,
       }));
-      setKitchenEquipmentForm((current) => ({
-        ...current,
-        equipmentName: "",
-        equipmentCategory: "",
-        specification: "",
-        quantity: "",
-        unit: "台",
-        location: "",
-        status: "in_use",
-        companyAssetTag: "",
-        sourceContractId: "",
-        lastCheckedDate: "",
-        remark: "",
-      }));
+      setKitchenEquipmentForm(resetKitchenEquipmentFormAfterCreate);
       setKitchenEquipmentSubmitState("idle");
       setOpenFormDrawer(null);
     } catch (error) {
@@ -742,13 +655,7 @@ export function ProjectSitesWorkspace({
         description: kitchenEquipmentChangeForm.description || null,
       });
       setKitchenEquipmentChangeRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
-      setKitchenEquipmentChangeForm((current) => ({
-        ...current,
-        proposedQuantity: "",
-        proposedLocation: "",
-        proposedStatus: "",
-        description: "",
-      }));
+      setKitchenEquipmentChangeForm(resetKitchenEquipmentChangeFormAfterCreate);
       setKitchenEquipmentChangeSubmitState("idle");
     } catch (error) {
       setKitchenEquipmentChangeSubmitError(formatApiError(error, "设备变更上报失败，请检查设备名称或项目点。"));
