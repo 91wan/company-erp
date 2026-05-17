@@ -1,4 +1,4 @@
-import { ClipboardList, Filter, MapPin, RefreshCw, Save, Search, Wrench } from "lucide-react";
+import { ClipboardList, Filter, MapPin, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
@@ -20,9 +20,7 @@ import {
   type ProjectSiteDto,
   type ProjectSiteInvestmentSummaryDto,
   type ProjectSiteKitchenEquipmentChangeRequestDto,
-  type ProjectSiteKitchenEquipmentChangeTypeCode,
   type ProjectSiteKitchenEquipmentDto,
-  type ProjectSiteKitchenEquipmentStatusCode,
   type ProjectUsageOptionMaterialDto,
   type ProjectUsageOptionsDto,
   type ProjectUsageRequestDto,
@@ -30,7 +28,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
-import { FormDrawer, PageHeader } from "./ui";
+import { PageHeader } from "./ui";
 import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
@@ -53,6 +51,14 @@ import {
   ProjectUsageIssueFormDrawer,
   type ProjectUsageIssueFormState,
 } from "./project-sites/ProjectUsageIssueFormDrawer";
+import {
+  ProjectSiteKitchenEquipmentCreateFormDrawer,
+  type ProjectSiteKitchenEquipmentCreateFormState,
+} from "./project-sites/ProjectSiteKitchenEquipmentCreateFormDrawer";
+import {
+  ProjectSiteKitchenEquipmentChangeFormDrawer,
+  type ProjectSiteKitchenEquipmentChangeFormState,
+} from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
@@ -100,31 +106,8 @@ type UsageWarehouseOption = {
 type SiteFormState = ProjectSiteCreateFormState;
 type UsageFormState = ProjectUsageRequestFormState;
 
-type KitchenEquipmentFormState = {
-  projectSiteId: string;
-  equipmentName: string;
-  equipmentCategory: string;
-  specification: string;
-  quantity: string;
-  unit: string;
-  location: string;
-  status: ProjectSiteKitchenEquipmentStatusCode;
-  companyAssetTag: string;
-  sourceContractId: string;
-  lastCheckedDate: string;
-  remark: string;
-};
-
-type KitchenEquipmentChangeFormState = {
-  projectSiteId: string;
-  equipmentId: string;
-  equipmentName: string;
-  changeType: ProjectSiteKitchenEquipmentChangeTypeCode;
-  proposedQuantity: string;
-  proposedLocation: string;
-  proposedStatus: "" | ProjectSiteKitchenEquipmentStatusCode;
-  description: string;
-};
+type KitchenEquipmentFormState = ProjectSiteKitchenEquipmentCreateFormState;
+type KitchenEquipmentChangeFormState = ProjectSiteKitchenEquipmentChangeFormState;
 
 type IssueFormState = ProjectUsageIssueFormState;
 
@@ -976,162 +959,31 @@ export function ProjectSitesWorkspace({
         onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
       />
 
-      <FormDrawer title="新增厨房设备" open={openFormDrawer === "equipment"} onClose={() => setOpenFormDrawer(null)}>
-        {!usageOnly && canEditSites ? (
-        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipment} aria-label="新增厨房设备表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <Wrench aria-hidden="true" size={16} />
-              新增厨房设备
-            </h3>
-            <button type="submit" disabled={kitchenEquipmentSubmitState === "saving"}>
-              <Save aria-hidden="true" size={15} />
-              保存设备
-            </button>
-          </div>
-          <label>
-            <span>项目点</span>
-            <select
-              aria-label="设备项目点"
-              value={kitchenEquipmentForm.projectSiteId}
-              onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, projectSiteId: event.target.value })}
-              required
-            >
-              <option value="">选择项目点</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>{site.siteName}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>设备名称</span>
-            <input value={kitchenEquipmentForm.equipmentName} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, equipmentName: event.target.value })} required />
-          </label>
-          <label>
-            <span>设备类目</span>
-            <input value={kitchenEquipmentForm.equipmentCategory} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, equipmentCategory: event.target.value })} />
-          </label>
-          <label>
-            <span>规格型号</span>
-            <input value={kitchenEquipmentForm.specification} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, specification: event.target.value })} />
-          </label>
-          <label>
-            <span>数量</span>
-            <input type="number" min="0.0001" step="0.0001" value={kitchenEquipmentForm.quantity} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, quantity: event.target.value })} required />
-          </label>
-          <label>
-            <span>单位</span>
-            <input value={kitchenEquipmentForm.unit} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, unit: event.target.value })} required />
-          </label>
-          <label>
-            <span>位置</span>
-            <input value={kitchenEquipmentForm.location} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, location: event.target.value })} />
-          </label>
-          <label>
-            <span>状态</span>
-            <select value={kitchenEquipmentForm.status} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, status: event.target.value as ProjectSiteKitchenEquipmentStatusCode })}>
-              {PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => (
-                <option key={status.code} value={status.code}>{status.label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>资产标签</span>
-            <input value={kitchenEquipmentForm.companyAssetTag} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, companyAssetTag: event.target.value })} />
-          </label>
-          <label>
-            <span>最近核对</span>
-            <input type="date" value={kitchenEquipmentForm.lastCheckedDate} onChange={(event) => setKitchenEquipmentForm({ ...kitchenEquipmentForm, lastCheckedDate: event.target.value })} />
-          </label>
-          {kitchenEquipmentSubmitState === "error" ? <p className="form-error">{kitchenEquipmentSubmitError || "厨房设备保存失败，请检查必填项或项目点。"}</p> : null}
-        </form>
-        ) : null}
-      </FormDrawer>
+      <ProjectSiteKitchenEquipmentCreateFormDrawer
+        open={openFormDrawer === "equipment"}
+        canEditSites={canEditSites}
+        usageOnly={usageOnly}
+        form={kitchenEquipmentForm}
+        sites={sites}
+        submitState={kitchenEquipmentSubmitState}
+        submitError={kitchenEquipmentSubmitError}
+        onChange={setKitchenEquipmentForm}
+        onClose={() => setOpenFormDrawer(null)}
+        onSubmit={handleCreateKitchenEquipment}
+      />
 
-      <FormDrawer title="上报设备变更" open={openFormDrawer === "equipmentChange"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleCreateKitchenEquipmentChangeRequest} aria-label="厨房设备变更上报表单" noValidate>
-        <div className="panel-header people-panel-title">
-          <h3>
-            <ClipboardList aria-hidden="true" size={16} />
-            上报设备变更
-          </h3>
-          <button type="submit" disabled={kitchenEquipmentChangeSubmitState === "saving"}>
-            <Save aria-hidden="true" size={15} />
-            提交上报
-          </button>
-        </div>
-        {!usageOnly ? (
-          <label>
-            <span>项目点</span>
-            <select
-              aria-label="上报项目点"
-              value={kitchenEquipmentChangeForm.projectSiteId}
-              onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, projectSiteId: event.target.value })}
-            >
-              <option value="">选择项目点</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>{site.siteName}</option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <label>
-          <span>关联设备</span>
-          <select
-            aria-label="关联设备"
-            value={kitchenEquipmentChangeForm.equipmentId}
-            onChange={(event) => {
-              const selected = kitchenEquipment.find((item) => item.id === event.target.value);
-              setKitchenEquipmentChangeForm({
-                ...kitchenEquipmentChangeForm,
-                equipmentId: event.target.value,
-                equipmentName: selected?.equipmentName ?? kitchenEquipmentChangeForm.equipmentName,
-                projectSiteId: selected?.projectSiteId ?? kitchenEquipmentChangeForm.projectSiteId,
-              });
-            }}
-          >
-            <option value="">新增设备或不关联</option>
-            {filteredKitchenEquipment.map((item) => (
-              <option key={item.id} value={item.id}>{item.equipmentName}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>设备名称</span>
-          <input value={kitchenEquipmentChangeForm.equipmentName} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, equipmentName: event.target.value })} required />
-        </label>
-        <label>
-          <span>变更类型</span>
-          <select value={kitchenEquipmentChangeForm.changeType} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, changeType: event.target.value as ProjectSiteKitchenEquipmentChangeTypeCode })}>
-            {PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => (
-              <option key={type.code} value={type.code}>{type.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>变更数量</span>
-          <input type="number" min="0.0001" step="0.0001" value={kitchenEquipmentChangeForm.proposedQuantity} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedQuantity: event.target.value })} />
-        </label>
-        <label>
-          <span>变更位置</span>
-          <input value={kitchenEquipmentChangeForm.proposedLocation} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedLocation: event.target.value })} />
-        </label>
-        <label>
-          <span>变更状态</span>
-          <select value={kitchenEquipmentChangeForm.proposedStatus} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, proposedStatus: event.target.value as "" | ProjectSiteKitchenEquipmentStatusCode })}>
-            <option value="">不变更状态</option>
-            {PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => (
-              <option key={status.code} value={status.code}>{status.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="wide">
-          <span>说明</span>
-          <textarea value={kitchenEquipmentChangeForm.description} onChange={(event) => setKitchenEquipmentChangeForm({ ...kitchenEquipmentChangeForm, description: event.target.value })} />
-        </label>
-        {kitchenEquipmentChangeSubmitState === "error" ? <p className="form-error">{kitchenEquipmentChangeSubmitError || "设备变更上报失败，请检查设备名称或项目点。"}</p> : null}
-        </form>
-      </FormDrawer>
+      <ProjectSiteKitchenEquipmentChangeFormDrawer
+        open={openFormDrawer === "equipmentChange"}
+        usageOnly={usageOnly}
+        form={kitchenEquipmentChangeForm}
+        sites={sites}
+        kitchenEquipment={filteredKitchenEquipment}
+        submitState={kitchenEquipmentChangeSubmitState}
+        submitError={kitchenEquipmentChangeSubmitError}
+        onChange={setKitchenEquipmentChangeForm}
+        onClose={() => setOpenFormDrawer(null)}
+        onSubmit={handleCreateKitchenEquipmentChangeRequest}
+      />
 
       <div className="party-toolbar">
         <label className="party-search">
