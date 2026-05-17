@@ -5,6 +5,7 @@ import type {
   AuditLogDto,
   AuthenticatedUserDto,
   CreateAttachmentRecordInput,
+  DashboardSummaryDto,
   LoginInput,
   UpdateAppConfigInput,
 } from "@company-erp/shared";
@@ -91,6 +92,12 @@ export async function getAppConfig(): Promise<AppConfigDto> {
 export async function getAppVersion(): Promise<AppVersionDto> {
   const payload = await requestJson<{ appVersion: AppVersionDto }>(`${apiBaseUrl}/api/app-version`);
   return payload.appVersion;
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummaryDto> {
+  const payload = await requestJson<{ dashboardSummary?: DashboardSummaryDto }>(`${apiBaseUrl}/api/dashboard/summary`);
+  if (!payload.dashboardSummary) throw new ApiRequestError(502, "DASHBOARD_SUMMARY_INVALID", []);
+  return payload.dashboardSummary;
 }
 
 export async function getAuditLogs(): Promise<AuditLogDto[]> {

@@ -41,6 +41,7 @@ export type MvpPermissionMatrix = {
   marketOperationsHandoffs: MvpPermissionRule;
   auditLogs: MvpPermissionRule;
   attachments: MvpPermissionRule;
+  dashboard: MvpPermissionRule;
   systemSettings: MvpPermissionRule;
 };
 
@@ -70,6 +71,44 @@ export type AppConfigDto = {
 
 export type UpdateAppConfigInput = {
   companyName?: string;
+};
+
+export type DashboardSummaryItemTone =
+  | "neutral"
+  | "info"
+  | "success"
+  | "warning"
+  | "danger"
+  | "rejected"
+  | "disabled"
+  | "notApplicable";
+
+export type DashboardSummaryItemDto = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  title: string;
+  subtitle?: string | null;
+  statusLabel?: string | null;
+  tone: DashboardSummaryItemTone;
+  targetWorkspace: string;
+  updatedAt?: string | null;
+};
+
+export type DashboardSummaryDto = {
+  todoCount: number;
+  redRiskCount: number;
+  warningCount: number;
+  pendingReviewCount: number;
+  lowStockCount: number;
+  procurementTodos: readonly DashboardSummaryItemDto[];
+  projectUsageTodos: readonly DashboardSummaryItemDto[];
+  certificateRisks: readonly DashboardSummaryItemDto[];
+  contractRisks: readonly DashboardSummaryItemDto[];
+  projectSiteComplianceRisks: readonly DashboardSummaryItemDto[];
+  lowStockItems: readonly DashboardSummaryItemDto[];
+  recentActivities: readonly DashboardSummaryItemDto[];
+  unavailableSections: readonly string[];
 };
 
 export type AppVersionDto = {
@@ -1881,6 +1920,10 @@ export const MVP_PERMISSION_MATRIX = {
   attachments: {
     read: ["admin", "hr", "procurement", "operations", "external_project_site"],
     manage: ["admin", "hr"],
+  },
+  dashboard: {
+    read: [...ALL_ROLES, "external_project_site"],
+    manage: [],
   },
   systemSettings: {
     read: ["admin"],

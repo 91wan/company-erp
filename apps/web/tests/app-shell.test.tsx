@@ -6,6 +6,7 @@ import {
   adminUser,
   attachmentRecord,
   contract,
+  defaultDashboardSummary,
   defaultAppVersion,
   expiredCertificate,
   externalProjectSiteUser,
@@ -431,6 +432,22 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText(/HT-LIVE-EXPIRED/)).toBeInTheDocument();
     expect(screen.getByText(/CERT-LIVE-EXPIRED/)).toBeInTheDocument();
     expect(screen.getAllByText(/实时过期健康证/).length).toBeGreaterThan(0);
+  });
+
+  it("uses dashboard summary API before falling back to per-module dashboard loading", async () => {
+    const fetchMock = mockShellFetch(adminUser, undefined, undefined, { dashboardSummary: defaultDashboardSummary });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /今日待办\s+2/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /红色风险\s+2/ })).toBeInTheDocument();
+    expect(screen.getByText(/PR-SUMMARY-001/)).toBeInTheDocument();
+    expect(screen.getAllByText(/MAT-SUMMARY-LOW/).length).toBeGreaterThan(0);
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.some((url) => url.endsWith("/api/dashboard/summary"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/compliance-summary"))).toBe(false);
   });
 
   it("separates certificate warning, pending review, and project-site compliance risk on the dashboard", async () => {
