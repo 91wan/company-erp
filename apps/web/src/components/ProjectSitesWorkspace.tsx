@@ -1,4 +1,4 @@
-import { ClipboardList, Filter, MapPin, RefreshCw, Search } from "lucide-react";
+import { Filter, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
@@ -28,7 +28,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
-import { PageHeader } from "./ui";
+import { DataTable, EmptyState, PageHeader, SectionCard } from "./ui";
 import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
@@ -60,7 +60,7 @@ import {
   type ProjectSiteKitchenEquipmentChangeFormState,
 } from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
-import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
+import { formatMoney } from "./project-sites/projectSiteFormat";
 import {
   defaultCreateKitchenEquipment,
   defaultCreateKitchenEquipmentChangeRequest,
@@ -805,44 +805,44 @@ export function ProjectSitesWorkspace({
         />
       </div> : null}
 
-      {!usageOnly ? <section className="dashboard-panel table-panel">
-        <div className="panel-header people-panel-title">
-          <h3>
-            <ClipboardList aria-hidden="true" size={16} />
-            投入合同
-          </h3>
-          <label className="inline-filter">
-            <span>项目点</span>
-            <select value={selectedInvestmentSiteId} onChange={(event) => setSelectedInvestmentSiteId(event.target.value)}>
-              <option value="">选择项目点</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.siteCode} {site.siteName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {investmentSummaryStatus === "loading" ? (
-          <StateMessage icon={<RefreshCw size={16} />} text="投入合同汇总加载中" />
-        ) : investmentSummaryStatus === "error" ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="投入合同汇总加载失败" />
-        ) : !investmentSummary || investmentSummary.contractCount === 0 ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="暂无投入合同" />
-        ) : (
-          <ResponsiveTable
+      {!usageOnly ? (
+        <SectionCard
+          title="投入合同"
+          action={(
+            <label className="inline-filter">
+              <span>项目点</span>
+              <select value={selectedInvestmentSiteId} onChange={(event) => setSelectedInvestmentSiteId(event.target.value)}>
+                <option value="">选择项目点</option>
+                {sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.siteCode} {site.siteName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        >
+          <DataTable
             headers={["投入分类", "合同数量", "金额合计"]}
-            rows={[
-              ...investmentSummary.categories.map((category) => [
-                investmentCategoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
-                category.contractCount,
-                formatMoney(category.totalAmount),
-              ]),
-              ["合计", investmentSummary.contractCount, formatMoney(investmentSummary.totalAmount)],
-            ]}
+            rows={investmentSummaryStatus === "ready" && investmentSummary && investmentSummary.contractCount > 0
+              ? [
+                  ...investmentSummary.categories.map((category) => [
+                    investmentCategoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
+                    category.contractCount,
+                    formatMoney(category.totalAmount),
+                  ]),
+                  ["合计", investmentSummary.contractCount, formatMoney(investmentSummary.totalAmount)],
+                ]
+              : []}
+            loading={investmentSummaryStatus === "loading"
+              ? <EmptyState title="投入合同汇总加载中" />
+              : investmentSummaryStatus === "error"
+                ? <EmptyState title="投入合同汇总加载失败" />
+                : undefined}
+            emptyState={<EmptyState title="暂无投入合同" />}
           />
-        )}
-      </section> : null}
+        </SectionCard>
+      ) : null}
 
       <div className="project-site-list-layout">
         <ProjectSiteUsagePanel
