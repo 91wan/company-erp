@@ -35,6 +35,7 @@ import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
+import { ProjectSiteActionBar } from "./project-sites/ProjectSiteActionBar";
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
 import { ProjectSiteRiskTable } from "./project-sites/ProjectSiteRiskTable";
@@ -972,13 +973,13 @@ export function ProjectSitesWorkspace({
         <p className="form-hint">月度经营报表、现场库存尚未开放；当前只展示可办理的项目点台账、领用、厨房设备和总部出库入口。</p>
       ) : null}
 
-      <div className="project-site-action-bar" aria-label="项目点快捷操作">
-        {!usageOnly && canEditSites ? <button type="button" onClick={() => setOpenFormDrawer("site")}>新增项目点</button> : null}
-        {canCreateUsage ? <button type="button" onClick={() => setOpenFormDrawer("usage")}>新增领用申请</button> : null}
-        {!usageOnly && canIssueUsage ? <button type="button" onClick={() => setOpenFormDrawer("issue")}>出库登记</button> : null}
-        {!usageOnly && canEditSites ? <button type="button" onClick={() => setOpenFormDrawer("equipment")}>新增厨房设备</button> : null}
-        <button type="button" onClick={() => setOpenFormDrawer("equipmentChange")}>上报设备变更</button>
-      </div>
+      <ProjectSiteActionBar
+        usageOnly={usageOnly}
+        canEditSites={canEditSites}
+        canCreateUsage={canCreateUsage}
+        canIssueUsage={canIssueUsage}
+        onOpenForm={setOpenFormDrawer}
+      />
       {masterStatus === "error" ? (
         <p className="form-error">
           {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
