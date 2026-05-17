@@ -27,12 +27,8 @@ import {
   type PurchaseRequestDto,
 } from "@company-erp/shared";
 import {
-  externalProjectSiteNavigationItems,
-  navigationGroups,
-  navigationItems,
   type MetricCard as MetricCardType,
   type MetricTone,
-  type NavigationGroup,
 } from "../dashboardData";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
@@ -53,6 +49,15 @@ import { DashboardQuickEntries } from "./dashboard/DashboardQuickEntries";
 import { DashboardRecentActivities } from "./dashboard/DashboardRecentActivities";
 import { Sidebar } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
+import {
+  buildVisibleNavigationGroups,
+  isExternalProjectSiteUser,
+  isProjectSiteScopedUser,
+  isReadOnlyUser,
+  resolveNavigationSelection,
+  workspaceForExternalPortalSection,
+  type WorkspaceKey,
+} from "./shell/dashboardShellNavigation";
 import {
   apiBaseUrl,
   createAttachment,
@@ -83,26 +88,15 @@ type DashboardShellProps = {
   onLogout: () => Promise<void> | void;
 };
 
-type WorkspaceKey = (typeof navigationItems)[number]["workspace"] | "系统设置";
-
 export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLogout }: DashboardShellProps) {
-  const isExternalProjectSite = currentUser.roles.includes("external_project_site");
+  const isExternalProjectSite = isExternalProjectSiteUser(currentUser);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
     isExternalProjectSite ? "项目点" : "总览",
   );
   const [activePortalSection, setActivePortalSection] = useState<ExternalProjectSitePortalSection>("overview");
-  const isProjectSiteScoped = currentUser.roles.includes("project_site") || currentUser.roles.includes("external_project_site");
-  const visibleNavigationGroups = buildVisibleNavigationGroups(currentUser, isExternalProjectSite);
-  const isReadOnly = !(
-    canManage(currentUser.roles, "masterData") ||
-    canManage(currentUser.roles, "procurement") ||
-    canManage(currentUser.roles, "inventory") ||
-    canManage(currentUser.roles, "projectSites") ||
-    canManage(currentUser.roles, "projectUsageRequest") ||
-    canManage(currentUser.roles, "contracts") ||
-    canManage(currentUser.roles, "certificates") ||
-    canManage(currentUser.roles, "employees")
-  );
+  const isProjectSiteScoped = isProjectSiteScopedUser(currentUser);
+  const visibleNavigationGroups = buildVisibleNavigationGroups(currentUser);
+  const isReadOnly = isReadOnlyUser(currentUser);
 
   return (
     <main className={isReadOnly ? "erp-shell read-only-shell" : "erp-shell"}>
@@ -113,10 +107,9 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
         externalMode={isExternalProjectSite}
         activePortalSection={activePortalSection}
         onSelectItem={(item) => {
-          if (isExternalProjectSite && item.portalSection) {
-            setActivePortalSection(item.portalSection);
-          }
-          setActiveWorkspace(item.workspace as WorkspaceKey);
+          const selection = resolveNavigationSelection(item);
+          if (isExternalProjectSite && selection.portalSection) setActivePortalSection(selection.portalSection);
+          setActiveWorkspace(selection.workspace);
         }}
         onSelectSettings={isExternalProjectSite ? undefined : () => setActiveWorkspace("系统设置")}
       />
@@ -187,29 +180,6 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
       </section>
     </main>
   );
-}
-
-function workspaceForExternalPortalSection(section: ExternalProjectSitePortalSection): WorkspaceKey {
-  if (section === "rosterHealth" || section === "foodLicense") return "证照资质";
-  return "项目点";
-}
-
-function buildVisibleNavigationGroups(currentUser: AuthenticatedUserDto, isExternalProjectSite: boolean): NavigationGroup[] {
-  if (isExternalProjectSite) {
-    return [
-      {
-        label: "项目点门户",
-        items: externalProjectSiteNavigationItems.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea)),
-      },
-    ];
-  }
-
-  return navigationGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea)),
-    }))
-    .filter((group) => group.items.length > 0);
 }
 
 type NavigateToWorkspace = (workspace: WorkspaceKey) => void;
