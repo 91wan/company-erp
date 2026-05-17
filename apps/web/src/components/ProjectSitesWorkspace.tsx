@@ -27,7 +27,7 @@ import {
   type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
+import { createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
 import { PageHeader } from "./ui";
 import {
   ExternalProjectSitePortal,
@@ -61,6 +61,25 @@ import {
 } from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
+import {
+  defaultCreateKitchenEquipment,
+  defaultCreateKitchenEquipmentChangeRequest,
+  defaultCreateProjectSite,
+  defaultCreateUsageRequest,
+  defaultIssueUsageRequest,
+  defaultLoadBusinessProjects,
+  defaultLoadComplianceSummary,
+  defaultLoadInvestmentSummary,
+  defaultLoadKitchenEquipment,
+  defaultLoadKitchenEquipmentChangeRequests,
+  defaultLoadMaterials,
+  defaultLoadParties,
+  defaultLoadProjectSites,
+  defaultLoadUsageOptions,
+  defaultLoadUsageRequests,
+  defaultLoadWarehouses,
+  defaultReviewKitchenEquipmentChangeRequest,
+} from "./project-sites/projectSiteApi";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -137,141 +156,6 @@ const complianceReviewStatusLabel = new Map([
   ["missing", "缺失"],
   ["not_required", "不需要"],
 ]);
-
-async function defaultLoadProjectSites(): Promise<ProjectSiteDto[]> {
-  const payload = await requestJson<{ projectSites: ProjectSiteDto[] }>(`${apiBaseUrl}/api/project-sites`);
-  return payload.projectSites;
-}
-
-async function defaultLoadUsageRequests(): Promise<ProjectUsageRequestDto[]> {
-  const payload = await requestJson<{ projectUsageRequests: ProjectUsageRequestDto[] }>(
-    `${apiBaseUrl}/api/project-usage-requests`,
-  );
-  return payload.projectUsageRequests;
-}
-
-async function defaultLoadParties(): Promise<PartyDto[]> {
-  const payload = await requestJson<{ parties: PartyDto[] }>(`${apiBaseUrl}/api/parties`);
-  return payload.parties;
-}
-
-async function defaultLoadMaterials(): Promise<MaterialDto[]> {
-  const payload = await requestJson<{ materials: MaterialDto[] }>(`${apiBaseUrl}/api/materials`);
-  return payload.materials;
-}
-
-async function defaultLoadWarehouses(): Promise<WarehouseDto[]> {
-  const payload = await requestJson<{ warehouses: WarehouseDto[] }>(`${apiBaseUrl}/api/warehouses`);
-  return payload.warehouses;
-}
-
-async function defaultLoadUsageOptions(): Promise<ProjectUsageOptionsDto> {
-  return requestJson<ProjectUsageOptionsDto>(`${apiBaseUrl}/api/project-usage-options`);
-}
-
-async function defaultLoadBusinessProjects(): Promise<BusinessProjectDto[]> {
-  const payload = await requestJson<{ businessProjects: BusinessProjectDto[] }>(`${apiBaseUrl}/api/business-projects`);
-  return payload.businessProjects;
-}
-
-async function defaultLoadInvestmentSummary(projectSiteId: string): Promise<ProjectSiteInvestmentSummaryDto> {
-  const payload = await requestJson<{ investmentSummary: ProjectSiteInvestmentSummaryDto }>(
-    `${apiBaseUrl}/api/project-sites/${projectSiteId}/investment-summary`,
-  );
-  return payload.investmentSummary;
-}
-
-async function defaultLoadComplianceSummary(projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto> {
-  const payload = await requestJson<{ complianceSummary: ProjectSiteComplianceSummaryDto }>(
-    `${apiBaseUrl}/api/project-sites/${projectSiteId}/compliance-summary`,
-  );
-  return payload.complianceSummary;
-}
-
-async function defaultLoadKitchenEquipment(): Promise<ProjectSiteKitchenEquipmentDto[]> {
-  const payload = await requestJson<{ kitchenEquipment: ProjectSiteKitchenEquipmentDto[] }>(
-    `${apiBaseUrl}/api/project-site-kitchen-equipment`,
-  );
-  return payload.kitchenEquipment;
-}
-
-async function defaultLoadKitchenEquipmentChangeRequests(): Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]> {
-  const payload = await requestJson<{ kitchenEquipmentChangeRequests: ProjectSiteKitchenEquipmentChangeRequestDto[] }>(
-    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests`,
-  );
-  return payload.kitchenEquipmentChangeRequests;
-}
-
-async function defaultCreateProjectSite(input: CreateProjectSiteInput): Promise<ProjectSiteDto> {
-  const payload = await requestJson<{ projectSite: ProjectSiteDto }>(`${apiBaseUrl}/api/project-sites`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-  return payload.projectSite;
-}
-
-async function defaultCreateKitchenEquipment(input: CreateProjectSiteKitchenEquipmentInput): Promise<ProjectSiteKitchenEquipmentDto> {
-  const payload = await requestJson<{ kitchenEquipment: ProjectSiteKitchenEquipmentDto }>(
-    `${apiBaseUrl}/api/project-site-kitchen-equipment`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.kitchenEquipment;
-}
-
-async function defaultCreateKitchenEquipmentChangeRequest(
-  input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
-): Promise<ProjectSiteKitchenEquipmentChangeRequestDto> {
-  const payload = await requestJson<{ kitchenEquipmentChangeRequest: ProjectSiteKitchenEquipmentChangeRequestDto }>(
-    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.kitchenEquipmentChangeRequest;
-}
-
-async function defaultReviewKitchenEquipmentChangeRequest(
-  id: string,
-  input: { reviewStatus: "approved" | "rejected"; reviewRemark?: string | null },
-): Promise<ProjectSiteKitchenEquipmentChangeRequestDto> {
-  const payload = await requestJson<{ kitchenEquipmentChangeRequest: ProjectSiteKitchenEquipmentChangeRequestDto }>(
-    `${apiBaseUrl}/api/project-site-kitchen-equipment-change-requests/${id}/review`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.kitchenEquipmentChangeRequest;
-}
-
-async function defaultCreateUsageRequest(input: CreateProjectUsageRequestInput): Promise<ProjectUsageRequestDto> {
-  const payload = await requestJson<{ projectUsageRequest: ProjectUsageRequestDto }>(
-    `${apiBaseUrl}/api/project-usage-requests`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.projectUsageRequest;
-}
-
-async function defaultIssueUsageRequest(
-  id: string,
-  input: IssueProjectUsageRequestInput,
-): Promise<ProjectUsageRequestDto> {
-  const payload = await requestJson<{ projectUsageRequest: ProjectUsageRequestDto }>(
-    `${apiBaseUrl}/api/project-usage-requests/${id}/issue`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.projectUsageRequest;
-}
 
 export function ProjectSitesWorkspace({
   loadProjectSites = defaultLoadProjectSites,
