@@ -48,6 +48,7 @@ import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { DashboardHeader, dashboardTarget } from "./dashboard/DashboardHeader";
 import { DashboardMetricStrip } from "./dashboard/DashboardMetricStrip";
+import { DashboardQuickEntries } from "./dashboard/DashboardQuickEntries";
 import { Sidebar } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -68,7 +69,6 @@ import {
   PageHeader,
   SectionCard,
   StatusBadge as UiStatusBadge,
-  SummaryCard,
 } from "./ui";
 
 const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
@@ -373,7 +373,7 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
         <RecentActivityPanel data={data} onNavigate={onNavigate} />
       </section>
       <section className="dashboard-grid dashboard-grid-secondary">
-        <QuickEntryPanel onNavigate={onNavigate} />
+        <DashboardQuickEntries onNavigate={onNavigate} />
         <LowStockPanel dashboardSummary={dashboardSummary(data)} inventoryBalances={data.inventoryBalances} onNavigate={onNavigate} />
         <SystemStatusPanel appVersion={data.appVersion} onNavigate={onNavigate} />
       </section>
@@ -794,32 +794,6 @@ function RecentActivityPanel({ data, onNavigate }: { data: DashboardLiveData; on
         emptyState={<EmptyState title="暂无动态" description="近期业务记录为空，或当前账号无可读模块。" />}
         onRowClick={(index) => onNavigate(rows[index].target)}
       />
-    </SectionCard>
-  );
-}
-
-function QuickEntryPanel({ onNavigate }: { onNavigate: NavigateToWorkspace }) {
-  const entries = [
-    { label: "新建采购需求", detail: "进入采购工作区登记需求", target: "采购" as WorkspaceKey, tone: "info" as const },
-    { label: "新建项目点", detail: "进入项目点台账维护", target: "项目点" as WorkspaceKey, tone: "success" as const },
-    { label: "提交证照", detail: "进入证照资质台账", target: "证照资质" as WorkspaceKey, tone: "warning" as const },
-    { label: "查看低库存", detail: "进入库存风险列表", target: "库存" as WorkspaceKey, tone: "danger" as const },
-  ];
-
-  return (
-    <SectionCard title="快捷入口">
-      <div className="quick-entry-grid">
-        {entries.map((entry) => (
-          <SummaryCard
-            key={entry.label}
-            label={entry.label}
-            value="进入"
-            detail={entry.detail}
-            tone={entry.tone}
-            onClick={() => onNavigate(entry.target)}
-          />
-        ))}
-      </div>
     </SectionCard>
   );
 }
