@@ -445,6 +445,19 @@ describe("attachments API", () => {
       url: "/api/attachments/33333333-3333-4333-8333-333333333333",
       cookies: { company_erp_session: externalCookie },
     });
+    const arbitraryCreate = await app.inject({
+      method: "POST",
+      url: "/api/attachments",
+      cookies: { company_erp_session: externalCookie },
+      payload: {
+        attachmentCode: "ATT-SITE-NEW",
+        displayName: "外部项目点任意附件",
+        storageKey: "project-sites/site-new.pdf",
+        ownerModule: "project_sites",
+        ownerEntityType: "project_site",
+        ownerEntityId: siteId,
+      },
+    });
     await app.close();
 
     expect(list.statusCode).toBe(200);
@@ -457,6 +470,8 @@ describe("attachments API", () => {
     });
     expect(outOfScopeDetail.statusCode).toBe(404);
     expect(outOfScopeDetail.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+    expect(arbitraryCreate.statusCode).toBe(403);
+    expect(arbitraryCreate.json()).toMatchObject({ permissionArea: "attachments", requiredLevel: "manage" });
   });
 
   it("serves scoped attachment content from safe storage keys without exposing root paths", async () => {
