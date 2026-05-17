@@ -38,6 +38,7 @@ import {
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
 import { ProjectSiteRiskTable } from "./project-sites/ProjectSiteRiskTable";
+import { ProjectSiteSummaryCards } from "./project-sites/ProjectSiteSummaryCards";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
@@ -984,34 +985,18 @@ export function ProjectSitesWorkspace({
         </p>
       ) : null}
 
-      <div className="party-summary people-summary" aria-label="项目点指标摘要">
-        <article>
-          <span>{usageOnly ? "可见项目点" : "项目点总数"}</span>
-          <strong>{sites.length}</strong>
-        </article>
-        {!usageOnly ? <article>
-          <span>服务中</span>
-          <strong>{activeSiteCount}</strong>
-        </article> : null}
-        <article>
-          <span>待处理领用</span>
-          <strong>{pendingUsageCount}</strong>
-        </article>
-        <article>
-          <span>申请/已出库</span>
-          <strong>
-            {totalRequestedQuantity}/{totalIssuedQuantity}
-          </strong>
-        </article>
-        <article>
-          <span>设备/待审</span>
-          <strong>{kitchenEquipment.length}/{pendingKitchenEquipmentChangeCount}</strong>
-        </article>
-        {!usageOnly ? <article>
-          <span>合规风险</span>
-          <strong>{complianceBlockingIssueCount}/{complianceWarningIssueCount}</strong>
-        </article> : null}
-      </div>
+      <ProjectSiteSummaryCards
+        usageOnly={usageOnly}
+        siteCount={sites.length}
+        activeSiteCount={activeSiteCount}
+        pendingUsageCount={pendingUsageCount}
+        totalRequestedQuantity={totalRequestedQuantity}
+        totalIssuedQuantity={totalIssuedQuantity}
+        kitchenEquipmentCount={kitchenEquipment.length}
+        pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+        complianceBlockingIssueCount={complianceBlockingIssueCount}
+        complianceWarningIssueCount={complianceWarningIssueCount}
+      />
 
       <ProjectSiteKitchenEquipmentPanel
         kitchenEquipment={filteredKitchenEquipment}
