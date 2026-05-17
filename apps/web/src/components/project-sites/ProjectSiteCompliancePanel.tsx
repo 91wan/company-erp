@@ -79,8 +79,8 @@ export function ProjectSiteCompliancePanel({
 }
 
 export function complianceStatusTone(status: string): "green" | "orange" | "gray" | "red" {
-  if (["blocking", "red", "missing", "expired", "rejected"].includes(status)) return "red";
-  if (["warning", "expiring", "expiring_soon", "pending", "review_due", "review_due_soon"].includes(status)) {
+  if (["blocking", "red", "missing", "expired", "rejected", "review_due"].includes(status)) return "red";
+  if (["warning", "expiring", "expiring_soon", "pending", "review_due_soon"].includes(status)) {
     return "orange";
   }
   if (status === "valid" || status === "approved") return "green";

@@ -581,10 +581,21 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("待后端支持").length).toBeGreaterThan(0);
   });
 
-  it("renders project-site compliance pack summary", async () => {
+  it("renders a single project-site risk table with compliance status and opens details", async () => {
     render(
       <ProjectSitesWorkspace
-        loadProjectSites={() => Promise.resolve([{ ...projectSite, payrollAgencyRequired: true }])}
+        loadProjectSites={() =>
+          Promise.resolve([
+            {
+              ...projectSite,
+              serviceMode: "subcontracted",
+              subcontractorPartyId: party.id,
+              subcontractorPartyName: "个人承包人王某",
+              subcontractorContactName: "王项目",
+              payrollAgencyRequired: false,
+            },
+          ])
+        }
         loadUsageRequests={() => Promise.resolve([])}
         loadParties={() => Promise.resolve([party])}
         loadMaterials={() => Promise.resolve([material])}
@@ -595,22 +606,26 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("合规资料")).toBeInTheDocument();
-    expect(screen.getByText("项目点现场人员名单")).toBeInTheDocument();
+    expect(await screen.findByText("项目点风险台账")).toBeInTheDocument();
+    expect(screen.getByText("项目点现场人员")).toBeInTheDocument();
     expect(screen.getAllByText("雇主责任险").length).toBeGreaterThan(0);
-    expect(screen.getByText("人员健康证")).toBeInTheDocument();
+    expect(screen.getByText("健康证")).toBeInTheDocument();
     expect(screen.getByText("食品经营许可证")).toBeInTheDocument();
     expect(screen.getAllByText("工资表").length).toBeGreaterThan(0);
+    expect(screen.getByText("个人承包人王某")).toBeInTheDocument();
     expect(await screen.findByText("12 人")).toBeInTheDocument();
-    expect(screen.getAllByText("缺 1 / 临期 2 / 过期 1").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("未覆盖 1 / 临期 1 / 过期 0").length).toBeGreaterThan(0);
+    expect(screen.getByText("缺失 1 / 临期 2 / 过期 1")).toBeInTheDocument();
+    expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("待审核").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("红色风险").length).toBeGreaterThan(0);
+    expect(screen.getByText("不需要")).toBeInTheDocument();
+    expect(screen.getByText("红色风险")).toHaveClass("red");
+
+    fireEvent.click(screen.getByRole("button", { name: "查看详情" }));
+    expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
   });
 
   it("maps project-site compliance states to red, orange, green, and gray risk tones", () => {
-    for (const status of ["blocking", "red", "missing", "expired", "rejected"]) {
+    for (const status of ["blocking", "red", "missing", "expired", "rejected", "review_due"]) {
       expect(complianceStatusTone(status)).toBe("red");
     }
     for (const status of ["warning", "expiring", "expiring_soon", "pending", "review_due_soon"]) {
@@ -780,7 +795,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("暂无项目点资料")).toBeInTheDocument();
+    expect(await screen.findByText("暂无项目点风险台账")).toBeInTheDocument();
     expect(await screen.findByText("暂无领用申请")).toBeInTheDocument();
 
     rerender(
@@ -795,7 +810,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("项目点资料加载失败")).toBeInTheDocument();
+    expect(await screen.findByText("项目点风险台账加载失败")).toBeInTheDocument();
     expect(await screen.findByText("领用申请加载失败")).toBeInTheDocument();
     expect(await screen.findByText("项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。")).toBeInTheDocument();
   });
@@ -825,7 +840,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    await screen.findByText("暂无项目点资料");
+    await screen.findByText("暂无项目点风险台账");
     fireEvent.click(screen.getByRole("button", { name: "新增项目点" }));
     fireEvent.change(screen.getByLabelText("项目点编码"), { target: { value: "SITE-WX-002" } });
     fireEvent.change(screen.getByLabelText("项目点名称"), { target: { value: "滨江项目点" } });
@@ -834,7 +849,7 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByText("SITE-WX-002")).toBeInTheDocument();
     expect(createProjectSite).toHaveBeenCalledWith(expect.objectContaining({ businessProjectId: businessProject.id }));
-    expect(screen.getAllByText("扬中中央厨房").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("滨江项目点").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     fireEvent.change(screen.getByLabelText("领用申请单号"), { target: { value: "USE20260511002" } });
     fireEvent.change(screen.getByLabelText("申请日期"), { target: { value: "2026-05-11" } });

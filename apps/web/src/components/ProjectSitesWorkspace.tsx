@@ -35,10 +35,9 @@ import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
-import { ProjectSiteCompliancePanel } from "./project-sites/ProjectSiteCompliancePanel";
 import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
-import { ProjectSiteList } from "./project-sites/ProjectSiteList";
+import { ProjectSiteRiskTable } from "./project-sites/ProjectSiteRiskTable";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
 import { ResponsiveTable, StateMessage, formatMoney } from "./project-sites/projectSiteUi";
 
@@ -348,7 +347,6 @@ export function ProjectSitesWorkspace({
   const [investmentSummary, setInvestmentSummary] = useState<ProjectSiteInvestmentSummaryDto | null>(null);
   const [investmentSummaryStatus, setInvestmentSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [complianceSummaries, setComplianceSummaries] = useState<Record<string, ProjectSiteComplianceSummaryDto>>({});
-  const [complianceStatus, setComplianceStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [kitchenEquipment, setKitchenEquipment] = useState<ProjectSiteKitchenEquipmentDto[]>([]);
   const [kitchenEquipmentChangeRequests, setKitchenEquipmentChangeRequests] = useState<ProjectSiteKitchenEquipmentChangeRequestDto[]>([]);
   const [kitchenEquipmentStatus, setKitchenEquipmentStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -567,27 +565,23 @@ export function ProjectSitesWorkspace({
   useEffect(() => {
     if (sites.length === 0) {
       setComplianceSummaries({});
-      setComplianceStatus(siteStatus === "ready" ? "ready" : "idle");
       return;
     }
 
     let mounted = true;
-    setComplianceStatus("loading");
     Promise.all(sites.map((site) => loadComplianceSummary(site.id).then((summary) => [site.id, summary] as const)))
       .then((entries) => {
         if (!mounted) return;
         setComplianceSummaries(Object.fromEntries(entries.filter((entry) => Boolean(entry[1]))));
-        setComplianceStatus("ready");
       })
       .catch(() => {
         if (!mounted) return;
         setComplianceSummaries({});
-        setComplianceStatus("error");
       });
     return () => {
       mounted = false;
     };
-  }, [loadComplianceSummary, siteStatus, sites, usageOnly]);
+  }, [loadComplianceSummary, sites]);
 
   useEffect(() => {
     let mounted = true;
@@ -1182,16 +1176,6 @@ export function ProjectSitesWorkspace({
         </form>
       </FormDrawer>
 
-      {!usageOnly ? (
-        <ProjectSiteCompliancePanel
-          sites={filteredSites}
-          summaries={complianceSummaries}
-          status={complianceStatus}
-          complianceComputedStatusLabel={complianceComputedStatusLabel}
-          complianceReviewStatusLabel={complianceReviewStatusLabel}
-        />
-      ) : null}
-
       <div className="party-toolbar">
         <label className="party-search">
           <Search aria-hidden="true" size={16} />
@@ -1219,7 +1203,7 @@ export function ProjectSitesWorkspace({
       </div>
 
       {!usageOnly ? <div className="project-site-list-layout">
-        <ProjectSiteList
+        <ProjectSiteRiskTable
           sites={filteredSites}
           status={siteStatus}
           serviceModeLabel={serviceModeLabel}
