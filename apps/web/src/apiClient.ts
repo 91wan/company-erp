@@ -100,8 +100,23 @@ export async function getDashboardSummary(): Promise<DashboardSummaryDto> {
   return payload.dashboardSummary;
 }
 
-export async function getAuditLogs(): Promise<AuditLogDto[]> {
-  const payload = await requestJson<{ auditLogs: AuditLogDto[] }>(`${apiBaseUrl}/api/audit-logs?limit=20`);
+export type AuditLogFilters = {
+  entityType?: string;
+  action?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+};
+
+export async function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogDto[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters.limit ?? 20));
+  for (const key of ["entityType", "action", "dateFrom", "dateTo"] as const) {
+    if (filters[key]) params.set(key, filters[key]);
+  }
+  const payload = await requestJson<{ auditLogs: AuditLogDto[] }>(
+    `${apiBaseUrl}/api/audit-logs?${params.toString()}`,
+  );
   return payload.auditLogs;
 }
 

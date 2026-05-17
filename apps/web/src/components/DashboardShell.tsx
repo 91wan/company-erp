@@ -1151,6 +1151,11 @@ function ResponsiveTable({
   );
 }
 
+function toAuditDateTime(date: string, boundary: "start" | "end"): string | undefined {
+  if (!date.trim()) return undefined;
+  return `${date.trim()}T${boundary === "start" ? "00:00:00.000Z" : "23:59:59.999Z"}`;
+}
+
 function SystemSettingsWorkspace({
   companyName,
   canManage,
@@ -1174,6 +1179,12 @@ function SystemSettingsWorkspace({
   const [auditStatus, setAuditStatus] = useState<"idle" | "loading" | "success" | "error">(
     canReadAuditLogs ? "loading" : "idle",
   );
+  const [auditFilters, setAuditFilters] = useState({
+    entityType: "",
+    action: "",
+    dateFrom: "",
+    dateTo: "",
+  });
   const [attachments, setAttachments] = useState<AttachmentRecordDto[]>([]);
   const [attachmentStatus, setAttachmentStatus] = useState<"idle" | "loading" | "success" | "error">(
     canReadAttachments ? "loading" : "idle",
@@ -1217,7 +1228,13 @@ function SystemSettingsWorkspace({
     if (!canReadAuditLogs) return;
     let isMounted = true;
     setAuditStatus("loading");
-    getAuditLogs()
+    getAuditLogs({
+      entityType: auditFilters.entityType.trim() || undefined,
+      action: auditFilters.action.trim() || undefined,
+      dateFrom: toAuditDateTime(auditFilters.dateFrom, "start"),
+      dateTo: toAuditDateTime(auditFilters.dateTo, "end"),
+      limit: 20,
+    })
       .then((logs) => {
         if (!isMounted) return;
         setAuditLogs(logs);
@@ -1232,7 +1249,7 @@ function SystemSettingsWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [canReadAuditLogs]);
+  }, [auditFilters.action, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.entityType, canReadAuditLogs]);
 
   useEffect(() => {
     if (!canReadAttachments) return;
@@ -1390,6 +1407,50 @@ function SystemSettingsWorkspace({
       {canReadAuditLogs ? (
         <SectionCard title="审计日志" badge={<UiStatusBadge tone="info">只读</UiStatusBadge>}>
           <p className="form-hint">只读查看最近的高风险业务操作记录。</p>
+
+          <div className="form-grid settings-filter-grid" aria-label="审计日志筛选">
+            <label>
+              <span>审计对象类型</span>
+              <input
+                value={auditFilters.entityType}
+                onChange={(event) => setAuditFilters((filters) => ({ ...filters, entityType: event.target.value }))}
+                placeholder="certificate"
+              />
+            </label>
+            <label>
+              <span>审计动作</span>
+              <input
+                value={auditFilters.action}
+                onChange={(event) => setAuditFilters((filters) => ({ ...filters, action: event.target.value }))}
+                placeholder="certificate.create"
+              />
+            </label>
+            <label>
+              <span>审计开始日期</span>
+              <input
+                type="date"
+                value={auditFilters.dateFrom}
+                onChange={(event) => setAuditFilters((filters) => ({ ...filters, dateFrom: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>审计结束日期</span>
+              <input
+                type="date"
+                value={auditFilters.dateTo}
+                onChange={(event) => setAuditFilters((filters) => ({ ...filters, dateTo: event.target.value }))}
+              />
+            </label>
+            <div className="filter-actions">
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setAuditFilters({ entityType: "", action: "", dateFrom: "", dateTo: "" })}
+              >
+                清空筛选
+              </button>
+            </div>
+          </div>
 
           {auditStatus === "loading" ? <p className="form-hint">审计日志加载中。</p> : null}
           {auditStatus === "error" ? <p className="form-error">审计日志暂不可用</p> : null}
