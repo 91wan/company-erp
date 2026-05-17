@@ -48,6 +48,7 @@ import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { DashboardHeader, dashboardTarget } from "./dashboard/DashboardHeader";
 import { DashboardMetricStrip } from "./dashboard/DashboardMetricStrip";
+import { DashboardPanelHeader } from "./dashboard/DashboardPanelHeader";
 import { DashboardQuickEntries } from "./dashboard/DashboardQuickEntries";
 import { DashboardRecentActivities } from "./dashboard/DashboardRecentActivities";
 import { Sidebar } from "./shell/Sidebar";
@@ -542,18 +543,6 @@ function buildMetrics(data: DashboardLiveData): MetricCardType[] {
   ];
 }
 
-function PanelHeader({ title, badge, onNavigate }: { title: string; badge?: string; onNavigate: () => void }) {
-  return (
-    <div className="panel-header">
-      <h3>
-        {title}
-        {badge ? <span>{badge}</span> : null}
-      </h3>
-      <button type="button" onClick={onNavigate}>查看全部</button>
-    </div>
-  );
-}
-
 type QueueItem = {
   title: string;
   category: string;
@@ -794,7 +783,7 @@ function LowStockPanel({
     const rows = dashboardSummary.lowStockItems.slice(0, 5);
     return (
       <section className="dashboard-panel table-panel">
-        <PanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
+        <DashboardPanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
         {dashboardSummary.unavailableSections.includes("inventory") ? <PanelStateMessage text="低库存数据暂不可用" /> : null}
         {!dashboardSummary.unavailableSections.includes("inventory") && rows.length === 0 ? <PanelStateMessage text="暂无低库存物料" /> : null}
         <ResponsiveTable
@@ -815,7 +804,7 @@ function LowStockPanel({
   const rows = inventoryBalances.data.filter((balance) => balance.isLowStock).slice(0, 5);
   return (
     <section className="dashboard-panel table-panel">
-      <PanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
+      <DashboardPanelHeader title="低库存物料" onNavigate={() => onNavigate("库存")} />
       {inventoryBalances.status === "error" ? <PanelStateMessage text="低库存数据暂不可用" /> : null}
       {inventoryBalances.status !== "error" && rows.length === 0 ? <PanelStateMessage text="暂无低库存物料" /> : null}
       <ResponsiveTable
@@ -852,7 +841,7 @@ function SystemStatusPanel({
   ];
   return (
     <section className="dashboard-panel system-panel">
-      <PanelHeader title="系统状态" onNavigate={() => onNavigate("系统设置")} />
+      <DashboardPanelHeader title="系统状态" onNavigate={() => onNavigate("系统设置")} />
       <div className="system-list">
         {items.map((item) => (
           <button key={item.label} type="button" className="system-item clickable-row" onClick={() => onNavigate("系统设置")}>
