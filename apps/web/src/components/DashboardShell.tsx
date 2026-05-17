@@ -49,6 +49,7 @@ import { CertificatesWorkspace } from "./CertificatesWorkspace";
 import { DashboardHeader, dashboardTarget } from "./dashboard/DashboardHeader";
 import { DashboardMetricStrip } from "./dashboard/DashboardMetricStrip";
 import { DashboardQuickEntries } from "./dashboard/DashboardQuickEntries";
+import { DashboardRecentActivities } from "./dashboard/DashboardRecentActivities";
 import { Sidebar } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
 import {
@@ -732,16 +733,7 @@ function RecentActivityPanel({ data, onNavigate }: { data: DashboardLiveData; on
   const summary = dashboardSummary(data);
   if (summary) {
     const rows = summary.recentActivities.map((entry) => summaryItemToQueueItem(entry, entry.statusLabel ?? "最近动态"));
-    return (
-      <SectionCard title="最近动态" action={<button type="button" onClick={() => onNavigate("系统设置")}>系统状态</button>}>
-        <DataTable
-          headers={["动态", "类型", "归属", "状态", "时间"]}
-          rows={rows.map((item) => [item.title, item.category, item.owner, item.status, item.updatedAt])}
-          emptyState={<EmptyState title="暂无动态" description="近期业务记录为空，或当前账号无可读模块。" />}
-          onRowClick={(index) => onNavigate(rows[index].target)}
-        />
-      </SectionCard>
-    );
+    return <DashboardRecentActivities rows={rows} onNavigate={onNavigate} />;
   }
 
   const inbound = data.inventoryMovements.data
@@ -786,16 +778,7 @@ function RecentActivityPanel({ data, onNavigate }: { data: DashboardLiveData; on
     .sort((left, right) => new Date(right.sortAt).getTime() - new Date(left.sortAt).getTime())
     .slice(0, 8);
 
-  return (
-    <SectionCard title="最近动态" action={<button type="button" onClick={() => onNavigate("系统设置")}>系统状态</button>}>
-      <DataTable
-        headers={["动态", "类型", "归属", "状态", "时间"]}
-        rows={rows.map((item) => [item.title, item.category, item.owner, item.status, item.updatedAt])}
-        emptyState={<EmptyState title="暂无动态" description="近期业务记录为空，或当前账号无可读模块。" />}
-        onRowClick={(index) => onNavigate(rows[index].target)}
-      />
-    </SectionCard>
-  );
+  return <DashboardRecentActivities rows={rows} onNavigate={onNavigate} />;
 }
 
 function LowStockPanel({
