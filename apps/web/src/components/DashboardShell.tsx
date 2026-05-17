@@ -164,6 +164,8 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canIssue={canManage(currentUser.roles, "inventory")}
               usageOnly={isExternalProjectSite}
               portalSection={activePortalSection}
+              externalProjectSiteContactName={currentUser.externalProjectSiteContactName}
+              externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
               onPortalSectionChange={(section) => {
                 setActivePortalSection(section);
                 setActiveWorkspace(workspaceForExternalPortalSection(section));

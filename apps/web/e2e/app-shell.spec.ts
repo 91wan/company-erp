@@ -305,15 +305,18 @@ test("external project-site accounts render only scoped project-site compliance 
   await page.goto("/");
 
   await expect(page.getByText("site-manager").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "现场人员/健康证", exact: true })).toBeVisible();
+  const externalSidebar = page.getByLabel("ERP modules");
+  const portalTabs = page.getByLabel("项目点门户分区");
+  await expect(externalSidebar.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
+  await expect(portalTabs.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
+  await expect(externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true })).toBeVisible();
   await expect(page.getByText("合规任务队列")).toBeVisible();
-  await expect(page.getByText("健康证阻断")).toBeVisible();
+  await expect(page.getByLabel("当前门户分区").getByText("健康证阻断")).toBeVisible();
   await expect(page.getByRole("button", { name: "处理健康证阻断" })).toBeVisible();
   await page.getByRole("button", { name: "处理健康证阻断" }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
   await expect(page.getByText("现场人员/健康证提交")).toBeVisible();
-  await page.getByRole("button", { name: "我的项目点", exact: true }).click();
+  await externalSidebar.getByRole("button", { name: "我的项目点", exact: true }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
@@ -335,7 +338,7 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByText("附件管理")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
+  await externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存证照" })).toBeVisible();
   const ownerTypeSelect = page.getByLabel("归属对象");

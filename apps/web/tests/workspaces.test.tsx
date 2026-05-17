@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GenerateReplenishmentSuggestionsResult, ImportJobDto, InventoryBalanceDto } from "@company-erp/shared";
 import {
@@ -686,15 +687,57 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
-    expect(await screen.findByText("健康证阻断")).toBeInTheDocument();
-    expect(screen.getByText("食品经营许可证预警")).toBeInTheDocument();
-    expect(screen.getByText("雇主责任险覆盖异常")).toBeInTheDocument();
-    expect(screen.getByText("工资表待审核")).toBeInTheDocument();
+    expect((await screen.findAllByText("健康证阻断")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("食品经营许可证预警").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("雇主责任险覆盖异常").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("工资表待审核").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "处理健康证阻断" }));
     expect(onPortalSectionChange).toHaveBeenCalledWith("rosterHealth");
-    expect(screen.queryByRole("button", { name: "处理雇主责任险覆盖异常" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("待后端支持").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "处理雇主责任险覆盖异常" }));
+    expect(onPortalSectionChange).toHaveBeenCalledWith("insurance");
+    fireEvent.click(screen.getByRole("button", { name: "处理工资表待审核" }));
+    expect(onPortalSectionChange).toHaveBeenCalledWith("payroll");
+  });
+
+  it("switches external project-site portal sections to real task guidance", async () => {
+    function PortalHarness() {
+      const [section, setSection] = useState<"overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll">("overview");
+      return (
+        <ProjectSitesWorkspace
+          usageOnly
+          portalSection={section}
+          onPortalSectionChange={setSection}
+          externalProjectSiteContactName="王项目"
+          externalProjectSiteContactPhone="13900000000"
+          loadProjectSites={() => Promise.resolve([{ ...projectSite, payrollAgencyRequired: true }])}
+          loadUsageRequests={() => Promise.resolve([])}
+          loadComplianceSummary={() => Promise.resolve(projectSiteComplianceSummary)}
+          loadUsageOptions={() =>
+            Promise.resolve({
+              defaultWarehouse: { id: warehouse.id, warehouseCode: warehouse.warehouseCode, warehouseName: warehouse.warehouseName },
+              materials: [{ id: material.id, materialCode: material.materialCode, materialName: material.materialName, unit: "套" }],
+            })
+          }
+          loadKitchenEquipment={() => Promise.resolve([])}
+          loadKitchenEquipmentChangeRequests={() => Promise.resolve([])}
+        />
+      );
+    }
+
+    render(<PortalHarness />);
+
+    expect(await screen.findByText("当前项目经理：王项目")).toBeInTheDocument();
+    expect(screen.getByText("联系电话：13900000000")).toBeInTheDocument();
+    expect((await screen.findAllByText("健康证阻断")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^雇主责任险提交$/ }));
+    expect((await screen.findAllByRole("heading", { name: "雇主责任险提交" })).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/待总部系统开放明细维护/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^工资表提交$/ }));
+    expect((await screen.findAllByRole("heading", { name: "工资表提交" })).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/待总部系统开放明细维护/).length).toBeGreaterThan(0);
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {

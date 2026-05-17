@@ -72,6 +72,8 @@ type ProjectSitesWorkspaceProps = {
   usageOnly?: boolean;
   portalSection?: ExternalProjectSitePortalSection;
   onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
+  externalProjectSiteContactName?: string | null;
+  externalProjectSiteContactPhone?: string | null;
 };
 
 type UsageWarehouseOption = {
@@ -333,6 +335,8 @@ export function ProjectSitesWorkspace({
   usageOnly = false,
   portalSection = "overview",
   onPortalSectionChange,
+  externalProjectSiteContactName,
+  externalProjectSiteContactPhone,
 }: ProjectSitesWorkspaceProps) {
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
@@ -926,8 +930,9 @@ export function ProjectSitesWorkspace({
           complianceSummaries={complianceSummaries}
           visibleProjectSiteCount={sites.length}
           pendingUsageCount={pendingUsageCount}
-          equipmentCount={filteredKitchenEquipment.length}
           pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+          currentContactName={externalProjectSiteContactName}
+          currentContactPhone={externalProjectSiteContactPhone}
           onSelectSection={onPortalSectionChange}
         />
       ) : (
