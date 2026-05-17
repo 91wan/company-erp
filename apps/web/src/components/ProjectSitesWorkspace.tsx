@@ -92,6 +92,15 @@ import {
   resetSiteFormAfterCreate,
   resetUsageFormAfterCreate,
 } from "./project-sites/projectSiteFormState";
+import {
+  filterKitchenEquipment,
+  filterKitchenEquipmentChangeRequests,
+  filterProjectSites,
+  filterProjectUsageRequests,
+  selectProjectSite,
+  selectProjectSiteDetailData,
+  selectProjectSiteParties,
+} from "./project-sites/projectSiteSelectors";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -426,62 +435,29 @@ export function ProjectSitesWorkspace({
     };
   }, [loadKitchenEquipment, loadKitchenEquipmentChangeRequests]);
 
-  const filteredSites = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return sites.filter((site) => {
-      if (!normalizedQuery) return true;
-      return [
-        site.siteCode,
-        site.siteName,
-        site.clientPartyName,
-        site.subcontractorPartyName,
-        site.region,
-        site.businessProjectName,
-        site.primaryManagerEmployeeName,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(normalizedQuery));
-    });
-  }, [query, sites]);
-  const selectedDetailSite = filteredSites.find((site) => site.id === selectedDetailSiteId) ?? null;
+  const scopedProjectSiteIds = useMemo(() => (usageOnly && sites.length > 0 ? sites.map((site) => site.id) : undefined), [sites, usageOnly]);
+  const filteredSites = useMemo(() => filterProjectSites(sites, query), [query, sites]);
+  const selectedDetailSite = selectProjectSite(filteredSites, selectedDetailSiteId);
 
-  const filteredUsageRequests = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return usageRequests.filter((request) => {
-      const matchesStatus = usageFilter === "all" || request.status === usageFilter;
-      const matchesQuery =
-        !normalizedQuery ||
-        [request.requestNo, request.projectSiteName, request.materialCode, request.materialName, request.requestedBy]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(normalizedQuery));
-      return matchesStatus && matchesQuery;
-    });
-  }, [query, usageFilter, usageRequests]);
+  const filteredUsageRequests = useMemo(
+    () => filterProjectUsageRequests(usageRequests, query, usageFilter),
+    [query, usageFilter, usageRequests],
+  );
 
-  const filteredKitchenEquipment = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return kitchenEquipment.filter((item) => {
-      if (!normalizedQuery) return true;
-      return [
-        item.projectSiteName,
-        item.equipmentName,
-        item.equipmentCategory,
-        item.specification,
-        item.location,
-        item.companyAssetTag,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(normalizedQuery));
-    });
-  }, [kitchenEquipment, query]);
+  const filteredKitchenEquipment = useMemo(
+    () => filterKitchenEquipment(kitchenEquipment, query, { projectSiteIds: scopedProjectSiteIds }),
+    [kitchenEquipment, query, scopedProjectSiteIds],
+  );
 
-  const filteredKitchenEquipmentChangeRequests = useMemo(() => {
-    const visibleSiteIds = new Set(filteredKitchenEquipment.map((item) => item.projectSiteId));
-    return kitchenEquipmentChangeRequests.filter((request) => {
-      if (usageOnly) return true;
-      return visibleSiteIds.size === 0 || visibleSiteIds.has(request.projectSiteId);
-    });
-  }, [filteredKitchenEquipment, kitchenEquipmentChangeRequests, usageOnly]);
+  const filteredKitchenEquipmentChangeRequests = useMemo(
+    () => filterKitchenEquipmentChangeRequests(kitchenEquipmentChangeRequests, {
+      kitchenEquipment: filteredKitchenEquipment,
+      projectSiteIds: scopedProjectSiteIds,
+      usageOnly,
+    }),
+    [filteredKitchenEquipment, kitchenEquipmentChangeRequests, scopedProjectSiteIds, usageOnly],
+  );
+  const selectedDetailSiteData = selectProjectSiteDetailData(selectedDetailSite, usageRequests, kitchenEquipment);
 
   const activeSiteCount = sites.filter((site) => site.status === "active").length;
   const pendingUsageCount = usageRequests.filter((request) => request.status === "pending").length;
@@ -497,9 +473,7 @@ export function ProjectSitesWorkspace({
     0,
   );
 
-  const clientParties = parties.filter((party) => party.partyTypes.includes("client"));
-  const operatorParties = parties.filter((party) => party.partyTypes.includes("operator"));
-  const subcontractorParties = parties.filter((party) => party.partyTypes.includes("subcontractor"));
+  const { clientParties, operatorParties, subcontractorParties } = selectProjectSiteParties(parties);
 
   function updateSelectedMaterial(materialId: string) {
     const material = materials.find((candidate) => candidate.id === materialId);
@@ -917,8 +891,8 @@ export function ProjectSitesWorkspace({
         <ProjectSiteDetailDrawer
           site={selectedDetailSite}
           complianceSummary={selectedDetailSite ? complianceSummaries[selectedDetailSite.id] : undefined}
-          usageRequests={selectedDetailSite ? usageRequests.filter((request) => request.projectSiteId === selectedDetailSite.id) : []}
-          kitchenEquipment={selectedDetailSite ? kitchenEquipment.filter((item) => item.projectSiteId === selectedDetailSite.id) : []}
+          usageRequests={selectedDetailSiteData.usageRequests}
+          kitchenEquipment={selectedDetailSiteData.kitchenEquipment}
           loadAttachments={loadUnifiedAttachments}
           createAttachment={createAttachment}
           getAttachmentDownloadUrl={getAttachmentDownloadUrl}
