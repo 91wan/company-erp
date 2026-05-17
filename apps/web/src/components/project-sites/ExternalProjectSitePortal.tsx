@@ -215,7 +215,7 @@ function SectionGuidance({
       <article>
         <StatusBadge tone="gray">待后端支持</StatusBadge>
         <strong>{sectionCopy[section].title}</strong>
-        <span>当前仅展示合规摘要任务；明细维护、附件上传和审核流程待总部系统开放明细维护。</span>
+        <span>当前仅展示合规摘要任务；明细维护和审核流程待总部系统开放明细维护，附件由总部登记或后续上传接口支持。</span>
       </article>
     </div>
   );

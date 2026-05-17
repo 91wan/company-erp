@@ -734,10 +734,14 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: /^雇主责任险提交$/ }));
     expect((await screen.findAllByRole("heading", { name: "雇主责任险提交" })).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/待总部系统开放明细维护/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/附件由总部登记或后续上传接口支持/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^工资表提交$/ }));
     expect((await screen.findAllByRole("heading", { name: "工资表提交" })).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/待总部系统开放明细维护/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/附件由总部登记或后续上传接口支持/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
   });
 
   it("renders project-site kitchen equipment and lets site users report changes", async () => {
