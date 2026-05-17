@@ -1,8 +1,5 @@
 import {
-  LogOut,
-  ChevronsRight,
   ClipboardCheck,
-  Database,
   MapPin,
   PackageCheck,
   Truck,
@@ -12,7 +9,6 @@ import type { FormEvent, ReactNode } from "react";
 import {
   canManage,
   canRead,
-  MVP_ROLES,
   type AppConfigDto,
   type AppVersionDto,
   type AttachmentRecordDto,
@@ -31,7 +27,6 @@ import {
   type PurchaseRequestDto,
 } from "@company-erp/shared";
 import {
-  SettingsIcon,
   externalProjectSiteNavigationItems,
   navigationGroups,
   navigationItems,
@@ -39,9 +34,7 @@ import {
   type MetricCard as MetricCardType,
   type MetricTone,
   type NavigationGroup,
-  type NavigationItem,
 } from "../dashboardData";
-import { ApiStatus } from "./ApiStatus";
 import { MaterialsWarehousesWorkspace } from "./MaterialsWarehousesWorkspace";
 import { PartiesWorkspace } from "./PartiesWorkspace";
 import { PeoplePermissionsWorkspace } from "./PeoplePermissionsWorkspace";
@@ -54,6 +47,8 @@ import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
 import { CertificatesWorkspace } from "./CertificatesWorkspace";
+import { Sidebar } from "./shell/Sidebar";
+import { TopBar } from "./shell/TopBar";
 import {
   apiBaseUrl,
   createAttachment,
@@ -75,7 +70,6 @@ import {
   SummaryCard,
 } from "./ui";
 
-const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const SCOPED_CERTIFICATE_OWNER_TYPES = ["person", "project_site"] as const;
 const SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES = ["roster"] as const;
 
@@ -213,89 +207,6 @@ function buildVisibleNavigationGroups(currentUser: AuthenticatedUserDto, isExter
       items: group.items.filter((item) => !item.permissionArea || canRead(currentUser.roles, item.permissionArea)),
     }))
     .filter((group) => group.items.length > 0);
-}
-
-function Sidebar({
-  companyName,
-  activeWorkspace,
-  groups,
-  externalMode,
-  activePortalSection,
-  onSelectItem,
-  onSelectSettings,
-}: {
-  companyName: string;
-  activeWorkspace: WorkspaceKey;
-  groups: NavigationGroup[];
-  externalMode: boolean;
-  activePortalSection: ExternalProjectSitePortalSection;
-  onSelectItem: (item: NavigationItem) => void;
-  onSelectSettings?: () => void;
-}) {
-  return (
-    <aside className="erp-sidebar" aria-label="ERP modules">
-      <div className="sidebar-brand">
-        <span className="app-icon">财</span>
-        <h1>{companyName}</h1>
-      </div>
-
-      <nav className="sidebar-nav">
-        {groups.map((group) => (
-          <div className="nav-group" key={group.label}>
-            <span className="nav-group-title">{group.label}</span>
-            {group.items.map((item) => (
-              <SidebarItem
-                key={`${group.label}-${item.label}`}
-                item={item}
-                activeWorkspace={activeWorkspace}
-                activePortalSection={activePortalSection}
-                onSelectItem={onSelectItem}
-              />
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      {onSelectSettings ? (
-        <button
-          type="button"
-          className={activeWorkspace === "系统设置" ? "nav-item sidebar-settings active" : "nav-item sidebar-settings"}
-          aria-current={activeWorkspace === "系统设置" ? "page" : undefined}
-          onClick={onSelectSettings}
-        >
-          <SettingsIcon aria-hidden="true" size={20} strokeWidth={1.9} />
-          <span>系统设置</span>
-          {externalMode ? <small>账号</small> : null}
-          <ChevronsRight aria-hidden="true" size={16} className="settings-chevron" />
-        </button>
-      ) : null}
-    </aside>
-  );
-}
-
-function SidebarItem({
-  item,
-  activeWorkspace,
-  activePortalSection,
-  onSelectItem,
-}: {
-  item: NavigationItem;
-  activeWorkspace: WorkspaceKey;
-  activePortalSection: ExternalProjectSitePortalSection;
-  onSelectItem: (item: NavigationItem) => void;
-}) {
-  const isActive = item.workspace === activeWorkspace && (!item.portalSection || item.portalSection === activePortalSection);
-  return (
-    <button
-      type="button"
-      className={isActive ? "nav-item active" : "nav-item"}
-      aria-current={isActive ? "page" : undefined}
-      onClick={() => onSelectItem(item)}
-    >
-      <item.icon aria-hidden="true" size={20} strokeWidth={1.9} />
-      <span>{item.label}</span>
-    </button>
-  );
 }
 
 type NavigateToWorkspace = (workspace: WorkspaceKey) => void;
@@ -466,42 +377,6 @@ function DashboardOverview({ currentUser, onNavigate }: { currentUser: Authentic
         <SystemStatusPanel appVersion={data.appVersion} onNavigate={onNavigate} />
       </section>
     </>
-  );
-}
-
-function TopBar({ currentUser, onLogout }: { currentUser: AuthenticatedUserDto; onLogout: () => Promise<void> | void }) {
-  return (
-    <header className="topbar">
-      <div className="topbar-context" aria-label="工作台说明">
-        <strong>角色工作台</strong>
-        <span>待办、风险与审核入口按当前权限展示</span>
-      </div>
-
-      <div className="topbar-actions">
-        <div className="connection-card">
-          <span className="status-dot" />
-          <ApiStatus />
-          <span className="divider" />
-          <Database aria-hidden="true" size={16} />
-          <span>数据库已连接</span>
-        </div>
-
-        <div className="user-chip">
-          <div className="avatar">{currentUser.username.slice(0, 1).toUpperCase()}</div>
-          <div>
-            <strong>{currentUser.username}</strong>
-            <small>{currentUser.roles.map((role) => roleLabel.get(role) ?? role).join(" / ")}</small>
-            {currentUser.assignedProjectSiteIds?.length ? (
-              <small>{currentUser.assignedProjectSiteIds.length} 个项目点</small>
-            ) : null}
-          </div>
-          <button className="logout-button" type="button" onClick={onLogout}>
-            <LogOut aria-hidden="true" size={15} />
-            退出登录
-          </button>
-        </div>
-      </div>
-    </header>
   );
 }
 
