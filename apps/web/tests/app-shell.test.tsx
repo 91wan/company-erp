@@ -597,7 +597,7 @@ describe("Company ERP app shell", () => {
 
     expect(await screen.findByText("site-manager")).toBeInTheDocument();
     for (const label of ["我的项目点", "物料领用", "现场人员/健康证", "食品经营许可证", "雇主责任险", "工资表"]) {
-      expect(screen.getByRole("button", { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: new RegExp(`^${label}$`) }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("button", { name: /^总览$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^基础资料$/ })).not.toBeInTheDocument();

@@ -120,14 +120,16 @@ export function buildProjectSiteComplianceActions(
       title: "雇主责任险覆盖异常",
       description: `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} 人，已过期 ${summary.insuranceExpiredCount} 份。`,
       tone: "danger",
-      actionLabel: "待后端支持",
+      actionLabel: "查看雇主责任险任务",
+      targetSection: "insurance",
     });
   } else if (summary.insuranceExpiringSoonCount > 0) {
     actions.push({
       title: "雇主责任险预警",
       description: `${summary.insuranceExpiringSoonCount} 份保单 30 天内到期。`,
       tone: "warning",
-      actionLabel: "待后端支持",
+      actionLabel: "查看雇主责任险任务",
+      targetSection: "insurance",
     });
   }
 
@@ -138,14 +140,16 @@ export function buildProjectSiteComplianceActions(
         title: "工资表待提交",
         description: `本项目点要求工资代发资料，本月状态：${summary.payrollCurrentMonthStatus}。`,
         tone: "danger",
-        actionLabel: "待后端支持",
+        actionLabel: "查看工资表任务",
+        targetSection: "payroll",
       });
     } else if (summary.payrollCurrentMonthStatus === "pending") {
       actions.push({
         title: "工资表待审核",
         description: "工资表已提交，等待总部审核；审核通过前仍显示为待处理。",
         tone: "warning",
-        actionLabel: "待后端支持",
+        actionLabel: "查看工资表任务",
+        targetSection: "payroll",
       });
     }
   }

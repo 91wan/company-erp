@@ -1,7 +1,7 @@
 import { ClipboardCheck, FileText, ShieldCheck, Users } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { PageHeader, SummaryCard, ComplianceChecklist } from "../ui";
-import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
+import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel, complianceStatusTone } from "./ProjectSiteCompliancePanel";
 import { StatusBadge } from "./projectSiteUi";
 
@@ -40,8 +40,9 @@ export function ExternalProjectSitePortal({
   complianceSummaries,
   visibleProjectSiteCount,
   pendingUsageCount,
-  equipmentCount,
   pendingEquipmentChangeCount,
+  currentContactName,
+  currentContactPhone,
   onSelectSection,
 }: {
   section?: ExternalProjectSitePortalSection;
@@ -49,13 +50,23 @@ export function ExternalProjectSitePortal({
   complianceSummaries: Record<string, ProjectSiteComplianceSummaryDto>;
   visibleProjectSiteCount: number;
   pendingUsageCount: number;
-  equipmentCount: number;
   pendingEquipmentChangeCount: number;
+  currentContactName?: string | null;
+  currentContactPhone?: string | null;
   onSelectSection?: (section: ExternalProjectSitePortalSection) => void;
 }) {
   const activeCopy = sectionCopy[section];
   const primarySite = sites[0] ?? null;
   const primarySummary = primarySite ? complianceSummaries[primarySite.id] : undefined;
+  const complianceActions = primarySite ? buildProjectSiteComplianceActions(primarySite, primarySummary) : [];
+  const rejectedCount = primarySummary
+    ? [primarySummary.foodOperationLicenseStatus, primarySummary.payrollCurrentMonthStatus].filter((status) => status === "rejected").length
+    : 0;
+  const pendingReviewCount = primarySummary
+    ? [primarySummary.foodOperationLicenseStatus, primarySummary.payrollCurrentMonthStatus].filter((status) =>
+        status === "pending" || status === "review_due" || status === "review_due_soon",
+      ).length
+    : 0;
 
   return (
     <section className="external-project-site-portal" aria-label="外部项目点门户">
@@ -67,8 +78,21 @@ export function ExternalProjectSitePortal({
       <div className="portal-summary-grid">
         <SummaryCard label="我的项目点" value={visibleProjectSiteCount} detail="由后台账号绑定" tone="info" />
         <SummaryCard label="待处理领用" value={pendingUsageCount} detail="等待总部或仓库处理" tone={pendingUsageCount > 0 ? "warning" : "success"} />
-        <SummaryCard label="厨房设备" value={equipmentCount} detail="本项目点可见设备" tone="neutral" />
-        <SummaryCard label="设备变更待审" value={pendingEquipmentChangeCount} detail="总部审核后才更新台账" tone={pendingEquipmentChangeCount > 0 ? "warning" : "success"} />
+        <SummaryCard label="被驳回资料" value={rejectedCount} detail="需重新提交或联系总部" tone={rejectedCount > 0 ? "danger" : "success"} />
+        <SummaryCard label="待总部审核" value={pendingReviewCount + pendingEquipmentChangeCount} detail="资料提交后等待总部复核" tone={pendingReviewCount + pendingEquipmentChangeCount > 0 ? "warning" : "success"} />
+      </div>
+
+      <div className="inventory-tabs external-portal-tabs" aria-label="项目点门户分区">
+        {Object.entries(sectionCopy).map(([key, copy]) => (
+          <button
+            key={key}
+            type="button"
+            aria-current={section === key ? "page" : undefined}
+            onClick={() => onSelectSection?.(key as ExternalProjectSitePortalSection)}
+          >
+            {copy.title}
+          </button>
+        ))}
       </div>
 
       <section className="dashboard-panel external-portal-section" aria-label="当前门户分区">
@@ -86,6 +110,8 @@ export function ExternalProjectSitePortal({
             <strong>{primarySite.siteName}</strong>
             <span>{primarySite.siteCode}</span>
             <span>{primarySite.siteAddress ?? primarySite.region ?? "项目点地址待维护"}</span>
+            <span>当前项目经理：{currentContactName ?? primarySite.subcontractorContactName ?? primarySite.primaryManagerEmployeeName ?? "待总部维护"}</span>
+            <span>联系电话：{currentContactPhone ?? primarySite.subcontractorContactPhone ?? primarySite.clientContactPhone ?? "待总部维护"}</span>
             {primarySummary ? (
               <span>
                 食品经营许可证：
@@ -99,6 +125,28 @@ export function ExternalProjectSitePortal({
           </div>
         ) : (
           <p className="form-helper">当前账号未返回绑定项目点，请联系总部检查账号绑定。</p>
+        )}
+        {section === "overview" ? (
+          <div className="external-portal-task-strip" aria-label="项目点任务摘要">
+            {complianceActions.map((action) => (
+              <article key={action.title}>
+                <StatusBadge tone={action.tone === "danger" ? "red" : action.tone === "warning" ? "orange" : action.tone === "success" ? "green" : "gray"}>
+                  {action.tone === "danger" ? "阻断" : action.tone === "warning" ? "预警" : action.tone === "success" ? "正常" : "待处理"}
+                </StatusBadge>
+                <strong>{action.title}</strong>
+                <span>{action.description}</span>
+              </article>
+            ))}
+            {pendingUsageCount > 0 ? (
+              <article>
+                <StatusBadge tone="orange">待处理</StatusBadge>
+                <strong>物料领用申请状态</strong>
+                <span>{pendingUsageCount} 条领用申请等待总部或仓库处理。</span>
+              </article>
+            ) : null}
+          </div>
+        ) : (
+          <SectionGuidance section={section} pendingUsageCount={pendingUsageCount} />
         )}
         {pendingUsageCount === 0 ? <p className="form-helper">暂无可见领用申请。</p> : null}
       </section>
@@ -140,5 +188,35 @@ export function ExternalProjectSitePortal({
         ]}
       />
     </section>
+  );
+}
+
+function SectionGuidance({
+  section,
+  pendingUsageCount,
+}: {
+  section: ExternalProjectSitePortalSection;
+  pendingUsageCount: number;
+}) {
+  if (section === "usage") {
+    return (
+      <div className="external-portal-task-strip" aria-label="物料领用处理">
+        <article>
+          <StatusBadge tone={pendingUsageCount > 0 ? "orange" : "green"}>{pendingUsageCount > 0 ? "待处理" : "无待处理"}</StatusBadge>
+          <strong>物料领用申请</strong>
+          <span>领用申请列表和新增入口在本页下方；项目点账号不选择其他项目点，也不填写仓库出库参数。</span>
+        </article>
+      </div>
+    );
+  }
+
+  return (
+    <div className="external-portal-task-strip" aria-label="合规资料处理">
+      <article>
+        <StatusBadge tone="gray">待后端支持</StatusBadge>
+        <strong>{sectionCopy[section].title}</strong>
+        <span>当前仅展示合规摘要任务；明细维护、附件上传和审核流程待总部系统开放明细维护。</span>
+      </article>
+    </div>
   );
 }
