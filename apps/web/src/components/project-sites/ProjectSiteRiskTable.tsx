@@ -1,8 +1,6 @@
-import { MapPin, RefreshCw } from "lucide-react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
-import { StatusBadge, type StatusTone } from "../ui";
+import { DataTable, EmptyState, SectionCard, StatusBadge, type StatusTone } from "../ui";
 import { complianceRiskLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
-import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
 
 function dated(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
@@ -66,16 +64,8 @@ export function ProjectSiteRiskTable({
   onSelectSite: (site: ProjectSiteDto) => void;
 }) {
   return (
-    <section className="dashboard-panel table-panel" aria-label="项目点风险台账">
-      <PanelTitle icon={<MapPin size={16} />} title="项目点风险台账" />
-      {status === "loading" ? (
-        <StateMessage icon={<RefreshCw size={16} />} text="项目点风险台账加载中" />
-      ) : status === "error" ? (
-        <StateMessage icon={<MapPin size={16} />} text="项目点风险台账加载失败" />
-      ) : sites.length === 0 ? (
-        <StateMessage icon={<MapPin size={16} />} text="暂无项目点风险台账" />
-      ) : (
-        <ResponsiveTable
+    <SectionCard title="项目点风险台账">
+      <DataTable
           headers={[
             "项目点",
             "经营模式",
@@ -91,7 +81,7 @@ export function ProjectSiteRiskTable({
             "最近更新时间",
             "操作",
           ]}
-          rows={sites.map((site) => {
+          rows={status === "ready" ? sites.map((site) => {
             const summary = complianceSummaries[site.id];
             const healthStatus = summary ? healthCertificateStatus(summary) : null;
             const insurance = summary ? insuranceStatus(summary) : null;
@@ -160,12 +150,13 @@ export function ProjectSiteRiskTable({
                 }}
               >
                 查看详情
-              </button>,
-            ];
-          })}
+               </button>,
+             ];
+          }) : []}
+          loading={status === "loading" ? <EmptyState title="项目点风险台账加载中" /> : status === "error" ? <EmptyState title="项目点风险台账加载失败" /> : undefined}
+          emptyState={<EmptyState title="暂无项目点风险台账" />}
           onRowClick={(index) => onSelectSite(sites[index])}
         />
-      )}
-    </section>
+    </SectionCard>
   );
 }

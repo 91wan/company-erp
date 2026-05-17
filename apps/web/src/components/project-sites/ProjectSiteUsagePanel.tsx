@@ -1,7 +1,6 @@
-import { ClipboardList, RefreshCw } from "lucide-react";
 import type { ProjectUsageRequestDto } from "@company-erp/shared";
-import { StatusBadge } from "../ui";
-import { PanelTitle, ResponsiveTable, StateMessage, formatMoney } from "./projectSiteUi";
+import { DataTable, EmptyState, SectionCard, StatusBadge } from "../ui";
+import { formatMoney } from "./projectSiteFormat";
 
 export function ProjectSiteUsagePanel({
   usageRequests,
@@ -15,16 +14,8 @@ export function ProjectSiteUsagePanel({
   usageStatusLabel: Map<string, string>;
 }) {
   return (
-    <section className="dashboard-panel table-panel">
-      <PanelTitle icon={<ClipboardList size={16} />} title="领用申请" />
-      {status === "loading" ? (
-        <StateMessage icon={<RefreshCw size={16} />} text="领用申请加载中" />
-      ) : status === "error" ? (
-        <StateMessage icon={<ClipboardList size={16} />} text="领用申请加载失败" />
-      ) : usageRequests.length === 0 ? (
-        <StateMessage icon={<ClipboardList size={16} />} text="暂无领用申请" />
-      ) : (
-        <ResponsiveTable
+    <SectionCard title="领用申请">
+      <DataTable
           headers={[
             "申请单号",
             ...(usageOnly ? [] : ["项目点"]),
@@ -38,7 +29,7 @@ export function ProjectSiteUsagePanel({
             "状态",
             "期望日期",
           ]}
-          rows={usageRequests.map((request) => [
+          rows={status === "ready" ? usageRequests.map((request) => [
             request.requestNo,
             ...(usageOnly ? [] : [request.projectSiteName]),
             `${request.materialCode} ${request.materialName}`,
@@ -52,9 +43,10 @@ export function ProjectSiteUsagePanel({
               {usageStatusLabel.get(request.status) ?? request.status}
             </StatusBadge>,
             request.expectedDate ?? "-",
-          ])}
+          ]) : []}
+          loading={status === "loading" ? <EmptyState title="领用申请加载中" /> : status === "error" ? <EmptyState title="领用申请加载失败" /> : undefined}
+          emptyState={<EmptyState title="暂无领用申请" />}
         />
-      )}
-    </section>
+    </SectionCard>
   );
 }

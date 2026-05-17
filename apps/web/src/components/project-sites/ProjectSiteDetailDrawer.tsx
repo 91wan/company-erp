@@ -12,7 +12,7 @@ import { BusinessAttachmentsPanel } from "../BusinessAttachmentsPanel";
 import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState } from "../ui";
 import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel } from "./projectSiteComplianceStatus";
-import { formatMoney } from "./projectSiteUi";
+import { formatMoney } from "./projectSiteFormat";
 
 type DetailTab = "overview" | "usage" | "equipment" | "attachments";
 

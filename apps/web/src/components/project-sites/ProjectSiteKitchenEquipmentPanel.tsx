@@ -1,10 +1,9 @@
-import { ClipboardList, RefreshCw, Wrench } from "lucide-react";
 import { useState } from "react";
 import type {
   ProjectSiteKitchenEquipmentChangeRequestDto,
   ProjectSiteKitchenEquipmentDto,
 } from "@company-erp/shared";
-import { PanelTitle, ResponsiveTable, StateMessage } from "./projectSiteUi";
+import { DataTable, EmptyState, SectionCard } from "../ui";
 
 export function ProjectSiteKitchenEquipmentPanel({
   kitchenEquipment,
@@ -32,16 +31,8 @@ export function ProjectSiteKitchenEquipmentPanel({
 
   return (
     <>
-      <section className="dashboard-panel table-panel" aria-label="项目点厨房设备">
-        <PanelTitle icon={<Wrench size={16} />} title="厨房设备" />
-        {status === "loading" ? (
-          <StateMessage icon={<RefreshCw size={16} />} text="厨房设备加载中" />
-        ) : status === "error" ? (
-          <StateMessage icon={<Wrench size={16} />} text="厨房设备加载失败" />
-        ) : kitchenEquipment.length === 0 ? (
-          <StateMessage icon={<Wrench size={16} />} text="暂无厨房设备" />
-        ) : (
-          <ResponsiveTable
+      <SectionCard title="厨房设备">
+        <DataTable
             headers={[
               ...(usageOnly ? [] : ["项目点"]),
               "设备",
@@ -53,7 +44,7 @@ export function ProjectSiteKitchenEquipmentPanel({
               "资产标签",
               "最近核对",
             ]}
-            rows={kitchenEquipment.map((item) => [
+            rows={status === "ready" ? kitchenEquipment.map((item) => [
               ...(usageOnly ? [] : [item.projectSiteName ?? "-"]),
               item.equipmentName,
               item.equipmentCategory ?? "-",
@@ -63,17 +54,14 @@ export function ProjectSiteKitchenEquipmentPanel({
               kitchenEquipmentStatusLabel.get(item.status) ?? item.status,
               item.companyAssetTag ?? "-",
               item.lastCheckedDate ?? "-",
-            ])}
+            ]) : []}
+            loading={status === "loading" ? <EmptyState title="厨房设备加载中" /> : status === "error" ? <EmptyState title="厨房设备加载失败" /> : undefined}
+            emptyState={<EmptyState title="暂无厨房设备" />}
           />
-        )}
-      </section>
+      </SectionCard>
 
-      <section className="dashboard-panel table-panel" aria-label="厨房设备变更上报">
-        <PanelTitle icon={<ClipboardList size={16} />} title="厨房设备变更上报" />
-        {changeRequests.length === 0 ? (
-          <StateMessage icon={<ClipboardList size={16} />} text="暂无设备变更上报" />
-        ) : (
-          <ResponsiveTable
+      <SectionCard title="厨房设备变更上报">
+        <DataTable
             headers={[
               "设备",
               "类型",
@@ -125,9 +113,9 @@ export function ProjectSiteKitchenEquipmentPanel({
                     ) : "-",
                   ]),
             ])}
+            emptyState={<EmptyState title="暂无设备变更上报" />}
           />
-        )}
-      </section>
+      </SectionCard>
     </>
   );
 }
