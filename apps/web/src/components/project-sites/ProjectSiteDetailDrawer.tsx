@@ -13,6 +13,7 @@ import { payrollStatusToBadge, projectSiteComplianceStatusToBadge } from "../sta
 import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel } from "./projectSiteComplianceStatus";
 import { formatMoney } from "./projectSiteFormat";
+import { ProjectSiteComplianceDetailsPanel } from "./ProjectSiteComplianceDetailsPanel";
 
 type DetailTab = "overview" | "usage" | "equipment" | "attachments";
 
@@ -138,6 +139,7 @@ export function ProjectSiteDetailDrawer({
               ]}
             />
             <ProjectSiteComplianceActionQueue site={site} summary={complianceSummary} />
+            <ProjectSiteComplianceDetailsPanel siteId={site.id} section="all" />
           </>
         ) : null}
 
