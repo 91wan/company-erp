@@ -359,6 +359,55 @@ const demoCertificate = {
   updatedAt: "2026-05-11T09:00:00.000Z",
 };
 
+const demoInsurancePolicy = {
+  id: "78787878-7878-4787-8787-787878787878",
+  policyNo: "DEMO-POLICY-001",
+  projectSiteId: demoProjectSite.id,
+  projectSiteName: demoProjectSite.siteName,
+  insurerName: "DEMO 保险公司",
+  startDate: "2026-05-01",
+  endDate: "2027-04-30",
+  reviewStatus: "approved",
+  reviewedByEmployeeId: null,
+  reviewedByName: "DEMO 审核人",
+  reviewedAt: "2026-05-11T10:00:00.000Z",
+  reviewRemark: "DEMO 已通过",
+  attachmentPath: null,
+  remark: "DEMO",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
+const demoCoveredPerson = {
+  id: "79797979-7979-4797-8797-797979797979",
+  policyId: demoInsurancePolicy.id,
+  rosterPersonId: "80808080-8080-4808-8808-808080808080",
+  rosterPersonName: "DEMO 现场人员",
+  coveredNameSnapshot: "DEMO 被保人",
+  identityNoLast4Snapshot: "1234",
+  remark: "DEMO",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
+const demoPayrollSubmission = {
+  id: "81818181-8181-4818-8818-818181818181",
+  projectSiteId: demoProjectSite.id,
+  projectSiteName: demoProjectSite.siteName,
+  payrollMonth: "2026-05",
+  attachmentPath: "unified-attachment-pending",
+  submittedBy: "DEMO 项目联系人",
+  submittedAt: "2026-05-11T09:00:00.000Z",
+  reviewStatus: "pending",
+  reviewedByEmployeeId: null,
+  reviewedByName: null,
+  reviewedAt: null,
+  reviewRemark: null,
+  remark: "DEMO",
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
 export async function mockCompanyErpApi(page: Page, options: MockApiOptions = {}) {
   await createMockCompanyErpApi(page, options);
 }
@@ -398,6 +447,9 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     projectUsageRequests: [{ ...demoUsageRequest }],
     contracts: [{ ...demoContract }],
     certificates: [{ ...demoCertificate }],
+    insurancePolicies: [{ ...demoInsurancePolicy }],
+    coveredPersons: [{ ...demoCoveredPerson }],
+    payrollSubmissions: [{ ...demoPayrollSubmission }],
     auditLogs: [
       {
         id: "efefefef-efef-4fef-8fef-efefefefefef",
@@ -944,9 +996,9 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname.startsWith("/api/certificates")) return { certificates: state.certificates };
   if (pathname === "/api/import-jobs") return { importJobs: state.importJobs };
   if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPeople: [] };
-  if (pathname.startsWith("/api/employer-liability-insurance-policies")) return { insurancePolicies: [] };
-  if (pathname.startsWith("/api/employer-liability-insurance-covered-persons")) return { coveredPersons: [] };
-  if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: [] };
+  if (pathname.startsWith("/api/employer-liability-insurance-policies")) return { insurancePolicies: state.insurancePolicies };
+  if (pathname.startsWith("/api/employer-liability-insurance-covered-persons")) return { coveredPersons: state.coveredPersons };
+  if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: state.payrollSubmissions };
   if (pathname.startsWith("/api/market-operations-handoffs")) return { marketOperationsHandoffs: [] };
   if (pathname.startsWith("/api/audit-logs")) return { auditLogs: state.auditLogs };
   if (pathname.startsWith("/api/attachments")) return { attachments: state.attachments };
@@ -966,6 +1018,9 @@ function makeStateShape() {
     projectUsageRequests: [demoUsageRequest],
     contracts: [demoContract],
     certificates: [demoCertificate],
+    insurancePolicies: [demoInsurancePolicy],
+    coveredPersons: [demoCoveredPerson],
+    payrollSubmissions: [demoPayrollSubmission],
     auditLogs: [] as Record<string, unknown>[],
     attachments: [] as Record<string, unknown>[],
     contractAttachments: [] as Record<string, unknown>[],
