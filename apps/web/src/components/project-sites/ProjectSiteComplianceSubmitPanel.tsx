@@ -457,7 +457,6 @@ function PayrollSubmissionForm({
         body: JSON.stringify({
           projectSiteId: site.id,
           payrollMonth: form.payrollMonth,
-          attachmentPath: "unified-attachment-pending",
           submittedBy: form.submittedBy || currentContactName || null,
           reviewStatus: "pending",
           remark: form.remark || "附件由总部登记或后续上传接口支持。",
@@ -474,7 +473,7 @@ function PayrollSubmissionForm({
   return (
     <form className="compact-form compliance-submit-form" aria-label="工资表提交" onSubmit={submit}>
       <h4>提交月度资料</h4>
-      <p className="form-helper">本轮只登记工资表提交记录；附件文件由总部在统一附件中补登，项目点账号不填写路径。</p>
+      <p className="form-helper">附件上传后续开放，当前由总部登记附件引用；项目点账号不填写附件路径或附件存储键。</p>
       <label>
         工资月份
         <input type="month" value={form.payrollMonth} onChange={(event) => setForm({ ...form, payrollMonth: event.target.value })} required />

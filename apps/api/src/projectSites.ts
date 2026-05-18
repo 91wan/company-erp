@@ -134,6 +134,8 @@ export type CreateProjectSitePayrollSubmissionInput = {
   remark?: string | null;
 };
 
+export const PAYROLL_ATTACHMENT_PENDING = "unified-attachment-pending";
+
 export type ProjectSiteRepository = {
   list(filters: ProjectSiteListFilters): Promise<ProjectSiteDto[]>;
   getById(id: string): Promise<ProjectSiteDto | null>;
@@ -438,7 +440,11 @@ export function normalizeProjectSitePayrollSubmissionInput(input: unknown): Crea
   const payload = input as Record<string, unknown>;
   const issues: string[] = [];
   const projectSiteId = normalizeRequiredString(payload.projectSiteId, "projectSiteId", issues);
-  const attachmentPath = normalizeRequiredString(payload.attachmentPath, "attachmentPath", issues);
+  if ("storageKey" in payload) issues.push("storageKey is not accepted for payroll submissions");
+  if ("ownerModule" in payload || "ownerEntityType" in payload || "ownerEntityId" in payload) {
+    issues.push("attachment owner fields are not accepted for payroll submissions");
+  }
+  const attachmentPath = normalizeNullableString(payload.attachmentPath) ?? PAYROLL_ATTACHMENT_PENDING;
   const payrollMonth =
     typeof payload.payrollMonth === "string" && /^\d{4}-\d{2}$/.test(payload.payrollMonth.trim())
       ? payload.payrollMonth.trim()
@@ -457,7 +463,7 @@ export function normalizeProjectSitePayrollSubmissionInput(input: unknown): Crea
   return {
     projectSiteId: projectSiteId!,
     payrollMonth: payrollMonth!,
-    attachmentPath: attachmentPath!,
+    attachmentPath,
     submittedBy: normalizeNullableString(payload.submittedBy),
     reviewStatus,
     remark: normalizeNullableString(payload.remark),
