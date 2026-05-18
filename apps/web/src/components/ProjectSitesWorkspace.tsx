@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import {
   type AttachmentRecordDto,
   type BusinessProjectDto,
@@ -56,6 +56,7 @@ import {
   selectProjectSiteParties,
 } from "./project-sites/projectSiteSelectors";
 import { useProjectSitesData } from "./project-sites/useProjectSitesData";
+import { useProjectSitesLoadDefaults } from "./project-sites/useProjectSitesLoadDefaults";
 import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations";
 import { useProjectSitesWorkspaceState } from "./project-sites/useProjectSitesWorkspaceState";
 
@@ -150,48 +151,18 @@ export function ProjectSitesWorkspace({
     closeFormDrawer,
   } = useProjectSitesWorkspaceState();
 
-  const onProjectSitesLoaded = useCallback((nextSites: ProjectSiteDto[]) => {
-    setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-    setKitchenEquipmentForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-    setKitchenEquipmentChangeForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-  }, []);
-
-  const onUsageRequestsLoaded = useCallback((nextRequests: ProjectUsageRequestDto[]) => {
-    setIssueForm((current) => ({ ...current, requestId: current.requestId || nextRequests[0]?.id || "" }));
-  }, []);
-
-  const onMasterDataLoaded = useCallback(
-    ({ materials: nextMaterials, warehouses: nextWarehouses }: { materials: MaterialDto[]; warehouses: WarehouseDto[] }) => {
-      setUsageForm((current) => ({
-        ...current,
-        warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
-        materialId: current.materialId || nextMaterials[0]?.id || "",
-        unit: current.unit || nextMaterials[0]?.projectSiteSaleUnit || nextMaterials[0]?.baseUnit || "",
-      }));
-    },
-    [],
-  );
-
-  const onUsageOptionsLoaded = useCallback((options: ProjectUsageOptionsDto) => {
-    setUsageForm((current) => ({
-      ...current,
-      warehouseId: current.warehouseId || options.defaultWarehouse?.id || "",
-      materialId: current.materialId || options.materials[0]?.id || "",
-      unit: current.unit || options.materials[0]?.unit || "",
-    }));
-  }, []);
-
-  const onKitchenEquipmentLoaded = useCallback((equipment: ProjectSiteKitchenEquipmentDto[]) => {
-    setKitchenEquipmentChangeForm((current) => {
-      const firstEquipment = equipment[0];
-      return {
-        ...current,
-        projectSiteId: current.projectSiteId || firstEquipment?.projectSiteId || "",
-        equipmentId: current.equipmentId || firstEquipment?.id || "",
-        equipmentName: current.equipmentName || firstEquipment?.equipmentName || "",
-      };
-    });
-  }, []);
+  const {
+    onProjectSitesLoaded,
+    onUsageRequestsLoaded,
+    onMasterDataLoaded,
+    onUsageOptionsLoaded,
+    onKitchenEquipmentLoaded,
+  } = useProjectSitesLoadDefaults({
+    setUsageForm,
+    setIssueForm,
+    setKitchenEquipmentForm,
+    setKitchenEquipmentChangeForm,
+  });
 
   const {
     sites,
