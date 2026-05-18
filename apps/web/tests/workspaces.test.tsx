@@ -573,10 +573,10 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByText("SITE-WX-001"));
 
     expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
-    expect(screen.getByText("健康证阻断")).toBeInTheDocument();
-    expect(screen.getByText("食品经营许可证预警")).toBeInTheDocument();
-    expect(screen.getByText("雇主责任险覆盖异常")).toBeInTheDocument();
-    expect(screen.getByText("工资表待审核")).toBeInTheDocument();
+    expect(screen.getByText("补充健康证")).toBeInTheDocument();
+    expect(screen.getByText("更新食品经营许可证")).toBeInTheDocument();
+    expect(screen.getByText("补充被保人员")).toBeInTheDocument();
+    expect(screen.getByText("工资表待总部审核")).toBeInTheDocument();
     expect(screen.queryByText("处理现场人员/健康证")).not.toBeInTheDocument();
     expect(screen.queryByText("处理食品经营许可证")).not.toBeInTheDocument();
     expect(screen.getAllByText("待后端支持").length).toBeGreaterThan(0);
@@ -687,16 +687,16 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
-    expect((await screen.findAllByText("健康证阻断")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("食品经营许可证预警").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("雇主责任险覆盖异常").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("工资表待审核").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("补充健康证")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("更新食品经营许可证").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("补充被保人员").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("工资表待总部审核").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "处理健康证阻断" }));
+    fireEvent.click(screen.getByRole("button", { name: "处理补充健康证" }));
     expect(onPortalSectionChange).toHaveBeenCalledWith("rosterHealth");
-    fireEvent.click(screen.getByRole("button", { name: "处理雇主责任险覆盖异常" }));
+    fireEvent.click(screen.getByRole("button", { name: "处理补充被保人员" }));
     expect(onPortalSectionChange).toHaveBeenCalledWith("insurance");
-    fireEvent.click(screen.getByRole("button", { name: "处理工资表待审核" }));
+    fireEvent.click(screen.getByRole("button", { name: "处理工资表待总部审核" }));
     expect(onPortalSectionChange).toHaveBeenCalledWith("payroll");
   });
 
@@ -729,7 +729,7 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByText("当前项目经理：王项目")).toBeInTheDocument();
     expect(screen.getByText("联系电话：13900000000")).toBeInTheDocument();
-    expect((await screen.findAllByText("健康证阻断")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("补充健康证")).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /^雇主责任险提交$/ }));
     expect((await screen.findAllByRole("heading", { name: "雇主责任险提交" })).length).toBeGreaterThan(0);

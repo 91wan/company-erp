@@ -83,6 +83,21 @@ describe("ExternalProjectSiteWorkspaceView", () => {
     expect(screen.queryByRole("button", { name: "出库登记" })).not.toBeInTheDocument();
   });
 
+  it("shows action-first compliance tasks without leaking raw status enums", () => {
+    renderExternalView();
+
+    expect(screen.getAllByText("补充健康证").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("更新临期健康证").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("立即更新过期健康证").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("补充被保人员").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("更新临期雇主责任险").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("工资表待总部审核").length).toBeGreaterThan(0);
+    expect(screen.getByText("食品经营许可证：")).toBeInTheDocument();
+    expect(screen.getAllByText("临期").length).toBeGreaterThan(0);
+    expect(screen.queryByText("expiring_soon")).not.toBeInTheDocument();
+    expect(screen.queryByText("pending")).not.toBeInTheDocument();
+  });
+
   it("routes portal section buttons to the matching scoped section", () => {
     const { onSelectSection } = renderExternalView();
 

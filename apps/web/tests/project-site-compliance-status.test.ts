@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { complianceRiskLabel, complianceStatusTone } from "../src/components/project-sites/projectSiteComplianceStatus";
+import { complianceRiskLabel, complianceStatusLabel, complianceStatusTone } from "../src/components/project-sites/projectSiteComplianceStatus";
 import { projectSiteComplianceSummary } from "./appTestHelpers";
 
 describe("project site compliance status helpers", () => {
@@ -26,5 +26,16 @@ describe("project site compliance status helpers", () => {
     expect(complianceRiskLabel({ ...projectSiteComplianceSummary, blockingIssueCount: 1, warningIssueCount: 0 })).toBe("红色风险");
     expect(complianceRiskLabel({ ...projectSiteComplianceSummary, blockingIssueCount: 0, warningIssueCount: 1 })).toBe("黄色预警");
     expect(complianceRiskLabel({ ...projectSiteComplianceSummary, blockingIssueCount: 0, warningIssueCount: 0 })).toBe("绿色正常");
+  });
+
+  it("maps compliance statuses to Chinese labels", () => {
+    expect(complianceStatusLabel("missing")).toBe("缺失");
+    expect(complianceStatusLabel("expired")).toBe("已过期");
+    expect(complianceStatusLabel("rejected")).toBe("已驳回");
+    expect(complianceStatusLabel("pending")).toBe("待审核");
+    expect(complianceStatusLabel("expiring_soon")).toBe("临期");
+    expect(complianceStatusLabel("valid")).toBe("有效");
+    expect(complianceStatusLabel("not_required")).toBe("不需要");
+    expect(complianceStatusLabel("not_applicable")).toBe("不适用");
   });
 });
