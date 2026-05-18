@@ -23,6 +23,7 @@ import {
 import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
+import { contractExpiryToBadge } from "./statusMappers";
 
 type ContractsWorkspaceProps = {
   loadContracts?: () => Promise<ContractDto[]>;
@@ -61,7 +62,6 @@ const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction
 const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
 const subjectCategoryLabel = new Map(CONTRACT_SUBJECT_CATEGORIES.map((category) => [category.code, category.label]));
 const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
-const expiryLabel = new Map(CONTRACT_EXPIRY_STATES.map((state) => [state.code, state.label]));
 
 async function defaultLoadContracts(): Promise<ContractDto[]> {
   const payload = await requestJson<{ contracts: ContractDto[] }>(`${apiBaseUrl}/api/contracts`);
@@ -555,8 +555,8 @@ function ContractsTable({ contracts, onSelectContract }: { contracts: ContractDt
               </td>
               <td>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</td>
               <td>
-                <StatusBadge tone={contractExpiryTone(contract.expiryState)}>
-                  {expiryLabel.get(contract.expiryState)}
+                <StatusBadge tone={contractExpiryToBadge(contract.expiryState).tone}>
+                  {contractExpiryToBadge(contract.expiryState).label}
                 </StatusBadge>
               </td>
               <td>{formatDateTime(contract.updatedAt)}</td>
@@ -586,7 +586,7 @@ function ContractDetail({ contract }: { contract: ContractDto }) {
       <dt>金额/预算</dt>
       <dd>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</dd>
       <dt>到期状态</dt>
-      <dd>{expiryLabel.get(contract.expiryState)}</dd>
+      <dd>{contractExpiryToBadge(contract.expiryState).label}</dd>
       <dt>附件</dt>
       <dd>{contract.attachmentRef ?? "暂无主附件引用"}</dd>
     </dl>
@@ -614,11 +614,4 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function contractExpiryTone(expiryState: ContractExpiryStateCode): "success" | "warning" | "danger" | "disabled" {
-  if (expiryState === "expired") return "danger";
-  if (expiryState === "terminated") return "disabled";
-  if (expiryState === "expiring_soon") return "warning";
-  return "success";
 }

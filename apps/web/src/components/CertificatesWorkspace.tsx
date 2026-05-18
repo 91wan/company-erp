@@ -30,6 +30,7 @@ import {
   Toolbar,
 } from "./ui";
 import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
+import { certificateStatusToBadge } from "./statusMappers";
 
 type CertificatesWorkspaceProps = {
   loadCertificates?: () => Promise<CertificateRecordDto[]>;
@@ -68,7 +69,6 @@ type CertificateFormState = {
 
 const typeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
 const ownerLabel = new Map(CERTIFICATE_OWNER_TYPES.map((item) => [item.code, item.label]));
-const statusLabel = new Map(CERTIFICATE_COMPUTED_STATUSES.map((item) => [item.code, item.label]));
 
 const certificatePortalCopy: Partial<Record<ExternalProjectSitePortalSection, { title: string; description: string }>> = {
   rosterHealth: {
@@ -411,27 +411,34 @@ export function CertificatesWorkspace({
           {status === "ready" ? (
             <DataTable
               headers={["证照", "类型", "归属对象", "适用项目点", "到期/复核", "剩余天数", "状态", "审核状态", "人员匹配"]}
-              rows={filteredCertificates.map((certificate) => [
-                <span key={`${certificate.id}-name`} className="table-cell-stack">
-                  <strong>{certificate.certificateName}</strong>
-                  <small>
-                    <span>{certificate.certificateCode}</span>
-                    <span>{certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : " / 未录入证号"}</span>
-                  </small>
-                </span>,
-                typeLabel.get(certificate.certificateType) ?? certificate.certificateType,
-                `${ownerLabel.get(certificate.ownerType) ?? certificate.ownerType} / ${certificate.ownerNameSnapshot}`,
-                certificate.ownerProjectSiteName ?? rosterProjectSiteName(certificate, rosterPeople) ?? "待后端支持",
-                certificate.expiryDate ?? certificate.nextReviewDate ?? "-",
-                remainingDaysLabel(certificate),
-                <StatusBadge key={`${certificate.id}-status`} tone={certificateStatusTone(certificate)}>
-                  {statusLabel.get(certificate.computedStatus) ?? certificate.computedStatus}
-                </StatusBadge>,
-                <StatusBadge key={`${certificate.id}-review`} tone={certificate.confirmedAt ? "success" : "info"}>
-                  {certificate.confirmedAt ? "已确认" : "待审核"}
-                </StatusBadge>,
-                healthMatchLabel(certificate),
-              ])}
+              rows={filteredCertificates.map((certificate) => {
+                const computedStatus = certificateStatusToBadge(certificate.computedStatus);
+                const statusTone =
+                  certificate.isDisabled || certificate.computedStatus === "disabled" || certificate.computedStatus === "archived"
+                    ? "disabled"
+                    : computedStatus.tone;
+                return [
+                  <span key={`${certificate.id}-name`} className="table-cell-stack">
+                    <strong>{certificate.certificateName}</strong>
+                    <small>
+                      <span>{certificate.certificateCode}</span>
+                      <span>{certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : " / 未录入证号"}</span>
+                    </small>
+                  </span>,
+                  typeLabel.get(certificate.certificateType) ?? certificate.certificateType,
+                  `${ownerLabel.get(certificate.ownerType) ?? certificate.ownerType} / ${certificate.ownerNameSnapshot}`,
+                  certificate.ownerProjectSiteName ?? rosterProjectSiteName(certificate, rosterPeople) ?? "待后端支持",
+                  certificate.expiryDate ?? certificate.nextReviewDate ?? "-",
+                  remainingDaysLabel(certificate),
+                  <StatusBadge key={`${certificate.id}-status`} tone={statusTone}>
+                    {computedStatus.label}
+                  </StatusBadge>,
+                  <StatusBadge key={`${certificate.id}-review`} tone={certificate.confirmedAt ? "success" : "info"}>
+                    {certificate.confirmedAt ? "已确认" : "待审核"}
+                  </StatusBadge>,
+                  healthMatchLabel(certificate),
+                ];
+              })}
               emptyState={<EmptyState title="暂无证照资料" description="可通过右侧表单登记证照，或调整筛选条件。" />}
               onRowClick={(index) => setSelectedCertificateId(filteredCertificates[index].id)}
             />
@@ -631,14 +638,6 @@ function StateLine({ text, icon, tone = "muted" }: { text: string; icon?: ReactN
       {text}
     </p>
   );
-}
-
-function certificateStatusTone(certificate: CertificateRecordDto): "success" | "warning" | "danger" | "disabled" | "info" {
-  if (certificate.isDisabled || certificate.computedStatus === "disabled" || certificate.computedStatus === "archived") return "disabled";
-  if (certificate.computedStatus === "expired" || certificate.computedStatus === "review_due") return "danger";
-  if (certificate.computedStatus === "expiring_soon" || certificate.computedStatus === "review_due_soon") return "warning";
-  if (!certificate.confirmedAt && certificate.isComplianceCritical) return "info";
-  return "success";
 }
 
 function remainingDaysLabel(certificate: CertificateRecordDto): string {

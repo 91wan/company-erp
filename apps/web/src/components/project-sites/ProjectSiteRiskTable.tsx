@@ -1,6 +1,7 @@
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { DataTable, EmptyState, SectionCard, StatusBadge, type StatusTone } from "../ui";
-import { complianceRiskLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
+import { payrollStatusToBadge, projectSiteComplianceStatusToBadge } from "../statusMappers";
+import { complianceRiskLabel } from "./projectSiteComplianceStatus";
 
 function dated(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
@@ -50,8 +51,6 @@ export function ProjectSiteRiskTable({
   serviceModeLabel,
   siteStatusLabel,
   complianceSummaries,
-  complianceComputedStatusLabel,
-  complianceReviewStatusLabel,
   onSelectSite,
 }: {
   sites: ProjectSiteDto[];
@@ -85,6 +84,8 @@ export function ProjectSiteRiskTable({
             const summary = complianceSummaries[site.id];
             const healthStatus = summary ? healthCertificateStatus(summary) : null;
             const insurance = summary ? insuranceStatus(summary) : null;
+            const foodLicense = summary ? projectSiteComplianceStatusToBadge(summary.foodOperationLicenseStatus) : null;
+            const payroll = summary && site.payrollAgencyRequired ? payrollStatusToBadge(summary.payrollCurrentMonthStatus ?? "missing") : null;
             return [
               <span key={`${site.id}-identity`} className="project-site-identity">
                 <span>{site.siteCode}</span>
@@ -119,18 +120,16 @@ export function ProjectSiteRiskTable({
                 "数据暂不可用"
               ),
               summary ? (
-                <StatusBadge key={`${site.id}-food`} tone={complianceStatusTone(summary.foodOperationLicenseStatus)}>
-                  {complianceComputedStatusLabel.get(summary.foodOperationLicenseStatus) ?? summary.foodOperationLicenseStatus}
+                <StatusBadge key={`${site.id}-food`} tone={foodLicense?.tone ?? "neutral"}>
+                  {foodLicense?.label ?? "数据暂不可用"}
                 </StatusBadge>
               ) : (
                 "数据暂不可用"
               ),
               summary ? (
                 site.payrollAgencyRequired ? (
-                  <StatusBadge key={`${site.id}-payroll`} tone={complianceStatusTone(summary.payrollCurrentMonthStatus ?? "missing")}>
-                    {complianceReviewStatusLabel.get(summary.payrollCurrentMonthStatus ?? "missing") ??
-                      summary.payrollCurrentMonthStatus ??
-                      "缺失"}
+                  <StatusBadge key={`${site.id}-payroll`} tone={payroll?.tone ?? "neutral"}>
+                    {payroll?.label ?? "数据暂不可用"}
                   </StatusBadge>
                 ) : (
                   <StatusBadge key={`${site.id}-payroll-not-required`} tone="notApplicable">

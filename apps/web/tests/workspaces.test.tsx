@@ -617,7 +617,7 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("12 人")).toBeInTheDocument();
     expect(screen.getByText("缺失 1 / 临期 2 / 过期 1")).toBeInTheDocument();
     expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
-    expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("临期").length).toBeGreaterThan(0);
     expect(screen.getByText("不需要")).toBeInTheDocument();
     expect(screen.getByText("红色风险")).toHaveClass("danger");
 
