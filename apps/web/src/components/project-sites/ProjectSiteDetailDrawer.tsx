@@ -8,7 +8,8 @@ import type {
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
 import { BusinessAttachmentsPanel } from "../BusinessAttachmentsPanel";
-import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState } from "../ui";
+import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState, type StatusTone } from "../ui";
+import { payrollStatusToBadge, projectSiteComplianceStatusToBadge } from "../statusMappers";
 import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel } from "./projectSiteComplianceStatus";
 import { formatMoney } from "./projectSiteFormat";
@@ -21,6 +22,25 @@ const detailTabs: { key: DetailTab; label: string }[] = [
   { key: "equipment", label: "厨房设备" },
   { key: "attachments", label: "统一附件" },
 ];
+
+function rosterTone(summary: ProjectSiteComplianceSummaryDto | undefined): StatusTone {
+  if (!summary) return "warning";
+  return summary.activeRosterCount > 0 ? "success" : "danger";
+}
+
+function healthCertificateTone(summary: ProjectSiteComplianceSummaryDto | undefined): StatusTone {
+  if (!summary) return "warning";
+  if (summary.missingHealthCertificateCount > 0 || summary.expiredHealthCertificateCount > 0) return "danger";
+  if (summary.expiringHealthCertificateCount > 0) return "warning";
+  return "success";
+}
+
+function insuranceTone(summary: ProjectSiteComplianceSummaryDto | undefined): StatusTone {
+  if (!summary) return "warning";
+  if (summary.insuranceUncoveredActiveRosterCount > 0 || summary.insuranceExpiredCount > 0) return "danger";
+  if (summary.insuranceExpiringSoonCount > 0) return "warning";
+  return "success";
+}
 
 export function ProjectSiteDetailDrawer({
   site,
@@ -70,35 +90,43 @@ export function ProjectSiteDetailDrawer({
                   description: complianceSummary
                     ? `${complianceSummary.activeRosterCount} 名 active 现场人员。`
                     : "现场人员汇总暂不可用。",
-                  tone: complianceSummary && complianceSummary.activeRosterCount > 0 ? "success" : "warning",
+                  tone: rosterTone(complianceSummary),
                 },
                 {
                   title: "健康证",
                   description: complianceSummary
                     ? `缺 ${complianceSummary.missingHealthCertificateCount}，临期 ${complianceSummary.expiringHealthCertificateCount}，过期 ${complianceSummary.expiredHealthCertificateCount}。`
                     : "健康证风险待后端汇总支持。",
-                  tone: complianceSummary && complianceSummary.expiredHealthCertificateCount === 0 && complianceSummary.missingHealthCertificateCount === 0 ? "success" : "warning",
+                  tone: healthCertificateTone(complianceSummary),
                 },
                 {
                   title: "食品经营许可证",
                   description: complianceSummary
-                    ? `当前状态：${complianceSummary.foodOperationLicenseStatus}。`
+                    ? `当前状态：${projectSiteComplianceStatusToBadge(complianceSummary.foodOperationLicenseStatus).label}。`
                     : "许可证状态暂不可用。",
-                  tone: complianceSummary?.foodOperationLicenseStatus === "valid" ? "success" : "warning",
+                  tone: complianceSummary
+                    ? projectSiteComplianceStatusToBadge(complianceSummary.foodOperationLicenseStatus).tone
+                    : "warning",
                 },
                 {
                   title: "雇主责任险",
                   description: complianceSummary
                     ? `未覆盖 ${complianceSummary.insuranceUncoveredActiveRosterCount} 人，临期 ${complianceSummary.insuranceExpiringSoonCount}，过期 ${complianceSummary.insuranceExpiredCount}。`
                     : "雇主责任险覆盖状态暂不可用。",
-                  tone: complianceSummary && complianceSummary.insuranceUncoveredActiveRosterCount === 0 && complianceSummary.insuranceExpiredCount === 0 ? "success" : "warning",
+                  tone: insuranceTone(complianceSummary),
                 },
                 {
                   title: "工资表",
                   description: site.payrollAgencyRequired
-                    ? `本月状态：${complianceSummary?.payrollCurrentMonthStatus ?? "待后端支持"}。`
+                    ? `本月状态：${
+                      complianceSummary?.payrollCurrentMonthStatus
+                        ? payrollStatusToBadge(complianceSummary.payrollCurrentMonthStatus).label
+                        : "待后端支持"
+                    }。`
                     : "本项目点不要求工资代发资料。",
-                  tone: site.payrollAgencyRequired ? "info" : "notApplicable",
+                  tone: site.payrollAgencyRequired && complianceSummary?.payrollCurrentMonthStatus
+                    ? payrollStatusToBadge(complianceSummary.payrollCurrentMonthStatus).tone
+                    : site.payrollAgencyRequired ? "info" : "notApplicable",
                 },
                 {
                   title: "综合风险",
