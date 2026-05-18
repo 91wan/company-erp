@@ -10,6 +10,10 @@ import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations
 import { useProjectSitesWorkspaceModel } from "./project-sites/useProjectSitesWorkspaceModel";
 import { useProjectSitesWorkspaceState } from "./project-sites/useProjectSitesWorkspaceState";
 import {
+  buildExternalProjectSitePortalOptions,
+  resolveProjectSitesWorkspacePermissions,
+} from "./project-sites/projectSitesWorkspaceOptions";
+import {
   buildExternalProjectSiteWorkspaceViewProps,
   buildProjectSitesHeadquartersViewProps,
 } from "./project-sites/projectSitesViewModels";
@@ -45,9 +49,13 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
     externalProjectSiteContactName,
     externalProjectSiteContactPhone,
   } = resolveProjectSitesWorkspaceProps(props);
-  const canEditSites = canManageSites ?? canManage;
-  const canCreateUsage = canManageUsage ?? canManage;
-  const canIssueUsage = canIssue ?? canManage;
+  const permissions = resolveProjectSitesWorkspacePermissions({
+    canManage,
+    canManageSites,
+    canManageUsage,
+    canIssue,
+  });
+  const { canEditSites, canCreateUsage, canIssueUsage } = permissions;
   const {
     query,
     setQuery,
@@ -205,12 +213,13 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
   });
 
   const externalProjectSiteWorkspaceViewProps = buildExternalProjectSiteWorkspaceViewProps({
-    portal: {
+    portal: buildExternalProjectSitePortalOptions({
       portalSection,
-      currentContactName: externalProjectSiteContactName,
-      currentContactPhone: externalProjectSiteContactPhone,
-      onSelectSection: onPortalSectionChange,
-    },
+      onPortalSectionChange,
+      externalProjectSiteContactName,
+      externalProjectSiteContactPhone,
+      permissions,
+    }),
     data: {
       sites,
       complianceSummaries,
@@ -228,11 +237,7 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
       metrics,
       updateSelectedMaterial,
     },
-    permissions: {
-      canEditSites,
-      canCreateUsage,
-      canIssueUsage,
-    },
+    permissions,
     state: {
       query,
       usageFilter,
