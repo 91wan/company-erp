@@ -15,6 +15,9 @@ describe("project-sites workspace final browser QA audit", () => {
     expect(audit).toContain("viewer");
     expect(audit).toContain("project_site");
     expect(audit).toContain("external_project_site");
+    expect(audit).toContain("controller hook");
+    expect(audit).toContain("controller contract tests");
+    expect(audit).toContain("final Playwright QA gate");
     expect(audit).toContain("ownerModule=project-sites");
     expect(audit).toContain("成本/采购价/库存金额不可见");
     expect(audit).toContain("Storage Key");
