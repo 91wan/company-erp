@@ -29,9 +29,10 @@ describe("DashboardOverview module", () => {
     expect(urls.some((url) => url.includes("/compliance-summary"))).toBe(false);
   });
 
-  it("falls back to existing per-module dashboard loading when summary is unavailable", async () => {
+  it("shows unavailable states without falling back to per-module loading when summary is unavailable", async () => {
     const onNavigate = vi.fn();
-    mockShellFetch(adminUser, undefined, undefined, {
+    const fetchSpy = mockShellFetch(adminUser, undefined, undefined, {
+      dashboardSummary: "error",
       purchaseRequests: [
         {
           ...purchaseRequest,
@@ -46,7 +47,13 @@ describe("DashboardOverview module", () => {
     render(<DashboardOverview currentUser={adminUser} onNavigate={onNavigate} />);
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(await screen.findByText("采购需求 PR-FALLBACK-001")).toBeInTheDocument();
+    expect(await screen.findByText("采购待办数据暂不可用")).toBeInTheDocument();
+    expect(screen.queryByText("采购需求 PR-FALLBACK-001")).not.toBeInTheDocument();
+
+    const urls = fetchSpy.mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.endsWith("/api/dashboard/summary"))).toBe(true);
+    expect(urls.some((url) => url.includes("/api/purchase-requests"))).toBe(false);
+    expect(urls.some((url) => url.includes("/compliance-summary"))).toBe(false);
   });
 
   it("does not request global inventory balances for project-site scoped users", async () => {

@@ -13,7 +13,7 @@ import type {
   PurchaseRecordDto,
   PurchaseRequestDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, getAppVersion, getDashboardSummary, requestJson } from "../../apiClient";
+import { getAppVersion, getDashboardSummary } from "../../apiClient";
 
 export type LoadState<T> =
   | { status: "loading"; data: T }
@@ -47,33 +47,6 @@ export const emptyDashboardData: DashboardLiveData = {
   projectSiteComplianceSummaries: { status: "loading", data: [] },
   appVersion: { status: "loading", data: null },
 };
-
-async function loadDashboardResource<T>(path: string, key: string): Promise<LoadState<T[]>> {
-  try {
-    const payload = await requestJson<Record<string, T[]>>(`${apiBaseUrl}${path}`);
-    return { status: "success", data: Array.isArray(payload[key]) ? payload[key] : [] };
-  } catch {
-    return { status: "error", data: [] };
-  }
-}
-
-async function loadProjectSiteComplianceSummaries(projectSites: LoadState<ProjectSiteDto[]>): Promise<LoadState<ProjectSiteComplianceSummaryDto[]>> {
-  if (projectSites.status === "error") return { status: "error", data: [] };
-
-  try {
-    const summaries = await Promise.all(
-      projectSites.data.map(async (site) => {
-        const payload = await requestJson<{ complianceSummary: ProjectSiteComplianceSummaryDto }>(
-          `${apiBaseUrl}/api/project-sites/${site.id}/compliance-summary`,
-        );
-        return payload.complianceSummary;
-      }),
-    );
-    return { status: "success", data: summaries };
-  } catch {
-    return { status: "error", data: [] };
-  }
-}
 
 export function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjectSiteOnly: boolean): DashboardLiveData {
   const [data, setData] = useState<DashboardLiveData>(emptyDashboardData);
@@ -111,43 +84,20 @@ export function useDashboardLiveData(currentUser: AuthenticatedUserDto, isProjec
         return;
       }
 
-      const [
-        purchaseRequests,
-        purchaseRecords,
-        inventoryMovements,
-        inventoryBalances,
-        projectUsageRequests,
-        contracts,
-        certificates,
-        projectSites,
-        appVersion,
-      ] = await Promise.all([
-        loadDashboardResource<PurchaseRequestDto>("/api/purchase-requests", "purchaseRequests"),
-        loadDashboardResource<PurchaseRecordDto>("/api/purchase-records", "purchaseRecords"),
-        loadDashboardResource<InventoryMovementDto>("/api/inventory-movements", "inventoryMovements"),
-        isProjectSiteOnly
-          ? Promise.resolve<LoadState<InventoryBalanceDto[]>>({ status: "error", data: [] })
-          : loadDashboardResource<InventoryBalanceDto>("/api/inventory-balances", "inventoryBalances"),
-        loadDashboardResource<ProjectUsageRequestDto>("/api/project-usage-requests", "projectUsageRequests"),
-        loadDashboardResource<ContractDto>("/api/contracts", "contracts"),
-        loadDashboardResource<CertificateRecordDto>("/api/certificates", "certificates"),
-        loadDashboardResource<ProjectSiteDto>("/api/project-sites", "projectSites"),
-        appVersionPromise,
-      ]);
-      const projectSiteComplianceSummaries = await loadProjectSiteComplianceSummaries(projectSites);
+      const appVersion = await appVersionPromise;
 
       if (!mounted) return;
       setData({
         dashboardSummary: summary,
-        purchaseRequests,
-        purchaseRecords,
-        inventoryMovements,
-        inventoryBalances,
-        projectUsageRequests,
-        contracts,
-        certificates,
-        projectSites,
-        projectSiteComplianceSummaries,
+        purchaseRequests: { status: "error", data: [] },
+        purchaseRecords: { status: "error", data: [] },
+        inventoryMovements: { status: "error", data: [] },
+        inventoryBalances: { status: isProjectSiteOnly ? "success" : "error", data: [] },
+        projectUsageRequests: { status: "error", data: [] },
+        contracts: { status: "error", data: [] },
+        certificates: { status: "error", data: [] },
+        projectSites: { status: "error", data: [] },
+        projectSiteComplianceSummaries: { status: "error", data: [] },
         appVersion,
       });
     }

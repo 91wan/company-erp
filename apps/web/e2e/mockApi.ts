@@ -487,6 +487,106 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       return fulfill(route, { ok: true });
     }
 
+    if (path === "/api/dashboard/summary" && method === "GET") {
+      const isScopedUser = currentUser?.roles.includes("project_site") || currentUser?.roles.includes("external_project_site");
+      return fulfill(route, {
+        dashboardSummary: {
+          todoCount: state.purchaseRequests.filter((request) => request.status === "pending_approval").length
+            + state.projectUsageRequests.filter((request) => request.status === "pending").length,
+          redRiskCount: 1,
+          warningCount: 1,
+          pendingReviewCount: state.certificates.filter((certificate) => certificate.isComplianceCritical && !certificate.confirmedAt).length,
+          lowStockCount: isScopedUser ? 0 : state.inventoryBalances.filter((balance) => balance.isLowStock).length,
+          procurementTodos: isScopedUser ? [] : state.purchaseRequests
+            .filter((request) => request.status === "pending_approval")
+            .map((request) => ({
+              id: `purchase_request:${request.id}`,
+              entityType: "purchase_request",
+              entityId: request.id,
+              title: request.requestNo,
+              subtitle: request.requesterName,
+              statusLabel: "待审批",
+              tone: "info",
+              targetWorkspace: "采购",
+              updatedAt: request.updatedAt,
+            })),
+          projectUsageTodos: state.projectUsageRequests
+            .filter((request) => request.status === "pending")
+            .map((request) => ({
+              id: `project_usage_request:${request.id}`,
+              entityType: "project_usage_request",
+              entityId: request.id,
+              title: request.requestNo,
+              subtitle: request.projectSiteName,
+              statusLabel: "待处理",
+              tone: "info",
+              targetWorkspace: "项目点",
+              updatedAt: request.updatedAt,
+            })),
+          certificateRisks: state.certificates.map((certificate) => ({
+            id: `certificate:${certificate.id}`,
+            entityType: "certificate",
+            entityId: certificate.id,
+            title: certificate.certificateCode,
+            subtitle: certificate.certificateName,
+            statusLabel: certificate.computedStatus === "expired" ? "已过期" : "即将到期",
+            tone: certificate.computedStatus === "expired" ? "danger" : "warning",
+            targetWorkspace: "证照资质",
+            updatedAt: certificate.updatedAt,
+          })),
+          contractRisks: state.contracts
+            .filter((contract) => contract.expiryState === "expired" || contract.expiryState === "expiring_soon")
+            .map((contract) => ({
+              id: `contract:${contract.id}`,
+              entityType: "contract",
+              entityId: contract.id,
+              title: contract.contractNo,
+              subtitle: contract.contractName,
+              statusLabel: contract.expiryState === "expired" ? "已到期" : "即将到期",
+              tone: contract.expiryState === "expired" ? "danger" : "warning",
+              targetWorkspace: "合同",
+              updatedAt: contract.updatedAt,
+            })),
+          projectSiteComplianceRisks: state.projectSites.map((site) => ({
+            id: `project_site_compliance:${site.id}`,
+            entityType: "project_site_compliance",
+            entityId: site.id,
+            title: site.siteName,
+            subtitle: "阻断 2 · 预警 3",
+            statusLabel: "红色风险",
+            tone: "danger",
+            targetWorkspace: "项目点",
+            updatedAt: site.updatedAt,
+          })),
+          lowStockItems: isScopedUser ? [] : state.inventoryBalances
+            .filter((balance) => balance.isLowStock)
+            .map((balance) => ({
+              id: `inventory_balance:${balance.materialId}`,
+              entityType: "inventory_balance",
+              entityId: balance.materialId,
+              title: balance.materialCode,
+              subtitle: balance.materialName,
+              statusLabel: "低库存",
+              tone: "warning",
+              targetWorkspace: "库存",
+              updatedAt: balance.lastMovementAt,
+            })),
+          recentActivities: state.purchaseRecords.map((record) => ({
+            id: `purchase_record:${record.id}`,
+            entityType: "purchase_record",
+            entityId: record.id,
+            title: record.purchaseNo,
+            subtitle: record.purchaserName,
+            statusLabel: "最近采购",
+            tone: "neutral",
+            targetWorkspace: "采购",
+            updatedAt: record.updatedAt,
+          })),
+          unavailableSections: [],
+        },
+      });
+    }
+
     if (path.includes("/investment-summary")) {
       return fulfill(route, { investmentSummary: { contractCount: 0, totalAmount: 0, categories: [] } });
     }

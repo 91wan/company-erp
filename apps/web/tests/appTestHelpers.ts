@@ -240,7 +240,7 @@ export function mockShellFetch(
     if (url.endsWith("/api/auth/login") && method === "POST") return Promise.resolve(jsonResponse({ user: adminUser }));
     if (url.endsWith("/api/auth/logout")) return Promise.resolve(jsonResponse({ ok: true }));
     if (url.endsWith("/api/dashboard/summary")) {
-      if (data.dashboardSummary === undefined) return Promise.resolve(jsonResponse({ error: "DASHBOARD_SUMMARY_UNAVAILABLE" }, false, 500));
+      if (data.dashboardSummary === undefined) return Promise.resolve(jsonResponse({ dashboardSummary: defaultDashboardSummary }));
       if (data.dashboardSummary === "error") return Promise.resolve(jsonResponse({ error: "DASHBOARD_SUMMARY_UNAVAILABLE" }, false, 500));
       return Promise.resolve(jsonResponse({ dashboardSummary: data.dashboardSummary }));
     }
