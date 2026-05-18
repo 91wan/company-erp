@@ -4,7 +4,6 @@ import {
   PROJECT_USAGE_STATUSES,
   type AttachmentRecordDto,
   type BusinessProjectDto,
-  type CreateAttachmentRecordInput,
   type PartyDto,
   type ProjectSiteComplianceSummaryDto,
   type ProjectSiteDto,
@@ -116,7 +115,6 @@ type ProjectSitesHeadquartersViewProps = {
   onCreateKitchenEquipmentChangeRequest: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onReviewKitchenEquipmentChangeRequest: (id: string, reviewStatus: "approved" | "rejected") => Promise<void>;
   loadAttachments: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
-  createAttachment: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
   getAttachmentDownloadUrl: (id: string) => Promise<string>;
 };
 
@@ -196,7 +194,6 @@ export function ProjectSitesHeadquartersView({
   onCreateKitchenEquipmentChangeRequest,
   onReviewKitchenEquipmentChangeRequest,
   loadAttachments,
-  createAttachment,
   getAttachmentDownloadUrl,
 }: ProjectSitesHeadquartersViewProps) {
   return (
@@ -320,7 +317,6 @@ export function ProjectSitesHeadquartersView({
         usageRequests={selectedDetailSiteData.usageRequests}
         kitchenEquipment={selectedDetailSiteData.kitchenEquipment}
         loadAttachments={loadAttachments}
-        createAttachment={createAttachment}
         getAttachmentDownloadUrl={getAttachmentDownloadUrl}
         canManageAttachments={canEditSites}
         onClose={onCloseDetail}

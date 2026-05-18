@@ -17,7 +17,7 @@ import {
   type ProjectSiteDto,
   type ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
+import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import {
   DataTable,
@@ -604,7 +604,6 @@ export function CertificatesWorkspace({
                 { label: "来源文件引用（历史路径）", value: selectedCertificate.sourceFilePath },
               ]}
               loadAttachments={loadUnifiedAttachments}
-              createAttachment={createAttachment}
               getAttachmentDownloadUrl={getAttachmentDownloadUrl}
             />
           </>

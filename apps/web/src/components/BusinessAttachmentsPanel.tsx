@@ -1,10 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
-import type { AttachmentRecordDto, CreateAttachmentRecordInput } from "@company-erp/shared";
+import { useEffect, useState } from "react";
+import type { AttachmentRecordDto } from "@company-erp/shared";
 import {
   ApiRequestError,
   apiBaseUrl,
-  createAttachment as defaultCreateAttachment,
-  formatApiError,
   getAttachmentDownloadUrl as defaultGetAttachmentDownloadUrl,
   getAttachments as defaultGetAttachments,
   type AttachmentFilters,
@@ -22,9 +20,7 @@ type BusinessAttachmentsPanelProps = {
   ownerEntityId: string | null | undefined;
   canManage?: boolean;
   legacyPaths?: LegacyAttachmentPath[];
-  allowManualRegistration?: boolean;
   loadAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
-  createAttachment?: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
   getAttachmentDownloadUrl?: (id: string) => Promise<string>;
 };
 
@@ -34,22 +30,12 @@ export function BusinessAttachmentsPanel({
   ownerEntityId,
   canManage = false,
   legacyPaths = [],
-  allowManualRegistration = false,
   loadAttachments = defaultGetAttachments,
-  createAttachment = defaultCreateAttachment,
   getAttachmentDownloadUrl = defaultGetAttachmentDownloadUrl,
 }: BusinessAttachmentsPanelProps) {
   const [attachments, setAttachments] = useState<AttachmentRecordDto[]>([]);
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [downloadError, setDownloadError] = useState("");
-  const [savingState, setSavingState] = useState<"idle" | "saving" | "success" | "error">("idle");
-  const [saveError, setSaveError] = useState("");
-  const [form, setForm] = useState({
-    attachmentCode: "",
-    displayName: "",
-    storageKey: "",
-    remark: "",
-  });
 
   useEffect(() => {
     if (!ownerEntityId) {
@@ -89,67 +75,16 @@ export function BusinessAttachmentsPanel({
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!ownerEntityId) return;
-    setSavingState("saving");
-    setSaveError("");
-    try {
-      const attachment = await createAttachment({
-        attachmentCode: form.attachmentCode,
-        displayName: form.displayName,
-        storageKey: form.storageKey,
-        ownerModule,
-        ownerEntityType,
-        ownerEntityId,
-        remark: form.remark.trim() ? form.remark.trim() : null,
-      });
-      setAttachments((records) => [attachment, ...records.filter((record) => record.id !== attachment.id)]);
-      setForm({ attachmentCode: "", displayName: "", storageKey: "", remark: "" });
-      setSavingState("success");
-      setStatus("success");
-    } catch (error) {
-      setSaveError(formatApiError(error, "附件引用格式不合法或保存失败。"));
-      setSavingState("error");
-    }
-  }
-
   return (
     <SectionCard
       title="统一附件"
-      badge={<StatusBadge tone={canManage ? "success" : "disabled"}>{canManage && allowManualRegistration ? "可登记" : "只读"}</StatusBadge>}
+      badge={<StatusBadge tone={canManage ? "info" : "disabled"}>只读</StatusBadge>}
     >
       <p className="form-hint">统一附件使用后端登记的附件引用和鉴权下载接口；历史路径只作为兼容字段展示。</p>
       {downloadError ? <p className="form-error">{downloadError}</p> : null}
 
-      {canManage && ownerEntityId && !allowManualRegistration ? (
+      {canManage && ownerEntityId ? (
         <p className="form-hint">业务页面仅查看和下载统一附件。新增或修改附件元数据请在系统设置的附件管理中登记，避免业务用户填写服务器路径。</p>
-      ) : null}
-
-      {canManage && ownerEntityId && allowManualRegistration ? (
-        <form className="party-form settings-form" onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <label>
-              <span>附件编号</span>
-              <input value={form.attachmentCode} onChange={(event) => setForm((current) => ({ ...current, attachmentCode: event.target.value }))} required />
-            </label>
-            <label>
-              <span>显示名称</span>
-              <input value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} required />
-            </label>
-            <label>
-              <span>Storage Key</span>
-              <input value={form.storageKey} onChange={(event) => setForm((current) => ({ ...current, storageKey: event.target.value }))} required placeholder={`${ownerModule}/uuid.pdf`} />
-            </label>
-          </div>
-          <label>
-            <span>备注</span>
-            <textarea value={form.remark} onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))} rows={2} />
-          </label>
-          <button type="submit" disabled={savingState === "saving"}>{savingState === "saving" ? "登记中" : "登记统一附件"}</button>
-          {savingState === "success" ? <p className="form-success">统一附件已登记。</p> : null}
-          {savingState === "error" ? <p className="form-error">{saveError || "附件引用格式不合法或保存失败。"}</p> : null}
-        </form>
       ) : null}
 
       {status === "loading" ? <p className="form-hint">统一附件加载中。</p> : null}

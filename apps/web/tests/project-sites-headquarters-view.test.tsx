@@ -97,7 +97,6 @@ function renderHeadquartersView() {
       onCreateKitchenEquipmentChangeRequest={vi.fn()}
       onReviewKitchenEquipmentChangeRequest={vi.fn()}
       loadAttachments={vi.fn().mockResolvedValue([])}
-      createAttachment={vi.fn()}
       getAttachmentDownloadUrl={vi.fn()}
     />,
   );

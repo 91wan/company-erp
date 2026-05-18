@@ -19,7 +19,7 @@ import {
   type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
-import { createAttachment, getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
+import { getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
 import {
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
@@ -480,7 +480,6 @@ export function ProjectSitesWorkspace({
           onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
           onReviewKitchenEquipmentChangeRequest={handleReviewKitchenEquipmentChangeRequest}
           loadAttachments={loadUnifiedAttachments}
-          createAttachment={createAttachment}
           getAttachmentDownloadUrl={getAttachmentDownloadUrl}
         />
       )}
