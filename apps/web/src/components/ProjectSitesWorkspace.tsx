@@ -61,6 +61,7 @@ import {
   createInitialSiteForm,
   createInitialUsageForm,
 } from "./project-sites/projectSiteFormState";
+import { calculateProjectSiteMetrics, selectScopedProjectSiteIds } from "./project-sites/projectSiteMetrics";
 import {
   filterKitchenEquipment,
   filterKitchenEquipmentChangeRequests,
@@ -295,7 +296,7 @@ export function ProjectSitesWorkspace({
     setOpenFormDrawer,
   });
 
-  const scopedProjectSiteIds = useMemo(() => (usageOnly && sites.length > 0 ? sites.map((site) => site.id) : undefined), [sites, usageOnly]);
+  const scopedProjectSiteIds = useMemo(() => selectScopedProjectSiteIds(usageOnly, sites), [sites, usageOnly]);
   const filteredSites = useMemo(() => filterProjectSites(sites, query), [query, sites]);
   const selectedDetailSite = selectProjectSite(filteredSites, selectedDetailSiteId);
 
@@ -319,18 +320,23 @@ export function ProjectSitesWorkspace({
   );
   const selectedDetailSiteData = selectProjectSiteDetailData(selectedDetailSite, usageRequests, kitchenEquipment);
 
-  const activeSiteCount = sites.filter((site) => site.status === "active").length;
-  const pendingUsageCount = usageRequests.filter((request) => request.status === "pending").length;
-  const totalRequestedQuantity = usageRequests.reduce((sum, request) => sum + request.requestedQuantity, 0);
-  const totalIssuedQuantity = usageRequests.reduce((sum, request) => sum + request.issuedQuantity, 0);
-  const pendingKitchenEquipmentChangeCount = kitchenEquipmentChangeRequests.filter((request) => request.reviewStatus === "pending").length;
-  const complianceBlockingIssueCount = Object.values(complianceSummaries).filter(Boolean).reduce(
-    (sum, summary) => sum + summary.blockingIssueCount,
-    0,
-  );
-  const complianceWarningIssueCount = Object.values(complianceSummaries).filter(Boolean).reduce(
-    (sum, summary) => sum + summary.warningIssueCount,
-    0,
+  const {
+    activeSiteCount,
+    pendingUsageCount,
+    totalRequestedQuantity,
+    totalIssuedQuantity,
+    pendingKitchenEquipmentChangeCount,
+    complianceBlockingIssueCount,
+    complianceWarningIssueCount,
+  } = useMemo(
+    () => calculateProjectSiteMetrics({
+      sites,
+      usageRequests,
+      kitchenEquipment,
+      kitchenEquipmentChangeRequests,
+      complianceSummaries,
+    }),
+    [complianceSummaries, kitchenEquipment, kitchenEquipmentChangeRequests, sites, usageRequests],
   );
 
   const { clientParties, operatorParties, subcontractorParties } = selectProjectSiteParties(parties);
