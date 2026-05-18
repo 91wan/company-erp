@@ -16,6 +16,23 @@ fail() {
   ERRORS+=("$*")
 }
 
+print_usage() {
+  cat <<'EOF'
+Usage: npm run preflight:nas
+       PREFLIGHT_ENV_FILE=/path/to/nas.env npm run preflight:nas
+
+Checks:
+  - APP_ENVIRONMENT is nas or production
+  - POSTGRES_PASSWORD, AUTH_SESSION_SECRET, and IDENTITY_ENCRYPTION_SECRET are non-placeholder values
+  - NAS_DATA_ROOT and NAS_ATTACHMENTS_ROOT exist or can be created
+  - PUBLIC_ACCESS_ENABLED=true uses secure cookies and HTTPS CORS origins
+  - docker compose config passes
+
+Options:
+  -h, --help    Show this help and exit without loading an environment file
+EOF
+}
+
 load_env() {
   if [[ -n "$ENV_FILE" ]]; then
     if [[ ! -f "$ENV_FILE" ]]; then
@@ -118,6 +135,11 @@ validate_docker_compose() {
 }
 
 main() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_usage
+    exit 0
+  fi
+
   load_env
 
   local environment="${APP_ENVIRONMENT:-}"
