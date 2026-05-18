@@ -80,6 +80,7 @@ Start from the template, then replace every placeholder in the real `.env`:
 
 ```bash
 cp .env.example .env
+openssl rand -base64 32
 ```
 
 Required production values. `IDENTITY_ENCRYPTION_SECRET` must be a separate
@@ -161,6 +162,30 @@ System Settings page, `/health`, `/api/app-version`, and
 `.deploy-revision.json` so operators can confirm the NAS is running the
 expected revision.
 
+## Preflight Before Starting
+
+Run the NAS preflight before `docker compose up` or any update. It validates the
+real `.env`, creates the configured NAS data and attachment roots if possible,
+checks placeholder secrets, enforces the public-access guardrails, and runs
+`docker compose config`.
+
+```bash
+npm run preflight:nas
+```
+
+For rehearsals that must not read the real `.env`, point the script at a
+temporary file:
+
+```bash
+PREFLIGHT_ENV_FILE=/path/to/nas.env npm run preflight:nas
+```
+
+The preflight must fail if production secrets are missing, short, empty, or
+still set to `change-me-*`. If `ERP_WEB_BIND_HOST` is not set, it prints a
+warning because Compose defaults the Web service to `127.0.0.1`; set a NAS LAN
+bind address deliberately when users should reach the Web UI from the internal
+network.
+
 ## Start On NAS
 
 From the repository directory in NAS Container Manager or an SSH shell:
@@ -214,6 +239,7 @@ EOF
 docker compose build api web
 docker compose run --rm migrate
 docker compose up -d api web
+docker compose ps
 ```
 
 ## Bootstrap First Admin
@@ -378,6 +404,13 @@ the `backups` directory next to `${NAS_DATA_ROOT}`:
 - `company_erp_YYYYMMDD_HHMMSS.sql`
 - `company_erp_attachments_YYYYMMDD_HHMMSS.tar.gz`
 
+Keep these artifacts together for a recoverable snapshot:
+
+- PostgreSQL dump from `scripts/nas-backup.sh`.
+- Attachments archive from `scripts/nas-backup.sh`.
+- The NAS `.env` file stored outside Git.
+- `.deploy-revision.json` or the exact Git commit used for the Docker build.
+
 ## Restore
 
 Restore is intentionally guarded because it overwrites the current PostgreSQL
@@ -401,7 +434,15 @@ After restore:
 
 ```bash
 curl http://<NAS_IP>:${ERP_WEB_PORT:-8080}/health
+curl http://<NAS_IP>:${ERP_WEB_PORT:-8080}/api/app-version
+docker compose ps
 ```
+
+To roll back application code without restoring data, sync the previous Git
+revision, refresh `.deploy-revision.json`, run `npm run preflight:nas`, rebuild
+`api` and `web`, run migrations only if that revision requires them, and then
+start the services again with `docker compose up -d api web`. Do not roll back
+the database unless you are intentionally restoring from a known backup.
 
 ## Local Development Reminder
 

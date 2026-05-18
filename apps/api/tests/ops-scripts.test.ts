@@ -1,7 +1,13 @@
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { DEMO_CODES } from "../src/pilotSmoke.js";
 import { resetAccountPassword } from "../src/accountOps.js";
 import { CONFIRM_DEMO_CLEANUP, DEMO_CLEANUP_TARGETS, cleanupDemoData } from "../src/demoCleanup.js";
+
+const repoRoot = new URL("../../..", import.meta.url).pathname;
 
 describe("account ops", () => {
   it("rejects missing and placeholder reset credentials", async () => {
@@ -101,6 +107,93 @@ describe("demo cleanup ops", () => {
   });
 });
 
+describe("NAS preflight script", () => {
+  it("passes with a safe NAS environment and runs docker compose config", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-ok-"));
+    const dataRoot = join(tempRoot, "data");
+    const attachmentsRoot = join(tempRoot, "attachments");
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+    const envFile = join(tempRoot, "safe.env");
+    writeFileSync(
+      envFile,
+      [
+        "APP_ENVIRONMENT=nas",
+        "POSTGRES_PASSWORD=correct-horse-db-secret",
+        "AUTH_SESSION_SECRET=correct-horse-session-secret-32",
+        "IDENTITY_ENCRYPTION_SECRET=correct-horse-identity-secret-32",
+        `NAS_DATA_ROOT=${dataRoot}`,
+        `NAS_ATTACHMENTS_ROOT=${attachmentsRoot}`,
+        "ERP_WEB_BIND_HOST=127.0.0.1",
+        "PUBLIC_ACCESS_ENABLED=false",
+        "AUTH_COOKIE_SECURE=false",
+        "CORS_ALLOWED_ORIGINS=",
+      ].join("\n"),
+    );
+
+    const result = runPreflight(envFile, binDir);
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("NAS preflight passed");
+  });
+
+  it("fails when required secrets are placeholders", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-placeholder-"));
+    const envFile = join(tempRoot, "placeholder.env");
+    writeFileSync(
+      envFile,
+      [
+        "APP_ENVIRONMENT=nas",
+        "POSTGRES_PASSWORD=change-me-in-nas",
+        "AUTH_SESSION_SECRET=change-me",
+        "IDENTITY_ENCRYPTION_SECRET=change-me",
+        `NAS_DATA_ROOT=${join(tempRoot, "data")}`,
+        `NAS_ATTACHMENTS_ROOT=${join(tempRoot, "attachments")}`,
+        "PUBLIC_ACCESS_ENABLED=false",
+      ].join("\n"),
+    );
+
+    const result = runPreflight(envFile);
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("POSTGRES_PASSWORD");
+    expect(result.stderr).toContain("placeholder");
+  });
+
+  it("rejects public access without secure cookies and HTTPS CORS origins", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-public-"));
+    const envFile = join(tempRoot, "public.env");
+    writeFileSync(
+      envFile,
+      [
+        "APP_ENVIRONMENT=production",
+        "POSTGRES_PASSWORD=correct-horse-db-secret",
+        "AUTH_SESSION_SECRET=correct-horse-session-secret-32",
+        "IDENTITY_ENCRYPTION_SECRET=correct-horse-identity-secret-32",
+        `NAS_DATA_ROOT=${join(tempRoot, "data")}`,
+        `NAS_ATTACHMENTS_ROOT=${join(tempRoot, "attachments")}`,
+        "PUBLIC_ACCESS_ENABLED=true",
+        "AUTH_COOKIE_SECURE=false",
+        "CORS_ALLOWED_ORIGINS=http://erp.example.com",
+      ].join("\n"),
+    );
+
+    const result = runPreflight(envFile);
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("AUTH_COOKIE_SECURE=true");
+    expect(result.stderr).toContain("HTTPS");
+  });
+});
+
 function createCleanupPrisma() {
   const count = vi.fn(async () => 1);
   const deleteMany = vi.fn(async () => ({ count: 1 }));
@@ -115,4 +208,16 @@ function createCleanupPrisma() {
     projectSite: { count, deleteMany },
     party: { count, deleteMany },
   };
+}
+
+function runPreflight(envFile: string, binDir?: string) {
+  return spawnSync("bash", ["scripts/preflight-nas.sh"], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      PREFLIGHT_ENV_FILE: envFile,
+      PATH: binDir ? `${binDir}:${process.env.PATH ?? ""}` : process.env.PATH,
+    },
+    encoding: "utf8",
+  });
 }

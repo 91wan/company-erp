@@ -13,7 +13,8 @@
     "test": "npm run test -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
     "db:generate": "prisma generate --schema database/prisma/schema.prisma",
-    "db:validate": "prisma validate --schema database/prisma/schema.prisma"
+    "db:validate": "prisma validate --schema database/prisma/schema.prisma",
+    "preflight:nas": "bash scripts/preflight-nas.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
