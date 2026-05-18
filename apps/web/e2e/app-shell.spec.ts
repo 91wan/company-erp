@@ -311,9 +311,9 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(portalTabs.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
   await expect(externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true })).toBeVisible();
   await expect(page.getByText("合规任务队列")).toBeVisible();
-  await expect(page.getByLabel("当前门户分区").getByText("健康证阻断")).toBeVisible();
-  await expect(page.getByRole("button", { name: "处理健康证阻断" })).toBeVisible();
-  await page.getByRole("button", { name: "处理健康证阻断" }).click();
+  await expect(page.getByLabel("当前门户分区").getByText("补充健康证")).toBeVisible();
+  await expect(page.getByRole("button", { name: "处理补充健康证" })).toBeVisible();
+  await page.getByRole("button", { name: "处理补充健康证" }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toHaveCount(0);
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "现场人员/健康证提交" })).toBeVisible();
   await externalSidebar.getByRole("button", { name: "我的项目点", exact: true }).click();

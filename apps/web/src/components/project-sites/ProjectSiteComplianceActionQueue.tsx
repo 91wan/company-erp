@@ -1,5 +1,6 @@
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { SectionCard, StatusBadge, type StatusTone } from "../ui";
+import { complianceStatusLabel } from "./projectSiteComplianceStatus";
 import type { ExternalProjectSitePortalSection } from "./ExternalProjectSitePortal";
 
 type ComplianceAction = {
@@ -71,7 +72,7 @@ export function buildProjectSiteComplianceActions(
   const actions: ComplianceAction[] = [];
   if (summary.activeRosterCount === 0) {
     actions.push({
-      title: "缺项目点现场人员名单",
+      title: "提交项目点现场人员名单",
       description: "请先登记实际在项目点工作的现场人员；这不是公司 HR 员工表。",
       tone: "danger",
       actionLabel: "处理现场人员/健康证",
@@ -79,17 +80,19 @@ export function buildProjectSiteComplianceActions(
     });
   }
 
-  if (summary.missingHealthCertificateCount > 0 || summary.expiredHealthCertificateCount > 0) {
+  if (summary.missingHealthCertificateCount > 0) {
     actions.push({
-      title: "健康证阻断",
-      description: `缺 ${summary.missingHealthCertificateCount} 份，已过期 ${summary.expiredHealthCertificateCount} 份。`,
+      title: "补充健康证",
+      description: `${summary.missingHealthCertificateCount} 名项目点现场人员缺少健康证。`,
       tone: "danger",
       actionLabel: "处理现场人员/健康证",
       targetSection: "rosterHealth",
     });
-  } else if (summary.expiringHealthCertificateCount > 0) {
+  }
+
+  if (summary.expiringHealthCertificateCount > 0) {
     actions.push({
-      title: "健康证预警",
+      title: "更新临期健康证",
       description: `${summary.expiringHealthCertificateCount} 份健康证 30 天内到期。`,
       tone: "warning",
       actionLabel: "处理现场人员/健康证",
@@ -97,35 +100,57 @@ export function buildProjectSiteComplianceActions(
     });
   }
 
+  if (summary.expiredHealthCertificateCount > 0) {
+    actions.push({
+      title: "立即更新过期健康证",
+      description: `${summary.expiredHealthCertificateCount} 份健康证已过期，当前为阻断风险。`,
+      tone: "danger",
+      actionLabel: "处理现场人员/健康证",
+      targetSection: "rosterHealth",
+    });
+  }
+
   if (["missing", "expired", "rejected"].includes(summary.foodOperationLicenseStatus)) {
     actions.push({
-      title: "食品经营许可证阻断",
-      description: `当前状态：${summary.foodOperationLicenseStatus}。`,
+      title: "补充食品经营许可证",
+      description: `当前状态：${complianceStatusLabel(summary.foodOperationLicenseStatus)}。`,
       tone: "danger",
       actionLabel: "处理食品经营许可证",
       targetSection: "foodLicense",
     });
-  } else if (["expiring", "expiring_soon", "pending", "review_due", "review_due_soon"].includes(summary.foodOperationLicenseStatus)) {
+  } else if (["expiring", "expiring_soon", "review_due", "review_due_soon"].includes(summary.foodOperationLicenseStatus)) {
     actions.push({
-      title: "食品经营许可证预警",
-      description: `当前状态：${summary.foodOperationLicenseStatus}。`,
+      title: "更新食品经营许可证",
+      description: `当前状态：${complianceStatusLabel(summary.foodOperationLicenseStatus)}。`,
       tone: "warning",
       actionLabel: "处理食品经营许可证",
       targetSection: "foodLicense",
     });
   }
 
-  if (summary.insuranceUncoveredActiveRosterCount > 0 || summary.insuranceExpiredCount > 0) {
+  if (summary.insuranceUncoveredActiveRosterCount > 0) {
     actions.push({
-      title: "雇主责任险覆盖异常",
-      description: `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} 人，已过期 ${summary.insuranceExpiredCount} 份。`,
+      title: "补充被保人员",
+      description: `${summary.insuranceUncoveredActiveRosterCount} 名 active 项目点现场人员未被雇主责任险覆盖。`,
       tone: "danger",
       actionLabel: "查看雇主责任险任务",
       targetSection: "insurance",
     });
-  } else if (summary.insuranceExpiringSoonCount > 0) {
+  }
+
+  if (summary.insuranceExpiredCount > 0) {
     actions.push({
-      title: "雇主责任险预警",
+      title: "上传新雇主责任险保单",
+      description: `${summary.insuranceExpiredCount} 份雇主责任险保单已过期。`,
+      tone: "danger",
+      actionLabel: "查看雇主责任险任务",
+      targetSection: "insurance",
+    });
+  }
+
+  if (summary.insuranceExpiringSoonCount > 0) {
+    actions.push({
+      title: "更新临期雇主责任险",
       description: `${summary.insuranceExpiringSoonCount} 份保单 30 天内到期。`,
       tone: "warning",
       actionLabel: "查看雇主责任险任务",
@@ -135,17 +160,25 @@ export function buildProjectSiteComplianceActions(
 
   const payrollRequired = summary.payrollAgencyRequired || site.payrollAgencyRequired;
   if (payrollRequired) {
-    if (summary.payrollCurrentMonthStatus === "missing" || summary.payrollCurrentMonthStatus === "rejected") {
+    if (summary.payrollCurrentMonthStatus === "missing") {
       actions.push({
-        title: "工资表待提交",
-        description: `本项目点要求工资代发资料，本月状态：${summary.payrollCurrentMonthStatus}。`,
+        title: "提交工资表",
+        description: "本项目点要求工资代发资料，本月工资表尚未提交。",
+        tone: "danger",
+        actionLabel: "查看工资表任务",
+        targetSection: "payroll",
+      });
+    } else if (summary.payrollCurrentMonthStatus === "rejected") {
+      actions.push({
+        title: "重新提交工资表",
+        description: "本月工资表已被驳回，需要修正后重新提交。",
         tone: "danger",
         actionLabel: "查看工资表任务",
         targetSection: "payroll",
       });
     } else if (summary.payrollCurrentMonthStatus === "pending") {
       actions.push({
-        title: "工资表待审核",
+        title: "工资表待总部审核",
         description: "工资表已提交，等待总部审核；审核通过前仍显示为待处理。",
         tone: "warning",
         actionLabel: "查看工资表任务",
