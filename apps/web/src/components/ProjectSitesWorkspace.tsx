@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   type AttachmentRecordDto,
   type BusinessProjectDto,
@@ -45,19 +44,10 @@ import {
   defaultLoadWarehouses,
   defaultReviewKitchenEquipmentChangeRequest,
 } from "./project-sites/projectSiteApi";
-import { calculateProjectSiteMetrics, selectScopedProjectSiteIds } from "./project-sites/projectSiteMetrics";
-import {
-  filterKitchenEquipment,
-  filterKitchenEquipmentChangeRequests,
-  filterProjectSites,
-  filterProjectUsageRequests,
-  selectProjectSite,
-  selectProjectSiteDetailData,
-  selectProjectSiteParties,
-} from "./project-sites/projectSiteSelectors";
 import { useProjectSitesData } from "./project-sites/useProjectSitesData";
 import { useProjectSitesLoadDefaults } from "./project-sites/useProjectSitesLoadDefaults";
 import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations";
+import { useProjectSitesWorkspaceModel } from "./project-sites/useProjectSitesWorkspaceModel";
 import { useProjectSitesWorkspaceState } from "./project-sites/useProjectSitesWorkspaceState";
 import {
   buildExternalProjectSiteWorkspaceViewProps,
@@ -260,29 +250,32 @@ export function ProjectSitesWorkspace({
     setPendingIssueConfirm,
   });
 
-  const scopedProjectSiteIds = useMemo(() => selectScopedProjectSiteIds(usageOnly, sites), [sites, usageOnly]);
-  const filteredSites = useMemo(() => filterProjectSites(sites, query), [query, sites]);
-  const selectedDetailSite = selectProjectSite(filteredSites, selectedDetailSiteId);
-
-  const filteredUsageRequests = useMemo(
-    () => filterProjectUsageRequests(usageRequests, query, usageFilter),
-    [query, usageFilter, usageRequests],
-  );
-
-  const filteredKitchenEquipment = useMemo(
-    () => filterKitchenEquipment(kitchenEquipment, query, { projectSiteIds: scopedProjectSiteIds }),
-    [kitchenEquipment, query, scopedProjectSiteIds],
-  );
-
-  const filteredKitchenEquipmentChangeRequests = useMemo(
-    () => filterKitchenEquipmentChangeRequests(kitchenEquipmentChangeRequests, {
-      kitchenEquipment: filteredKitchenEquipment,
-      projectSiteIds: scopedProjectSiteIds,
-      usageOnly,
-    }),
-    [filteredKitchenEquipment, kitchenEquipmentChangeRequests, scopedProjectSiteIds, usageOnly],
-  );
-  const selectedDetailSiteData = selectProjectSiteDetailData(selectedDetailSite, usageRequests, kitchenEquipment);
+  const {
+    filteredSites,
+    selectedDetailSite,
+    filteredUsageRequests,
+    filteredKitchenEquipment,
+    filteredKitchenEquipmentChangeRequests,
+    selectedDetailSiteData,
+    metrics,
+    clientParties,
+    operatorParties,
+    subcontractorParties,
+    updateSelectedMaterial,
+  } = useProjectSitesWorkspaceModel({
+    usageOnly,
+    sites,
+    usageRequests,
+    kitchenEquipment,
+    kitchenEquipmentChangeRequests,
+    complianceSummaries,
+    parties,
+    materials,
+    query,
+    usageFilter,
+    selectedDetailSiteId,
+    setUsageForm,
+  });
 
   const {
     activeSiteCount,
@@ -292,27 +285,7 @@ export function ProjectSitesWorkspace({
     pendingKitchenEquipmentChangeCount,
     complianceBlockingIssueCount,
     complianceWarningIssueCount,
-  } = useMemo(
-    () => calculateProjectSiteMetrics({
-      sites,
-      usageRequests,
-      kitchenEquipment,
-      kitchenEquipmentChangeRequests,
-      complianceSummaries,
-    }),
-    [complianceSummaries, kitchenEquipment, kitchenEquipmentChangeRequests, sites, usageRequests],
-  );
-
-  const { clientParties, operatorParties, subcontractorParties } = selectProjectSiteParties(parties);
-
-  function updateSelectedMaterial(materialId: string) {
-    const material = materials.find((candidate) => candidate.id === materialId);
-    setUsageForm((current) => ({
-      ...current,
-      materialId,
-      unit: material?.unit || current.unit,
-    }));
-  }
+  } = metrics;
 
   const externalProjectSiteWorkspaceViewProps = buildExternalProjectSiteWorkspaceViewProps({
     portalSection,
