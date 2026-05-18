@@ -41,7 +41,7 @@ type ProjectSiteDetailData = {
   kitchenEquipment: ProjectSiteKitchenEquipmentDto[];
 };
 
-type ProjectSitesHeadquartersViewProps = {
+export type ProjectSitesHeadquartersViewProps = {
   sites: ProjectSiteDto[];
   filteredSites: ProjectSiteDto[];
   siteStatus: LoadStatus;
