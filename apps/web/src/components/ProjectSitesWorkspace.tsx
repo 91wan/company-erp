@@ -14,6 +14,10 @@ import {
 } from "./project-sites/projectSitesWorkspaceOptions";
 import { buildProjectSitesDataInput } from "./project-sites/projectSitesDataInput";
 import { buildProjectSiteMutationInput } from "./project-sites/projectSitesMutationInput";
+import {
+  buildExternalProjectSitesWorkspaceInput,
+  buildHeadquartersProjectSitesWorkspaceInput,
+} from "./project-sites/projectSitesViewInputs";
 import type { ExternalViewModelInput, HeadquartersViewModelInput } from "./project-sites/projectSitesViewModels";
 
 export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
@@ -222,7 +226,7 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
     setUsageForm,
   });
 
-  const externalProjectSiteWorkspaceInput: ExternalViewModelInput = {
+  const externalProjectSiteWorkspaceInput: ExternalViewModelInput = buildExternalProjectSitesWorkspaceInput({
     portal: buildExternalProjectSitePortalOptions({
       portalSection,
       onPortalSectionChange,
@@ -277,9 +281,9 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
       onCreateKitchenEquipmentChangeRequest: handleCreateKitchenEquipmentChangeRequest,
       onReviewKitchenEquipmentChangeRequest: handleReviewKitchenEquipmentChangeRequest,
     },
-  };
+  });
 
-  const projectSitesHeadquartersInput: HeadquartersViewModelInput = {
+  const projectSitesHeadquartersInput: HeadquartersViewModelInput = buildHeadquartersProjectSitesWorkspaceInput({
     data: {
       sites,
       siteStatus,
@@ -362,7 +366,7 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
       loadAttachments: loadUnifiedAttachments,
       getAttachmentDownloadUrl,
     },
-  };
+  });
 
   return (
     <ProjectSitesWorkspaceRenderer
