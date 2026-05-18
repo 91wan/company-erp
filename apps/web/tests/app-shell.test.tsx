@@ -669,18 +669,15 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: "月度经营报表 后续开放" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^现场人员\/健康证$/ }));
-    expect(await screen.findByRole("heading", { name: "证照资质" })).toBeInTheDocument();
-    expect(screen.getByText("现场人员/健康证提交")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "保存证照" })).toBeInTheDocument();
-    expect(screen.getByLabelText("归属对象")).toHaveDisplayValue("人员");
-    expect(screen.getByLabelText("人员来源")).toHaveDisplayValue("项目点现场人员");
+    expect((await screen.findAllByRole("heading", { name: "现场人员/健康证提交" })).length).toBeGreaterThan(0);
+    expect(screen.getByText(/待总部系统开放明细维护/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "证照资质" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存证照" })).not.toBeInTheDocument();
     expect(screen.queryByText("公司员工")).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "供应商" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "公司主体" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^食品经营许可证$/ }));
-    expect(screen.getByText("食品经营许可证提交")).toBeInTheDocument();
-    expect(screen.getByLabelText("归属对象")).toHaveDisplayValue("项目点");
+    expect((await screen.findAllByRole("heading", { name: "食品经营许可证提交" })).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("归属对象")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^物料领用$/ }));
     expect((await screen.findAllByText("物料领用申请")).length).toBeGreaterThan(0);
@@ -692,8 +689,8 @@ describe("Company ERP app shell", () => {
     const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(calledUrls.some((url) => url.includes("/api/project-usage-options"))).toBe(true);
     expect(calledUrls.some((url) => url.includes("/api/project-usage-requests"))).toBe(true);
-    expect(calledUrls.some((url) => url.includes("/api/project-site-roster-persons"))).toBe(true);
-    expect(calledUrls.some((url) => url.includes("/api/certificates"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/api/project-site-roster-persons"))).toBe(false);
+    expect(calledUrls.some((url) => url.includes("/api/certificates"))).toBe(false);
     expect(calledUrls.some((url) => url.includes("/api/parties"))).toBe(false);
     expect(calledUrls.some((url) => url.includes("/api/inventory-balances"))).toBe(false);
   });
