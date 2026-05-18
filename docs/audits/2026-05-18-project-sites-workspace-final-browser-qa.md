@@ -1,7 +1,7 @@
 # ProjectSites workspace final browser QA
 
 Date: 2026-05-18
-Scope: UI-only final regression after the ProjectSites workspace state, defaults, view model, business-entry, and attachment-boundary split.
+Scope: UI-only final regression after the ProjectSites workspace state, defaults, view input, controller hook, controller contract, business-entry, and attachment-boundary split.
 
 ## 覆盖范围
 
@@ -13,12 +13,14 @@ Scope: UI-only final regression after the ProjectSites workspace state, defaults
 ## 验收结论
 
 - ProjectSitesWorkspace remains the entry component, but the state/default/view-model split is covered by focused unit tests and existing browser regression tests.
+- ProjectSitesWorkspace now delegates orchestration through the controller hook; the controller contract tests cover admin, viewer, project_site, and external_project_site inputs plus mutation handler passthrough.
 - Project-site details expose only real primary sections: 合规摘要, 物料领用, 厨房设备, and 统一附件. Fake detail tabs for roster, health certificate, insurance, and payroll remain absent until real backend detail APIs exist.
 - Unified attachment requests use owner context, including ownerModule=project-sites, ownerEntityType=project_site, and the selected project-site id.
 - Business pages do not show the Storage Key registration form. Storage Key remains limited to system settings attachment metadata management.
 - Unsafe legacy attachment paths are redacted in business pages; safe relative compatibility references remain visible as 历史路径/兼容字段.
 - External project-site and project_site views keep 成本/采购价/库存金额不可见.
 - Issue execution still requires inline confirmation before submission; canceling the confirmation leaves the API path untouched.
+- The final Playwright QA gate covers admin, viewer, project_site, and external_project_site paths after the controller extraction.
 
 ## 后续需要后端支持的口径
 
