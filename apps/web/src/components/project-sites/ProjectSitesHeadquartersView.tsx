@@ -1,7 +1,6 @@
 import { Filter, MapPin, Search } from "lucide-react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
-  CONTRACT_INVESTMENT_CATEGORIES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
   PROJECT_SITE_SERVICE_MODES,
@@ -21,7 +20,7 @@ import {
   type ProjectUsageStatusCode,
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
-import { DataTable, EmptyState, PageHeader, SectionCard } from "../ui";
+import { PageHeader } from "../ui";
 import { ProjectSiteActionBar } from "./ProjectSiteActionBar";
 import {
   ProjectSiteCreateFormDrawer,
@@ -37,6 +36,7 @@ import {
   type ProjectSiteKitchenEquipmentCreateFormState,
 } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./ProjectSiteKitchenEquipmentPanel";
+import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
 import { ProjectSiteModuleIntro } from "./ProjectSiteModuleIntro";
 import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
 import { ProjectSiteSummaryCards } from "./ProjectSiteSummaryCards";
@@ -49,7 +49,6 @@ import {
   ProjectUsageRequestFormDrawer,
   type ProjectUsageRequestFormState,
 } from "./ProjectUsageRequestFormDrawer";
-import { formatMoney } from "./projectSiteFormat";
 import type { UsageWarehouseOption } from "./useProjectSitesData";
 
 export type ProjectSiteFormDrawer = "site" | "usage" | "issue" | "equipment" | "equipmentChange" | null;
@@ -144,7 +143,6 @@ type ProjectSitesHeadquartersViewProps = {
 const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
 const kitchenEquipmentStatusLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => [status.code, status.label]));
 const kitchenEquipmentChangeTypeLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => [type.code, type.label]));
 const complianceComputedStatusLabel = new Map([
@@ -375,42 +373,13 @@ export function ProjectSitesHeadquartersView({
         />
       </div>
 
-      <SectionCard
-        title="投入合同"
-        action={(
-          <label className="inline-filter">
-            <span>项目点</span>
-            <select value={selectedInvestmentSiteId} onChange={(event) => onSelectedInvestmentSiteChange(event.target.value)}>
-              <option value="">选择项目点</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.siteCode} {site.siteName}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      >
-        <DataTable
-          headers={["投入分类", "合同数量", "金额合计"]}
-          rows={investmentSummaryStatus === "ready" && investmentSummary && investmentSummary.contractCount > 0
-            ? [
-                ...investmentSummary.categories.map((category) => [
-                  investmentCategoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
-                  category.contractCount,
-                  formatMoney(category.totalAmount),
-                ]),
-                ["合计", investmentSummary.contractCount, formatMoney(investmentSummary.totalAmount)],
-              ]
-            : []}
-          loading={investmentSummaryStatus === "loading"
-            ? <EmptyState title="投入合同汇总加载中" />
-            : investmentSummaryStatus === "error"
-              ? <EmptyState title="投入合同汇总加载失败" />
-              : undefined}
-          emptyState={<EmptyState title="暂无投入合同" />}
-        />
-      </SectionCard>
+      <ProjectSiteInvestmentSection
+        sites={sites}
+        selectedSiteId={selectedInvestmentSiteId}
+        investmentSummary={investmentSummary}
+        investmentSummaryStatus={investmentSummaryStatus}
+        onSelectedSiteChange={onSelectedInvestmentSiteChange}
+      />
 
       <div className="project-site-list-layout">
         <ProjectSiteUsagePanel
