@@ -128,13 +128,32 @@ export function BusinessAttachmentsPanel({
               .map((item) => (
                 <div key={item.label}>
                   <dt>{item.label}</dt>
-                  <dd>{item.value}</dd>
+                  <dd>{formatLegacyAttachmentPath(item.value)}</dd>
                 </div>
               ))}
           </dl>
         </div>
       ) : null}
     </SectionCard>
+  );
+}
+
+function formatLegacyAttachmentPath(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return "-";
+  if (isUnsafeLegacyAttachmentPath(trimmed)) return "已隐藏服务器路径，仅保留历史兼容字段记录。";
+  return trimmed;
+}
+
+function isUnsafeLegacyAttachmentPath(value: string): boolean {
+  return (
+    value.startsWith("/") ||
+    value.startsWith("\\") ||
+    /^[a-zA-Z]:[\\/]/.test(value) ||
+    /^https?:\/\//i.test(value) ||
+    value.includes("..") ||
+    value.includes("\\") ||
+    /[\u0000-\u001f]/.test(value)
   );
 }
 
