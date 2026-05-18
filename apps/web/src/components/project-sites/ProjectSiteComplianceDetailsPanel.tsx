@@ -5,6 +5,7 @@ import {
   PROJECT_SITE_ROSTER_STATUSES,
   PROJECT_SITE_ROSTER_WORKER_TYPES,
   type CertificateRecordDto,
+  type ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
   type ProjectSiteEmployerLiabilityInsurancePolicyDto,
   type ProjectSitePayrollSubmissionDto,
   type ProjectSiteRosterPersonDto,
@@ -21,6 +22,7 @@ type ComplianceDetails = {
   rosterPeople: ProjectSiteRosterPersonDto[];
   certificates: CertificateRecordDto[];
   insurancePolicies: ProjectSiteEmployerLiabilityInsurancePolicyDto[];
+  coveredPersons: ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[];
   payrollSubmissions: ProjectSitePayrollSubmissionDto[];
 };
 
@@ -28,6 +30,7 @@ const emptyDetails: ComplianceDetails = {
   rosterPeople: [],
   certificates: [],
   insurancePolicies: [],
+  coveredPersons: [],
   payrollSubmissions: [],
 };
 
@@ -102,7 +105,7 @@ export function ProjectSiteComplianceDetailsPanel({
       ) : null}
 
       {section === "all" || section === "insurance" ? (
-        <InsurancePoliciesSection insurancePolicies={details.insurancePolicies} />
+        <InsurancePoliciesSection insurancePolicies={details.insurancePolicies} coveredPersons={details.coveredPersons} />
       ) : null}
 
       {section === "all" || section === "payroll" ? (
@@ -166,26 +169,45 @@ function CertificatesSection({
 
 function InsurancePoliciesSection({
   insurancePolicies,
+  coveredPersons,
 }: {
   insurancePolicies: ProjectSiteEmployerLiabilityInsurancePolicyDto[];
+  coveredPersons: ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[];
 }) {
   return (
-    <SectionCard title="保单明细">
-      <DataTable
-        headers={["保单号", "保险公司", "起止日期", "审核状态", "备注"]}
-        rows={insurancePolicies.map((policy) => [
-          policy.policyNo,
-          policy.insurerName,
-          `${policy.startDate} 至 ${policy.endDate}`,
-          <StatusBadge tone={payrollStatusToBadge(policy.reviewStatus).tone}>
-            {reviewStatusLabel.get(policy.reviewStatus) ?? payrollStatusToBadge(policy.reviewStatus).label}
-          </StatusBadge>,
-          policy.remark ?? "-",
-        ])}
-        emptyState={<EmptyState title="暂无雇主责任险保单" description="该项目点暂无可见雇主责任险保单。" />}
-      />
-      <p className="form-helper">被保人员明细后续开放；当前展示保单台账和覆盖风险汇总。</p>
-    </SectionCard>
+    <>
+      <SectionCard title="保单明细">
+        <DataTable
+          headers={["保单号", "保险公司", "起止日期", "审核状态", "备注"]}
+          rows={insurancePolicies.map((policy) => [
+            policy.policyNo,
+            policy.insurerName,
+            `${policy.startDate} 至 ${policy.endDate}`,
+            <StatusBadge tone={payrollStatusToBadge(policy.reviewStatus).tone}>
+              {reviewStatusLabel.get(policy.reviewStatus) ?? payrollStatusToBadge(policy.reviewStatus).label}
+            </StatusBadge>,
+            policy.remark ?? "-",
+          ])}
+          emptyState={<EmptyState title="暂无雇主责任险保单" description="该项目点暂无可见雇主责任险保单。" />}
+        />
+      </SectionCard>
+      <SectionCard title="被保人员明细">
+        <DataTable
+          headers={["被保人", "绑定项目点现场人员", "身份证后四位", "保单", "备注"]}
+          rows={coveredPersons.map((person) => {
+            const policy = insurancePolicies.find((item) => item.id === person.policyId);
+            return [
+              person.coveredNameSnapshot,
+              person.rosterPersonName ?? "未绑定",
+              person.identityNoLast4Snapshot ?? "-",
+              policy?.policyNo ?? person.policyId,
+              person.remark ?? "-",
+            ];
+          })}
+          emptyState={<EmptyState title="暂无被保人员" description="该项目点暂无可见被保人员明细。" />}
+        />
+      </SectionCard>
+    </>
   );
 }
 
@@ -215,10 +237,11 @@ function PayrollSubmissionsSection({
 }
 
 async function loadComplianceDetails(siteId: string): Promise<ComplianceDetails> {
-  const [rosterPeople, certificates, insurancePolicies, payrollSubmissions] = await Promise.all([
+  const [rosterPeople, certificates, insurancePolicies, coveredPersons, payrollSubmissions] = await Promise.all([
     loadRosterPeople(siteId),
     loadCertificates(siteId),
     loadInsurancePolicies(siteId),
+    loadCoveredPersons(siteId),
     loadPayrollSubmissions(siteId),
   ]);
 
@@ -226,6 +249,7 @@ async function loadComplianceDetails(siteId: string): Promise<ComplianceDetails>
     rosterPeople,
     certificates,
     insurancePolicies,
+    coveredPersons,
     payrollSubmissions,
   };
 }
@@ -251,6 +275,14 @@ async function loadInsurancePolicies(siteId: string): Promise<ProjectSiteEmploye
     `${apiBaseUrl}/api/employer-liability-insurance-policies?${params.toString()}`,
   );
   return payload.insurancePolicies.filter((policy) => policy.projectSiteId === siteId);
+}
+
+async function loadCoveredPersons(siteId: string): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[]> {
+  const params = new URLSearchParams({ projectSiteId: siteId });
+  const payload = await requestJson<{ coveredPersons: ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[] }>(
+    `${apiBaseUrl}/api/employer-liability-insurance-covered-persons?${params.toString()}`,
+  );
+  return payload.coveredPersons;
 }
 
 async function loadPayrollSubmissions(siteId: string): Promise<ProjectSitePayrollSubmissionDto[]> {

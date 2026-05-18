@@ -406,6 +406,7 @@ function repositories(overrides: Partial<{
       async createRosterPerson() { throw new Error("not implemented"); },
       async listInsurancePolicies() { return []; },
       async createInsurancePolicy() { throw new Error("not implemented"); },
+      async listCoveredPeople() { return []; },
       async createCoveredPerson() { throw new Error("not implemented"); },
       async listPayrollSubmissions() { return []; },
       async createPayrollSubmission() { throw new Error("not implemented"); },

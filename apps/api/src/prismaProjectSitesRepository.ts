@@ -33,6 +33,7 @@ import {
   ProjectUsageRequestConflictError,
   ProjectUsageRequestValidationError,
   type ProjectSiteComplianceRepository,
+  type ProjectSiteInsuranceCoveredPersonListFilters,
   type ProjectSiteInsurancePolicyListFilters,
   type ProjectSiteKitchenEquipmentChangeRequestListFilters,
   type ProjectSiteKitchenEquipmentListFilters,
@@ -597,6 +598,20 @@ function insurancePolicyWhere(
   };
 }
 
+function coveredPersonWhere(
+  filters: ProjectSiteInsuranceCoveredPersonListFilters,
+): Prisma.ProjectSiteEmployerLiabilityInsuranceCoveredPersonWhereInput {
+  const siteConstraints: Prisma.ProjectSiteEmployerLiabilityInsuranceCoveredPersonWhereInput[] = [
+    ...(filters.projectSiteId ? [{ policy: { projectSiteId: filters.projectSiteId } }] : []),
+    ...(filters.projectSiteIds ? [{ policy: { projectSiteId: { in: [...filters.projectSiteIds] } } }] : []),
+  ];
+
+  return {
+    ...(filters.policyId ? { policyId: filters.policyId } : {}),
+    ...(siteConstraints.length > 0 ? { AND: siteConstraints } : {}),
+  };
+}
+
 function payrollSubmissionWhere(
   filters: ProjectSitePayrollSubmissionListFilters,
 ): Prisma.ProjectSitePayrollSubmissionWhereInput {
@@ -893,6 +908,14 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
       } catch (error) {
         mapComplianceError(error);
       }
+    },
+    async listCoveredPeople(filters: ProjectSiteInsuranceCoveredPersonListFilters) {
+      const people = await client.projectSiteEmployerLiabilityInsuranceCoveredPerson.findMany({
+        where: coveredPersonWhere(filters),
+        include: coveredPersonInclude,
+        orderBy: [{ updatedAt: "desc" }],
+      });
+      return people.map(toCoveredPersonDto);
     },
     async createCoveredPerson(input: CreateProjectSiteInsuranceCoveredPersonInput) {
       try {

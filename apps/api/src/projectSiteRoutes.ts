@@ -8,7 +8,7 @@ import type {
 } from "@company-erp/shared";
 import type { AuthenticatedRequest } from "./auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
-import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
+import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteInsuranceCoveredPersonFilters, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
 function kitchenEquipmentAuditSnapshot(equipment: ProjectSiteKitchenEquipmentDto) {
   return {
@@ -305,6 +305,21 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       }
       throw error;
     }
+  });
+
+  app.get("/api/employer-liability-insurance-covered-persons", async (request, reply) => {
+    if (!options.projectSiteComplianceRepository) {
+      return reply.status(503).send({ error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" });
+    }
+    const scope = scopedProjectSiteIds(request);
+    if (scope?.length === 0) return { coveredPersons: [] };
+    const filters = {
+      ...normalizeProjectSiteInsuranceCoveredPersonFilters(request.query as Record<string, unknown>),
+      ...(scope ? { projectSiteIds: scope } : {}),
+    };
+    if (filters.projectSiteId && isOutsideProjectSiteScope(scope, filters.projectSiteId)) return { coveredPersons: [] };
+    const coveredPersons = await options.projectSiteComplianceRepository.listCoveredPeople(filters);
+    return { coveredPersons };
   });
 
   app.post("/api/employer-liability-insurance-covered-persons", async (request, reply) => {

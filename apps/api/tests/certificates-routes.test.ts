@@ -25,6 +25,7 @@ import type {
   CreateProjectSitePayrollSubmissionInput,
   CreateProjectSiteRosterPersonInput,
   ProjectSiteComplianceRepository,
+  ProjectSiteInsuranceCoveredPersonListFilters,
   ProjectSiteInsurancePolicyListFilters,
   ProjectSitePayrollSubmissionListFilters,
   ProjectSiteRosterPersonListFilters,
@@ -131,6 +132,9 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
     },
     async createInsurancePolicy(_input: CreateProjectSiteInsurancePolicyInput): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto> {
       throw new Error("not used");
+    },
+    async listCoveredPeople(_filters: ProjectSiteInsuranceCoveredPersonListFilters): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[]> {
+      return [];
     },
     async createCoveredPerson(_input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto> {
       throw new Error("not used");
