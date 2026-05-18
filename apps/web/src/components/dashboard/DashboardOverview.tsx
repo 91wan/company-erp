@@ -12,7 +12,8 @@ import type {
   PurchaseRecordDto,
 } from "@company-erp/shared";
 import type { MetricCard as MetricCardType } from "../../dashboardData";
-import { DataTable, EmptyState, SectionCard, StatusBadge as UiStatusBadge } from "../ui";
+import { DataTable, EmptyState, SectionCard, StatusBadge as UiStatusBadge, type StatusTone } from "../ui";
+import { certificateStatusToBadge, contractExpiryToBadge, inventoryRiskToBadge, projectUsageStatusToBadge } from "../statusMappers";
 import { DashboardHeader, dashboardTarget } from "./DashboardHeader";
 import { DashboardMetricStrip } from "./DashboardMetricStrip";
 import { DashboardPanelHeader } from "./DashboardPanelHeader";
@@ -68,36 +69,15 @@ function purchaseRecordStatusLabel(status: PurchaseRecordDto["status"]): string 
 }
 
 function projectUsageStatusLabel(status: ProjectUsageRequestDto["status"]): string {
-  const labels: Record<ProjectUsageRequestDto["status"], string> = {
-    pending: "待处理",
-    partially_issued: "部分出库",
-    issued: "已出库",
-    rejected: "已驳回",
-  };
-  return labels[status] ?? status;
+  return projectUsageStatusToBadge(status).label;
 }
 
 function contractExpiryLabel(expiryState: ContractDto["expiryState"]): string {
-  const labels: Record<ContractDto["expiryState"], string> = {
-    normal: "正常",
-    expiring_soon: "即将到期",
-    expired: "已到期",
-    terminated: "已终止",
-  };
-  return labels[expiryState] ?? expiryState;
+  return contractExpiryToBadge(expiryState).label;
 }
 
 function certificateStatusLabel(status: CertificateRecordDto["computedStatus"]): string {
-  const labels: Record<CertificateRecordDto["computedStatus"], string> = {
-    valid: "正常",
-    expiring_soon: "即将到期",
-    expired: "已过期",
-    review_due_soon: "即将复核",
-    review_due: "待复核",
-    archived: "归档",
-    disabled: "停用",
-  };
-  return labels[status] ?? status;
+  return certificateStatusToBadge(status).label;
 }
 
 function PanelStateMessage({ text }: { text: string }) {
@@ -212,7 +192,7 @@ type QueueItem = {
   status: string;
   updatedAt: string;
   target: WorkspaceKey;
-  tone?: "info" | "success" | "warning" | "danger" | "rejected" | "notApplicable";
+  tone?: StatusTone;
 };
 
 function dashboardSummary(data: DashboardLiveData): DashboardSummaryDto | null {
@@ -273,7 +253,7 @@ function TodoQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       status: certificateStatusLabel(certificate.computedStatus),
       updatedAt: formatDateTime(certificate.nextReviewDate ?? certificate.updatedAt),
       target: "证照资质",
-      tone: certificate.computedStatus === "review_due" ? "danger" : "warning",
+      tone: certificateStatusToBadge(certificate.computedStatus).tone,
     }));
   const rows = [...pendingRequests, ...pendingUsage, ...certificateReviews].slice(0, 8);
 
@@ -312,7 +292,7 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       status: certificateStatusLabel(certificate.computedStatus),
       updatedAt: formatDateTime(certificate.expiryDate ?? certificate.updatedAt),
       target: "证照资质",
-      tone: certificate.computedStatus === "expired" ? "danger" : "warning",
+      tone: certificateStatusToBadge(certificate.computedStatus).tone,
     }));
   const contractRisks: QueueItem[] = summary
     ? summary.contractRisks.map((entry) => summaryItemToQueueItem(entry, "合同风险"))
@@ -326,7 +306,7 @@ function RiskQueuePanel({ data, onNavigate }: { data: DashboardLiveData; onNavig
       status: contractExpiryLabel(contract.expiryState),
       updatedAt: formatDateTime(contract.endDate ?? contract.updatedAt),
       target: "合同",
-      tone: contract.expiryState === "expired" ? "danger" : "warning",
+      tone: contractExpiryToBadge(contract.expiryState).tone,
     }));
   const lowStocks: QueueItem[] = summary
     ? summary.lowStockItems.map((entry) => summaryItemToQueueItem(entry, "低库存"))
@@ -456,7 +436,7 @@ function LowStockPanel({
             row.subtitle ?? "-",
             "-",
             "-",
-            <StatusBadge key={`${row.id}-status`} status={row.statusLabel ?? "低库存"} />,
+            <UiStatusBadge key={`${row.id}-status`} tone={inventoryRiskToBadge(true).tone}>{row.statusLabel ?? "低库存"}</UiStatusBadge>,
           ])}
         />
       </section>
@@ -477,7 +457,9 @@ function LowStockPanel({
           row.materialName,
           `${row.currentQuantity} ${row.unit}`,
           String(row.safeStock ?? "-"),
-          <StatusBadge key={`${row.materialCode}-status`} status={row.isLowStock ? "低库存" : "正常"} />,
+          <UiStatusBadge key={`${row.materialCode}-status`} tone={inventoryRiskToBadge(row.isLowStock).tone}>
+            {inventoryRiskToBadge(row.isLowStock).label}
+          </UiStatusBadge>,
         ])}
       />
     </section>
@@ -566,8 +548,4 @@ function ResponsiveTable({
       </table>
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return <span className={status.includes("低") || status.includes("过期") ? "status-badge warning" : "status-badge"}>{status}</span>;
 }

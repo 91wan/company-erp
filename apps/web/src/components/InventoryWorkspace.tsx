@@ -12,6 +12,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
 import { DataTable, DetailDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
+import { inventoryRiskToBadge } from "./statusMappers";
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
@@ -538,7 +539,8 @@ function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
 }
 
 function InventoryStockBadge({ low }: { low: boolean }) {
-  return <StatusBadge tone={low ? "danger" : "success"}>{low ? "低库存" : "正常"}</StatusBadge>;
+  const badge = inventoryRiskToBadge(low);
+  return <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>;
 }
 
 function InventoryMovementDetail({ movement }: { movement: InventoryMovementDto }) {

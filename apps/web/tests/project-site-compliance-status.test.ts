@@ -34,7 +34,7 @@ describe("project site compliance status helpers", () => {
     expect(complianceStatusLabel("rejected")).toBe("已驳回");
     expect(complianceStatusLabel("pending")).toBe("待审核");
     expect(complianceStatusLabel("expiring_soon")).toBe("临期");
-    expect(complianceStatusLabel("valid")).toBe("有效");
+    expect(complianceStatusLabel("valid")).toBe("正常");
     expect(complianceStatusLabel("not_required")).toBe("不需要");
     expect(complianceStatusLabel("not_applicable")).toBe("不适用");
   });
