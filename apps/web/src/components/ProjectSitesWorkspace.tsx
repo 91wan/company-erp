@@ -59,6 +59,10 @@ import { useProjectSitesData } from "./project-sites/useProjectSitesData";
 import { useProjectSitesLoadDefaults } from "./project-sites/useProjectSitesLoadDefaults";
 import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations";
 import { useProjectSitesWorkspaceState } from "./project-sites/useProjectSitesWorkspaceState";
+import {
+  buildExternalProjectSiteWorkspaceViewProps,
+  buildProjectSitesHeadquartersViewProps,
+} from "./project-sites/projectSitesViewModels";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -310,135 +314,139 @@ export function ProjectSitesWorkspace({
     }));
   }
 
+  const externalProjectSiteWorkspaceViewProps = buildExternalProjectSiteWorkspaceViewProps({
+    portalSection,
+    sites,
+    complianceSummaries,
+    pendingUsageCount,
+    pendingKitchenEquipmentChangeCount,
+    activeSiteCount,
+    totalRequestedQuantity,
+    totalIssuedQuantity,
+    kitchenEquipment,
+    filteredKitchenEquipment,
+    filteredKitchenEquipmentChangeRequests,
+    kitchenEquipmentStatus,
+    filteredUsageRequests,
+    usageStatus,
+    masterStatus,
+    query,
+    usageFilter,
+    openFormDrawer,
+    canEditSites,
+    canCreateUsage,
+    canIssueUsage,
+    usageForm,
+    kitchenEquipmentForm,
+    kitchenEquipmentChangeForm,
+    warehouses,
+    materials,
+    usageSubmitState,
+    kitchenEquipmentSubmitState,
+    kitchenEquipmentChangeSubmitState,
+    usageSubmitError,
+    kitchenEquipmentSubmitError,
+    kitchenEquipmentChangeSubmitError,
+    currentContactName: externalProjectSiteContactName,
+    currentContactPhone: externalProjectSiteContactPhone,
+    onSelectSection: onPortalSectionChange,
+    onOpenForm: setOpenFormDrawer,
+    onQueryChange: setQuery,
+    onUsageFilterChange: setUsageFilter,
+    onUsageFormChange: setUsageForm,
+    onKitchenEquipmentFormChange: setKitchenEquipmentForm,
+    onKitchenEquipmentChangeFormChange: setKitchenEquipmentChangeForm,
+    onMaterialChange: updateSelectedMaterial,
+    onCloseForm: closeFormDrawer,
+    onCreateUsageRequest: handleCreateUsageRequest,
+    onCreateKitchenEquipment: handleCreateKitchenEquipment,
+    onCreateKitchenEquipmentChangeRequest: handleCreateKitchenEquipmentChangeRequest,
+    onReviewKitchenEquipmentChangeRequest: handleReviewKitchenEquipmentChangeRequest,
+  });
+
+  const projectSitesHeadquartersViewProps = buildProjectSitesHeadquartersViewProps({
+    sites,
+    filteredSites,
+    siteStatus,
+    complianceSummaries,
+    usageRequests,
+    filteredUsageRequests,
+    usageStatus,
+    materials,
+    warehouses,
+    businessProjects,
+    clientParties,
+    operatorParties,
+    subcontractorParties,
+    investmentSummary,
+    investmentSummaryStatus,
+    selectedInvestmentSiteId,
+    kitchenEquipment,
+    filteredKitchenEquipment,
+    filteredKitchenEquipmentChangeRequests,
+    kitchenEquipmentStatus,
+    query,
+    usageFilter,
+    activeSiteCount,
+    pendingUsageCount,
+    totalRequestedQuantity,
+    totalIssuedQuantity,
+    pendingKitchenEquipmentChangeCount,
+    complianceBlockingIssueCount,
+    complianceWarningIssueCount,
+    canEditSites,
+    canCreateUsage,
+    canIssueUsage,
+    masterStatus,
+    openFormDrawer,
+    selectedDetailSite,
+    selectedDetailSiteData,
+    siteForm,
+    usageForm,
+    issueForm,
+    kitchenEquipmentForm,
+    kitchenEquipmentChangeForm,
+    siteSubmitState,
+    usageSubmitState,
+    issueSubmitState,
+    kitchenEquipmentSubmitState,
+    kitchenEquipmentChangeSubmitState,
+    siteSubmitError,
+    usageSubmitError,
+    issueSubmitError,
+    kitchenEquipmentSubmitError,
+    kitchenEquipmentChangeSubmitError,
+    pendingIssueConfirm,
+    onQueryChange: setQuery,
+    onUsageFilterChange: setUsageFilter,
+    onOpenForm: setOpenFormDrawer,
+    onSelectSite: (site) => setSelectedDetailSiteId(site.id),
+    onSelectedInvestmentSiteChange: setSelectedInvestmentSiteId,
+    onSiteFormChange: setSiteForm,
+    onUsageFormChange: setUsageForm,
+    onIssueFormChange: setIssueForm,
+    onKitchenEquipmentFormChange: setKitchenEquipmentForm,
+    onKitchenEquipmentChangeFormChange: setKitchenEquipmentChangeForm,
+    onMaterialChange: updateSelectedMaterial,
+    onCancelIssueConfirm: () => setPendingIssueConfirm(false),
+    onCloseForm: closeFormDrawer,
+    onCloseDetail: () => setSelectedDetailSiteId(""),
+    onCreateSite: handleCreateSite,
+    onCreateUsageRequest: handleCreateUsageRequest,
+    onIssueUsageRequest: handleIssueUsageRequest,
+    onCreateKitchenEquipment: handleCreateKitchenEquipment,
+    onCreateKitchenEquipmentChangeRequest: handleCreateKitchenEquipmentChangeRequest,
+    onReviewKitchenEquipmentChangeRequest: handleReviewKitchenEquipmentChangeRequest,
+    loadAttachments: loadUnifiedAttachments,
+    getAttachmentDownloadUrl,
+  });
+
   return (
     <section className="project-sites-workspace" aria-label="项目点">
       {usageOnly ? (
-        <ExternalProjectSiteWorkspaceView
-          portalSection={portalSection}
-          sites={sites}
-          complianceSummaries={complianceSummaries}
-          pendingUsageCount={pendingUsageCount}
-          pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-          activeSiteCount={activeSiteCount}
-          totalRequestedQuantity={totalRequestedQuantity}
-          totalIssuedQuantity={totalIssuedQuantity}
-          kitchenEquipment={kitchenEquipment}
-          filteredKitchenEquipment={filteredKitchenEquipment}
-          filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
-          kitchenEquipmentStatus={kitchenEquipmentStatus}
-          filteredUsageRequests={filteredUsageRequests}
-          usageStatus={usageStatus}
-          masterStatus={masterStatus}
-          query={query}
-          usageFilter={usageFilter}
-          openFormDrawer={openFormDrawer}
-          canEditSites={canEditSites}
-          canCreateUsage={canCreateUsage}
-          canIssueUsage={canIssueUsage}
-          usageForm={usageForm}
-          kitchenEquipmentForm={kitchenEquipmentForm}
-          kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
-          warehouses={warehouses}
-          materials={materials}
-          usageSubmitState={usageSubmitState}
-          kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
-          kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
-          usageSubmitError={usageSubmitError}
-          kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
-          kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
-          currentContactName={externalProjectSiteContactName}
-          currentContactPhone={externalProjectSiteContactPhone}
-          onSelectSection={onPortalSectionChange}
-          onOpenForm={setOpenFormDrawer}
-          onQueryChange={setQuery}
-          onUsageFilterChange={setUsageFilter}
-          onUsageFormChange={setUsageForm}
-          onKitchenEquipmentFormChange={setKitchenEquipmentForm}
-          onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
-          onMaterialChange={updateSelectedMaterial}
-          onCloseForm={closeFormDrawer}
-          onCreateUsageRequest={handleCreateUsageRequest}
-          onCreateKitchenEquipment={handleCreateKitchenEquipment}
-          onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
-          onReviewKitchenEquipmentChangeRequest={handleReviewKitchenEquipmentChangeRequest}
-        />
+        <ExternalProjectSiteWorkspaceView {...externalProjectSiteWorkspaceViewProps} />
       ) : (
-        <ProjectSitesHeadquartersView
-          sites={sites}
-          filteredSites={filteredSites}
-          siteStatus={siteStatus}
-          complianceSummaries={complianceSummaries}
-          usageRequests={usageRequests}
-          filteredUsageRequests={filteredUsageRequests}
-          usageStatus={usageStatus}
-          materials={materials}
-          warehouses={warehouses}
-          businessProjects={businessProjects}
-          clientParties={clientParties}
-          operatorParties={operatorParties}
-          subcontractorParties={subcontractorParties}
-          investmentSummary={investmentSummary}
-          investmentSummaryStatus={investmentSummaryStatus}
-          selectedInvestmentSiteId={selectedInvestmentSiteId}
-          kitchenEquipment={kitchenEquipment}
-          filteredKitchenEquipment={filteredKitchenEquipment}
-          filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
-          kitchenEquipmentStatus={kitchenEquipmentStatus}
-          query={query}
-          usageFilter={usageFilter}
-          activeSiteCount={activeSiteCount}
-          pendingUsageCount={pendingUsageCount}
-          totalRequestedQuantity={totalRequestedQuantity}
-          totalIssuedQuantity={totalIssuedQuantity}
-          pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-          complianceBlockingIssueCount={complianceBlockingIssueCount}
-          complianceWarningIssueCount={complianceWarningIssueCount}
-          canEditSites={canEditSites}
-          canCreateUsage={canCreateUsage}
-          canIssueUsage={canIssueUsage}
-          masterStatus={masterStatus}
-          openFormDrawer={openFormDrawer}
-          selectedDetailSite={selectedDetailSite}
-          selectedDetailSiteData={selectedDetailSiteData}
-          siteForm={siteForm}
-          usageForm={usageForm}
-          issueForm={issueForm}
-          kitchenEquipmentForm={kitchenEquipmentForm}
-          kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
-          siteSubmitState={siteSubmitState}
-          usageSubmitState={usageSubmitState}
-          issueSubmitState={issueSubmitState}
-          kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
-          kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
-          siteSubmitError={siteSubmitError}
-          usageSubmitError={usageSubmitError}
-          issueSubmitError={issueSubmitError}
-          kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
-          kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
-          pendingIssueConfirm={pendingIssueConfirm}
-          onQueryChange={setQuery}
-          onUsageFilterChange={setUsageFilter}
-          onOpenForm={setOpenFormDrawer}
-          onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
-          onSelectedInvestmentSiteChange={setSelectedInvestmentSiteId}
-          onSiteFormChange={setSiteForm}
-          onUsageFormChange={setUsageForm}
-          onIssueFormChange={setIssueForm}
-          onKitchenEquipmentFormChange={setKitchenEquipmentForm}
-          onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
-          onMaterialChange={updateSelectedMaterial}
-          onCancelIssueConfirm={() => setPendingIssueConfirm(false)}
-          onCloseForm={closeFormDrawer}
-          onCloseDetail={() => setSelectedDetailSiteId("")}
-          onCreateSite={handleCreateSite}
-          onCreateUsageRequest={handleCreateUsageRequest}
-          onIssueUsageRequest={handleIssueUsageRequest}
-          onCreateKitchenEquipment={handleCreateKitchenEquipment}
-          onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
-          onReviewKitchenEquipmentChangeRequest={handleReviewKitchenEquipmentChangeRequest}
-          loadAttachments={loadUnifiedAttachments}
-          getAttachmentDownloadUrl={getAttachmentDownloadUrl}
-        />
+        <ProjectSitesHeadquartersView {...projectSitesHeadquartersViewProps} />
       )}
     </section>
   );

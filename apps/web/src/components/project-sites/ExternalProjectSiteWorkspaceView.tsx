@@ -29,7 +29,7 @@ import type { UsageWarehouseOption } from "./useProjectSitesData";
 type LoadStatus = "loading" | "ready" | "error";
 type SubmitState = "idle" | "saving" | "error";
 
-type ExternalProjectSiteWorkspaceViewProps = {
+export type ExternalProjectSiteWorkspaceViewProps = {
   portalSection: ExternalProjectSitePortalSection;
   sites: ProjectSiteDto[];
   complianceSummaries: Record<string, ProjectSiteComplianceSummaryDto>;
