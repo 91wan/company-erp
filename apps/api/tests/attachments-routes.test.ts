@@ -75,6 +75,7 @@ function createFakeAttachmentRepository(seed: AttachmentRecordDto[] = [makeAttac
       return attachments.filter((attachment) => {
         if (filters.ownerModule && attachment.ownerModule !== filters.ownerModule) return false;
         if (filters.ownerEntityType && attachment.ownerEntityType !== filters.ownerEntityType) return false;
+        if (filters.ownerEntityId && attachment.ownerEntityId !== filters.ownerEntityId) return false;
         if (filters.status && attachment.status !== filters.status) return false;
         if (filters.q && !`${attachment.attachmentCode} ${attachment.displayName} ${attachment.storageKey}`.includes(filters.q)) {
           return false;
@@ -385,10 +386,11 @@ describe("attachments API", () => {
     expect(scopedDownload.json()).toEqual({
       attachmentDownload: {
         attachmentId: "22222222-2222-4222-8222-222222222222",
-        storageKey: "project-sites/site-license.pdf",
+        storageKey: "",
         downloadRef: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
       },
     });
+    expect(JSON.stringify(scopedDownload.json())).not.toContain("project-sites/site-license.pdf");
     expect(JSON.stringify(scopedDownload.json())).not.toContain("/volume1");
     expect(outOfScope.statusCode).toBe(404);
     expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
@@ -435,6 +437,11 @@ describe("attachments API", () => {
       url: "/api/attachments",
       cookies: { company_erp_session: externalCookie },
     });
+    const ownerFilteredOutOfScopeList = await app.inject({
+      method: "GET",
+      url: `/api/attachments?ownerModule=project_sites&ownerEntityType=project_site&ownerEntityId=${otherSiteId}`,
+      cookies: { company_erp_session: externalCookie },
+    });
     const assignedDetail = await app.inject({
       method: "GET",
       url: "/api/attachments/22222222-2222-4222-8222-222222222222",
@@ -462,12 +469,16 @@ describe("attachments API", () => {
 
     expect(list.statusCode).toBe(200);
     expect(list.json()).toEqual({
-      attachments: [expect.objectContaining({ attachmentCode: "ATT-SITE-001" })],
+      attachments: [expect.objectContaining({ attachmentCode: "ATT-SITE-001", storageKey: "" })],
     });
+    expect(JSON.stringify(list.json())).not.toContain("project-sites/site-license.pdf");
+    expect(ownerFilteredOutOfScopeList.statusCode).toBe(200);
+    expect(ownerFilteredOutOfScopeList.json()).toEqual({ attachments: [] });
     expect(assignedDetail.statusCode).toBe(200);
     expect(assignedDetail.json()).toEqual({
-      attachment: expect.objectContaining({ attachmentCode: "ATT-SITE-001" }),
+      attachment: expect.objectContaining({ attachmentCode: "ATT-SITE-001", storageKey: "" }),
     });
+    expect(JSON.stringify(assignedDetail.json())).not.toContain("project-sites/site-license.pdf");
     expect(outOfScopeDetail.statusCode).toBe(404);
     expect(outOfScopeDetail.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
     expect(arbitraryCreate.statusCode).toBe(403);
