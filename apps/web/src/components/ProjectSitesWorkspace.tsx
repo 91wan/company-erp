@@ -13,6 +13,7 @@ import {
   buildExternalProjectSitePortalOptions,
   resolveProjectSitesWorkspacePermissions,
 } from "./project-sites/projectSitesWorkspaceOptions";
+import { buildProjectSitesDataInput } from "./project-sites/projectSitesDataInput";
 import {
   buildExternalProjectSiteWorkspaceViewProps,
   buildProjectSitesHeadquartersViewProps,
@@ -116,26 +117,30 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
     siteStatus,
     usageStatus,
     masterStatus,
-  } = useProjectSitesData({
-    canEditSites,
-    usageOnly,
-    loadProjectSites,
-    loadUsageRequests,
-    loadParties,
-    loadMaterials,
-    loadWarehouses,
-    loadUsageOptions,
-    loadBusinessProjects,
-    loadInvestmentSummary,
-    loadComplianceSummary,
-    loadKitchenEquipment,
-    loadKitchenEquipmentChangeRequests,
-    onProjectSitesLoaded,
-    onUsageRequestsLoaded,
-    onMasterDataLoaded,
-    onUsageOptionsLoaded,
-    onKitchenEquipmentLoaded,
-  });
+  } = useProjectSitesData(buildProjectSitesDataInput({
+    permissions,
+    options: { usageOnly },
+    dependencies: {
+      loadProjectSites,
+      loadUsageRequests,
+      loadParties,
+      loadMaterials,
+      loadWarehouses,
+      loadUsageOptions,
+      loadBusinessProjects,
+      loadInvestmentSummary,
+      loadComplianceSummary,
+      loadKitchenEquipment,
+      loadKitchenEquipmentChangeRequests,
+    },
+    defaults: {
+      onProjectSitesLoaded,
+      onUsageRequestsLoaded,
+      onMasterDataLoaded,
+      onUsageOptionsLoaded,
+      onKitchenEquipmentLoaded,
+    },
+  }));
 
   const {
     siteSubmitState,
