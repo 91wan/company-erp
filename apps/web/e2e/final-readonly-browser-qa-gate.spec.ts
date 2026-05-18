@@ -28,6 +28,11 @@ test("admin final readonly gate uses dashboard summary and keeps audit, attachme
   await expect(page.getByRole("heading", { name: "项目点风险台账" })).toBeVisible();
   await page.locator("tr.clickable-row", { hasText: "DEMO-SITE-001" }).click();
   await expect(page.getByRole("heading", { name: "DEMO-SITE-001 DEMO 项目点" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "项目点现场人员明细" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "健康证明细" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "食品经营许可证" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "保单明细" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "月度提交记录" })).toBeVisible();
   await page.getByRole("tab", { name: "统一附件" }).click();
   await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
   await expect(page.getByText("Storage Key")).toHaveCount(0);
