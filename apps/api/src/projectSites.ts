@@ -68,6 +68,12 @@ export type ProjectSiteInsurancePolicyListFilters = {
   projectSiteIds?: readonly string[];
 };
 
+export type ProjectSiteInsuranceCoveredPersonListFilters = {
+  policyId?: string;
+  projectSiteId?: string;
+  projectSiteIds?: readonly string[];
+};
+
 export type ProjectSitePayrollSubmissionListFilters = {
   projectSiteId?: string;
   projectSiteIds?: readonly string[];
@@ -141,6 +147,7 @@ export type ProjectSiteComplianceRepository = {
   createRosterPerson(input: CreateProjectSiteRosterPersonInput): Promise<ProjectSiteRosterPersonDto>;
   listInsurancePolicies(filters: ProjectSiteInsurancePolicyListFilters): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto[]>;
   createInsurancePolicy(input: CreateProjectSiteInsurancePolicyInput): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto>;
+  listCoveredPeople(filters: ProjectSiteInsuranceCoveredPersonListFilters): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[]>;
   createCoveredPerson(input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto>;
   listPayrollSubmissions(filters: ProjectSitePayrollSubmissionListFilters): Promise<ProjectSitePayrollSubmissionDto[]>;
   createPayrollSubmission(input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto>;
@@ -297,6 +304,15 @@ export function normalizeProjectSiteRosterPersonFilters(query: Record<string, un
 
 export function normalizeProjectSiteInsurancePolicyFilters(query: Record<string, unknown>): ProjectSiteInsurancePolicyListFilters {
   const filters: ProjectSiteInsurancePolicyListFilters = {};
+  if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
+  return filters;
+}
+
+export function normalizeProjectSiteInsuranceCoveredPersonFilters(
+  query: Record<string, unknown>,
+): ProjectSiteInsuranceCoveredPersonListFilters {
+  const filters: ProjectSiteInsuranceCoveredPersonListFilters = {};
+  if (typeof query.policyId === "string" && query.policyId.trim()) filters.policyId = query.policyId.trim();
   if (typeof query.projectSiteId === "string" && query.projectSiteId.trim()) filters.projectSiteId = query.projectSiteId.trim();
   return filters;
 }

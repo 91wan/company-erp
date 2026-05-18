@@ -58,6 +58,24 @@ function mockComplianceDetailFetch() {
       expect(url).toContain(`projectSiteId=${projectSite.id}`);
       return Promise.resolve(jsonResponse({ insurancePolicies: [insurancePolicy] }));
     }
+    if (url.includes("/api/employer-liability-insurance-covered-persons")) {
+      expect(url).toContain(`projectSiteId=${projectSite.id}`);
+      return Promise.resolve(jsonResponse({
+        coveredPersons: [
+          {
+            id: "77777777-7777-4777-8777-777777777777",
+            policyId: insurancePolicy.id,
+            rosterPersonId: rosterPerson.id,
+            rosterPersonName: rosterPerson.personName,
+            coveredNameSnapshot: rosterPerson.personName,
+            identityNoLast4Snapshot: rosterPerson.identityNoLast4,
+            remark: "已覆盖",
+            createdAt: "2026-05-13T08:00:00.000Z",
+            updatedAt: "2026-05-13T08:00:00.000Z",
+          },
+        ],
+      }));
+    }
     if (url.includes("/api/project-site-payroll-submissions")) {
       expect(url).toContain(`projectSiteId=${projectSite.id}`);
       return Promise.resolve(jsonResponse({ payrollSubmissions: [payrollSubmission] }));
@@ -75,9 +93,10 @@ describe("ProjectSiteComplianceDetailsPanel", () => {
 
     render(<ProjectSiteComplianceDetailsPanel siteId={projectSite.id} section="all" />);
 
-    expect(await screen.findByText(rosterPerson.personName)).toBeInTheDocument();
+    await screen.findByText(certificate.certificateName);
+    expect(screen.getAllByText(rosterPerson.personName).length).toBeGreaterThan(0);
     expect(screen.getByText(certificate.certificateName)).toBeInTheDocument();
-    expect(screen.getByText(insurancePolicy.policyNo)).toBeInTheDocument();
+    expect(screen.getAllByText(insurancePolicy.policyNo).length).toBeGreaterThan(0);
     expect(screen.getByText(payrollSubmission.payrollMonth)).toBeInTheDocument();
     expect(screen.queryByText(/明细维护后续开放/)).not.toBeInTheDocument();
 
@@ -89,13 +108,16 @@ describe("ProjectSiteComplianceDetailsPanel", () => {
     });
   });
 
-  it("keeps unsupported covered-person details explicit without pretending they are editable", async () => {
+  it("renders covered-person details without pretending they are editable", async () => {
     mockComplianceDetailFetch();
 
     render(<ProjectSiteComplianceDetailsPanel siteId={projectSite.id} section="insurance" />);
 
-    expect(await screen.findByText(insurancePolicy.policyNo)).toBeInTheDocument();
-    expect(screen.getByText(/被保人员明细后续开放/)).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "被保人员明细" });
+    expect(screen.getAllByText(insurancePolicy.policyNo).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "被保人员明细" })).toBeInTheDocument();
+    expect(screen.getByText("已覆盖")).toBeInTheDocument();
+    expect(screen.queryByText(/被保人员明细后续开放/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /新增被保人员/ })).not.toBeInTheDocument();
   });
 });

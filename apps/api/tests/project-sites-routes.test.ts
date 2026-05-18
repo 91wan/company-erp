@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AuditLogDto,
   CreateProjectSiteInput,
@@ -451,6 +451,15 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
       const policy = makeInsurancePolicy({ id: "18181818-1818-4181-8181-181818181818", ...input });
       policies.unshift(policy);
       return policy;
+    },
+    async listCoveredPeople(filters) {
+      return coveredPeople.filter((person) => {
+        const policy = policies.find((item) => item.id === person.policyId);
+        const matchesPolicy = filters.policyId ? person.policyId === filters.policyId : true;
+        const matchesSite = filters.projectSiteId ? policy?.projectSiteId === filters.projectSiteId : true;
+        const matchesScopedSites = filters.projectSiteIds?.length ? Boolean(policy && filters.projectSiteIds.includes(policy.projectSiteId)) : true;
+        return matchesPolicy && matchesSite && matchesScopedSites;
+      });
     },
     async createCoveredPerson(input) {
       const covered = makeCoveredPerson({ id: "19191919-1919-4191-8191-191919191919", ...input });
@@ -1522,6 +1531,54 @@ describe("project usage request API", () => {
     expect(unassignedRosterCoveredPerson.statusCode).toBe(404);
     expect(assignedPayroll.statusCode).toBe(201);
     expect(updateProjectSite.statusCode).toBe(403);
+  });
+
+  it("lists employer liability insurance covered persons with project-site scope", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const projectSiteComplianceRepository = createFakeComplianceRepository();
+    const listCoveredPeople = vi.spyOn(projectSiteComplianceRepository, "listCoveredPeople");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-covered-person-list" },
+      authRepository: createFakeAuthRepository([makeExternalProjectSiteAuthAccount({ passwordHash })]),
+      projectSiteComplianceRepository,
+    });
+    const cookie = await loginCookie(app, "site-manager");
+
+    const assignedByPolicy = await app.inject({
+      method: "GET",
+      url: `/api/employer-liability-insurance-covered-persons?policyId=${insurancePolicyId}`,
+      cookies: { company_erp_session: cookie },
+    });
+    const assignedBySite = await app.inject({
+      method: "GET",
+      url: "/api/employer-liability-insurance-covered-persons?projectSiteId=11111111-1111-4111-8111-111111111111",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedBySite = await app.inject({
+      method: "GET",
+      url: "/api/employer-liability-insurance-covered-persons?projectSiteId=22222222-2222-4222-8222-222222222222",
+      cookies: { company_erp_session: cookie },
+    });
+    const unassignedByPolicy = await app.inject({
+      method: "GET",
+      url: "/api/employer-liability-insurance-covered-persons?policyId=31313131-3131-4313-8313-313131313131",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(listCoveredPeople).toHaveBeenCalledWith(expect.objectContaining({ policyId: insurancePolicyId }));
+    expect(assignedByPolicy.statusCode).toBe(200);
+    expect(assignedByPolicy.json()).toMatchObject({
+      coveredPersons: [{ policyId: insurancePolicyId, coveredNameSnapshot: "王现场" }],
+    });
+    expect(assignedBySite.statusCode).toBe(200);
+    expect(assignedBySite.json()).toMatchObject({
+      coveredPersons: [{ policyId: insurancePolicyId, rosterPersonName: "王现场" }],
+    });
+    expect(unassignedBySite.statusCode).toBe(200);
+    expect(unassignedBySite.json()).toEqual({ coveredPersons: [] });
+    expect(unassignedByPolicy.statusCode).toBe(200);
+    expect(unassignedByPolicy.json()).toEqual({ coveredPersons: [] });
   });
 });
 
