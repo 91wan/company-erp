@@ -1,49 +1,9 @@
-import {
-  type AttachmentRecordDto,
-  type BusinessProjectDto,
-  type CreateProjectSiteKitchenEquipmentChangeRequestInput,
-  type CreateProjectSiteKitchenEquipmentInput,
-  type CreateProjectSiteInput,
-  type CreateProjectUsageRequestInput,
-  type IssueProjectUsageRequestInput,
-  type MaterialDto,
-  type PartyDto,
-  type ProjectSiteComplianceSummaryDto,
-  type ProjectSiteDto,
-  type ProjectSiteInvestmentSummaryDto,
-  type ProjectSiteKitchenEquipmentChangeRequestDto,
-  type ProjectSiteKitchenEquipmentDto,
-  type ProjectUsageOptionsDto,
-  type ProjectUsageRequestDto,
-  type WarehouseDto,
-} from "@company-erp/shared";
-import { getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
-import {
-  type ExternalProjectSitePortalSection,
-} from "./project-sites/ExternalProjectSitePortal";
 import { ExternalProjectSiteWorkspaceView } from "./project-sites/ExternalProjectSiteWorkspaceView";
+import { ProjectSitesHeadquartersView } from "./project-sites/ProjectSitesHeadquartersView";
 import {
-  ProjectSitesHeadquartersView,
-} from "./project-sites/ProjectSitesHeadquartersView";
-import {
-  defaultCreateKitchenEquipment,
-  defaultCreateKitchenEquipmentChangeRequest,
-  defaultCreateProjectSite,
-  defaultCreateUsageRequest,
-  defaultIssueUsageRequest,
-  defaultLoadBusinessProjects,
-  defaultLoadComplianceSummary,
-  defaultLoadInvestmentSummary,
-  defaultLoadKitchenEquipment,
-  defaultLoadKitchenEquipmentChangeRequests,
-  defaultLoadMaterials,
-  defaultLoadParties,
-  defaultLoadProjectSites,
-  defaultLoadUsageOptions,
-  defaultLoadUsageRequests,
-  defaultLoadWarehouses,
-  defaultReviewKitchenEquipmentChangeRequest,
-} from "./project-sites/projectSiteApi";
+  resolveProjectSitesWorkspaceProps,
+  type ProjectSitesWorkspaceProps,
+} from "./project-sites/projectSitesWorkspaceContract";
 import { useProjectSitesData } from "./project-sites/useProjectSitesData";
 import { useProjectSitesLoadDefaults } from "./project-sites/useProjectSitesLoadDefaults";
 import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations";
@@ -54,70 +14,37 @@ import {
   buildProjectSitesHeadquartersViewProps,
 } from "./project-sites/projectSitesViewModels";
 
-type ProjectSitesWorkspaceProps = {
-  loadProjectSites?: () => Promise<ProjectSiteDto[]>;
-  loadUsageRequests?: () => Promise<ProjectUsageRequestDto[]>;
-  createProjectSite?: (input: CreateProjectSiteInput) => Promise<ProjectSiteDto>;
-  createUsageRequest?: (input: CreateProjectUsageRequestInput) => Promise<ProjectUsageRequestDto>;
-  issueUsageRequest?: (id: string, input: IssueProjectUsageRequestInput) => Promise<ProjectUsageRequestDto>;
-  loadParties?: () => Promise<PartyDto[]>;
-  loadMaterials?: () => Promise<MaterialDto[]>;
-  loadWarehouses?: () => Promise<WarehouseDto[]>;
-  loadUsageOptions?: () => Promise<ProjectUsageOptionsDto>;
-  loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
-  loadInvestmentSummary?: (projectSiteId: string) => Promise<ProjectSiteInvestmentSummaryDto>;
-  loadComplianceSummary?: (projectSiteId: string) => Promise<ProjectSiteComplianceSummaryDto>;
-  loadKitchenEquipment?: () => Promise<ProjectSiteKitchenEquipmentDto[]>;
-  loadKitchenEquipmentChangeRequests?: () => Promise<ProjectSiteKitchenEquipmentChangeRequestDto[]>;
-  loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
-  createKitchenEquipment?: (input: CreateProjectSiteKitchenEquipmentInput) => Promise<ProjectSiteKitchenEquipmentDto>;
-  createKitchenEquipmentChangeRequest?: (
-    input: CreateProjectSiteKitchenEquipmentChangeRequestInput,
-  ) => Promise<ProjectSiteKitchenEquipmentChangeRequestDto>;
-  reviewKitchenEquipmentChangeRequest?: (
-    id: string,
-    input: { reviewStatus: "approved" | "rejected"; reviewRemark?: string | null },
-  ) => Promise<ProjectSiteKitchenEquipmentChangeRequestDto>;
-  canManage?: boolean;
-  canManageSites?: boolean;
-  canManageUsage?: boolean;
-  canIssue?: boolean;
-  usageOnly?: boolean;
-  portalSection?: ExternalProjectSitePortalSection;
-  onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
-  externalProjectSiteContactName?: string | null;
-  externalProjectSiteContactPhone?: string | null;
-};
-
-export function ProjectSitesWorkspace({
-  loadProjectSites = defaultLoadProjectSites,
-  loadUsageRequests = defaultLoadUsageRequests,
-  createProjectSite = defaultCreateProjectSite,
-  createUsageRequest = defaultCreateUsageRequest,
-  issueUsageRequest = defaultIssueUsageRequest,
-  loadParties = defaultLoadParties,
-  loadMaterials = defaultLoadMaterials,
-  loadWarehouses = defaultLoadWarehouses,
-  loadUsageOptions = defaultLoadUsageOptions,
-  loadBusinessProjects = defaultLoadBusinessProjects,
-  loadInvestmentSummary = defaultLoadInvestmentSummary,
-  loadComplianceSummary = defaultLoadComplianceSummary,
-  loadKitchenEquipment = defaultLoadKitchenEquipment,
-  loadKitchenEquipmentChangeRequests = defaultLoadKitchenEquipmentChangeRequests,
-  loadUnifiedAttachments = getAttachments,
-  createKitchenEquipment = defaultCreateKitchenEquipment,
-  createKitchenEquipmentChangeRequest = defaultCreateKitchenEquipmentChangeRequest,
-  reviewKitchenEquipmentChangeRequest = defaultReviewKitchenEquipmentChangeRequest,
-  canManage = true,
-  canManageSites,
-  canManageUsage,
-  canIssue,
-  usageOnly = false,
-  portalSection = "overview",
-  onPortalSectionChange,
-  externalProjectSiteContactName,
-  externalProjectSiteContactPhone,
-}: ProjectSitesWorkspaceProps) {
+export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
+  const {
+    loadProjectSites,
+    loadUsageRequests,
+    createProjectSite,
+    createUsageRequest,
+    issueUsageRequest,
+    loadParties,
+    loadMaterials,
+    loadWarehouses,
+    loadUsageOptions,
+    loadBusinessProjects,
+    loadInvestmentSummary,
+    loadComplianceSummary,
+    loadKitchenEquipment,
+    loadKitchenEquipmentChangeRequests,
+    loadUnifiedAttachments,
+    getAttachmentDownloadUrl,
+    createKitchenEquipment,
+    createKitchenEquipmentChangeRequest,
+    reviewKitchenEquipmentChangeRequest,
+    canManage,
+    canManageSites,
+    canManageUsage,
+    canIssue,
+    usageOnly,
+    portalSection,
+    onPortalSectionChange,
+    externalProjectSiteContactName,
+    externalProjectSiteContactPhone,
+  } = resolveProjectSitesWorkspaceProps(props);
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
   const canIssueUsage = canIssue ?? canManage;
