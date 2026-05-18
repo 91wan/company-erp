@@ -30,7 +30,7 @@ type MasterDataLoadedPayload = {
   businessProjects: BusinessProjectDto[];
 };
 
-type UseProjectSitesDataOptions = {
+export type UseProjectSitesDataOptions = {
   canEditSites: boolean;
   usageOnly: boolean;
   loadProjectSites: () => Promise<ProjectSiteDto[]>;
