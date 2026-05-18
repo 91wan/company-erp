@@ -108,6 +108,23 @@ describe("demo cleanup ops", () => {
 });
 
 describe("NAS preflight script", () => {
+  it("prints help without loading an environment file", () => {
+    const result = spawnSync("bash", ["scripts/preflight-nas.sh", "--help"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-preflight-missing.env"),
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run preflight:nas");
+    expect(result.stdout).toContain("PREFLIGHT_ENV_FILE");
+    expect(result.stdout).toContain("APP_ENVIRONMENT");
+    expect(result.stderr).toBe("");
+  });
+
   it("passes with a safe NAS environment and runs docker compose config", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-ok-"));
     const dataRoot = join(tempRoot, "data");
