@@ -63,6 +63,14 @@ async function filterAttachmentsForScope<T extends { ownerEntityType: string; ow
   return visible;
 }
 
+function redactAttachmentStorageKeyForScopedRequest<T extends { storageKey: string }>(request: unknown, attachment: T): T {
+  return scopedProjectSiteIds(request) === null ? attachment : { ...attachment, storageKey: "" };
+}
+
+function redactAttachmentDownloadRefForScopedRequest<T extends { storageKey: string }>(request: unknown, downloadRef: T): T {
+  return scopedProjectSiteIds(request) === null ? downloadRef : { ...downloadRef, storageKey: "" };
+}
+
 function resolveAttachmentContentPath(storageKey: string): string {
   createAttachmentDownloadRef({ id: "attachment", storageKey });
   const root = resolve(process.env.NAS_ATTACHMENTS_ROOT?.trim() || "/attachments");
@@ -83,7 +91,10 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     try {
       const filters = normalizeAttachmentFilters(request.query as Record<string, unknown>);
       const attachments = await options.attachmentRepository.list(filters);
-      return { attachments: await filterAttachmentsForScope(request, options, attachments) };
+      const scopedAttachments = await filterAttachmentsForScope(request, options, attachments);
+      return {
+        attachments: scopedAttachments.map((attachment) => redactAttachmentStorageKeyForScopedRequest(request, attachment)),
+      };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -103,7 +114,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     if (await isAttachmentOutsideScope(request, options, attachment)) {
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
-    return { attachment };
+    return { attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) };
   });
 
   app.get("/api/attachments/:id/content", async (request, reply) => {
@@ -150,7 +161,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
     try {
-      return { attachmentDownload: createAttachmentDownloadRef(attachment) };
+      return { attachmentDownload: redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment)) };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
