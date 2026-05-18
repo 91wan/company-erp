@@ -12,7 +12,7 @@ type HeadquartersMetrics = Pick<
   | "complianceWarningIssueCount"
 >;
 
-type HeadquartersViewModelInput = {
+export type HeadquartersViewModelInput = {
   data: Pick<
     ProjectSitesHeadquartersViewProps,
     | "sites"
@@ -105,7 +105,7 @@ type ExternalMetrics = Pick<
   | "pendingKitchenEquipmentChangeCount"
 >;
 
-type ExternalViewModelInput = {
+export type ExternalViewModelInput = {
   portal: Pick<
     ExternalProjectSiteWorkspaceViewProps,
     "portalSection" | "currentContactName" | "currentContactPhone" | "onSelectSection"

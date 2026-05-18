@@ -1,5 +1,4 @@
-import { ExternalProjectSiteWorkspaceView } from "./project-sites/ExternalProjectSiteWorkspaceView";
-import { ProjectSitesHeadquartersView } from "./project-sites/ProjectSitesHeadquartersView";
+import { ProjectSitesWorkspaceRenderer } from "./project-sites/ProjectSitesWorkspaceRenderer";
 import {
   resolveProjectSitesWorkspaceProps,
   type ProjectSitesWorkspaceProps,
@@ -15,10 +14,7 @@ import {
 } from "./project-sites/projectSitesWorkspaceOptions";
 import { buildProjectSitesDataInput } from "./project-sites/projectSitesDataInput";
 import { buildProjectSiteMutationInput } from "./project-sites/projectSitesMutationInput";
-import {
-  buildExternalProjectSiteWorkspaceViewProps,
-  buildProjectSitesHeadquartersViewProps,
-} from "./project-sites/projectSitesViewModels";
+import type { ExternalViewModelInput, HeadquartersViewModelInput } from "./project-sites/projectSitesViewModels";
 
 export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
   const {
@@ -226,7 +222,7 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
     setUsageForm,
   });
 
-  const externalProjectSiteWorkspaceViewProps = buildExternalProjectSiteWorkspaceViewProps({
+  const externalProjectSiteWorkspaceInput: ExternalViewModelInput = {
     portal: buildExternalProjectSitePortalOptions({
       portalSection,
       onPortalSectionChange,
@@ -281,9 +277,9 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
       onCreateKitchenEquipmentChangeRequest: handleCreateKitchenEquipmentChangeRequest,
       onReviewKitchenEquipmentChangeRequest: handleReviewKitchenEquipmentChangeRequest,
     },
-  });
+  };
 
-  const projectSitesHeadquartersViewProps = buildProjectSitesHeadquartersViewProps({
+  const projectSitesHeadquartersInput: HeadquartersViewModelInput = {
     data: {
       sites,
       siteStatus,
@@ -366,15 +362,13 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
       loadAttachments: loadUnifiedAttachments,
       getAttachmentDownloadUrl,
     },
-  });
+  };
 
   return (
-    <section className="project-sites-workspace" aria-label="项目点">
-      {usageOnly ? (
-        <ExternalProjectSiteWorkspaceView {...externalProjectSiteWorkspaceViewProps} />
-      ) : (
-        <ProjectSitesHeadquartersView {...projectSitesHeadquartersViewProps} />
-      )}
-    </section>
+    <ProjectSitesWorkspaceRenderer
+      usageOnly={usageOnly}
+      externalInput={externalProjectSiteWorkspaceInput}
+      headquartersInput={projectSitesHeadquartersInput}
+    />
   );
 }
