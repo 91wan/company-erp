@@ -1,5 +1,5 @@
 import { Filter, MapPin, Search } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import {
   CONTRACT_INVESTMENT_CATEGORIES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
@@ -21,7 +21,6 @@ import {
   type ProjectSiteInvestmentSummaryDto,
   type ProjectSiteKitchenEquipmentChangeRequestDto,
   type ProjectSiteKitchenEquipmentDto,
-  type ProjectUsageOptionMaterialDto,
   type ProjectUsageOptionsDto,
   type ProjectUsageRequestDto,
   type ProjectUsageStatusCode,
@@ -101,6 +100,7 @@ import {
   selectProjectSiteDetailData,
   selectProjectSiteParties,
 } from "./project-sites/projectSiteSelectors";
+import { useProjectSitesData } from "./project-sites/useProjectSitesData";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -135,12 +135,6 @@ type ProjectSitesWorkspaceProps = {
   onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
   externalProjectSiteContactName?: string | null;
   externalProjectSiteContactPhone?: string | null;
-};
-
-type UsageWarehouseOption = {
-  id: string;
-  warehouseCode: string;
-  warehouseName: string;
 };
 
 type SiteFormState = ProjectSiteCreateFormState;
@@ -210,22 +204,6 @@ export function ProjectSitesWorkspace({
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
   const canIssueUsage = canIssue ?? canManage;
-  const [sites, setSites] = useState<ProjectSiteDto[]>([]);
-  const [usageRequests, setUsageRequests] = useState<ProjectUsageRequestDto[]>([]);
-  const [parties, setParties] = useState<PartyDto[]>([]);
-  const [materials, setMaterials] = useState<ProjectUsageOptionMaterialDto[]>([]);
-  const [warehouses, setWarehouses] = useState<UsageWarehouseOption[]>([]);
-  const [businessProjects, setBusinessProjects] = useState<BusinessProjectDto[]>([]);
-  const [selectedInvestmentSiteId, setSelectedInvestmentSiteId] = useState("");
-  const [investmentSummary, setInvestmentSummary] = useState<ProjectSiteInvestmentSummaryDto | null>(null);
-  const [investmentSummaryStatus, setInvestmentSummaryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [complianceSummaries, setComplianceSummaries] = useState<Record<string, ProjectSiteComplianceSummaryDto>>({});
-  const [kitchenEquipment, setKitchenEquipment] = useState<ProjectSiteKitchenEquipmentDto[]>([]);
-  const [kitchenEquipmentChangeRequests, setKitchenEquipmentChangeRequests] = useState<ProjectSiteKitchenEquipmentChangeRequestDto[]>([]);
-  const [kitchenEquipmentStatus, setKitchenEquipmentStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [siteStatus, setSiteStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [usageStatus, setUsageStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [usageFilter, setUsageFilter] = useState<"all" | ProjectUsageStatusCode>("all");
   const [siteSubmitState, setSiteSubmitState] = useState<"idle" | "saving" | "error">("idle");
@@ -249,191 +227,92 @@ export function ProjectSitesWorkspace({
     createInitialKitchenEquipmentChangeForm,
   );
 
-  useEffect(() => {
-    let mounted = true;
-    setSiteStatus("loading");
-    loadProjectSites()
-      .then((nextSites) => {
-        if (!mounted) return;
-        setSites(nextSites);
-        setSiteStatus("ready");
-        setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-        setKitchenEquipmentForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-        setKitchenEquipmentChangeForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
-        setSelectedInvestmentSiteId((current) => (usageOnly ? "" : current || nextSites[0]?.id || ""));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setSiteStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [loadProjectSites, usageOnly]);
+  const onProjectSitesLoaded = useCallback((nextSites: ProjectSiteDto[]) => {
+    setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+    setKitchenEquipmentForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+    setKitchenEquipmentChangeForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
+  }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    setUsageStatus("loading");
-    loadUsageRequests()
-      .then((nextRequests) => {
-        if (!mounted) return;
-        setUsageRequests(nextRequests);
-        setUsageStatus("ready");
-        setIssueForm((current) => ({ ...current, requestId: current.requestId || nextRequests[0]?.id || "" }));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setUsageStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [loadUsageRequests]);
+  const onUsageRequestsLoaded = useCallback((nextRequests: ProjectUsageRequestDto[]) => {
+    setIssueForm((current) => ({ ...current, requestId: current.requestId || nextRequests[0]?.id || "" }));
+  }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    setMasterStatus("loading");
-    if (usageOnly) {
-      loadUsageOptions()
-        .then((options) => {
-          if (!mounted) return;
-          setParties([]);
-          setBusinessProjects([]);
-          setWarehouses(options.defaultWarehouse ? [options.defaultWarehouse] : []);
-          setMaterials([...options.materials]);
-          setMasterStatus("ready");
-          setUsageForm((current) => ({
-            ...current,
-            warehouseId: current.warehouseId || options.defaultWarehouse?.id || "",
-            materialId: current.materialId || options.materials[0]?.id || "",
-            unit: current.unit || options.materials[0]?.unit || "",
-          }));
-        })
-        .catch(() => {
-          if (!mounted) return;
-          setMasterStatus("error");
-        });
-      return () => {
-        mounted = false;
+  const onMasterDataLoaded = useCallback(
+    ({ materials: nextMaterials, warehouses: nextWarehouses }: { materials: MaterialDto[]; warehouses: WarehouseDto[] }) => {
+      setUsageForm((current) => ({
+        ...current,
+        warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
+        materialId: current.materialId || nextMaterials[0]?.id || "",
+        unit: current.unit || nextMaterials[0]?.projectSiteSaleUnit || nextMaterials[0]?.baseUnit || "",
+      }));
+    },
+    [],
+  );
+
+  const onUsageOptionsLoaded = useCallback((options: ProjectUsageOptionsDto) => {
+    setUsageForm((current) => ({
+      ...current,
+      warehouseId: current.warehouseId || options.defaultWarehouse?.id || "",
+      materialId: current.materialId || options.materials[0]?.id || "",
+      unit: current.unit || options.materials[0]?.unit || "",
+    }));
+  }, []);
+
+  const onKitchenEquipmentLoaded = useCallback((equipment: ProjectSiteKitchenEquipmentDto[]) => {
+    setKitchenEquipmentChangeForm((current) => {
+      const firstEquipment = equipment[0];
+      return {
+        ...current,
+        projectSiteId: current.projectSiteId || firstEquipment?.projectSiteId || "",
+        equipmentId: current.equipmentId || firstEquipment?.id || "",
+        equipmentName: current.equipmentName || firstEquipment?.equipmentName || "",
       };
-    }
+    });
+  }, []);
 
-    Promise.all([loadParties(), loadMaterials(), loadWarehouses(), canEditSites ? loadBusinessProjects() : Promise.resolve([])])
-      .then(([nextParties, nextMaterials, nextWarehouses, nextBusinessProjects]) => {
-        if (!mounted) return;
-        setParties(nextParties);
-        setMaterials(nextMaterials.map((material) => ({
-          id: material.id,
-          materialCode: material.materialCode,
-          materialName: material.materialName,
-          specification: material.specification,
-          unit: material.projectSiteSaleUnit || material.baseUnit,
-        })));
-        setWarehouses(nextWarehouses.map((warehouse) => ({
-          id: warehouse.id,
-          warehouseCode: warehouse.warehouseCode,
-          warehouseName: warehouse.warehouseName,
-        })));
-        setBusinessProjects(nextBusinessProjects);
-        setMasterStatus("ready");
-        setUsageForm((current) => ({
-          ...current,
-          warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
-          materialId: current.materialId || nextMaterials[0]?.id || "",
-          unit: current.unit || nextMaterials[0]?.projectSiteSaleUnit || nextMaterials[0]?.baseUnit || "",
-        }));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setMasterStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [canEditSites, loadBusinessProjects, loadMaterials, loadParties, loadUsageOptions, loadWarehouses, usageOnly]);
-
-  useEffect(() => {
-    if (usageOnly) {
-      setInvestmentSummary(null);
-      setInvestmentSummaryStatus("idle");
-      return;
-    }
-    if (!selectedInvestmentSiteId) {
-      setInvestmentSummary(null);
-      setInvestmentSummaryStatus("idle");
-      return;
-    }
-
-    let mounted = true;
-    setInvestmentSummaryStatus("loading");
-    loadInvestmentSummary(selectedInvestmentSiteId)
-      .then((summary) => {
-        if (!mounted) return;
-        setInvestmentSummary(summary);
-        setInvestmentSummaryStatus("ready");
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setInvestmentSummary(null);
-        setInvestmentSummaryStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [loadInvestmentSummary, selectedInvestmentSiteId, usageOnly]);
-
-  useEffect(() => {
-    if (sites.length === 0) {
-      setComplianceSummaries({});
-      return;
-    }
-
-    let mounted = true;
-    Promise.all(sites.map((site) => loadComplianceSummary(site.id).then((summary) => [site.id, summary] as const)))
-      .then((entries) => {
-        if (!mounted) return;
-        setComplianceSummaries(Object.fromEntries(entries.filter((entry) => Boolean(entry[1]))));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setComplianceSummaries({});
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [loadComplianceSummary, sites]);
-
-  useEffect(() => {
-    let mounted = true;
-    setKitchenEquipmentStatus("loading");
-    Promise.all([loadKitchenEquipment(), loadKitchenEquipmentChangeRequests()])
-      .then(([nextEquipment, nextChangeRequests]) => {
-        if (!mounted) return;
-        const equipment = Array.isArray(nextEquipment) ? nextEquipment : [];
-        const changeRequests = Array.isArray(nextChangeRequests) ? nextChangeRequests : [];
-        setKitchenEquipment(equipment);
-        setKitchenEquipmentChangeRequests(changeRequests);
-        setKitchenEquipmentStatus("ready");
-        setKitchenEquipmentChangeForm((current) => {
-          const firstEquipment = equipment[0];
-          return {
-            ...current,
-            projectSiteId: current.projectSiteId || firstEquipment?.projectSiteId || "",
-            equipmentId: current.equipmentId || firstEquipment?.id || "",
-            equipmentName: current.equipmentName || firstEquipment?.equipmentName || "",
-          };
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setKitchenEquipment([]);
-        setKitchenEquipmentChangeRequests([]);
-        setKitchenEquipmentStatus("error");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [loadKitchenEquipment, loadKitchenEquipmentChangeRequests]);
+  const {
+    sites,
+    setSites,
+    usageRequests,
+    setUsageRequests,
+    parties,
+    materials,
+    warehouses,
+    businessProjects,
+    selectedInvestmentSiteId,
+    setSelectedInvestmentSiteId,
+    investmentSummary,
+    investmentSummaryStatus,
+    complianceSummaries,
+    kitchenEquipment,
+    setKitchenEquipment,
+    kitchenEquipmentChangeRequests,
+    setKitchenEquipmentChangeRequests,
+    kitchenEquipmentStatus,
+    setKitchenEquipmentStatus,
+    siteStatus,
+    usageStatus,
+    masterStatus,
+  } = useProjectSitesData({
+    canEditSites,
+    usageOnly,
+    loadProjectSites,
+    loadUsageRequests,
+    loadParties,
+    loadMaterials,
+    loadWarehouses,
+    loadUsageOptions,
+    loadBusinessProjects,
+    loadInvestmentSummary,
+    loadComplianceSummary,
+    loadKitchenEquipment,
+    loadKitchenEquipmentChangeRequests,
+    onProjectSitesLoaded,
+    onUsageRequestsLoaded,
+    onMasterDataLoaded,
+    onUsageOptionsLoaded,
+    onKitchenEquipmentLoaded,
+  });
 
   const scopedProjectSiteIds = useMemo(() => (usageOnly && sites.length > 0 ? sites.map((site) => site.id) : undefined), [sites, usageOnly]);
   const filteredSites = useMemo(() => filterProjectSites(sites, query), [query, sites]);
