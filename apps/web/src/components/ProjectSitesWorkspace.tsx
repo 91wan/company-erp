@@ -1,8 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
-  PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
-  PROJECT_USAGE_STATUSES,
   type AttachmentRecordDto,
   type BusinessProjectDto,
   type CreateProjectSiteKitchenEquipmentChangeRequestInput,
@@ -24,30 +21,16 @@ import {
 } from "@company-erp/shared";
 import { createAttachment, getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
 import {
-  ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
-import { ProjectSiteActionBar } from "./project-sites/ProjectSiteActionBar";
+import { ExternalProjectSiteWorkspaceView } from "./project-sites/ExternalProjectSiteWorkspaceView";
 import {
   type ProjectSiteCreateFormState,
 } from "./project-sites/ProjectSiteCreateFormDrawer";
-import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
-import { ProjectSiteModuleIntro } from "./project-sites/ProjectSiteModuleIntro";
-import { ProjectSiteSummaryCards } from "./project-sites/ProjectSiteSummaryCards";
-import {
-  ProjectUsageRequestFormDrawer,
-  type ProjectUsageRequestFormState,
-} from "./project-sites/ProjectUsageRequestFormDrawer";
+import type { ProjectUsageRequestFormState } from "./project-sites/ProjectUsageRequestFormDrawer";
 import type { ProjectUsageIssueFormState } from "./project-sites/ProjectUsageIssueFormDrawer";
-import {
-  ProjectSiteKitchenEquipmentCreateFormDrawer,
-  type ProjectSiteKitchenEquipmentCreateFormState,
-} from "./project-sites/ProjectSiteKitchenEquipmentCreateFormDrawer";
-import {
-  ProjectSiteKitchenEquipmentChangeFormDrawer,
-  type ProjectSiteKitchenEquipmentChangeFormState,
-} from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
-import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
+import type { ProjectSiteKitchenEquipmentCreateFormState } from "./project-sites/ProjectSiteKitchenEquipmentCreateFormDrawer";
+import type { ProjectSiteKitchenEquipmentChangeFormState } from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
 import {
   ProjectSitesHeadquartersView,
   type ProjectSiteFormDrawer,
@@ -132,17 +115,6 @@ type KitchenEquipmentFormState = ProjectSiteKitchenEquipmentCreateFormState;
 type KitchenEquipmentChangeFormState = ProjectSiteKitchenEquipmentChangeFormState;
 
 type IssueFormState = ProjectUsageIssueFormState;
-
-const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-const kitchenEquipmentStatusLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => [status.code, status.label]));
-const kitchenEquipmentChangeTypeLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => [type.code, type.label]));
-const complianceReviewStatusLabel = new Map([
-  ["pending", "待审核"],
-  ["approved", "已通过"],
-  ["rejected", "已驳回"],
-  ["missing", "缺失"],
-  ["not_required", "不需要"],
-]);
 
 export function ProjectSitesWorkspace({
   loadProjectSites = defaultLoadProjectSites,
@@ -375,132 +347,55 @@ export function ProjectSitesWorkspace({
   return (
     <section className="project-sites-workspace" aria-label="项目点">
       {usageOnly ? (
-        <>
-          <ExternalProjectSitePortal
-            section={portalSection}
-            sites={sites}
-            complianceSummaries={complianceSummaries}
-            visibleProjectSiteCount={sites.length}
-            pendingUsageCount={pendingUsageCount}
-            pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-            currentContactName={externalProjectSiteContactName}
-            currentContactPhone={externalProjectSiteContactPhone}
-            onSelectSection={onPortalSectionChange}
-          />
-
-          <ProjectSiteModuleIntro usageOnly canIssueUsage={canIssueUsage} />
-
-          <ProjectSiteActionBar
-            usageOnly
-            canEditSites={canEditSites}
-            canCreateUsage={canCreateUsage}
-            canIssueUsage={canIssueUsage}
-            onOpenForm={setOpenFormDrawer}
-          />
-          {masterStatus === "error" ? (
-            <p className="form-error">物料或默认仓库接口暂不可用，暂不能登记领用。</p>
-          ) : null}
-
-          <ProjectSiteSummaryCards
-            usageOnly
-            siteCount={sites.length}
-            activeSiteCount={activeSiteCount}
-            pendingUsageCount={pendingUsageCount}
-            totalRequestedQuantity={totalRequestedQuantity}
-            totalIssuedQuantity={totalIssuedQuantity}
-            kitchenEquipmentCount={kitchenEquipment.length}
-            pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-            complianceBlockingIssueCount={complianceBlockingIssueCount}
-            complianceWarningIssueCount={complianceWarningIssueCount}
-          />
-
-          <ProjectSiteKitchenEquipmentPanel
-            kitchenEquipment={filteredKitchenEquipment}
-            changeRequests={filteredKitchenEquipmentChangeRequests}
-            status={kitchenEquipmentStatus}
-            usageOnly
-            kitchenEquipmentStatusLabel={kitchenEquipmentStatusLabel}
-            kitchenEquipmentChangeTypeLabel={kitchenEquipmentChangeTypeLabel}
-            complianceReviewStatusLabel={complianceReviewStatusLabel}
-            onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
-          />
-
-          <ProjectSiteKitchenEquipmentCreateFormDrawer
-            open={openFormDrawer === "equipment"}
-            canEditSites={canEditSites}
-            usageOnly
-            form={kitchenEquipmentForm}
-            sites={sites}
-            submitState={kitchenEquipmentSubmitState}
-            submitError={kitchenEquipmentSubmitError}
-            onChange={setKitchenEquipmentForm}
-            onClose={() => setOpenFormDrawer(null)}
-            onSubmit={handleCreateKitchenEquipment}
-          />
-
-          <ProjectSiteKitchenEquipmentChangeFormDrawer
-            open={openFormDrawer === "equipmentChange"}
-            usageOnly
-            form={kitchenEquipmentChangeForm}
-            sites={sites}
-            kitchenEquipment={filteredKitchenEquipment}
-            submitState={kitchenEquipmentChangeSubmitState}
-            submitError={kitchenEquipmentChangeSubmitError}
-            onChange={setKitchenEquipmentChangeForm}
-            onClose={() => setOpenFormDrawer(null)}
-            onSubmit={handleCreateKitchenEquipmentChangeRequest}
-          />
-
-          <div className="party-toolbar">
-            <label className="party-search">
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索项目点、客户、物料、申请单"
-              />
-            </label>
-            <label className="party-filter">
-              <select
-                aria-label="领用状态筛选"
-                value={usageFilter}
-                onChange={(event) => setUsageFilter(event.target.value as "all" | ProjectUsageStatusCode)}
-              >
-                <option value="all">全部领用状态</option>
-                {PROJECT_USAGE_STATUSES.map((status) => (
-                  <option key={status.code} value={status.code}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="project-site-list-layout">
-            <ProjectSiteUsagePanel
-              usageRequests={filteredUsageRequests}
-              status={usageStatus}
-              usageOnly
-              usageStatusLabel={usageStatusLabel}
-            />
-
-            <ProjectUsageRequestFormDrawer
-              open={openFormDrawer === "usage"}
-              canCreateUsage={canCreateUsage}
-              usageOnly
-              form={usageForm}
-              sites={sites}
-              warehouses={warehouses}
-              materials={materials}
-              masterStatus={masterStatus}
-              submitState={usageSubmitState}
-              submitError={usageSubmitError}
-              onChange={setUsageForm}
-              onMaterialChange={updateSelectedMaterial}
-              onClose={() => setOpenFormDrawer(null)}
-              onSubmit={handleCreateUsageRequest}
-            />
-          </div>
-        </>
+        <ExternalProjectSiteWorkspaceView
+          portalSection={portalSection}
+          sites={sites}
+          complianceSummaries={complianceSummaries}
+          pendingUsageCount={pendingUsageCount}
+          pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+          activeSiteCount={activeSiteCount}
+          totalRequestedQuantity={totalRequestedQuantity}
+          totalIssuedQuantity={totalIssuedQuantity}
+          kitchenEquipment={kitchenEquipment}
+          filteredKitchenEquipment={filteredKitchenEquipment}
+          filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
+          kitchenEquipmentStatus={kitchenEquipmentStatus}
+          filteredUsageRequests={filteredUsageRequests}
+          usageStatus={usageStatus}
+          masterStatus={masterStatus}
+          query={query}
+          usageFilter={usageFilter}
+          openFormDrawer={openFormDrawer}
+          canEditSites={canEditSites}
+          canCreateUsage={canCreateUsage}
+          canIssueUsage={canIssueUsage}
+          usageForm={usageForm}
+          kitchenEquipmentForm={kitchenEquipmentForm}
+          kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
+          warehouses={warehouses}
+          materials={materials}
+          usageSubmitState={usageSubmitState}
+          kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
+          kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
+          usageSubmitError={usageSubmitError}
+          kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
+          kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
+          currentContactName={externalProjectSiteContactName}
+          currentContactPhone={externalProjectSiteContactPhone}
+          onSelectSection={onPortalSectionChange}
+          onOpenForm={setOpenFormDrawer}
+          onQueryChange={setQuery}
+          onUsageFilterChange={setUsageFilter}
+          onUsageFormChange={setUsageForm}
+          onKitchenEquipmentFormChange={setKitchenEquipmentForm}
+          onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
+          onMaterialChange={updateSelectedMaterial}
+          onCloseForm={() => setOpenFormDrawer(null)}
+          onCreateUsageRequest={handleCreateUsageRequest}
+          onCreateKitchenEquipment={handleCreateKitchenEquipment}
+          onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
+          onReviewKitchenEquipmentChangeRequest={handleReviewKitchenEquipmentChangeRequest}
+        />
       ) : (
         <ProjectSitesHeadquartersView
           sites={sites}
