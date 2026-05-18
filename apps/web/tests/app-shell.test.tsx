@@ -344,16 +344,16 @@ describe("Company ERP app shell", () => {
     expect(await screen.findByRole("heading", { name: "采购管理" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^总览$/ }));
-    fireEvent.click((await screen.findAllByText(/最近入库/))[0]);
+    fireEvent.click((await screen.findAllByText(/MAT-SUMMARY-LOW/))[0]);
     expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^总览$/ }));
-    fireEvent.click((await screen.findAllByText(/科技园一期项目点/))[0]);
+    fireEvent.click((await screen.findAllByText(/无锡项目点/))[0]);
     expect(await screen.findByRole("heading", { name: "项目点" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^总览$/ }));
-    fireEvent.click(await screen.findByText(/HT20260511001/));
-    expect((await screen.findAllByRole("heading", { name: "合同台账" })).length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByText(/CERT-SUMMARY-001/));
+    expect((await screen.findAllByRole("heading", { name: "证照资质" })).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /^总览$/ }));
     fireEvent.click(await screen.findByText("API 服务"));
@@ -378,16 +378,90 @@ describe("Company ERP app shell", () => {
       expect(screen.getAllByText(panel).length).toBeGreaterThan(0);
     }
 
-    expect(await screen.findByText(/PO20260511001/)).toBeInTheDocument();
+    expect(await screen.findByText(/PO-SUMMARY-001/)).toBeInTheDocument();
     expect(screen.getAllByText(/最近采购/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/最近入库/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/RK20260511001/)).toBeInTheDocument();
-    expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/科技园一期项目点/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/最近入库/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/MAT-SUMMARY-LOW/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/无锡项目点/).length).toBeGreaterThan(0);
   });
 
-  it("loads dashboard metrics and panels from live business API responses", async () => {
+  it("loads dashboard metrics and panels from the dashboard summary API response", async () => {
     mockShellFetch(adminUser, undefined, undefined, {
+      dashboardSummary: {
+        ...defaultDashboardSummary,
+        todoCount: 1,
+        redRiskCount: 3,
+        warningCount: 0,
+        pendingReviewCount: 1,
+        lowStockCount: 1,
+        procurementTodos: [{
+          id: "purchase_request:live-pr-pending",
+          entityType: "purchase_request",
+          entityId: "live-pr-pending",
+          title: "PR-LIVE-APPROVAL",
+          subtitle: "实时申请人",
+          statusLabel: "待审批",
+          tone: "info",
+          targetWorkspace: "采购",
+          updatedAt: "2026-05-13T08:30:00.000Z",
+        }],
+        projectUsageTodos: [],
+        lowStockItems: [{
+          id: "inventory_balance:live-low",
+          entityType: "inventory_balance",
+          entityId: "live-low",
+          title: "LIVE-MAT-LOW",
+          subtitle: "实时低库存物料",
+          statusLabel: "低库存",
+          tone: "danger",
+          targetWorkspace: "库存",
+          updatedAt: "2026-05-13T09:30:00.000Z",
+        }],
+        projectSiteComplianceRisks: [{
+          id: "project_site_compliance:live-site",
+          entityType: "project_site_compliance",
+          entityId: "live-site",
+          title: "实时项目点",
+          subtitle: "阻断 1",
+          statusLabel: "红色风险",
+          tone: "danger",
+          targetWorkspace: "项目点",
+          updatedAt: "2026-05-13T09:30:00.000Z",
+        }],
+        contractRisks: [{
+          id: "contract:live-contract",
+          entityType: "contract",
+          entityId: "live-contract",
+          title: "HT-LIVE-EXPIRED",
+          subtitle: "实时到期合同",
+          statusLabel: "已到期",
+          tone: "danger",
+          targetWorkspace: "合同",
+          updatedAt: "2026-05-13T09:40:00.000Z",
+        }],
+        certificateRisks: [{
+          id: "certificate:live-certificate",
+          entityType: "certificate",
+          entityId: "live-certificate",
+          title: "CERT-LIVE-EXPIRED",
+          subtitle: "实时过期健康证",
+          statusLabel: "已过期",
+          tone: "danger",
+          targetWorkspace: "证照资质",
+          updatedAt: "2026-05-13T09:50:00.000Z",
+        }],
+        recentActivities: [{
+          id: "purchase_record:live-po",
+          entityType: "purchase_record",
+          entityId: "live-po",
+          title: "PO-LIVE-001",
+          subtitle: "实时采购人",
+          statusLabel: "最近采购",
+          tone: "neutral",
+          targetWorkspace: "采购",
+          updatedAt: "2026-05-13T09:00:00.000Z",
+        }],
+      },
       purchaseRequests: [
         {
           ...purchaseRequest,
@@ -483,7 +557,6 @@ describe("Company ERP app shell", () => {
     expect(screen.getByText(/PR-LIVE-APPROVAL/)).toBeInTheDocument();
     expect(screen.getByText(/实时申请人/)).toBeInTheDocument();
     expect(screen.getByText(/PO-LIVE-001/)).toBeInTheDocument();
-    expect(screen.getByText(/LIVE-IN-001/)).toBeInTheDocument();
     expect(screen.getAllByText("实时低库存物料").length).toBeGreaterThan(0);
     expect(screen.getByText("实时项目点")).toBeInTheDocument();
     expect(screen.getByText(/HT-LIVE-EXPIRED/)).toBeInTheDocument();
@@ -491,7 +564,7 @@ describe("Company ERP app shell", () => {
     expect(screen.getAllByText(/实时过期健康证/).length).toBeGreaterThan(0);
   });
 
-  it("uses dashboard summary API before falling back to per-module dashboard loading", async () => {
+  it("uses dashboard summary API without requesting per-site compliance summaries", async () => {
     const fetchMock = mockShellFetch(adminUser, undefined, undefined, { dashboardSummary: defaultDashboardSummary });
 
     render(<App />);
@@ -509,6 +582,54 @@ describe("Company ERP app shell", () => {
 
   it("separates certificate warning, pending review, and project-site compliance risk on the dashboard", async () => {
     mockShellFetch(adminUser, undefined, undefined, {
+      dashboardSummary: {
+        ...defaultDashboardSummary,
+        todoCount: 0,
+        redRiskCount: 1,
+        warningCount: 1,
+        pendingReviewCount: 1,
+        lowStockCount: 0,
+        procurementTodos: [],
+        projectUsageTodos: [],
+        lowStockItems: [],
+        certificateRisks: [
+          {
+            id: "certificate:warning",
+            entityType: "certificate",
+            entityId: "warning",
+            title: "CERT-WARNING-CONFIRMED",
+            subtitle: "已确认临期证照",
+            statusLabel: "即将到期",
+            tone: "warning",
+            targetWorkspace: "证照资质",
+            updatedAt: "2026-05-13T10:00:00.000Z",
+          },
+          {
+            id: "certificate:pending",
+            entityType: "certificate",
+            entityId: "pending",
+            title: "CERT-PENDING-REVIEW",
+            subtitle: "待总部确认资料",
+            statusLabel: "待审核",
+            tone: "info",
+            targetWorkspace: "证照资质",
+            updatedAt: "2026-05-13T10:00:00.000Z",
+          },
+        ],
+        contractRisks: [],
+        projectSiteComplianceRisks: [{
+          id: "project_site_compliance:summary",
+          entityType: "project_site_compliance",
+          entityId: "summary",
+          title: "项目点合规",
+          subtitle: "阻断 2 · 预警 1",
+          statusLabel: "阻断 2",
+          tone: "danger",
+          targetWorkspace: "项目点",
+          updatedAt: "2026-05-13T10:00:00.000Z",
+        }],
+        recentActivities: [],
+      },
       purchaseRequests: [],
       projectUsageRequests: [],
       contracts: [],
@@ -552,6 +673,22 @@ describe("Company ERP app shell", () => {
 
   it("keeps the dashboard usable when one live summary source fails", async () => {
     mockShellFetch(adminUser, undefined, undefined, {
+      dashboardSummary: {
+        ...defaultDashboardSummary,
+        procurementTodos: [{
+          id: "purchase_request:still-visible",
+          entityType: "purchase_request",
+          entityId: "still-visible",
+          title: "PR-LIVE-STILL-VISIBLE",
+          subtitle: "采购申请人",
+          statusLabel: "待审批",
+          tone: "info",
+          targetWorkspace: "采购",
+          updatedAt: "2026-05-13T10:00:00.000Z",
+        }],
+        lowStockItems: [],
+        unavailableSections: ["inventory"],
+      },
       purchaseRequests: [{ ...purchaseRequest, requestNo: "PR-LIVE-STILL-VISIBLE", status: "pending_approval" }],
       failures: ["/api/inventory-balances"],
     });
