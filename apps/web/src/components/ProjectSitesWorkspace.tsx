@@ -14,6 +14,7 @@ import {
   resolveProjectSitesWorkspacePermissions,
 } from "./project-sites/projectSitesWorkspaceOptions";
 import { buildProjectSitesDataInput } from "./project-sites/projectSitesDataInput";
+import { buildProjectSiteMutationInput } from "./project-sites/projectSitesMutationInput";
 import {
   buildExternalProjectSiteWorkspaceViewProps,
   buildProjectSitesHeadquartersViewProps,
@@ -159,36 +160,44 @@ export function ProjectSitesWorkspace(props: ProjectSitesWorkspaceProps) {
     handleCreateKitchenEquipment,
     handleCreateKitchenEquipmentChangeRequest,
     handleReviewKitchenEquipmentChangeRequest,
-  } = useProjectSiteMutations({
-    usageOnly,
-    siteForm,
-    usageForm,
-    issueForm,
-    kitchenEquipmentForm,
-    kitchenEquipmentChangeForm,
-    kitchenEquipment,
-    createProjectSite,
-    createUsageRequest,
-    issueUsageRequest,
-    createKitchenEquipment,
-    createKitchenEquipmentChangeRequest,
-    reviewKitchenEquipmentChangeRequest,
-    loadKitchenEquipment,
-    setSites,
-    setUsageRequests,
-    setIssueForm,
-    setSiteForm,
-    setUsageForm,
-    setKitchenEquipment,
-    setKitchenEquipmentChangeRequests,
-    setKitchenEquipmentForm,
-    setKitchenEquipmentChangeForm,
-    setKitchenEquipmentStatus,
-    setSelectedInvestmentSiteId,
-    setOpenFormDrawer,
-    pendingIssueConfirm,
-    setPendingIssueConfirm,
-  });
+  } = useProjectSiteMutations(buildProjectSiteMutationInput({
+    options: { usageOnly },
+    forms: {
+      siteForm,
+      usageForm,
+      issueForm,
+      kitchenEquipmentForm,
+      kitchenEquipmentChangeForm,
+    },
+    data: { kitchenEquipment },
+    dependencies: {
+      createProjectSite,
+      createUsageRequest,
+      issueUsageRequest,
+      createKitchenEquipment,
+      createKitchenEquipmentChangeRequest,
+      reviewKitchenEquipmentChangeRequest,
+      loadKitchenEquipment,
+    },
+    setters: {
+      setSites,
+      setUsageRequests,
+      setIssueForm,
+      setSiteForm,
+      setUsageForm,
+      setKitchenEquipment,
+      setKitchenEquipmentChangeRequests,
+      setKitchenEquipmentForm,
+      setKitchenEquipmentChangeForm,
+      setKitchenEquipmentStatus,
+      setSelectedInvestmentSiteId,
+      setOpenFormDrawer,
+    },
+    confirmation: {
+      pendingIssueConfirm,
+      setPendingIssueConfirm,
+    },
+  }));
 
   const {
     filteredSites,
