@@ -123,7 +123,7 @@ export function BusinessAttachmentsPanel({
       {downloadError ? <p className="form-error">{downloadError}</p> : null}
 
       {canManage && ownerEntityId && !allowManualRegistration ? (
-        <p className="form-hint">业务页面仅查看和下载统一附件。新增或修改 storage key 请在系统设置的附件管理中登记，避免业务用户填写服务器路径。</p>
+        <p className="form-hint">业务页面仅查看和下载统一附件。新增或修改附件元数据请在系统设置的附件管理中登记，避免业务用户填写服务器路径。</p>
       ) : null}
 
       {canManage && ownerEntityId && allowManualRegistration ? (
