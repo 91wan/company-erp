@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import {
   type AttachmentRecordDto,
   type BusinessProjectDto,
@@ -16,7 +16,6 @@ import {
   type ProjectSiteKitchenEquipmentDto,
   type ProjectUsageOptionsDto,
   type ProjectUsageRequestDto,
-  type ProjectUsageStatusCode,
   type WarehouseDto,
 } from "@company-erp/shared";
 import { getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
@@ -25,15 +24,7 @@ import {
 } from "./project-sites/ExternalProjectSitePortal";
 import { ExternalProjectSiteWorkspaceView } from "./project-sites/ExternalProjectSiteWorkspaceView";
 import {
-  type ProjectSiteCreateFormState,
-} from "./project-sites/ProjectSiteCreateFormDrawer";
-import type { ProjectUsageRequestFormState } from "./project-sites/ProjectUsageRequestFormDrawer";
-import type { ProjectUsageIssueFormState } from "./project-sites/ProjectUsageIssueFormDrawer";
-import type { ProjectSiteKitchenEquipmentCreateFormState } from "./project-sites/ProjectSiteKitchenEquipmentCreateFormDrawer";
-import type { ProjectSiteKitchenEquipmentChangeFormState } from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
-import {
   ProjectSitesHeadquartersView,
-  type ProjectSiteFormDrawer,
 } from "./project-sites/ProjectSitesHeadquartersView";
 import {
   defaultCreateKitchenEquipment,
@@ -54,13 +45,6 @@ import {
   defaultLoadWarehouses,
   defaultReviewKitchenEquipmentChangeRequest,
 } from "./project-sites/projectSiteApi";
-import {
-  createInitialIssueForm,
-  createInitialKitchenEquipmentChangeForm,
-  createInitialKitchenEquipmentForm,
-  createInitialSiteForm,
-  createInitialUsageForm,
-} from "./project-sites/projectSiteFormState";
 import { calculateProjectSiteMetrics, selectScopedProjectSiteIds } from "./project-sites/projectSiteMetrics";
 import {
   filterKitchenEquipment,
@@ -73,6 +57,7 @@ import {
 } from "./project-sites/projectSiteSelectors";
 import { useProjectSitesData } from "./project-sites/useProjectSitesData";
 import { useProjectSiteMutations } from "./project-sites/useProjectSiteMutations";
+import { useProjectSitesWorkspaceState } from "./project-sites/useProjectSitesWorkspaceState";
 
 type ProjectSitesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
@@ -109,14 +94,6 @@ type ProjectSitesWorkspaceProps = {
   externalProjectSiteContactPhone?: string | null;
 };
 
-type SiteFormState = ProjectSiteCreateFormState;
-type UsageFormState = ProjectUsageRequestFormState;
-
-type KitchenEquipmentFormState = ProjectSiteKitchenEquipmentCreateFormState;
-type KitchenEquipmentChangeFormState = ProjectSiteKitchenEquipmentChangeFormState;
-
-type IssueFormState = ProjectUsageIssueFormState;
-
 export function ProjectSitesWorkspace({
   loadProjectSites = defaultLoadProjectSites,
   loadUsageRequests = defaultLoadUsageRequests,
@@ -149,17 +126,29 @@ export function ProjectSitesWorkspace({
   const canEditSites = canManageSites ?? canManage;
   const canCreateUsage = canManageUsage ?? canManage;
   const canIssueUsage = canIssue ?? canManage;
-  const [query, setQuery] = useState("");
-  const [usageFilter, setUsageFilter] = useState<"all" | ProjectUsageStatusCode>("all");
-  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
-  const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
-  const [siteForm, setSiteForm] = useState<SiteFormState>(createInitialSiteForm);
-  const [usageForm, setUsageForm] = useState<UsageFormState>(createInitialUsageForm);
-  const [issueForm, setIssueForm] = useState<IssueFormState>(createInitialIssueForm);
-  const [kitchenEquipmentForm, setKitchenEquipmentForm] = useState<KitchenEquipmentFormState>(createInitialKitchenEquipmentForm);
-  const [kitchenEquipmentChangeForm, setKitchenEquipmentChangeForm] = useState<KitchenEquipmentChangeFormState>(
-    createInitialKitchenEquipmentChangeForm,
-  );
+  const {
+    query,
+    setQuery,
+    usageFilter,
+    setUsageFilter,
+    selectedDetailSiteId,
+    setSelectedDetailSiteId,
+    openFormDrawer,
+    setOpenFormDrawer,
+    siteForm,
+    setSiteForm,
+    usageForm,
+    setUsageForm,
+    issueForm,
+    setIssueForm,
+    kitchenEquipmentForm,
+    setKitchenEquipmentForm,
+    kitchenEquipmentChangeForm,
+    setKitchenEquipmentChangeForm,
+    pendingIssueConfirm,
+    setPendingIssueConfirm,
+    closeFormDrawer,
+  } = useProjectSitesWorkspaceState();
 
   const onProjectSitesLoaded = useCallback((nextSites: ProjectSiteDto[]) => {
     setUsageForm((current) => ({ ...current, projectSiteId: current.projectSiteId || nextSites[0]?.id || "" }));
@@ -259,8 +248,6 @@ export function ProjectSitesWorkspace({
     issueSubmitError,
     kitchenEquipmentSubmitError,
     kitchenEquipmentChangeSubmitError,
-    pendingIssueConfirm,
-    setPendingIssueConfirm,
     handleCreateSite,
     handleCreateUsageRequest,
     handleIssueUsageRequest,
@@ -294,6 +281,8 @@ export function ProjectSitesWorkspace({
     setKitchenEquipmentStatus,
     setSelectedInvestmentSiteId,
     setOpenFormDrawer,
+    pendingIssueConfirm,
+    setPendingIssueConfirm,
   });
 
   const scopedProjectSiteIds = useMemo(() => selectScopedProjectSiteIds(usageOnly, sites), [sites, usageOnly]);
@@ -396,7 +385,7 @@ export function ProjectSitesWorkspace({
           onKitchenEquipmentFormChange={setKitchenEquipmentForm}
           onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
           onMaterialChange={updateSelectedMaterial}
-          onCloseForm={() => setOpenFormDrawer(null)}
+          onCloseForm={closeFormDrawer}
           onCreateUsageRequest={handleCreateUsageRequest}
           onCreateKitchenEquipment={handleCreateKitchenEquipment}
           onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
@@ -468,10 +457,7 @@ export function ProjectSitesWorkspace({
           onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
           onMaterialChange={updateSelectedMaterial}
           onCancelIssueConfirm={() => setPendingIssueConfirm(false)}
-          onCloseForm={() => {
-            setPendingIssueConfirm(false);
-            setOpenFormDrawer(null);
-          }}
+          onCloseForm={closeFormDrawer}
           onCloseDetail={() => setSelectedDetailSiteId("")}
           onCreateSite={handleCreateSite}
           onCreateUsageRequest={handleCreateUsageRequest}

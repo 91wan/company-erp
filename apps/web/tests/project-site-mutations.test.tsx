@@ -20,6 +20,7 @@ describe("useProjectSiteMutations", () => {
     const setIssueForm = vi.fn();
     const setUsageForm = vi.fn();
     const setOpenFormDrawer = vi.fn();
+    const setPendingIssueConfirm = vi.fn();
 
     const { result } = renderHook(() =>
       useProjectSiteMutations({
@@ -61,6 +62,8 @@ describe("useProjectSiteMutations", () => {
         setKitchenEquipmentStatus: vi.fn(),
         setSelectedInvestmentSiteId: vi.fn(),
         setOpenFormDrawer,
+        pendingIssueConfirm: false,
+        setPendingIssueConfirm,
       }),
     );
 
@@ -83,7 +86,11 @@ describe("useProjectSiteMutations", () => {
   it("requires inline confirmation before issuing a usage request", async () => {
     const issueUsageRequest = vi.fn().mockResolvedValue({ ...projectUsageRequest, status: "issued" });
     const setUsageRequests = vi.fn();
-    const { result } = renderHook(() =>
+    let pendingIssueConfirm = false;
+    const setPendingIssueConfirm = vi.fn((value) => {
+      pendingIssueConfirm = typeof value === "function" ? value(pendingIssueConfirm) : value;
+    });
+    const { result, rerender } = renderHook(() =>
       useProjectSiteMutations({
         usageOnly: false,
         siteForm: { siteCode: "", siteName: "", clientPartyId: "", operatorPartyId: "", serviceMode: "direct", subcontractorPartyId: "", region: "", siteAddress: "", serviceType: "", businessProjectId: "", primaryManagerEmployeeId: "", clientContactName: "", clientContactPhone: "", remark: "" },
@@ -111,15 +118,19 @@ describe("useProjectSiteMutations", () => {
         setKitchenEquipmentStatus: vi.fn(),
         setSelectedInvestmentSiteId: vi.fn(),
         setOpenFormDrawer: vi.fn(),
+        pendingIssueConfirm,
+        setPendingIssueConfirm,
       }),
     );
 
     await result.current.handleIssueUsageRequest(submitEvent());
     expect(issueUsageRequest).not.toHaveBeenCalled();
-    await waitFor(() => expect(result.current.pendingIssueConfirm).toBe(true));
+    expect(setPendingIssueConfirm).toHaveBeenCalledWith(true);
 
+    rerender();
     await result.current.handleIssueUsageRequest(submitEvent());
     await waitFor(() => expect(issueUsageRequest).toHaveBeenCalledWith(projectUsageRequest.id, expect.objectContaining({ quantity: 2 })));
     expect(setUsageRequests).toHaveBeenCalledWith(expect.any(Function));
+    expect(setPendingIssueConfirm).toHaveBeenCalledWith(false);
   });
 });
