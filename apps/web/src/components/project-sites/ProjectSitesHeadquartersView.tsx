@@ -21,7 +21,6 @@ import {
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
 import { PageHeader } from "../ui";
-import { ProjectSiteActionBar } from "./ProjectSiteActionBar";
 import {
   ProjectSiteCreateFormDrawer,
   type ProjectSiteCreateFormState,
@@ -37,9 +36,8 @@ import {
 } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./ProjectSiteKitchenEquipmentPanel";
 import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
-import { ProjectSiteModuleIntro } from "./ProjectSiteModuleIntro";
+import { ProjectSiteOperationsOverview } from "./ProjectSiteOperationsOverview";
 import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
-import { ProjectSiteSummaryCards } from "./ProjectSiteSummaryCards";
 import { ProjectSiteToolbar } from "./ProjectSiteToolbar";
 import { ProjectSiteUsagePanel } from "./ProjectSiteUsagePanel";
 import {
@@ -256,21 +254,11 @@ export function ProjectSitesHeadquartersView({
         )}
       />
 
-      <ProjectSiteModuleIntro usageOnly={false} canIssueUsage={canIssueUsage} />
-
-      <ProjectSiteActionBar
-        usageOnly={false}
+      <ProjectSiteOperationsOverview
         canEditSites={canEditSites}
         canCreateUsage={canCreateUsage}
         canIssueUsage={canIssueUsage}
-        onOpenForm={(form) => onOpenForm(form)}
-      />
-      {masterStatus === "error" ? (
-        <p className="form-error">项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。</p>
-      ) : null}
-
-      <ProjectSiteSummaryCards
-        usageOnly={false}
+        masterStatus={masterStatus}
         siteCount={sites.length}
         activeSiteCount={activeSiteCount}
         pendingUsageCount={pendingUsageCount}
@@ -280,6 +268,7 @@ export function ProjectSitesHeadquartersView({
         pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
         complianceBlockingIssueCount={complianceBlockingIssueCount}
         complianceWarningIssueCount={complianceWarningIssueCount}
+        onOpenForm={onOpenForm}
       />
 
       <ProjectSiteKitchenEquipmentPanel
