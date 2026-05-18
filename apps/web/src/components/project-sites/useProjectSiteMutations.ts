@@ -58,6 +58,8 @@ type UseProjectSiteMutationsOptions = {
   setKitchenEquipmentStatus: Dispatch<SetStateAction<"loading" | "ready" | "error">>;
   setSelectedInvestmentSiteId: Dispatch<SetStateAction<string>>;
   setOpenFormDrawer: (drawer: null) => void;
+  pendingIssueConfirm: boolean;
+  setPendingIssueConfirm: Dispatch<SetStateAction<boolean>>;
 };
 
 export function useProjectSiteMutations({
@@ -87,6 +89,8 @@ export function useProjectSiteMutations({
   setKitchenEquipmentStatus,
   setSelectedInvestmentSiteId,
   setOpenFormDrawer,
+  pendingIssueConfirm,
+  setPendingIssueConfirm,
 }: UseProjectSiteMutationsOptions) {
   const [siteSubmitState, setSiteSubmitState] = useState<SubmitState>("idle");
   const [usageSubmitState, setUsageSubmitState] = useState<SubmitState>("idle");
@@ -98,7 +102,6 @@ export function useProjectSiteMutations({
   const [issueSubmitError, setIssueSubmitError] = useState("");
   const [kitchenEquipmentSubmitError, setKitchenEquipmentSubmitError] = useState("");
   const [kitchenEquipmentChangeSubmitError, setKitchenEquipmentChangeSubmitError] = useState("");
-  const [pendingIssueConfirm, setPendingIssueConfirm] = useState(false);
 
   async function handleCreateSite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -277,8 +280,6 @@ export function useProjectSiteMutations({
     issueSubmitError,
     kitchenEquipmentSubmitError,
     kitchenEquipmentChangeSubmitError,
-    pendingIssueConfirm,
-    setPendingIssueConfirm,
     handleCreateSite,
     handleCreateUsageRequest,
     handleIssueUsageRequest,
