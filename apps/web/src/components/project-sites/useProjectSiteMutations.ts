@@ -26,7 +26,7 @@ import {
 
 type SubmitState = "idle" | "saving" | "error";
 
-type UseProjectSiteMutationsOptions = {
+export type UseProjectSiteMutationsOptions = {
   usageOnly: boolean;
   siteForm: ProjectSiteCreateFormState;
   usageForm: ProjectUsageRequestFormState;
