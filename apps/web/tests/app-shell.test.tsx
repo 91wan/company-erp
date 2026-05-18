@@ -811,7 +811,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^现场人员\/健康证$/ }));
     expect((await screen.findAllByRole("heading", { name: "现场人员/健康证提交" })).length).toBeGreaterThan(0);
-    expect(screen.getByText(/待总部系统开放明细维护/)).toBeInTheDocument();
+    expect(screen.getByText(/下方展示当前已有接口可读取的明细/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "证照资质" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存证照" })).not.toBeInTheDocument();
     expect(screen.queryByText("公司员工")).not.toBeInTheDocument();
@@ -830,8 +830,8 @@ describe("Company ERP app shell", () => {
     const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(calledUrls.some((url) => url.includes("/api/project-usage-options"))).toBe(true);
     expect(calledUrls.some((url) => url.includes("/api/project-usage-requests"))).toBe(true);
-    expect(calledUrls.some((url) => url.includes("/api/project-site-roster-persons"))).toBe(false);
-    expect(calledUrls.some((url) => url.includes("/api/certificates"))).toBe(false);
+    expect(calledUrls.some((url) => url.includes("/api/project-site-roster-persons"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/api/certificates"))).toBe(true);
     expect(calledUrls.some((url) => url.includes("/api/parties"))).toBe(false);
     expect(calledUrls.some((url) => url.includes("/api/inventory-balances"))).toBe(false);
   });

@@ -3,6 +3,7 @@ import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-e
 import { PageHeader, SummaryCard, ComplianceChecklist, StatusBadge } from "../ui";
 import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel, complianceStatusLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
+import { ProjectSiteComplianceDetailsPanel, type ProjectSiteComplianceDetailSection } from "./ProjectSiteComplianceDetailsPanel";
 
 export type ExternalProjectSitePortalSection = "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll";
 
@@ -145,7 +146,12 @@ export function ExternalProjectSitePortal({
             ) : null}
           </div>
         ) : (
-          <SectionGuidance section={section} pendingUsageCount={pendingUsageCount} />
+          <>
+            <SectionGuidance section={section} pendingUsageCount={pendingUsageCount} />
+            {primarySite && complianceDetailSectionFor(section) ? (
+              <ProjectSiteComplianceDetailsPanel siteId={primarySite.id} section={complianceDetailSectionFor(section)!} />
+            ) : null}
+          </>
         )}
         {pendingUsageCount === 0 ? <p className="form-helper">暂无可见领用申请。</p> : null}
       </section>
@@ -190,6 +196,14 @@ export function ExternalProjectSitePortal({
   );
 }
 
+function complianceDetailSectionFor(section: ExternalProjectSitePortalSection): ProjectSiteComplianceDetailSection | null {
+  if (section === "rosterHealth") return "rosterHealth";
+  if (section === "foodLicense") return "foodLicense";
+  if (section === "insurance") return "insurance";
+  if (section === "payroll") return "payroll";
+  return null;
+}
+
 function SectionGuidance({
   section,
   pendingUsageCount,
@@ -212,9 +226,9 @@ function SectionGuidance({
   return (
     <div className="external-portal-task-strip" aria-label="合规资料处理">
       <article>
-        <StatusBadge tone="notApplicable">待后端支持</StatusBadge>
+        <StatusBadge tone="info">明细</StatusBadge>
         <strong>{sectionCopy[section].title}</strong>
-        <span>当前仅展示合规摘要任务；明细维护和审核流程待总部系统开放明细维护，附件由总部登记或后续上传接口支持。</span>
+        <span>下方展示当前已有接口可读取的明细；附件由总部登记或后续上传接口支持。</span>
       </article>
     </div>
   );
