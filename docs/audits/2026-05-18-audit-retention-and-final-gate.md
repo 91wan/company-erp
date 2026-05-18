@@ -1,7 +1,7 @@
 # Audit retention and final gate
 
 Date: 2026-05-18
-Scope: NAS intranet trial readiness after the project-site compliance detail, compliance submission, and backup/restore drill slices. This is a local verification record only; it does not deploy, read, or restart NAS services and does not import real business data.
+Scope: NAS intranet trial readiness after the project-site compliance detail, compliance submission, and backup restore drill slices. This is a local verification record only; it does not deploy, read, or restart NAS services and does not import real business data.
 
 ## 结论
 
@@ -32,5 +32,5 @@ Scope: NAS intranet trial readiness after the project-site compliance detail, co
 ## 仍需后续支持
 
 - 真实文件上传、附件 owner 迁移、OCR、附件归档和正式下载审计仍需独立切片。
-- 项目点合规明细已优先接入现有 API；被保人员等尚无稳定明细接口的项目继续显示后续开放，不伪装成完整功能。
+- 项目点合规明细已优先接入现有 API：项目点现场人员、健康证、食品经营许可证、雇主责任险保单、被保人员和工资表均可在 scoped 视图中读取；仍无稳定接口的项目继续显示后续开放，不伪装成完整功能。
 - NAS 试点前应至少完成一次本地备份恢复演练；如果 Docker 不可用，必须记录 `BLOCKED` 原因，不能误报演练成功。

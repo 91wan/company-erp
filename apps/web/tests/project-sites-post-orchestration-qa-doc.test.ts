@@ -11,12 +11,14 @@ describe("project-sites post-orchestration QA audit", () => {
     expect(audit).toContain("## 覆盖范围");
     expect(audit).toContain("## 回归断言");
     expect(audit).toContain("## 修复项");
-    expect(audit).toContain("## 后续需要后端支持的口径");
+    expect(audit).toContain("## 合规明细当前口径");
     expect(audit).toContain("admin");
     expect(audit).toContain("viewer");
     expect(audit).toContain("project_site");
     expect(audit).toContain("external_project_site");
     expect(audit).toContain("统一附件 owner-context");
     expect(audit).toContain("成本/采购价/库存金额不可见");
+    expect(audit).toContain("被保人员");
+    expect(audit).toContain("已接入现有后端明细接口");
   });
 });

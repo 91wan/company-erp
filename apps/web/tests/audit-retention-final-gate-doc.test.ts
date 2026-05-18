@@ -21,6 +21,8 @@ describe("audit retention and final gate record", () => {
     expect(audit).toContain("project_site");
     expect(audit).toContain("external_project_site");
     expect(audit).toContain("附件 scope");
+    expect(audit).toContain("被保人员");
+    expect(audit).toContain("backup restore drill");
     expect(audit).toContain("禁止公网暴露 API/PostgreSQL");
   });
 });
