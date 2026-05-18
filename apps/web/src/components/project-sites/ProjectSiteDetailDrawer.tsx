@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type {
   AttachmentRecordDto,
-  CreateAttachmentRecordInput,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteDto,
   ProjectSiteKitchenEquipmentDto,
@@ -29,7 +28,6 @@ export function ProjectSiteDetailDrawer({
   usageRequests,
   kitchenEquipment,
   loadAttachments,
-  createAttachment,
   getAttachmentDownloadUrl,
   canManageAttachments = false,
   onClose,
@@ -39,7 +37,6 @@ export function ProjectSiteDetailDrawer({
   usageRequests: ProjectUsageRequestDto[];
   kitchenEquipment: ProjectSiteKitchenEquipmentDto[];
   loadAttachments: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
-  createAttachment: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
   getAttachmentDownloadUrl: (id: string) => Promise<string>;
   canManageAttachments?: boolean;
   onClose: () => void;
@@ -152,7 +149,6 @@ export function ProjectSiteDetailDrawer({
             ownerEntityId={site.id}
             canManage={canManageAttachments}
             loadAttachments={loadAttachments}
-            createAttachment={createAttachment}
             getAttachmentDownloadUrl={getAttachmentDownloadUrl}
           />
         ) : null}

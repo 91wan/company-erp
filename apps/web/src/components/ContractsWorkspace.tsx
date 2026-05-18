@@ -17,11 +17,10 @@ import {
   type ContractStatusCode,
   type ContractSubjectCategoryCode,
   type CreateContractInput,
-  type CreateAttachmentRecordInput,
   type PartyDto,
   type ProjectSiteDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, createAttachment, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
+import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
 
@@ -32,7 +31,6 @@ type ContractsWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadBusinessProjects?: () => Promise<BusinessProjectDto[]>;
   loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
-  createUnifiedAttachment?: (input: CreateAttachmentRecordInput) => Promise<AttachmentRecordDto>;
   getUnifiedAttachmentDownloadUrl?: (id: string) => Promise<string>;
   canManage?: boolean;
 };
@@ -100,7 +98,6 @@ export function ContractsWorkspace({
   loadProjectSites = defaultLoadProjectSites,
   loadBusinessProjects = defaultLoadBusinessProjects,
   loadUnifiedAttachments = getAttachments,
-  createUnifiedAttachment = createAttachment,
   getUnifiedAttachmentDownloadUrl = getAttachmentDownloadUrl,
   canManage = true,
 }: ContractsWorkspaceProps) {
@@ -458,7 +455,6 @@ export function ContractsWorkspace({
               canManage={canManage}
               legacyPaths={[{ label: "主附件引用（历史路径）", value: selectedContract.attachmentRef }]}
               loadAttachments={loadUnifiedAttachments}
-              createAttachment={createUnifiedAttachment}
               getAttachmentDownloadUrl={getUnifiedAttachmentDownloadUrl}
             />
           </>
