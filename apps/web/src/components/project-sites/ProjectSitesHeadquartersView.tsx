@@ -1,8 +1,6 @@
 import { MapPin } from "lucide-react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
-  PROJECT_SITE_SERVICE_MODES,
-  PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
   type AttachmentRecordDto,
   type BusinessProjectDto,
@@ -19,17 +17,14 @@ import {
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
 import { PageHeader } from "../ui";
-import {
-  ProjectSiteCreateFormDrawer,
-  type ProjectSiteCreateFormState,
-} from "./ProjectSiteCreateFormDrawer";
+import type { ProjectSiteCreateFormState } from "./ProjectSiteCreateFormDrawer";
 import { ProjectSiteDetailDrawer } from "./ProjectSiteDetailDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
 import type { ProjectSiteKitchenEquipmentCreateFormState } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
 import { ProjectSiteEquipmentSection } from "./ProjectSiteEquipmentSection";
 import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
 import { ProjectSiteOperationsOverview } from "./ProjectSiteOperationsOverview";
-import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
+import { ProjectSiteRiskLedgerSection } from "./ProjectSiteRiskLedgerSection";
 import { ProjectSiteToolbar } from "./ProjectSiteToolbar";
 import { ProjectSiteUsageSection } from "./ProjectSiteUsageSection";
 import type { ProjectUsageIssueFormState } from "./ProjectUsageIssueFormDrawer";
@@ -125,27 +120,7 @@ type ProjectSitesHeadquartersViewProps = {
   getAttachmentDownloadUrl: (id: string) => Promise<string>;
 };
 
-const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
-const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-const complianceComputedStatusLabel = new Map([
-  ["valid", "有效"],
-  ["expiring_soon", "即将到期"],
-  ["expired", "已过期"],
-  ["review_due_soon", "即将复核"],
-  ["review_due", "待复核"],
-  ["archived", "归档"],
-  ["disabled", "已停用"],
-  ["missing", "缺失"],
-  ["not_applicable", "不适用"],
-]);
-const complianceReviewStatusLabel = new Map([
-  ["pending", "待审核"],
-  ["approved", "已通过"],
-  ["rejected", "已驳回"],
-  ["missing", "缺失"],
-  ["not_required", "不需要"],
-]);
 
 export function ProjectSitesHeadquartersView({
   sites,
@@ -283,34 +258,25 @@ export function ProjectSitesHeadquartersView({
         onUsageFilterChange={onUsageFilterChange}
       />
 
-      <div className="project-site-list-layout">
-        <ProjectSiteRiskTable
-          sites={filteredSites}
-          status={siteStatus}
-          serviceModeLabel={serviceModeLabel}
-          siteStatusLabel={siteStatusLabel}
-          complianceSummaries={complianceSummaries}
-          complianceComputedStatusLabel={complianceComputedStatusLabel}
-          complianceReviewStatusLabel={complianceReviewStatusLabel}
-          onSelectSite={onSelectSite}
-        />
-
-        <ProjectSiteCreateFormDrawer
-          open={openFormDrawer === "site"}
-          canEditSites={canEditSites}
-          form={siteForm}
-          clientParties={clientParties}
-          operatorParties={operatorParties}
-          subcontractorParties={subcontractorParties}
-          businessProjects={businessProjects}
-          masterStatus={masterStatus}
-          submitState={siteSubmitState}
-          submitError={siteSubmitError}
-          onChange={onSiteFormChange}
-          onClose={onCloseForm}
-          onSubmit={onCreateSite}
-        />
-      </div>
+      <ProjectSiteRiskLedgerSection
+        filteredSites={filteredSites}
+        siteStatus={siteStatus}
+        complianceSummaries={complianceSummaries}
+        openFormDrawer={openFormDrawer}
+        canEditSites={canEditSites}
+        siteForm={siteForm}
+        clientParties={clientParties}
+        operatorParties={operatorParties}
+        subcontractorParties={subcontractorParties}
+        businessProjects={businessProjects}
+        masterStatus={masterStatus}
+        siteSubmitState={siteSubmitState}
+        siteSubmitError={siteSubmitError}
+        onSelectSite={onSelectSite}
+        onSiteFormChange={onSiteFormChange}
+        onCloseForm={onCloseForm}
+        onCreateSite={onCreateSite}
+      />
 
       <ProjectSiteInvestmentSection
         sites={sites}
