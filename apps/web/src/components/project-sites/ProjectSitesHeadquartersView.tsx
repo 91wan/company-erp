@@ -31,15 +31,9 @@ import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
 import { ProjectSiteOperationsOverview } from "./ProjectSiteOperationsOverview";
 import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
 import { ProjectSiteToolbar } from "./ProjectSiteToolbar";
-import { ProjectSiteUsagePanel } from "./ProjectSiteUsagePanel";
-import {
-  ProjectUsageIssueFormDrawer,
-  type ProjectUsageIssueFormState,
-} from "./ProjectUsageIssueFormDrawer";
-import {
-  ProjectUsageRequestFormDrawer,
-  type ProjectUsageRequestFormState,
-} from "./ProjectUsageRequestFormDrawer";
+import { ProjectSiteUsageSection } from "./ProjectSiteUsageSection";
+import type { ProjectUsageIssueFormState } from "./ProjectUsageIssueFormDrawer";
+import type { ProjectUsageRequestFormState } from "./ProjectUsageRequestFormDrawer";
 import type { UsageWarehouseOption } from "./useProjectSitesData";
 
 export type ProjectSiteFormDrawer = "site" | "usage" | "issue" | "equipment" | "equipmentChange" | null;
@@ -326,44 +320,32 @@ export function ProjectSitesHeadquartersView({
         onSelectedSiteChange={onSelectedInvestmentSiteChange}
       />
 
-      <div className="project-site-list-layout">
-        <ProjectSiteUsagePanel
-          usageRequests={filteredUsageRequests}
-          status={usageStatus}
-          usageOnly={false}
-          usageStatusLabel={usageStatusLabel}
-        />
-
-        <ProjectUsageRequestFormDrawer
-          open={openFormDrawer === "usage"}
-          canCreateUsage={canCreateUsage}
-          usageOnly={false}
-          form={usageForm}
-          sites={sites}
-          warehouses={warehouses}
-          materials={materials}
-          masterStatus={masterStatus}
-          submitState={usageSubmitState}
-          submitError={usageSubmitError}
-          onChange={onUsageFormChange}
-          onMaterialChange={onMaterialChange}
-          onClose={onCloseForm}
-          onSubmit={onCreateUsageRequest}
-        />
-      </div>
-
-      <ProjectUsageIssueFormDrawer
-        open={openFormDrawer === "issue"}
-        canIssueUsage={canIssueUsage}
-        form={issueForm}
+      <ProjectSiteUsageSection
         usageRequests={usageRequests}
+        filteredUsageRequests={filteredUsageRequests}
+        usageStatus={usageStatus}
+        usageStatusLabel={usageStatusLabel}
+        openFormDrawer={openFormDrawer}
+        canCreateUsage={canCreateUsage}
+        canIssueUsage={canIssueUsage}
+        usageForm={usageForm}
+        issueForm={issueForm}
+        sites={sites}
+        warehouses={warehouses}
+        materials={materials}
+        masterStatus={masterStatus}
         pendingIssueConfirm={pendingIssueConfirm}
-        submitState={issueSubmitState}
-        submitError={issueSubmitError}
-        onChange={onIssueFormChange}
-        onCancelConfirm={onCancelIssueConfirm}
-        onClose={onCloseForm}
-        onSubmit={onIssueUsageRequest}
+        usageSubmitState={usageSubmitState}
+        issueSubmitState={issueSubmitState}
+        usageSubmitError={usageSubmitError}
+        issueSubmitError={issueSubmitError}
+        onUsageFormChange={onUsageFormChange}
+        onIssueFormChange={onIssueFormChange}
+        onMaterialChange={onMaterialChange}
+        onCancelIssueConfirm={onCancelIssueConfirm}
+        onCloseForm={onCloseForm}
+        onCreateUsageRequest={onCreateUsageRequest}
+        onIssueUsageRequest={onIssueUsageRequest}
       />
 
       <ProjectSiteDetailDrawer
