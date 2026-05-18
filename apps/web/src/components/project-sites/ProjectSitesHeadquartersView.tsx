@@ -1,8 +1,6 @@
 import { MapPin } from "lucide-react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
-  PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
-  PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
   PROJECT_SITE_SERVICE_MODES,
   PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
@@ -26,15 +24,9 @@ import {
   type ProjectSiteCreateFormState,
 } from "./ProjectSiteCreateFormDrawer";
 import { ProjectSiteDetailDrawer } from "./ProjectSiteDetailDrawer";
-import {
-  ProjectSiteKitchenEquipmentChangeFormDrawer,
-  type ProjectSiteKitchenEquipmentChangeFormState,
-} from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
-import {
-  ProjectSiteKitchenEquipmentCreateFormDrawer,
-  type ProjectSiteKitchenEquipmentCreateFormState,
-} from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
-import { ProjectSiteKitchenEquipmentPanel } from "./ProjectSiteKitchenEquipmentPanel";
+import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
+import type { ProjectSiteKitchenEquipmentCreateFormState } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
+import { ProjectSiteEquipmentSection } from "./ProjectSiteEquipmentSection";
 import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
 import { ProjectSiteOperationsOverview } from "./ProjectSiteOperationsOverview";
 import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
@@ -142,8 +134,6 @@ type ProjectSitesHeadquartersViewProps = {
 const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-const kitchenEquipmentStatusLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => [status.code, status.label]));
-const kitchenEquipmentChangeTypeLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => [type.code, type.label]));
 const complianceComputedStatusLabel = new Map([
   ["valid", "有效"],
   ["expiring_soon", "即将到期"],
@@ -271,41 +261,25 @@ export function ProjectSitesHeadquartersView({
         onOpenForm={onOpenForm}
       />
 
-      <ProjectSiteKitchenEquipmentPanel
-        kitchenEquipment={filteredKitchenEquipment}
-        changeRequests={filteredKitchenEquipmentChangeRequests}
-        status={kitchenEquipmentStatus}
-        usageOnly={false}
-        kitchenEquipmentStatusLabel={kitchenEquipmentStatusLabel}
-        kitchenEquipmentChangeTypeLabel={kitchenEquipmentChangeTypeLabel}
-        complianceReviewStatusLabel={complianceReviewStatusLabel}
-        onReviewChangeRequest={(id, reviewStatus) => void onReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
-      />
-
-      <ProjectSiteKitchenEquipmentCreateFormDrawer
-        open={openFormDrawer === "equipment"}
+      <ProjectSiteEquipmentSection
+        filteredKitchenEquipment={filteredKitchenEquipment}
+        filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
+        kitchenEquipmentStatus={kitchenEquipmentStatus}
+        openFormDrawer={openFormDrawer}
         canEditSites={canEditSites}
-        usageOnly={false}
-        form={kitchenEquipmentForm}
+        kitchenEquipmentForm={kitchenEquipmentForm}
+        kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
         sites={sites}
-        submitState={kitchenEquipmentSubmitState}
-        submitError={kitchenEquipmentSubmitError}
-        onChange={onKitchenEquipmentFormChange}
-        onClose={onCloseForm}
-        onSubmit={onCreateKitchenEquipment}
-      />
-
-      <ProjectSiteKitchenEquipmentChangeFormDrawer
-        open={openFormDrawer === "equipmentChange"}
-        usageOnly={false}
-        form={kitchenEquipmentChangeForm}
-        sites={sites}
-        kitchenEquipment={filteredKitchenEquipment}
-        submitState={kitchenEquipmentChangeSubmitState}
-        submitError={kitchenEquipmentChangeSubmitError}
-        onChange={onKitchenEquipmentChangeFormChange}
-        onClose={onCloseForm}
-        onSubmit={onCreateKitchenEquipmentChangeRequest}
+        kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
+        kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
+        kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
+        kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
+        onKitchenEquipmentFormChange={onKitchenEquipmentFormChange}
+        onKitchenEquipmentChangeFormChange={onKitchenEquipmentChangeFormChange}
+        onCloseForm={onCloseForm}
+        onCreateKitchenEquipment={onCreateKitchenEquipment}
+        onCreateKitchenEquipmentChangeRequest={onCreateKitchenEquipmentChangeRequest}
+        onReviewKitchenEquipmentChangeRequest={onReviewKitchenEquipmentChangeRequest}
       />
 
       <ProjectSiteToolbar
