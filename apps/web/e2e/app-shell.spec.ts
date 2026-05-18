@@ -314,8 +314,8 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByLabel("当前门户分区").getByText("健康证阻断")).toBeVisible();
   await expect(page.getByRole("button", { name: "处理健康证阻断" })).toBeVisible();
   await page.getByRole("button", { name: "处理健康证阻断" }).click();
-  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
-  await expect(page.getByText("现场人员/健康证提交")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toHaveCount(0);
+  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "现场人员/健康证提交" })).toBeVisible();
   await externalSidebar.getByRole("button", { name: "我的项目点", exact: true }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
@@ -339,12 +339,10 @@ test("external project-site accounts render only scoped project-site compliance 
   await expect(page.getByRole("button", { name: "月度经营报表 后续开放" })).toHaveCount(0);
 
   await externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "保存证照" })).toBeVisible();
-  const ownerTypeSelect = page.getByLabel("归属对象");
-  await expect(ownerTypeSelect).toHaveValue("person");
-  await expect(page.getByLabel("人员来源")).toHaveValue("roster");
-  expect(await ownerTypeSelect.locator("option").allTextContents()).toEqual(["人员", "项目点"]);
+  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "现场人员/健康证提交" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "保存证照" })).toHaveCount(0);
+  await expect(page.getByLabel("归属对象")).toHaveCount(0);
   await expectHealthyShell(page, issues);
 });
 

@@ -32,7 +32,7 @@ export function isReadOnlyUser(currentUser: AuthenticatedUserDto): boolean {
 }
 
 export function workspaceForExternalPortalSection(section: ExternalProjectSitePortalSection): WorkspaceKey {
-  if (section === "rosterHealth" || section === "foodLicense") return "证照资质";
+  void section;
   return "项目点";
 }
 
