@@ -7,8 +7,48 @@ POSTGRES_USER="${POSTGRES_USER:-company_erp}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-company_erp}"
 POSTGRES_DB="${POSTGRES_DB:-company_erp_backup_restore_test}"
 
-if ! "$DOCKER_BIN" info >/dev/null 2>&1; then
-  echo "Docker daemon is required for backup/restore verification" >&2
+usage() {
+  cat <<'EOF'
+Usage: npm run test:backup-restore [-- --dry-run]
+       scripts/test-backup-restore.sh [--help|--dry-run]
+
+Runs a local backup/restore drill against a temporary PostgreSQL container.
+It seeds non-production verification rows, creates a pg_dump, resets the
+temporary schema, restores the dump, and verifies the restored rows.
+
+Options:
+  --help     Print this help and exit without checking Docker or env files.
+  --dry-run  Print what would be checked without starting Docker.
+
+This script never reads .env, NAS data directories, NAS attachments, or real
+ERP data. It uses only a disposable PostgreSQL container and a temporary dump.
+EOF
+}
+
+case "${1:-}" in
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  --dry-run)
+    echo "Backup/restore drill dry-run"
+    echo "Would start a temporary PostgreSQL container using ${POSTGRES_IMAGE}."
+    echo "Would create a pg_dump, reset the temporary schema, restore it, and verify smoke rows."
+    echo "No NAS data, attachments, or .env file will be read."
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if ! command -v "$DOCKER_BIN" >/dev/null 2>&1 || ! "$DOCKER_BIN" info >/dev/null 2>&1; then
+  echo "BLOCKED: Docker daemon is required for backup/restore verification" >&2
+  echo "Install/start Docker locally, then rerun npm run test:backup-restore." >&2
   exit 1
 fi
 

@@ -211,6 +211,59 @@ describe("NAS preflight script", () => {
   });
 });
 
+describe("backup restore drill script", () => {
+  it("prints help without requiring Docker or reading deployment env", () => {
+    const result = spawnSync("bash", ["scripts/test-backup-restore.sh", "--help"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DOCKER_BIN: join(tmpdir(), "company-erp-missing-docker"),
+        POSTGRES_PASSWORD: "should-not-be-required",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run test:backup-restore");
+    expect(result.stdout).toContain("--dry-run");
+    expect(result.stderr).toBe("");
+  });
+
+  it("supports dry-run without starting Docker or reading NAS paths", () => {
+    const result = spawnSync("bash", ["scripts/test-backup-restore.sh", "--dry-run"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DOCKER_BIN: join(tmpdir(), "company-erp-missing-docker"),
+        NAS_DATA_ROOT: "/volume1/should-not-be-read",
+        NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Backup/restore drill dry-run");
+    expect(result.stdout).toContain("No NAS data, attachments, or .env file will be read");
+    expect(result.stderr).toBe("");
+  });
+
+  it("reports a blocker when Docker is unavailable instead of reporting success", () => {
+    const result = spawnSync("bash", ["scripts/test-backup-restore.sh"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DOCKER_BIN: join(tmpdir(), "company-erp-missing-docker"),
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("BLOCKED");
+    expect(result.stderr).toContain("Docker daemon is required");
+    expect(result.stdout).not.toContain("Backup/restore verification passed");
+  });
+});
+
 function createCleanupPrisma() {
   const count = vi.fn(async () => 1);
   const deleteMany = vi.fn(async () => ({ count: 1 }));

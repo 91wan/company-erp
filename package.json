@@ -14,7 +14,8 @@
     "typecheck": "npm run typecheck -ws --if-present",
     "db:generate": "prisma generate --schema database/prisma/schema.prisma",
     "db:validate": "prisma validate --schema database/prisma/schema.prisma",
-    "preflight:nas": "bash scripts/preflight-nas.sh"
+    "preflight:nas": "bash scripts/preflight-nas.sh",
+    "test:backup-restore": "bash scripts/test-backup-restore.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

@@ -131,6 +131,19 @@ against a temporary PostgreSQL container. The workflow only seeds synthetic
 `backup_restore_smoke` rows and never touches NAS data, attachments, or real ERP
 records.
 
+Before the NAS trial starts, run the same drill locally at least once and record
+the result with the deploy revision:
+
+```bash
+npm run test:backup-restore -- --dry-run
+npm run test:backup-restore
+```
+
+If Docker is unavailable, the script exits with a `BLOCKED` message instead of
+reporting success. The drill does not read `.env`, NAS paths, attachments, or
+real business data; it only validates that the pg_dump/restore chain works on a
+temporary PostgreSQL container.
+
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
 `POSTGRES_MEMORY_LIMIT`, `API_MEMORY_LIMIT`, and `WEB_MEMORY_LIMIT` in the NAS
@@ -410,6 +423,8 @@ Keep these artifacts together for a recoverable snapshot:
 - Attachments archive from `scripts/nas-backup.sh`.
 - The NAS `.env` file stored outside Git.
 - `.deploy-revision.json` or the exact Git commit used for the Docker build.
+- A record that `npm run test:backup-restore` passed before the trial deploy, or
+  a documented blocker if Docker was not available on the operator machine.
 
 ## Restore
 
