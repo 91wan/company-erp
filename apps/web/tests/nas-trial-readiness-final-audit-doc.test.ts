@@ -22,6 +22,9 @@ describe("NAS trial readiness final audit", () => {
     expect(audit).toContain("actorUsername");
     expect(audit).toContain("FormDrawer");
     expect(audit).toContain("preflight:nas");
+    expect(audit).toContain("backup restore drill");
+    expect(audit).toContain("被保人员");
+    expect(audit).toContain("仅进入项目点门户");
     expect(audit).toContain("禁止公网暴露 API/PostgreSQL");
   });
 });
