@@ -13,12 +13,12 @@ import {
   createInitialUsageForm,
 } from "../src/components/project-sites/projectSiteFormState";
 
-function renderExternalView() {
+function renderExternalView(portalSection: "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll" = "overview") {
   const onSelectSection = vi.fn();
 
   render(
     <ExternalProjectSiteWorkspaceView
-      portalSection="overview"
+      portalSection={portalSection}
       sites={[projectSite]}
       complianceSummaries={{ [projectSite.id]: projectSiteComplianceSummary }}
       pendingUsageCount={0}
@@ -106,5 +106,14 @@ describe("ExternalProjectSiteWorkspaceView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "工资表提交" }));
     expect(onSelectSection).toHaveBeenCalledWith("payroll");
+  });
+
+  it("shows scoped compliance submit forms without project-site or storage-key fields", () => {
+    renderExternalView("insurance");
+
+    expect(screen.getByRole("form", { name: "雇主责任险保单提交" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("项目点")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Storage Key/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/附件由总部登记或后续上传接口支持/).length).toBeGreaterThan(0);
   });
 });

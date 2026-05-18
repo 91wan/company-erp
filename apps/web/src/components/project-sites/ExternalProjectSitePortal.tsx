@@ -3,7 +3,8 @@ import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-e
 import { PageHeader, SummaryCard, ComplianceChecklist, StatusBadge } from "../ui";
 import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel, complianceStatusLabel, complianceStatusTone } from "./projectSiteComplianceStatus";
-import { ProjectSiteComplianceDetailsPanel, type ProjectSiteComplianceDetailSection } from "./ProjectSiteComplianceDetailsPanel";
+import { ProjectSiteComplianceDetailsPanel } from "./ProjectSiteComplianceDetailsPanel";
+import { ProjectSiteComplianceSubmitPanel, type ProjectSiteComplianceSubmitSection } from "./ProjectSiteComplianceSubmitPanel";
 
 export type ExternalProjectSitePortalSection = "overview" | "usage" | "rosterHealth" | "foodLicense" | "insurance" | "payroll";
 
@@ -149,7 +150,14 @@ export function ExternalProjectSitePortal({
           <>
             <SectionGuidance section={section} pendingUsageCount={pendingUsageCount} />
             {primarySite && complianceDetailSectionFor(section) ? (
-              <ProjectSiteComplianceDetailsPanel siteId={primarySite.id} section={complianceDetailSectionFor(section)!} />
+              <>
+                <ProjectSiteComplianceDetailsPanel siteId={primarySite.id} section={complianceDetailSectionFor(section)!} />
+                <ProjectSiteComplianceSubmitPanel
+                  site={primarySite}
+                  section={complianceDetailSectionFor(section)!}
+                  currentContactName={currentContactName}
+                />
+              </>
             ) : null}
           </>
         )}
@@ -196,7 +204,7 @@ export function ExternalProjectSitePortal({
   );
 }
 
-function complianceDetailSectionFor(section: ExternalProjectSitePortalSection): ProjectSiteComplianceDetailSection | null {
+function complianceDetailSectionFor(section: ExternalProjectSitePortalSection): ProjectSiteComplianceSubmitSection | null {
   if (section === "rosterHealth") return "rosterHealth";
   if (section === "foodLicense") return "foodLicense";
   if (section === "insurance") return "insurance";
@@ -217,7 +225,7 @@ function SectionGuidance({
         <article>
           <StatusBadge tone={pendingUsageCount > 0 ? "warning" : "success"}>{pendingUsageCount > 0 ? "待处理" : "无待处理"}</StatusBadge>
           <strong>物料领用申请</strong>
-          <span>领用申请列表和新增入口在本页下方；项目点账号不选择其他项目点，也不填写仓库出库参数。</span>
+          <span>领用申请列表和新增入口在本页下方；项目点账号不选择非绑定项目点，也不填写仓库出库参数。</span>
         </article>
       </div>
     );
