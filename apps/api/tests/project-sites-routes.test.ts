@@ -1512,7 +1512,16 @@ describe("project usage request API", () => {
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         payrollMonth: "2026-05",
-        attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+      },
+    });
+    const payrollWithStorageKey = await app.inject({
+      method: "POST",
+      url: "/api/project-site-payroll-submissions",
+      cookies: { company_erp_session: cookie },
+      payload: {
+        projectSiteId: "11111111-1111-4111-8111-111111111111",
+        payrollMonth: "2026-06",
+        storageKey: "project-sites/payroll.xlsx",
       },
     });
     const updateProjectSite = await app.inject({
@@ -1530,6 +1539,11 @@ describe("project usage request API", () => {
     expect(unassignedPolicyCoveredPerson.statusCode).toBe(404);
     expect(unassignedRosterCoveredPerson.statusCode).toBe(404);
     expect(assignedPayroll.statusCode).toBe(201);
+    expect(assignedPayroll.json()).toMatchObject({
+      payrollSubmission: { attachmentPath: "unified-attachment-pending", reviewStatus: "pending" },
+    });
+    expect(payrollWithStorageKey.statusCode).toBe(400);
+    expect(payrollWithStorageKey.json().issues).toContain("storageKey is not accepted for payroll submissions");
     expect(updateProjectSite.statusCode).toBe(403);
   });
 

@@ -118,4 +118,26 @@ describe("ProjectSiteComplianceSubmitPanel", () => {
       });
     });
   });
+
+  it("submits payroll records without exposing legacy paths or storage keys", async () => {
+    const fetchMock = mockSubmitPanelFetch();
+
+    render(<ProjectSiteComplianceSubmitPanel site={{ ...projectSite, payrollAgencyRequired: true }} section="payroll" currentContactName="王项目" />);
+
+    expect(screen.getByText(/附件上传后续开放，当前由总部登记附件引用/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/附件路径/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交工资表" }));
+
+    await waitFor(() => {
+      const payrollCall = fetchMock.mock.calls.find(([url, init]) =>
+        String(url).includes("/api/project-site-payroll-submissions") && init?.method === "POST",
+      );
+      expect(payrollCall).toBeTruthy();
+      const payload = JSON.parse(String(payrollCall?.[1]?.body));
+      expect(payload).toMatchObject({ projectSiteId: projectSite.id, submittedBy: "王项目" });
+      expect(payload).not.toHaveProperty("attachmentPath");
+      expect(payload).not.toHaveProperty("storageKey");
+    });
+  });
 });

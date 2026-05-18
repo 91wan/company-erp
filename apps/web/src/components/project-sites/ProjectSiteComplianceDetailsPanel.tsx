@@ -38,6 +38,7 @@ const rosterWorkerTypeLabel = new Map(PROJECT_SITE_ROSTER_WORKER_TYPES.map((item
 const rosterStatusLabel = new Map(PROJECT_SITE_ROSTER_STATUSES.map((item) => [item.code, item.label]));
 const reviewStatusLabel = new Map(PROJECT_SITE_COMPLIANCE_REVIEW_STATUSES.map((item) => [item.code, item.label]));
 const certificateTypeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
+const payrollAttachmentPending = "unified-attachment-pending";
 
 export function ProjectSiteComplianceDetailsPanel({
   siteId,
@@ -219,7 +220,7 @@ function PayrollSubmissionsSection({
   return (
     <SectionCard title="月度提交记录">
       <DataTable
-        headers={["月份", "提交人", "提交时间", "审核状态", "备注"]}
+        headers={["月份", "提交人", "提交时间", "审核状态", "附件状态", "备注"]}
         rows={payrollSubmissions.map((submission) => {
           const status = payrollStatusToBadge(submission.reviewStatus);
           return [
@@ -227,6 +228,7 @@ function PayrollSubmissionsSection({
             submission.submittedBy ?? "-",
             submission.submittedAt,
             <StatusBadge tone={status.tone}>{status.label}</StatusBadge>,
+            payrollAttachmentLabel(submission.attachmentPath),
             submission.remark ?? "-",
           ];
         })}
@@ -234,6 +236,11 @@ function PayrollSubmissionsSection({
       />
     </SectionCard>
   );
+}
+
+function payrollAttachmentLabel(attachmentPath: string | null): string {
+  if (!attachmentPath || attachmentPath === payrollAttachmentPending) return "统一附件待总部登记";
+  return "旧路径字段，仅迁移参考";
 }
 
 async function loadComplianceDetails(siteId: string): Promise<ComplianceDetails> {
