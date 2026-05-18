@@ -1,11 +1,7 @@
-import { Filter, MapPin, Search } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
-  CONTRACT_INVESTMENT_CATEGORIES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES,
   PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES,
-  PROJECT_SITE_SERVICE_MODES,
-  PROJECT_SITE_STATUSES,
   PROJECT_USAGE_STATUSES,
   type AttachmentRecordDto,
   type BusinessProjectDto,
@@ -27,29 +23,22 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { createAttachment, getAttachmentDownloadUrl, getAttachments, type AttachmentFilters } from "../apiClient";
-import { DataTable, EmptyState, PageHeader, SectionCard } from "./ui";
 import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
 } from "./project-sites/ExternalProjectSitePortal";
 import { ProjectSiteActionBar } from "./project-sites/ProjectSiteActionBar";
 import {
-  ProjectSiteCreateFormDrawer,
   type ProjectSiteCreateFormState,
 } from "./project-sites/ProjectSiteCreateFormDrawer";
-import { ProjectSiteDetailDrawer } from "./project-sites/ProjectSiteDetailDrawer";
 import { ProjectSiteKitchenEquipmentPanel } from "./project-sites/ProjectSiteKitchenEquipmentPanel";
 import { ProjectSiteModuleIntro } from "./project-sites/ProjectSiteModuleIntro";
-import { ProjectSiteRiskTable } from "./project-sites/ProjectSiteRiskTable";
 import { ProjectSiteSummaryCards } from "./project-sites/ProjectSiteSummaryCards";
 import {
   ProjectUsageRequestFormDrawer,
   type ProjectUsageRequestFormState,
 } from "./project-sites/ProjectUsageRequestFormDrawer";
-import {
-  ProjectUsageIssueFormDrawer,
-  type ProjectUsageIssueFormState,
-} from "./project-sites/ProjectUsageIssueFormDrawer";
+import type { ProjectUsageIssueFormState } from "./project-sites/ProjectUsageIssueFormDrawer";
 import {
   ProjectSiteKitchenEquipmentCreateFormDrawer,
   type ProjectSiteKitchenEquipmentCreateFormState,
@@ -59,7 +48,10 @@ import {
   type ProjectSiteKitchenEquipmentChangeFormState,
 } from "./project-sites/ProjectSiteKitchenEquipmentChangeFormDrawer";
 import { ProjectSiteUsagePanel } from "./project-sites/ProjectSiteUsagePanel";
-import { formatMoney } from "./project-sites/projectSiteFormat";
+import {
+  ProjectSitesHeadquartersView,
+  type ProjectSiteFormDrawer,
+} from "./project-sites/ProjectSitesHeadquartersView";
 import {
   defaultCreateKitchenEquipment,
   defaultCreateKitchenEquipmentChangeRequest,
@@ -141,25 +133,9 @@ type KitchenEquipmentChangeFormState = ProjectSiteKitchenEquipmentChangeFormStat
 
 type IssueFormState = ProjectUsageIssueFormState;
 
-type ProjectSiteFormDrawer = "site" | "usage" | "issue" | "equipment" | "equipmentChange" | null;
-
-const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
-const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-const investmentCategoryLabel = new Map(CONTRACT_INVESTMENT_CATEGORIES.map((category) => [category.code, category.label]));
 const kitchenEquipmentStatusLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_STATUSES.map((status) => [status.code, status.label]));
 const kitchenEquipmentChangeTypeLabel = new Map(PROJECT_SITE_KITCHEN_EQUIPMENT_CHANGE_TYPES.map((type) => [type.code, type.label]));
-const complianceComputedStatusLabel = new Map([
-  ["valid", "有效"],
-  ["expiring_soon", "即将到期"],
-  ["expired", "已过期"],
-  ["review_due_soon", "即将复核"],
-  ["review_due", "待复核"],
-  ["archived", "归档"],
-  ["disabled", "已停用"],
-  ["missing", "缺失"],
-  ["not_applicable", "不适用"],
-]);
 const complianceReviewStatusLabel = new Map([
   ["pending", "待审核"],
   ["approved", "已通过"],
@@ -399,253 +375,214 @@ export function ProjectSitesWorkspace({
   return (
     <section className="project-sites-workspace" aria-label="项目点">
       {usageOnly ? (
-        <ExternalProjectSitePortal
-          section={portalSection}
-          sites={sites}
-          complianceSummaries={complianceSummaries}
-          visibleProjectSiteCount={sites.length}
-          pendingUsageCount={pendingUsageCount}
-          pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-          currentContactName={externalProjectSiteContactName}
-          currentContactPhone={externalProjectSiteContactPhone}
-          onSelectSection={onPortalSectionChange}
-        />
-      ) : (
-        <PageHeader
-          eyebrow="项目点"
-          title="项目点"
-          subtitle="维护项目点基础台账、合规资料、领用申请、厨房设备和总部出库动作。"
-          actions={(
-            <span className="parties-total">
-              <MapPin aria-hidden="true" size={18} />
-              {sites.length} 个项目点
-            </span>
-          )}
-        />
-      )}
-
-      {!usageOnly ? <div className="parties-heading project-sites-legacy-heading">
-        <span className="parties-total">
-          <MapPin aria-hidden="true" size={18} />
-          {sites.length} 个项目点
-        </span>
-      </div> : null}
-
-      <ProjectSiteModuleIntro usageOnly={usageOnly} canIssueUsage={canIssueUsage} />
-
-      <ProjectSiteActionBar
-        usageOnly={usageOnly}
-        canEditSites={canEditSites}
-        canCreateUsage={canCreateUsage}
-        canIssueUsage={canIssueUsage}
-        onOpenForm={setOpenFormDrawer}
-      />
-      {masterStatus === "error" ? (
-        <p className="form-error">
-          {usageOnly ? "物料或默认仓库接口暂不可用，暂不能登记领用。" : "项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。"}
-        </p>
-      ) : null}
-
-      <ProjectSiteSummaryCards
-        usageOnly={usageOnly}
-        siteCount={sites.length}
-        activeSiteCount={activeSiteCount}
-        pendingUsageCount={pendingUsageCount}
-        totalRequestedQuantity={totalRequestedQuantity}
-        totalIssuedQuantity={totalIssuedQuantity}
-        kitchenEquipmentCount={kitchenEquipment.length}
-        pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-        complianceBlockingIssueCount={complianceBlockingIssueCount}
-        complianceWarningIssueCount={complianceWarningIssueCount}
-      />
-
-      <ProjectSiteKitchenEquipmentPanel
-        kitchenEquipment={filteredKitchenEquipment}
-        changeRequests={filteredKitchenEquipmentChangeRequests}
-        status={kitchenEquipmentStatus}
-        usageOnly={usageOnly}
-        kitchenEquipmentStatusLabel={kitchenEquipmentStatusLabel}
-        kitchenEquipmentChangeTypeLabel={kitchenEquipmentChangeTypeLabel}
-        complianceReviewStatusLabel={complianceReviewStatusLabel}
-        onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
-      />
-
-      <ProjectSiteKitchenEquipmentCreateFormDrawer
-        open={openFormDrawer === "equipment"}
-        canEditSites={canEditSites}
-        usageOnly={usageOnly}
-        form={kitchenEquipmentForm}
-        sites={sites}
-        submitState={kitchenEquipmentSubmitState}
-        submitError={kitchenEquipmentSubmitError}
-        onChange={setKitchenEquipmentForm}
-        onClose={() => setOpenFormDrawer(null)}
-        onSubmit={handleCreateKitchenEquipment}
-      />
-
-      <ProjectSiteKitchenEquipmentChangeFormDrawer
-        open={openFormDrawer === "equipmentChange"}
-        usageOnly={usageOnly}
-        form={kitchenEquipmentChangeForm}
-        sites={sites}
-        kitchenEquipment={filteredKitchenEquipment}
-        submitState={kitchenEquipmentChangeSubmitState}
-        submitError={kitchenEquipmentChangeSubmitError}
-        onChange={setKitchenEquipmentChangeForm}
-        onClose={() => setOpenFormDrawer(null)}
-        onSubmit={handleCreateKitchenEquipmentChangeRequest}
-      />
-
-      <div className="party-toolbar">
-        <label className="party-search">
-          <Search aria-hidden="true" size={16} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索项目点、客户、物料、申请单"
+        <>
+          <ExternalProjectSitePortal
+            section={portalSection}
+            sites={sites}
+            complianceSummaries={complianceSummaries}
+            visibleProjectSiteCount={sites.length}
+            pendingUsageCount={pendingUsageCount}
+            pendingEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+            currentContactName={externalProjectSiteContactName}
+            currentContactPhone={externalProjectSiteContactPhone}
+            onSelectSection={onPortalSectionChange}
           />
-        </label>
-        <label className="party-filter">
-          <Filter aria-hidden="true" size={16} />
-          <select
-            aria-label="领用状态筛选"
-            value={usageFilter}
-            onChange={(event) => setUsageFilter(event.target.value as "all" | ProjectUsageStatusCode)}
-          >
-            <option value="all">全部领用状态</option>
-            {PROJECT_USAGE_STATUSES.map((status) => (
-              <option key={status.code} value={status.code}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
 
-      {!usageOnly ? <div className="project-site-list-layout">
-        <ProjectSiteRiskTable
-          sites={filteredSites}
-          status={siteStatus}
-          serviceModeLabel={serviceModeLabel}
-          siteStatusLabel={siteStatusLabel}
-          complianceSummaries={complianceSummaries}
-          complianceComputedStatusLabel={complianceComputedStatusLabel}
-          complianceReviewStatusLabel={complianceReviewStatusLabel}
-          onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
-        />
+          <ProjectSiteModuleIntro usageOnly canIssueUsage={canIssueUsage} />
 
-        <ProjectSiteCreateFormDrawer
-          open={openFormDrawer === "site"}
-          canEditSites={canEditSites}
-          form={siteForm}
-          clientParties={clientParties}
-          operatorParties={operatorParties}
-          subcontractorParties={subcontractorParties}
-          businessProjects={businessProjects}
-          masterStatus={masterStatus}
-          submitState={siteSubmitState}
-          submitError={siteSubmitError}
-          onChange={setSiteForm}
-          onClose={() => setOpenFormDrawer(null)}
-          onSubmit={handleCreateSite}
-        />
-      </div> : null}
+          <ProjectSiteActionBar
+            usageOnly
+            canEditSites={canEditSites}
+            canCreateUsage={canCreateUsage}
+            canIssueUsage={canIssueUsage}
+            onOpenForm={setOpenFormDrawer}
+          />
+          {masterStatus === "error" ? (
+            <p className="form-error">物料或默认仓库接口暂不可用，暂不能登记领用。</p>
+          ) : null}
 
-      {!usageOnly ? (
-        <SectionCard
-          title="投入合同"
-          action={(
-            <label className="inline-filter">
-              <span>项目点</span>
-              <select value={selectedInvestmentSiteId} onChange={(event) => setSelectedInvestmentSiteId(event.target.value)}>
-                <option value="">选择项目点</option>
-                {sites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.siteCode} {site.siteName}
+          <ProjectSiteSummaryCards
+            usageOnly
+            siteCount={sites.length}
+            activeSiteCount={activeSiteCount}
+            pendingUsageCount={pendingUsageCount}
+            totalRequestedQuantity={totalRequestedQuantity}
+            totalIssuedQuantity={totalIssuedQuantity}
+            kitchenEquipmentCount={kitchenEquipment.length}
+            pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+            complianceBlockingIssueCount={complianceBlockingIssueCount}
+            complianceWarningIssueCount={complianceWarningIssueCount}
+          />
+
+          <ProjectSiteKitchenEquipmentPanel
+            kitchenEquipment={filteredKitchenEquipment}
+            changeRequests={filteredKitchenEquipmentChangeRequests}
+            status={kitchenEquipmentStatus}
+            usageOnly
+            kitchenEquipmentStatusLabel={kitchenEquipmentStatusLabel}
+            kitchenEquipmentChangeTypeLabel={kitchenEquipmentChangeTypeLabel}
+            complianceReviewStatusLabel={complianceReviewStatusLabel}
+            onReviewChangeRequest={(id, reviewStatus) => void handleReviewKitchenEquipmentChangeRequest(id, reviewStatus)}
+          />
+
+          <ProjectSiteKitchenEquipmentCreateFormDrawer
+            open={openFormDrawer === "equipment"}
+            canEditSites={canEditSites}
+            usageOnly
+            form={kitchenEquipmentForm}
+            sites={sites}
+            submitState={kitchenEquipmentSubmitState}
+            submitError={kitchenEquipmentSubmitError}
+            onChange={setKitchenEquipmentForm}
+            onClose={() => setOpenFormDrawer(null)}
+            onSubmit={handleCreateKitchenEquipment}
+          />
+
+          <ProjectSiteKitchenEquipmentChangeFormDrawer
+            open={openFormDrawer === "equipmentChange"}
+            usageOnly
+            form={kitchenEquipmentChangeForm}
+            sites={sites}
+            kitchenEquipment={filteredKitchenEquipment}
+            submitState={kitchenEquipmentChangeSubmitState}
+            submitError={kitchenEquipmentChangeSubmitError}
+            onChange={setKitchenEquipmentChangeForm}
+            onClose={() => setOpenFormDrawer(null)}
+            onSubmit={handleCreateKitchenEquipmentChangeRequest}
+          />
+
+          <div className="party-toolbar">
+            <label className="party-search">
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索项目点、客户、物料、申请单"
+              />
+            </label>
+            <label className="party-filter">
+              <select
+                aria-label="领用状态筛选"
+                value={usageFilter}
+                onChange={(event) => setUsageFilter(event.target.value as "all" | ProjectUsageStatusCode)}
+              >
+                <option value="all">全部领用状态</option>
+                {PROJECT_USAGE_STATUSES.map((status) => (
+                  <option key={status.code} value={status.code}>
+                    {status.label}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-        >
-          <DataTable
-            headers={["投入分类", "合同数量", "金额合计"]}
-            rows={investmentSummaryStatus === "ready" && investmentSummary && investmentSummary.contractCount > 0
-              ? [
-                  ...investmentSummary.categories.map((category) => [
-                    investmentCategoryLabel.get(category.investmentCategory) ?? category.investmentCategory,
-                    category.contractCount,
-                    formatMoney(category.totalAmount),
-                  ]),
-                  ["合计", investmentSummary.contractCount, formatMoney(investmentSummary.totalAmount)],
-                ]
-              : []}
-            loading={investmentSummaryStatus === "loading"
-              ? <EmptyState title="投入合同汇总加载中" />
-              : investmentSummaryStatus === "error"
-                ? <EmptyState title="投入合同汇总加载失败" />
-                : undefined}
-            emptyState={<EmptyState title="暂无投入合同" />}
-          />
-        </SectionCard>
-      ) : null}
+          </div>
 
-      <div className="project-site-list-layout">
-        <ProjectSiteUsagePanel
-          usageRequests={filteredUsageRequests}
-          status={usageStatus}
-          usageOnly={usageOnly}
-          usageStatusLabel={usageStatusLabel}
-        />
+          <div className="project-site-list-layout">
+            <ProjectSiteUsagePanel
+              usageRequests={filteredUsageRequests}
+              status={usageStatus}
+              usageOnly
+              usageStatusLabel={usageStatusLabel}
+            />
 
-        <ProjectUsageRequestFormDrawer
-          open={openFormDrawer === "usage"}
-          canCreateUsage={canCreateUsage}
-          usageOnly={usageOnly}
-          form={usageForm}
+            <ProjectUsageRequestFormDrawer
+              open={openFormDrawer === "usage"}
+              canCreateUsage={canCreateUsage}
+              usageOnly
+              form={usageForm}
+              sites={sites}
+              warehouses={warehouses}
+              materials={materials}
+              masterStatus={masterStatus}
+              submitState={usageSubmitState}
+              submitError={usageSubmitError}
+              onChange={setUsageForm}
+              onMaterialChange={updateSelectedMaterial}
+              onClose={() => setOpenFormDrawer(null)}
+              onSubmit={handleCreateUsageRequest}
+            />
+          </div>
+        </>
+      ) : (
+        <ProjectSitesHeadquartersView
           sites={sites}
-          warehouses={warehouses}
+          filteredSites={filteredSites}
+          siteStatus={siteStatus}
+          complianceSummaries={complianceSummaries}
+          usageRequests={usageRequests}
+          filteredUsageRequests={filteredUsageRequests}
+          usageStatus={usageStatus}
           materials={materials}
+          warehouses={warehouses}
+          businessProjects={businessProjects}
+          clientParties={clientParties}
+          operatorParties={operatorParties}
+          subcontractorParties={subcontractorParties}
+          investmentSummary={investmentSummary}
+          investmentSummaryStatus={investmentSummaryStatus}
+          selectedInvestmentSiteId={selectedInvestmentSiteId}
+          kitchenEquipment={kitchenEquipment}
+          filteredKitchenEquipment={filteredKitchenEquipment}
+          filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
+          kitchenEquipmentStatus={kitchenEquipmentStatus}
+          query={query}
+          usageFilter={usageFilter}
+          activeSiteCount={activeSiteCount}
+          pendingUsageCount={pendingUsageCount}
+          totalRequestedQuantity={totalRequestedQuantity}
+          totalIssuedQuantity={totalIssuedQuantity}
+          pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+          complianceBlockingIssueCount={complianceBlockingIssueCount}
+          complianceWarningIssueCount={complianceWarningIssueCount}
+          canEditSites={canEditSites}
+          canCreateUsage={canCreateUsage}
+          canIssueUsage={canIssueUsage}
           masterStatus={masterStatus}
-          submitState={usageSubmitState}
-          submitError={usageSubmitError}
-          onChange={setUsageForm}
+          openFormDrawer={openFormDrawer}
+          selectedDetailSite={selectedDetailSite}
+          selectedDetailSiteData={selectedDetailSiteData}
+          siteForm={siteForm}
+          usageForm={usageForm}
+          issueForm={issueForm}
+          kitchenEquipmentForm={kitchenEquipmentForm}
+          kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
+          siteSubmitState={siteSubmitState}
+          usageSubmitState={usageSubmitState}
+          issueSubmitState={issueSubmitState}
+          kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
+          kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
+          siteSubmitError={siteSubmitError}
+          usageSubmitError={usageSubmitError}
+          issueSubmitError={issueSubmitError}
+          kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
+          kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
+          pendingIssueConfirm={pendingIssueConfirm}
+          onQueryChange={setQuery}
+          onUsageFilterChange={setUsageFilter}
+          onOpenForm={setOpenFormDrawer}
+          onSelectSite={(site) => setSelectedDetailSiteId(site.id)}
+          onSelectedInvestmentSiteChange={setSelectedInvestmentSiteId}
+          onSiteFormChange={setSiteForm}
+          onUsageFormChange={setUsageForm}
+          onIssueFormChange={setIssueForm}
+          onKitchenEquipmentFormChange={setKitchenEquipmentForm}
+          onKitchenEquipmentChangeFormChange={setKitchenEquipmentChangeForm}
           onMaterialChange={updateSelectedMaterial}
-          onClose={() => setOpenFormDrawer(null)}
-          onSubmit={handleCreateUsageRequest}
-        />
-      </div>
-
-      <ProjectUsageIssueFormDrawer
-        open={openFormDrawer === "issue"}
-        canIssueUsage={canIssueUsage}
-        form={issueForm}
-        usageRequests={usageRequests}
-        pendingIssueConfirm={pendingIssueConfirm}
-        submitState={issueSubmitState}
-        submitError={issueSubmitError}
-        onChange={setIssueForm}
-        onCancelConfirm={() => setPendingIssueConfirm(false)}
-        onClose={() => {
-          setPendingIssueConfirm(false);
-          setOpenFormDrawer(null);
-        }}
-        onSubmit={handleIssueUsageRequest}
-      />
-
-      {!usageOnly ? (
-        <ProjectSiteDetailDrawer
-          site={selectedDetailSite}
-          complianceSummary={selectedDetailSite ? complianceSummaries[selectedDetailSite.id] : undefined}
-          usageRequests={selectedDetailSiteData.usageRequests}
-          kitchenEquipment={selectedDetailSiteData.kitchenEquipment}
+          onCancelIssueConfirm={() => setPendingIssueConfirm(false)}
+          onCloseForm={() => {
+            setPendingIssueConfirm(false);
+            setOpenFormDrawer(null);
+          }}
+          onCloseDetail={() => setSelectedDetailSiteId("")}
+          onCreateSite={handleCreateSite}
+          onCreateUsageRequest={handleCreateUsageRequest}
+          onIssueUsageRequest={handleIssueUsageRequest}
+          onCreateKitchenEquipment={handleCreateKitchenEquipment}
+          onCreateKitchenEquipmentChangeRequest={handleCreateKitchenEquipmentChangeRequest}
+          onReviewKitchenEquipmentChangeRequest={handleReviewKitchenEquipmentChangeRequest}
           loadAttachments={loadUnifiedAttachments}
           createAttachment={createAttachment}
           getAttachmentDownloadUrl={getAttachmentDownloadUrl}
-          canManageAttachments={canEditSites}
-          onClose={() => setSelectedDetailSiteId("")}
         />
-      ) : null}
+      )}
     </section>
   );
 }
