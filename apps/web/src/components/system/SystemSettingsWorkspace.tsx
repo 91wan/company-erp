@@ -46,6 +46,7 @@ export function SystemSettingsWorkspace({
   const [auditFilters, setAuditFilters] = useState({
     entityType: "",
     action: "",
+    actorUsername: "",
     dateFrom: "",
     dateTo: "",
   });
@@ -95,6 +96,7 @@ export function SystemSettingsWorkspace({
     getAuditLogs({
       entityType: auditFilters.entityType.trim() || undefined,
       action: auditFilters.action.trim() || undefined,
+      actorUsername: auditFilters.actorUsername.trim() || undefined,
       dateFrom: toAuditDateTime(auditFilters.dateFrom, "start"),
       dateTo: toAuditDateTime(auditFilters.dateTo, "end"),
       limit: 20,
@@ -113,7 +115,7 @@ export function SystemSettingsWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [auditFilters.action, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.entityType, canReadAuditLogs]);
+  }, [auditFilters.action, auditFilters.actorUsername, auditFilters.dateFrom, auditFilters.dateTo, auditFilters.entityType, canReadAuditLogs]);
 
   useEffect(() => {
     if (!canReadAttachments) return;
@@ -290,6 +292,14 @@ export function SystemSettingsWorkspace({
               />
             </label>
             <label>
+              <span>操作账号</span>
+              <input
+                value={auditFilters.actorUsername}
+                onChange={(event) => setAuditFilters((filters) => ({ ...filters, actorUsername: event.target.value }))}
+                placeholder="admin"
+              />
+            </label>
+            <label>
               <span>审计开始日期</span>
               <input
                 type="date"
@@ -309,7 +319,7 @@ export function SystemSettingsWorkspace({
               <button
                 type="button"
                 className="secondary-action"
-                onClick={() => setAuditFilters({ entityType: "", action: "", dateFrom: "", dateTo: "" })}
+                onClick={() => setAuditFilters({ entityType: "", action: "", actorUsername: "", dateFrom: "", dateTo: "" })}
               >
                 清空筛选
               </button>

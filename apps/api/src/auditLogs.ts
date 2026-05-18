@@ -4,6 +4,7 @@ export type AuditLogListFilters = {
   entityType?: string;
   entityId?: string;
   actorUserId?: string;
+  actorUsername?: string;
   action?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -73,6 +74,7 @@ export function normalizeAuditLogFilters(query: Record<string, unknown>): AuditL
     entityType: normalizeString(query.entityType),
     entityId: normalizeString(query.entityId),
     actorUserId: normalizeString(query.actorUserId),
+    actorUsername: normalizeString(query.actorUsername),
     action: normalizeString(query.action),
     dateFrom: normalizeDateTime(query.dateFrom, "dateFrom", issues),
     dateTo: normalizeDateTime(query.dateTo, "dateTo", issues),

@@ -58,6 +58,19 @@ function createFakeAuditLogRepository(): AuditLogRepository {
       userAgent: "vitest",
       createdAt: now,
     },
+    {
+      id: "77777777-7777-4777-8777-777777777777",
+      actorUserId: "66666666-6666-4666-8666-666666666666",
+      actorUsername: "ops",
+      action: "user_account.create",
+      entityType: "user_account",
+      entityId: "88888888-8888-4888-8888-888888888888",
+      beforeJson: null,
+      afterJson: { username: "lisi", password: "[redacted]" },
+      ip: "127.0.0.1",
+      userAgent: "vitest",
+      createdAt: now,
+    },
   ];
 
   return {
@@ -65,6 +78,7 @@ function createFakeAuditLogRepository(): AuditLogRepository {
       return logs.filter((log) => {
         if (filters.entityType && log.entityType !== filters.entityType) return false;
         if (filters.actorUserId && log.actorUserId !== filters.actorUserId) return false;
+        if (filters.actorUsername && log.actorUsername !== filters.actorUsername) return false;
         if (filters.action && log.action !== filters.action) return false;
         return true;
       });
@@ -149,7 +163,7 @@ describe("audit logs API", () => {
     const viewerCookie = await loginCookie(app, "viewer");
     const admin = await app.inject({
       method: "GET",
-      url: "/api/audit-logs?entityType=user_account&action=user_account.create",
+      url: "/api/audit-logs?entityType=user_account&action=user_account.create&actorUsername=admin",
       cookies: { company_erp_session: adminCookie },
     });
     const viewer = await app.inject({

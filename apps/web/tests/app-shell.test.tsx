@@ -186,6 +186,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.change(screen.getByLabelText("审计对象类型"), { target: { value: "certificate" } });
     fireEvent.change(screen.getByLabelText("审计动作"), { target: { value: "certificate.create" } });
+    fireEvent.change(screen.getByLabelText("操作账号"), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText("审计开始日期"), { target: { value: "2026-05-14" } });
     fireEvent.change(screen.getByLabelText("审计结束日期"), { target: { value: "2026-05-15" } });
 
@@ -197,6 +198,7 @@ describe("Company ERP app shell", () => {
         const parsed = new URL(url);
         return parsed.searchParams.get("entityType") === "certificate"
           && parsed.searchParams.get("action") === "certificate.create"
+          && parsed.searchParams.get("actorUsername") === "admin"
           && parsed.searchParams.get("dateFrom") === "2026-05-14T00:00:00.000Z"
           && parsed.searchParams.get("dateTo") === "2026-05-15T23:59:59.999Z";
       })).toBe(true);
@@ -207,6 +209,7 @@ describe("Company ERP app shell", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("审计对象类型")).toHaveValue("");
       expect(screen.getByLabelText("审计动作")).toHaveValue("");
+      expect(screen.getByLabelText("操作账号")).toHaveValue("");
       const auditUrls = fetchSpy.mock.calls
         .map(([input]) => String(input))
         .filter((url) => url.includes("/api/audit-logs"));
@@ -214,6 +217,7 @@ describe("Company ERP app shell", () => {
         const parsed = new URL(url);
         return !parsed.searchParams.has("entityType")
           && !parsed.searchParams.has("action")
+          && !parsed.searchParams.has("actorUsername")
           && !parsed.searchParams.has("dateFrom")
           && !parsed.searchParams.has("dateTo");
       })).toBe(true);

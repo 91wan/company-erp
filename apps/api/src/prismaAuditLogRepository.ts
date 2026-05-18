@@ -82,6 +82,7 @@ export function createPrismaAuditLogRepository(prisma: PrismaClient | AuditLogPr
           ...(filters.entityType ? { entityType: filters.entityType } : {}),
           ...(filters.entityId ? { entityId: filters.entityId } : {}),
           ...(filters.actorUserId ? { actorUserId: filters.actorUserId } : {}),
+          ...(filters.actorUsername ? { actorUsername: filters.actorUsername } : {}),
           ...(filters.action ? { action: filters.action } : {}),
           ...(createdAt ? { createdAt } : {}),
         },
