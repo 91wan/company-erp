@@ -87,10 +87,12 @@ export function ProjectSiteComplianceSubmitPanel({
   site,
   section,
   currentContactName,
+  onSubmitted,
 }: {
   site: ProjectSiteDto;
   section: ProjectSiteComplianceSubmitSection;
   currentContactName?: string | null;
+  onSubmitted?: () => void;
 }) {
   const [rosterPeople, setRosterPeople] = useState<ProjectSiteRosterPersonDto[]>([]);
   const [insurancePolicies, setInsurancePolicies] = useState<ProjectSiteEmployerLiabilityInsurancePolicyDto[]>([]);
@@ -145,28 +147,29 @@ export function ProjectSiteComplianceSubmitPanel({
         {loadStatus === "error" ? <p className="form-error">项目点现场人员列表暂不可用，人员绑定类资料暂不能提交。</p> : null}
         {section === "rosterHealth" ? (
           <div className="compliance-submit-grid">
-            <RosterPersonForm site={site} />
-            <HealthCertificateForm site={site} rosterPeople={rosterPeople} loadStatus={loadStatus} />
+            <RosterPersonForm site={site} onSubmitted={onSubmitted} />
+            <HealthCertificateForm site={site} rosterPeople={rosterPeople} loadStatus={loadStatus} onSubmitted={onSubmitted} />
           </div>
         ) : null}
-        {section === "foodLicense" ? <FoodLicenseForm site={site} /> : null}
+        {section === "foodLicense" ? <FoodLicenseForm site={site} onSubmitted={onSubmitted} /> : null}
         {section === "insurance" ? (
           <div className="compliance-submit-grid">
-            <InsurancePolicyForm site={site} />
+            <InsurancePolicyForm site={site} onSubmitted={onSubmitted} />
             <CoveredPersonForm
               rosterPeople={rosterPeople}
               insurancePolicies={insurancePolicies}
               loadStatus={loadStatus}
+              onSubmitted={onSubmitted}
             />
           </div>
         ) : null}
-        {section === "payroll" ? <PayrollSubmissionForm site={site} currentContactName={currentContactName} /> : null}
+        {section === "payroll" ? <PayrollSubmissionForm site={site} currentContactName={currentContactName} onSubmitted={onSubmitted} /> : null}
       </SectionCard>
     </section>
   );
 }
 
-function RosterPersonForm({ site }: { site: ProjectSiteDto }) {
+function RosterPersonForm({ site, onSubmitted }: { site: ProjectSiteDto; onSubmitted?: () => void }) {
   const [form, setForm] = useState<RosterForm>(initialRosterForm);
   const [state, setState] = useState<SubmitState>("idle");
   const [error, setError] = useState("");
@@ -193,6 +196,7 @@ function RosterPersonForm({ site }: { site: ProjectSiteDto }) {
       });
       setForm(initialRosterForm);
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "现场人员提交失败，请检查字段后重试。"));
       setState("error");
@@ -230,10 +234,12 @@ function HealthCertificateForm({
   site,
   rosterPeople,
   loadStatus,
+  onSubmitted,
 }: {
   site: ProjectSiteDto;
   rosterPeople: ProjectSiteRosterPersonDto[];
   loadStatus: "idle" | "loading" | "ready" | "error";
+  onSubmitted?: () => void;
 }) {
   const [form, setForm] = useState<CertificateForm>(initialCertificateForm);
   const [state, setState] = useState<SubmitState>("idle");
@@ -272,6 +278,7 @@ function HealthCertificateForm({
       });
       setForm({ ...initialCertificateForm, ownerRosterPersonId: selectedPerson.id });
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "健康证提交失败，请检查字段后重试。"));
       setState("error");
@@ -316,7 +323,7 @@ function HealthCertificateForm({
   );
 }
 
-function FoodLicenseForm({ site }: { site: ProjectSiteDto }) {
+function FoodLicenseForm({ site, onSubmitted }: { site: ProjectSiteDto; onSubmitted?: () => void }) {
   const [form, setForm] = useState<FoodLicenseForm>(initialFoodLicenseForm);
   const [state, setState] = useState<SubmitState>("idle");
   const [error, setError] = useState("");
@@ -349,6 +356,7 @@ function FoodLicenseForm({ site }: { site: ProjectSiteDto }) {
       });
       setForm(initialFoodLicenseForm);
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "食品经营许可证提交失败，请检查字段后重试。"));
       setState("error");
@@ -378,7 +386,7 @@ function FoodLicenseForm({ site }: { site: ProjectSiteDto }) {
   );
 }
 
-function InsurancePolicyForm({ site }: { site: ProjectSiteDto }) {
+function InsurancePolicyForm({ site, onSubmitted }: { site: ProjectSiteDto; onSubmitted?: () => void }) {
   const [form, setForm] = useState<InsuranceForm>(initialInsuranceForm);
   const [state, setState] = useState<SubmitState>("idle");
   const [error, setError] = useState("");
@@ -404,6 +412,7 @@ function InsurancePolicyForm({ site }: { site: ProjectSiteDto }) {
       });
       setForm(initialInsuranceForm);
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "雇主责任险保单提交失败，请检查字段后重试。"));
       setState("error");
@@ -445,10 +454,12 @@ function CoveredPersonForm({
   rosterPeople,
   insurancePolicies,
   loadStatus,
+  onSubmitted,
 }: {
   rosterPeople: ProjectSiteRosterPersonDto[];
   insurancePolicies: ProjectSiteEmployerLiabilityInsurancePolicyDto[];
   loadStatus: "idle" | "loading" | "ready" | "error";
+  onSubmitted?: () => void;
 }) {
   const activePeople = useMemo(() => rosterPeople.filter((person) => person.status === "active"), [rosterPeople]);
   const [form, setForm] = useState<CoveredPersonForm>({
@@ -491,6 +502,7 @@ function CoveredPersonForm({
         remark: "",
       });
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "被保人员提交失败，请检查字段后重试。"));
       setState("error");
@@ -540,9 +552,11 @@ function CoveredPersonForm({
 function PayrollSubmissionForm({
   site,
   currentContactName,
+  onSubmitted,
 }: {
   site: ProjectSiteDto;
   currentContactName?: string | null;
+  onSubmitted?: () => void;
 }) {
   const [form, setForm] = useState<PayrollForm>({
     payrollMonth: currentMonth(),
@@ -570,6 +584,7 @@ function PayrollSubmissionForm({
       });
       setForm({ payrollMonth: currentMonth(), submittedBy: currentContactName ?? "", remark: "" });
       setState("success");
+      onSubmitted?.();
     } catch (nextError) {
       setError(formatApiError(nextError, "工资表提交失败，请检查字段后重试。"));
       setState("error");

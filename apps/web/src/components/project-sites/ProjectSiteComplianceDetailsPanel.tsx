@@ -43,9 +43,11 @@ const payrollAttachmentPending = "unified-attachment-pending";
 export function ProjectSiteComplianceDetailsPanel({
   siteId,
   section = "all",
+  refreshKey = 0,
 }: {
   siteId: string;
   section?: ProjectSiteComplianceDetailSection;
+  refreshKey?: number;
 }) {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [details, setDetails] = useState<ComplianceDetails>(emptyDetails);
@@ -68,7 +70,7 @@ export function ProjectSiteComplianceDetailsPanel({
     return () => {
       mounted = false;
     };
-  }, [siteId]);
+  }, [siteId, refreshKey]);
 
   const healthCertificates = useMemo(
     () => details.certificates.filter((certificate) => certificate.certificateType === "person_health_cert"),
