@@ -481,6 +481,7 @@ describe("attachments API", () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const siteId = "77777777-7777-4777-8777-777777777777";
     const otherSiteId = "88888888-8888-4888-8888-888888888888";
+    const auditLogRepository = createFakeAuditLogRepository();
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
@@ -511,6 +512,7 @@ describe("attachments API", () => {
           ownerEntityId: otherSiteId,
         }),
       ]),
+      auditLogRepository,
     });
 
     const adminCookie = await loginCookie(app, "admin");
@@ -530,6 +532,7 @@ describe("attachments API", () => {
       url: "/api/attachments/33333333-3333-4333-8333-333333333333/download-url",
       cookies: { company_erp_session: externalCookie },
     });
+    const logs = await auditLogRepository.list({});
     await app.close();
 
     expect(adminDownload.statusCode).toBe(200);
@@ -545,6 +548,9 @@ describe("attachments API", () => {
     expect(JSON.stringify(scopedDownload.json())).not.toContain("/volume1");
     expect(outOfScope.statusCode).toBe(404);
     expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
+    expect(logs.map((log) => log.action)).toEqual(["attachment.download_url", "attachment.download_url"]);
+    expect(JSON.stringify(logs)).not.toContain("project-sites/site-license.pdf");
+    expect(JSON.stringify(logs)).not.toContain("/volume1");
   });
 
   it("scopes attachment metadata list and detail for external project-site accounts", async () => {
@@ -645,6 +651,7 @@ describe("attachments API", () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const siteId = "77777777-7777-4777-8777-777777777777";
     const otherSiteId = "88888888-8888-4888-8888-888888888888";
+    const auditLogRepository = createFakeAuditLogRepository();
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret" },
       authRepository: createFakeAuthRepository([
@@ -662,6 +669,7 @@ describe("attachments API", () => {
           id: "22222222-2222-4222-8222-222222222222",
           attachmentCode: "ATT-SITE-001",
           storageKey: "project-sites/site-license.txt",
+          originalFileName: "site-license.txt",
           fileType: "text/plain",
           ownerModule: "project_sites",
           ownerEntityType: "project_site",
@@ -684,6 +692,7 @@ describe("attachments API", () => {
           ownerEntityId: siteId,
         }),
       ]),
+      auditLogRepository,
     });
 
     try {
@@ -709,16 +718,25 @@ describe("attachments API", () => {
         url: "/api/attachments/44444444-4444-4444-8444-444444444444/content",
         cookies: { company_erp_session: externalCookie },
       });
+      const logs = await auditLogRepository.list({});
 
       expect(adminContent.statusCode).toBe(200);
       expect(adminContent.payload).toBe("DEMO attachment content");
+      expect(adminContent.headers["content-type"]).toContain("text/plain");
+      expect(adminContent.headers["content-disposition"]).toBe('attachment; filename="site-license.txt"');
+      expect(adminContent.headers["x-content-type-options"]).toBe("nosniff");
       expect(scopedContent.statusCode).toBe(200);
       expect(scopedContent.payload).toBe("DEMO attachment content");
+      expect(scopedContent.headers["content-disposition"]).toBe('attachment; filename="site-license.txt"');
+      expect(scopedContent.headers["x-content-type-options"]).toBe("nosniff");
       expect(JSON.stringify(scopedContent.headers)).not.toContain(root);
       expect(outOfScope.statusCode).toBe(404);
       expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
       expect(missingContent.statusCode).toBe(404);
       expect(missingContent.json()).toEqual({ error: "ATTACHMENT_CONTENT_NOT_FOUND" });
+      expect(logs.map((log) => log.action)).toEqual(["attachment.content_read", "attachment.content_read"]);
+      expect(JSON.stringify(logs)).not.toContain(root);
+      expect(JSON.stringify(logs)).not.toContain("project-sites/site-license.txt");
     } finally {
       await app.close();
       await rm(root, { recursive: true, force: true });

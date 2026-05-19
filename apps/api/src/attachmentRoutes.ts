@@ -102,6 +102,11 @@ function safeFileName(fileName: string | undefined): string {
   return baseName.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180) || fallback;
 }
 
+function contentDispositionFileName(attachment: { originalFileName?: string | null; displayName: string; storageKey: string }): string {
+  const fileName = safeFileName(attachment.originalFileName ?? attachment.displayName ?? attachment.storageKey);
+  return fileName.replace(/["\\]/g, "_");
+}
+
 function uploadStoragePrefix(ownerModule: string): string {
   return ownerModule.replace(/[^A-Za-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "attachments";
 }
@@ -161,6 +166,20 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       const contentPath = resolveAttachmentContentPath(attachment.storageKey);
       const content = await readFile(contentPath);
       if (attachment.fileType) reply.type(attachment.fileType);
+      reply.header("Content-Disposition", `attachment; filename="${contentDispositionFileName(attachment)}"`);
+      reply.header("X-Content-Type-Options", "nosniff");
+      await writeAuditLog(request, options, {
+        action: "attachment.content_read",
+        entityType: "attachment",
+        entityId: attachment.id,
+        afterJson: {
+          attachmentId: attachment.id,
+          ownerModule: attachment.ownerModule,
+          ownerEntityType: attachment.ownerEntityType,
+          ownerEntityId: attachment.ownerEntityId,
+          storageKey: "[redacted]",
+        },
+      });
       return reply.send(content);
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
@@ -190,7 +209,20 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
     try {
-      return { attachmentDownload: redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment)) };
+      const attachmentDownload = redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment));
+      await writeAuditLog(request, options, {
+        action: "attachment.download_url",
+        entityType: "attachment",
+        entityId: attachment.id,
+        afterJson: {
+          attachmentId: attachment.id,
+          ownerModule: attachment.ownerModule,
+          ownerEntityType: attachment.ownerEntityType,
+          ownerEntityId: attachment.ownerEntityId,
+          storageKey: "[redacted]",
+        },
+      });
+      return { attachmentDownload };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
