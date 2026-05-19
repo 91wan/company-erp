@@ -332,6 +332,64 @@ describe("local NAS pilot verification pack", () => {
   });
 });
 
+describe("attachment legacy migration readiness report", () => {
+  it("prints help without requiring DATABASE_URL or reading deployment env", () => {
+    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--help"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: "",
+        NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run attachments:legacy-report");
+    expect(result.stdout).toContain("--dry-run");
+    expect(result.stderr).toBe("");
+  });
+
+  it("supports dry-run without opening a database connection or reading NAS paths", () => {
+    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--dry-run"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: "",
+        NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Attachment legacy migration readiness dry-run");
+    expect(result.stdout).toContain("No database connection will be opened");
+    expect(result.stdout).toContain("合同");
+    expect(result.stdout).toContain("证照");
+    expect(result.stdout).toContain("工资表");
+    expect(result.stdout).toContain("雇主责任险");
+    expect(result.stdout).toContain("厨房设备");
+    expect(result.stdout).toContain("项目点资料");
+    expect(result.stdout).not.toContain("/volume1/should-not-be-read");
+    expect(result.stderr).toBe("");
+  });
+
+  it("requires DATABASE_URL outside dry-run instead of reading .env implicitly", () => {
+    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: "",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("DATABASE_URL is required");
+    expect(result.stderr).toContain("--dry-run");
+  });
+});
+
 function createCleanupPrisma() {
   const count = vi.fn(async () => 1);
   const deleteMany = vi.fn(async () => ({ count: 1 }));

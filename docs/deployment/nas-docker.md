@@ -144,6 +144,21 @@ reporting success. The drill does not read `.env`, NAS paths, attachments, or
 real business data; it only validates that the pg_dump/restore chain works on a
 temporary PostgreSQL container.
 
+Before importing real attachments or asking operators to rely on the unified
+attachment panel, run a read-only legacy attachment readiness report:
+
+```bash
+npm run attachments:legacy-report -- --dry-run
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report
+```
+
+The report groups counts for contracts, certificates, payroll submissions,
+employer liability insurance, kitchen equipment, and project-site materials. It
+does not read `.env`, NAS attachment directories, attachment bytes, or legacy
+path values, and it does not migrate data. Use it only to estimate the gap
+between legacy raw attachment fields and unified attachment metadata before a
+future migration PR.
+
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
 `POSTGRES_MEMORY_LIMIT`, `API_MEMORY_LIMIT`, and `WEB_MEMORY_LIMIT` in the NAS
@@ -425,6 +440,8 @@ Keep these artifacts together for a recoverable snapshot:
 - `.deploy-revision.json` or the exact Git commit used for the Docker build.
 - A record that `npm run test:backup-restore` passed before the trial deploy, or
   a documented blocker if Docker was not available on the operator machine.
+- A read-only `npm run attachments:legacy-report` summary if legacy attachment
+  fields still exist; keep only counts and migration notes, not raw file paths.
 
 ## Restore
 
