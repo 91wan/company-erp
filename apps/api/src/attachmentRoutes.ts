@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
-import { readFile } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   AttachmentConflictError,
   AttachmentValidationError,
   createAttachmentDownloadRef,
-  normalizeAttachmentFilters,
   normalizeCreateAttachmentInput,
+  normalizeAttachmentFilters,
   normalizeUpdateAttachmentInput,
 } from "./attachments.js";
 import { type AuthenticatedRequest } from "./auth.js";
@@ -80,6 +81,34 @@ function resolveAttachmentContentPath(storageKey: string): string {
     throw new AttachmentValidationError(["storageKey must be a safe relative storage key"]);
   }
   return filePath;
+}
+
+const uploadMimeExtensions = new Map([
+  ["application/pdf", "pdf"],
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+]);
+
+function multipartFieldValue(field: unknown): string | undefined {
+  if (!field || typeof field !== "object" || !("value" in field)) return undefined;
+  const value = (field as { value?: unknown }).value;
+  return typeof value === "string" ? value : undefined;
+}
+
+function safeFileName(fileName: string | undefined): string {
+  const fallback = "attachment";
+  if (!fileName) return fallback;
+  const baseName = fileName.split(/[\\/]/).pop()?.trim() || fallback;
+  return baseName.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180) || fallback;
+}
+
+function uploadStoragePrefix(ownerModule: string): string {
+  return ownerModule.replace(/[^A-Za-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "attachments";
+}
+
+function generatedAttachmentCode(): string {
+  const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  return `ATT-${date}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
 export function registerAttachmentRoutes(app: FastifyInstance, options: BuildAppOptions) {
@@ -186,6 +215,79 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
         entityType: "attachment",
         entityId: attachment.id,
         afterJson: attachment,
+      });
+      return reply.status(201).send({ attachment });
+    } catch (error) {
+      if (error instanceof AttachmentValidationError) {
+        return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof AttachmentConflictError) {
+        return reply.status(409).send({ error: "ATTACHMENT_CONFLICT" });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/attachments/upload", async (request, reply) => {
+    if (!options.attachmentRepository) {
+      return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const file = await request.file();
+      if (!file) {
+        return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: ["file is required"] });
+      }
+      const fields = file.fields as Record<string, unknown>;
+      if (multipartFieldValue(fields.storageKey) !== undefined) {
+        return reply.status(400).send({
+          error: "ATTACHMENT_VALIDATION_FAILED",
+          issues: ["storageKey cannot be supplied for upload"],
+        });
+      }
+      const extension = uploadMimeExtensions.get(file.mimetype);
+      if (!extension) {
+        return reply.status(400).send({
+          error: "ATTACHMENT_VALIDATION_FAILED",
+          issues: ["file must be a PDF, JPEG, or PNG"],
+        });
+      }
+
+      const ownerModule = multipartFieldValue(fields.ownerModule);
+      const ownerEntityType = multipartFieldValue(fields.ownerEntityType);
+      const ownerEntityId = multipartFieldValue(fields.ownerEntityId);
+      const originalFileName = safeFileName(file.filename);
+      const storageKey = `${uploadStoragePrefix(ownerModule ?? "attachments")}/${randomUUID()}.${extension}`;
+      const buffer = await file.toBuffer();
+      const input = {
+        ...normalizeCreateAttachmentInput({
+          attachmentCode: generatedAttachmentCode(),
+          displayName: multipartFieldValue(fields.displayName) ?? originalFileName,
+          storageKey,
+          originalFileName,
+          fileType: file.mimetype,
+          fileSize: buffer.length,
+          ownerModule,
+          ownerEntityType,
+          ownerEntityId,
+          status: "active",
+          remark: multipartFieldValue(fields.remark),
+        }),
+        ...actorFields(request),
+      };
+
+      const contentPath = resolveAttachmentContentPath(input.storageKey);
+      await mkdir(dirname(contentPath), { recursive: true });
+      await writeFile(contentPath, buffer);
+      const attachment = await options.attachmentRepository.create(input);
+      await writeAuditLog(request, options, {
+        action: "attachment.upload",
+        entityType: "attachment",
+        entityId: attachment.id,
+        afterJson: {
+          ...attachment,
+          storageKey: "[generated]",
+        },
       });
       return reply.status(201).send({ attachment });
     } catch (error) {

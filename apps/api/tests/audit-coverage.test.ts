@@ -8,6 +8,7 @@ const auditedMutationRoutes = [
   ["appCoreRoutes.ts", "patch", "/api/app-config"],
   ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
   ["attachmentRoutes.ts", "post", "/api/attachments"],
+  ["attachmentRoutes.ts", "post", "/api/attachments/upload"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/business-projects/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/certificates/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
@@ -66,6 +67,7 @@ type AuditRoute = readonly [string, string, string];
 
 const requiredAttachmentAuditRoutes: ReadonlyArray<AuditRoute> = [
   ["attachmentRoutes.ts", "post", "/api/attachments"],
+  ["attachmentRoutes.ts", "post", "/api/attachments/upload"],
   ["attachmentRoutes.ts", "patch", "/api/attachments/:id"],
   ["contractsBusinessCertificatesRoutes.ts", "post", "/api/contracts/:id/attachments"],
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
