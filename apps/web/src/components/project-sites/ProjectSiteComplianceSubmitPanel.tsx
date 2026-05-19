@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type {
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
   ProjectSiteDto,
   ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
@@ -35,6 +36,12 @@ type InsuranceForm = {
   insurerName: string;
   startDate: string;
   endDate: string;
+  remark: string;
+};
+
+type CoveredPersonForm = {
+  policyId: string;
+  rosterPersonId: string;
   remark: string;
 };
 
@@ -86,6 +93,7 @@ export function ProjectSiteComplianceSubmitPanel({
   currentContactName?: string | null;
 }) {
   const [rosterPeople, setRosterPeople] = useState<ProjectSiteRosterPersonDto[]>([]);
+  const [insurancePolicies, setInsurancePolicies] = useState<ProjectSiteEmployerLiabilityInsurancePolicyDto[]>([]);
   const [loadStatus, setLoadStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
@@ -102,6 +110,23 @@ export function ProjectSiteComplianceSubmitPanel({
         if (!mounted) return;
         setRosterPeople([]);
         setLoadStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [section, site.id]);
+
+  useEffect(() => {
+    if (section !== "insurance") return undefined;
+    let mounted = true;
+    loadInsurancePolicies(site.id)
+      .then((nextPolicies) => {
+        if (!mounted) return;
+        setInsurancePolicies(nextPolicies);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setInsurancePolicies([]);
       });
     return () => {
       mounted = false;
@@ -128,7 +153,11 @@ export function ProjectSiteComplianceSubmitPanel({
         {section === "insurance" ? (
           <div className="compliance-submit-grid">
             <InsurancePolicyForm site={site} />
-            <CoveredPersonPlaceholder rosterPeople={rosterPeople} loadStatus={loadStatus} />
+            <CoveredPersonForm
+              rosterPeople={rosterPeople}
+              insurancePolicies={insurancePolicies}
+              loadStatus={loadStatus}
+            />
           </div>
         ) : null}
         {section === "payroll" ? <PayrollSubmissionForm site={site} currentContactName={currentContactName} /> : null}
@@ -412,22 +441,99 @@ function InsurancePolicyForm({ site }: { site: ProjectSiteDto }) {
   );
 }
 
-function CoveredPersonPlaceholder({
+function CoveredPersonForm({
   rosterPeople,
+  insurancePolicies,
   loadStatus,
 }: {
   rosterPeople: ProjectSiteRosterPersonDto[];
+  insurancePolicies: ProjectSiteEmployerLiabilityInsurancePolicyDto[];
   loadStatus: "idle" | "loading" | "ready" | "error";
 }) {
-  const activeCount = useMemo(() => rosterPeople.filter((person) => person.status === "active").length, [rosterPeople]);
+  const activePeople = useMemo(() => rosterPeople.filter((person) => person.status === "active"), [rosterPeople]);
+  const [form, setForm] = useState<CoveredPersonForm>({
+    policyId: "",
+    rosterPersonId: "",
+    remark: "",
+  });
+  const [state, setState] = useState<SubmitState>("idle");
+  const [error, setError] = useState("");
+  const selectedPerson = activePeople.find((person) => person.id === form.rosterPersonId) ?? activePeople[0] ?? null;
+  const selectedPolicy = insurancePolicies.find((policy) => policy.id === form.policyId) ?? insurancePolicies[0] ?? null;
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      policyId: current.policyId || insurancePolicies[0]?.id || "",
+      rosterPersonId: current.rosterPersonId || activePeople[0]?.id || "",
+    }));
+  }, [activePeople, insurancePolicies]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (state === "saving" || !selectedPolicy || !selectedPerson) return;
+    setState("saving");
+    setError("");
+    try {
+      await requestJson(`${apiBaseUrl}/api/employer-liability-insurance-covered-persons`, {
+        method: "POST",
+        body: JSON.stringify({
+          policyId: selectedPolicy.id,
+          rosterPersonId: selectedPerson.id,
+          coveredNameSnapshot: selectedPerson.personName,
+          identityNoLast4Snapshot: selectedPerson.identityNoLast4 ?? null,
+          remark: form.remark || null,
+        }),
+      });
+      setForm({
+        policyId: selectedPolicy.id,
+        rosterPersonId: selectedPerson.id,
+        remark: "",
+      });
+      setState("success");
+    } catch (nextError) {
+      setError(formatApiError(nextError, "被保人员提交失败，请检查字段后重试。"));
+      setState("error");
+    }
+  }
+
   return (
-    <div className="compact-form compliance-submit-form" aria-label="被保人员提交说明">
+    <form className="compact-form compliance-submit-form" aria-label="被保人员提交" onSubmit={submit}>
       <h4>被保人员</h4>
       {loadStatus === "loading" ? <p className="form-helper">项目点现场人员加载中...</p> : null}
-      <p className="form-helper">
-        当前可见 active 项目点现场人员 {activeCount} 人。被保人员明细维护后续开放，当前由总部复核保单覆盖情况。
-      </p>
-    </div>
+      {insurancePolicies.length === 0 ? (
+        <EmptyState title="暂无可绑定雇主责任险保单" description="请先提交本项目点雇主责任险保单，再补充被保人员。" />
+      ) : activePeople.length === 0 ? (
+        <EmptyState title="暂无可绑定项目点现场人员" description="请先提交项目点现场人员名单，再补充被保人员。" />
+      ) : (
+        <>
+          <label>
+            雇主责任险保单
+            <select value={form.policyId} onChange={(event) => setForm({ ...form, policyId: event.target.value })}>
+              {insurancePolicies.map((policy) => (
+                <option key={policy.id} value={policy.id}>{policy.policyNo}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            绑定项目点现场人员
+            <select value={form.rosterPersonId} onChange={(event) => setForm({ ...form, rosterPersonId: event.target.value })}>
+              {activePeople.map((person) => (
+                <option key={person.id} value={person.id}>{person.personName}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            备注
+            <input value={form.remark} onChange={(event) => setForm({ ...form, remark: event.target.value })} />
+          </label>
+          <SubmitFeedback state={state} error={error} successText="被保人员已提交，等待总部复核。" />
+          <button type="submit" className="primary-action" disabled={state === "saving" || !selectedPolicy || !selectedPerson}>
+            {state === "saving" ? "提交中..." : "提交被保人员"}
+          </button>
+        </>
+      )}
+    </form>
   );
 }
 
@@ -514,6 +620,14 @@ async function loadRosterPeople(siteId: string): Promise<ProjectSiteRosterPerson
     `${apiBaseUrl}/api/project-site-roster-persons?${params.toString()}`,
   );
   return payload.rosterPeople.filter((person) => person.projectSiteId === siteId);
+}
+
+async function loadInsurancePolicies(siteId: string): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto[]> {
+  const params = new URLSearchParams({ projectSiteId: siteId });
+  const payload = await requestJson<{ insurancePolicies: ProjectSiteEmployerLiabilityInsurancePolicyDto[] }>(
+    `${apiBaseUrl}/api/employer-liability-insurance-policies?${params.toString()}`,
+  );
+  return payload.insurancePolicies.filter((policy) => policy.projectSiteId === siteId);
 }
 
 function buildCertificateCode(prefix: string, siteCode: string, certificateNumber: string): string {
