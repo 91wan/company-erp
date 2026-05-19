@@ -16,7 +16,8 @@
     "db:validate": "prisma validate --schema database/prisma/schema.prisma",
     "preflight:nas": "bash scripts/preflight-nas.sh",
     "test:backup-restore": "bash scripts/test-backup-restore.sh",
-    "pilot:verify-local": "bash scripts/pilot-verify-local.sh"
+    "pilot:verify-local": "bash scripts/pilot-verify-local.sh",
+    "attachments:legacy-report": "node scripts/attachments-legacy-report.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
