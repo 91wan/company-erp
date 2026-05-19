@@ -188,6 +188,36 @@ export async function uploadAttachment(input: UploadAttachmentInput): Promise<At
   return payload.attachment;
 }
 
+export type ProjectSiteBusinessAttachmentTargetType =
+  | "certificate_record"
+  | "employer_liability_policy"
+  | "payroll_submission"
+  | "project_site_food_license";
+
+export type UploadProjectSiteBusinessAttachmentInput = {
+  file: File;
+  targetType: ProjectSiteBusinessAttachmentTargetType;
+  targetId: string;
+  displayName?: string;
+  remark?: string;
+};
+
+export async function uploadProjectSiteBusinessAttachment(
+  input: UploadProjectSiteBusinessAttachmentInput,
+): Promise<AttachmentRecordDto> {
+  const formData = new FormData();
+  formData.set("file", input.file);
+  formData.set("targetType", input.targetType);
+  formData.set("targetId", input.targetId);
+  if (input.displayName) formData.set("displayName", input.displayName);
+  if (input.remark) formData.set("remark", input.remark);
+  const payload = await requestJson<{ attachment: AttachmentRecordDto }>(`${apiBaseUrl}/api/project-site-attachment-uploads`, {
+    method: "POST",
+    body: formData,
+  });
+  return payload.attachment;
+}
+
 export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppConfigDto> {
   const payload = await requestJson<{ appConfig: AppConfigDto }>(`${apiBaseUrl}/api/app-config`, {
     method: "PATCH",

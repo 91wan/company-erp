@@ -1,10 +1,18 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type {
+  CertificateRecordDto,
   ProjectSiteEmployerLiabilityInsurancePolicyDto,
+  ProjectSitePayrollSubmissionDto,
   ProjectSiteDto,
   ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
+import {
+  apiBaseUrl,
+  formatApiError,
+  requestJson,
+  uploadProjectSiteBusinessAttachment,
+  type ProjectSiteBusinessAttachmentTargetType,
+} from "../../apiClient";
 import { EmptyState, SectionCard, StatusBadge } from "../ui";
 import type { ProjectSiteComplianceDetailSection } from "./ProjectSiteComplianceDetailsPanel";
 
@@ -51,6 +59,12 @@ type PayrollForm = {
   remark: string;
 };
 
+type UploadTarget = {
+  targetType: ProjectSiteBusinessAttachmentTargetType;
+  targetId: string;
+  label: string;
+};
+
 const initialRosterForm: RosterForm = {
   personName: "",
   phone: "",
@@ -95,7 +109,9 @@ export function ProjectSiteComplianceSubmitPanel({
   onSubmitted?: () => void;
 }) {
   const [rosterPeople, setRosterPeople] = useState<ProjectSiteRosterPersonDto[]>([]);
+  const [certificates, setCertificates] = useState<CertificateRecordDto[]>([]);
   const [insurancePolicies, setInsurancePolicies] = useState<ProjectSiteEmployerLiabilityInsurancePolicyDto[]>([]);
+  const [payrollSubmissions, setPayrollSubmissions] = useState<ProjectSitePayrollSubmissionDto[]>([]);
   const [loadStatus, setLoadStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
@@ -135,6 +151,57 @@ export function ProjectSiteComplianceSubmitPanel({
     };
   }, [section, site.id]);
 
+  useEffect(() => {
+    if (section !== "rosterHealth" && section !== "foodLicense") return undefined;
+    let mounted = true;
+    loadCertificates(site.id)
+      .then((nextCertificates) => {
+        if (!mounted) return;
+        setCertificates(nextCertificates);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCertificates([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [section, site.id]);
+
+  useEffect(() => {
+    if (section !== "payroll") return undefined;
+    let mounted = true;
+    loadPayrollSubmissions(site.id)
+      .then((nextSubmissions) => {
+        if (!mounted) return;
+        setPayrollSubmissions(nextSubmissions);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPayrollSubmissions([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [section, site.id]);
+
+  const healthCertificateTargets = certificates
+    .filter((certificate) => certificate.certificateType === "person_health_cert")
+    .map((certificate) => certificateUploadTarget(certificate));
+  const foodLicenseTargets = certificates
+    .filter((certificate) => certificate.certificateType === "food_operation_license")
+    .map((certificate) => certificateUploadTarget(certificate));
+  const insuranceTargets = insurancePolicies.map((policy) => ({
+    targetType: "employer_liability_policy" as const,
+    targetId: policy.id,
+    label: `${policy.policyNo} / ${policy.insurerName}`,
+  }));
+  const payrollTargets = payrollSubmissions.map((submission) => ({
+    targetType: "payroll_submission" as const,
+    targetId: submission.id,
+    label: `${submission.payrollMonth} 工资表`,
+  }));
+
   return (
     <section className="project-site-compliance-submit" aria-label="项目点合规资料提交">
       <SectionCard
@@ -149,9 +216,15 @@ export function ProjectSiteComplianceSubmitPanel({
           <div className="compliance-submit-grid">
             <RosterPersonForm site={site} onSubmitted={onSubmitted} />
             <HealthCertificateForm site={site} rosterPeople={rosterPeople} loadStatus={loadStatus} onSubmitted={onSubmitted} />
+            <BusinessTargetUploadForm targets={healthCertificateTargets} onUploaded={onSubmitted} />
           </div>
         ) : null}
-        {section === "foodLicense" ? <FoodLicenseForm site={site} onSubmitted={onSubmitted} /> : null}
+        {section === "foodLicense" ? (
+          <div className="compliance-submit-grid">
+            <FoodLicenseForm site={site} onSubmitted={onSubmitted} />
+            <BusinessTargetUploadForm targets={foodLicenseTargets} onUploaded={onSubmitted} />
+          </div>
+        ) : null}
         {section === "insurance" ? (
           <div className="compliance-submit-grid">
             <InsurancePolicyForm site={site} onSubmitted={onSubmitted} />
@@ -161,11 +234,119 @@ export function ProjectSiteComplianceSubmitPanel({
               loadStatus={loadStatus}
               onSubmitted={onSubmitted}
             />
+            <BusinessTargetUploadForm targets={insuranceTargets} onUploaded={onSubmitted} />
           </div>
         ) : null}
-        {section === "payroll" ? <PayrollSubmissionForm site={site} currentContactName={currentContactName} onSubmitted={onSubmitted} /> : null}
+        {section === "payroll" ? (
+          <div className="compliance-submit-grid">
+            <PayrollSubmissionForm site={site} currentContactName={currentContactName} onSubmitted={onSubmitted} />
+            <BusinessTargetUploadForm targets={payrollTargets} onUploaded={onSubmitted} />
+          </div>
+        ) : null}
       </SectionCard>
     </section>
+  );
+}
+
+function certificateUploadTarget(certificate: CertificateRecordDto): UploadTarget {
+  return {
+    targetType: "certificate_record",
+    targetId: certificate.id,
+    label: `${certificate.certificateName}${certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : ""}`,
+  };
+}
+
+function BusinessTargetUploadForm({
+  targets,
+  onUploaded,
+}: {
+  targets: UploadTarget[];
+  onUploaded?: () => void;
+}) {
+  const [targetId, setTargetId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [remark, setRemark] = useState("");
+  const [state, setState] = useState<SubmitState>("idle");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setTargetId((current) => current || targets[0]?.targetId || "");
+  }, [targets]);
+
+  const selectedTarget = targets.find((target) => target.targetId === targetId) ?? targets[0] ?? null;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedTarget || !file || state === "saving") return;
+    setState("saving");
+    setError("");
+    try {
+      await uploadProjectSiteBusinessAttachment({
+        file,
+        targetType: selectedTarget.targetType,
+        targetId: selectedTarget.targetId,
+        displayName: displayName.trim() || file.name,
+        remark: remark.trim(),
+      });
+      setFile(null);
+      setDisplayName("");
+      setRemark("");
+      setState("success");
+      onUploaded?.();
+    } catch (nextError) {
+      setError(formatApiError(nextError, "统一附件上传失败，请检查文件类型或联系总部。"));
+      setState("error");
+    }
+  }
+
+  if (targets.length === 0) {
+    return (
+      <div className="compact-form compliance-submit-form" aria-label="统一附件上传">
+        <h4>统一附件</h4>
+        <EmptyState title="暂无可绑定附件的资料记录" description="请先提交结构化资料，再上传附件。" />
+        <p className="form-helper">附件上传使用后端生成的附件引用；项目点账号不填写附件路径、owner 或技术存储字段。</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="compact-form compliance-submit-form" aria-label="统一附件上传" onSubmit={submit}>
+      <h4>上传统一附件</h4>
+      <p className="form-helper">附件将绑定到已提交的业务记录；项目点账号不填写附件路径、owner 或技术存储字段。</p>
+      <label>
+        绑定资料
+        <select value={selectedTarget?.targetId ?? ""} onChange={(event) => setTargetId(event.target.value)}>
+          {targets.map((target) => (
+            <option key={target.targetId} value={target.targetId}>{target.label}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        选择统一附件
+        <input
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+        />
+      </label>
+      <label>
+        附件显示名称
+        <input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          placeholder={file?.name ?? "例如：食品经营许可证扫描件"}
+        />
+      </label>
+      <label>
+        备注
+        <input value={remark} onChange={(event) => setRemark(event.target.value)} />
+      </label>
+      <SubmitFeedback state={state} error={error} successText="统一附件已上传，等待总部复核。" />
+      <button type="submit" className="primary-action" disabled={!file || state === "saving"}>
+        {state === "saving" ? "上传中..." : "上传统一附件"}
+      </button>
+    </form>
   );
 }
 
@@ -643,6 +824,21 @@ async function loadInsurancePolicies(siteId: string): Promise<ProjectSiteEmploye
     `${apiBaseUrl}/api/employer-liability-insurance-policies?${params.toString()}`,
   );
   return payload.insurancePolicies.filter((policy) => policy.projectSiteId === siteId);
+}
+
+async function loadCertificates(siteId: string): Promise<CertificateRecordDto[]> {
+  const payload = await requestJson<{ certificates: CertificateRecordDto[] }>(`${apiBaseUrl}/api/certificates`);
+  return payload.certificates.filter(
+    (certificate) => certificate.ownerProjectSiteId === siteId || certificate.ownerRosterPersonProjectSiteId === siteId,
+  );
+}
+
+async function loadPayrollSubmissions(siteId: string): Promise<ProjectSitePayrollSubmissionDto[]> {
+  const params = new URLSearchParams({ projectSiteId: siteId });
+  const payload = await requestJson<{ payrollSubmissions: ProjectSitePayrollSubmissionDto[] }>(
+    `${apiBaseUrl}/api/project-site-payroll-submissions?${params.toString()}`,
+  );
+  return payload.payrollSubmissions.filter((submission) => submission.projectSiteId === siteId);
 }
 
 function buildCertificateCode(prefix: string, siteCode: string, certificateNumber: string): string {
