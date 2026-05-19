@@ -55,6 +55,9 @@ function mockSubmitPanelFetch() {
     if (method === "POST" && url.includes("/api/employer-liability-insurance-covered-persons")) {
       return Promise.resolve(jsonResponse({ coveredPerson: { id: "covered-new" } }, true, 201));
     }
+    if (method === "POST" && url.includes("/api/project-site-attachment-uploads")) {
+      return Promise.resolve(jsonResponse({ attachment: { id: "attachment-new", storageKey: "" } }, true, 201));
+    }
 
     return Promise.resolve(jsonResponse({}));
   });
@@ -193,5 +196,49 @@ describe("ProjectSiteComplianceSubmitPanel", () => {
       expect(payload).not.toHaveProperty("attachmentPath");
     });
     expect(await screen.findByText("被保人员已提交，等待总部复核。")).toBeInTheDocument();
+  });
+
+  it("uploads unified attachments against visible business records without exposing storage keys or owner fields", async () => {
+    const fetchMock = mockSubmitPanelFetch();
+
+    render(<ProjectSiteComplianceSubmitPanel site={projectSite} section="insurance" currentContactName="王项目" />);
+
+    const uploadForm = await screen.findByRole("form", { name: "统一附件上传" });
+    expect(within(uploadForm).getByLabelText("绑定资料")).toHaveValue(insurancePolicy.id);
+    expect(screen.queryByText(/Storage Key/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/附件路径/)).not.toBeInTheDocument();
+
+    const file = new File(["PDF demo content"], "policy.pdf", { type: "application/pdf" });
+    fireEvent.change(within(uploadForm).getByLabelText("选择统一附件"), { target: { files: [file] } });
+    fireEvent.change(within(uploadForm).getByLabelText("附件显示名称"), { target: { value: "雇主责任险保单扫描件" } });
+    fireEvent.click(within(uploadForm).getByRole("button", { name: "上传统一附件" }));
+
+    await waitFor(() => {
+      const uploadCall = fetchMock.mock.calls.find(([url, init]) =>
+        String(url).includes("/api/project-site-attachment-uploads") && init?.method === "POST",
+      );
+      expect(uploadCall).toBeTruthy();
+      const body = uploadCall?.[1]?.body;
+      expect(body).toBeInstanceOf(FormData);
+      const formData = body as FormData;
+      expect(formData.get("targetType")).toBe("employer_liability_policy");
+      expect(formData.get("targetId")).toBe(insurancePolicy.id);
+      expect(formData.get("displayName")).toBe("雇主责任险保单扫描件");
+      expect(formData.has("storageKey")).toBe(false);
+      expect(formData.has("ownerModule")).toBe(false);
+      expect(formData.has("ownerEntityId")).toBe(false);
+    });
+    expect(await screen.findByText("统一附件已上传，等待总部复核。")).toBeInTheDocument();
+  });
+
+  it("shows an empty upload state when no existing payroll record can receive an attachment", async () => {
+    mockSubmitPanelFetch();
+
+    render(<ProjectSiteComplianceSubmitPanel site={{ ...projectSite, payrollAgencyRequired: true }} section="payroll" currentContactName="王项目" />);
+
+    expect(await screen.findByText("暂无可绑定附件的资料记录")).toBeInTheDocument();
+    expect(screen.getByText("请先提交结构化资料，再上传附件。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上传统一附件" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Storage Key/i)).not.toBeInTheDocument();
   });
 });
