@@ -15,7 +15,8 @@
     "db:generate": "prisma generate --schema database/prisma/schema.prisma",
     "db:validate": "prisma validate --schema database/prisma/schema.prisma",
     "preflight:nas": "bash scripts/preflight-nas.sh",
-    "test:backup-restore": "bash scripts/test-backup-restore.sh"
+    "test:backup-restore": "bash scripts/test-backup-restore.sh",
+    "pilot:verify-local": "bash scripts/pilot-verify-local.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
