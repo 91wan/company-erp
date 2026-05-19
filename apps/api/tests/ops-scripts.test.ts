@@ -298,6 +298,9 @@ describe("local NAS pilot verification pack", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Pilot local verification dry-run");
     expect(result.stdout).toContain("Would run NAS preflight with a temporary safe env");
+    expect(result.stdout).toContain("Would smoke-check controlled external project-site attachment upload source");
+    expect(result.stdout).toContain("Would run attachment legacy readiness report in dry-run mode");
+    expect(result.stdout).toContain("Would smoke-check audit CSV export source");
     expect(result.stdout).toContain("Would check Dashboard N+1 regression");
     expect(result.stdout).toContain("No real .env, NAS data, or production container will be read");
     expect(result.stderr).toBe("");
@@ -326,6 +329,9 @@ describe("local NAS pilot verification pack", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("NAS preflight passed");
     expect(result.stdout).toContain("Backup/restore drill dry-run");
+    expect(result.stdout).toContain("Controlled external project-site attachment upload smoke passed");
+    expect(result.stdout).toContain("Attachment legacy migration readiness dry-run");
+    expect(result.stdout).toContain("Audit CSV export smoke passed");
     expect(result.stdout).toContain("Dashboard N+1 regression check passed");
     expect(result.stdout).toContain("Pilot local verification passed");
     expect(result.stdout).not.toContain("/volume1/should-not-be-read");
