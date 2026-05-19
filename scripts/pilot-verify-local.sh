@@ -12,6 +12,9 @@ NAS data directories, attachments, or production containers.
 Checks:
   - NAS preflight with a generated temporary safe env
   - backup/restore drill dry-run
+  - controlled external project-site attachment upload smoke
+  - attachment legacy readiness report dry-run
+  - audit CSV export smoke
   - fixture path scan for NAS-like attachment paths
   - Dashboard N+1 regression static check
 
@@ -68,6 +71,17 @@ process.exit(found ? 0 : 1);
 NODE
 }
 
+require_source_match() {
+  local label="$1"
+  local pattern="$2"
+  local mode="$3"
+  shift 3
+  if ! scan_files "$pattern" "$mode" "$@" >/dev/null; then
+    echo "BLOCKED: ${label} check did not find expected source evidence" >&2
+    exit 1
+  fi
+}
+
 case "${1:-}" in
   --help|-h)
     usage
@@ -78,6 +92,9 @@ case "${1:-}" in
 Pilot local verification dry-run
 Would run NAS preflight with a temporary safe env.
 Would run backup/restore drill in dry-run mode.
+Would smoke-check controlled external project-site attachment upload source.
+Would run attachment legacy readiness report in dry-run mode.
+Would smoke-check audit CSV export source.
 Would scan fixtures for NAS-like raw attachment paths.
 Would check Dashboard N+1 regression.
 No real .env, NAS data, or production container will be read.
@@ -122,11 +139,29 @@ pilot_identity_secret="pilot-local-identity-value-32"
   printf '%s\n' "CORS_ALLOWED_ORIGINS="
 } > "$safe_env"
 
+if ! docker compose --env-file "$safe_env" config >/dev/null 2>&1; then
+  echo "BLOCKED: Docker Compose v2 with --env-file support is required for NAS preflight." >&2
+  echo "Install or update Docker Compose locally, then rerun npm run pilot:verify-local." >&2
+  exit 1
+fi
+
 echo "Running NAS preflight with temporary safe env..."
 PREFLIGHT_ENV_FILE="$safe_env" bash scripts/preflight-nas.sh
 
 echo "Running backup/restore drill dry-run..."
 bash scripts/test-backup-restore.sh --dry-run
+
+echo "Checking controlled external project-site attachment upload source..."
+require_source_match "project-site attachment upload route" "/api/project-site-attachment-uploads" fixed apps/api/src apps/web/src
+require_source_match "project-site attachment upload audit" "attachment.business_upload" fixed apps/api/src apps/api/tests
+echo "Controlled external project-site attachment upload smoke passed"
+
+echo "Running attachment legacy readiness report dry-run..."
+npm run attachments:legacy-report -- --dry-run
+
+echo "Checking audit CSV export source..."
+require_source_match "audit CSV export route" "/api/audit-logs/export.csv" fixed apps/api/src apps/web/src apps/api/tests apps/web/tests
+echo "Audit CSV export smoke passed"
 
 echo "Scanning fixtures for NAS-like raw attachment paths..."
 nas_like_attachment_path="/volume1/company-erp/""attachments"
