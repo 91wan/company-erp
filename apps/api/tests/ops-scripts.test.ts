@@ -264,6 +264,74 @@ describe("backup restore drill script", () => {
   });
 });
 
+describe("local NAS pilot verification pack", () => {
+  it("prints help without reading deployment env or checking Docker", () => {
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--help"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-should-not-read.env"),
+        DOCKER_BIN: join(tmpdir(), "company-erp-missing-docker"),
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run pilot:verify-local");
+    expect(result.stdout).toContain("--dry-run");
+    expect(result.stderr).toBe("");
+  });
+
+  it("supports dry-run without reading real env, NAS paths, or Docker", () => {
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--dry-run"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-should-not-read.env"),
+        NAS_DATA_ROOT: "/volume1/should-not-be-read",
+        NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+        DOCKER_BIN: join(tmpdir(), "company-erp-missing-docker"),
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Pilot local verification dry-run");
+    expect(result.stdout).toContain("Would run NAS preflight with a temporary safe env");
+    expect(result.stdout).toContain("Would check Dashboard N+1 regression");
+    expect(result.stdout).toContain("No real .env, NAS data, or production container will be read");
+    expect(result.stderr).toBe("");
+  });
+
+  it("runs local pilot checks with temporary env and docker compose stub", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-verify-"));
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
+      encoding: "utf8",
+    });
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("NAS preflight passed");
+    expect(result.stdout).toContain("Backup/restore drill dry-run");
+    expect(result.stdout).toContain("Dashboard N+1 regression check passed");
+    expect(result.stdout).toContain("Pilot local verification passed");
+    expect(result.stdout).not.toContain("/volume1/should-not-be-read");
+  });
+});
+
 function createCleanupPrisma() {
   const count = vi.fn(async () => 1);
   const deleteMany = vi.fn(async () => ({ count: 1 }));

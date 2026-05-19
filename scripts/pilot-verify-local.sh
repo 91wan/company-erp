@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: npm run pilot:verify-local
+       scripts/pilot-verify-local.sh [--help|--dry-run]
+
+Runs the local NAS pilot readiness pack without reading real .env files,
+NAS data directories, attachments, or production containers.
+
+Checks:
+  - NAS preflight with a generated temporary safe env
+  - backup/restore drill dry-run
+  - fixture path scan for NAS-like attachment paths
+  - Dashboard N+1 regression static check
+
+Options:
+  --help     Show this help and exit without checking Docker or env files.
+  --dry-run  Print the checks that would run without touching Docker or env files.
+EOF
+}
+
+scan_files() {
+  local pattern="$1"
+  local grep_mode="$2"
+  shift 2
+  node - "$pattern" "$grep_mode" "$@" <<'NODE'
+const { execFileSync } = require("node:child_process");
+const { existsSync, readFileSync } = require("node:fs");
+
+const [, , pattern, mode, ...paths] = process.argv;
+const excluded = new Set([
+  "apps/api/tests/test-fixture-redaction.test.ts",
+  "scripts/pilot-verify-local.sh",
+]);
+
+function gitFiles(args) {
+  try {
+    return execFileSync("git", args, { encoding: "utf8" })
+      .split("\n")
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+const files = new Set([
+  ...gitFiles(["ls-files", ...paths]),
+  ...gitFiles(["ls-files", "--others", "--exclude-standard", ...paths]),
+]);
+const matcher = mode === "extended" ? new RegExp(pattern) : null;
+let found = false;
+
+for (const file of [...files].sort()) {
+  if (excluded.has(file) || !existsSync(file)) continue;
+  const lines = readFileSync(file, "utf8").split(/\r?\n/);
+  lines.forEach((line, index) => {
+    const matched = matcher ? matcher.test(line) : line.includes(pattern);
+    if (matched) {
+      found = true;
+      console.log(`${file}:${index + 1}:${line}`);
+    }
+  });
+}
+
+process.exit(found ? 0 : 1);
+NODE
+}
+
+case "${1:-}" in
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  --dry-run)
+    cat <<'EOF'
+Pilot local verification dry-run
+Would run NAS preflight with a temporary safe env.
+Would run backup/restore drill in dry-run mode.
+Would scan fixtures for NAS-like raw attachment paths.
+Would check Dashboard N+1 regression.
+No real .env, NAS data, or production container will be read.
+EOF
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
+tmp_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$tmp_dir"
+}
+trap cleanup EXIT INT TERM
+
+safe_env="$tmp_dir/pilot-safe.env"
+data_root="$tmp_dir/data"
+attachments_root="$tmp_dir/attachments"
+pilot_db_password="pilot-local-db-password-32"
+pilot_session_secret="pilot-local-session-value-32"
+pilot_identity_secret="pilot-local-identity-value-32"
+
+{
+  printf '%s\n' "APP_ENVIRONMENT=nas"
+  printf '%s=%s\n' "POSTGRES_PASSWORD" "$pilot_db_password"
+  printf '%s=%s\n' "AUTH_SESSION_SECRET" "$pilot_session_secret"
+  printf '%s=%s\n' "IDENTITY_ENCRYPTION_SECRET" "$pilot_identity_secret"
+  printf '%s=%s\n' "NAS_DATA_ROOT" "$data_root"
+  printf '%s=%s\n' "NAS_ATTACHMENTS_ROOT" "$attachments_root"
+  printf '%s\n' "ERP_WEB_BIND_HOST=127.0.0.1"
+  printf '%s\n' "PUBLIC_ACCESS_ENABLED=false"
+  printf '%s\n' "AUTH_COOKIE_SECURE=false"
+  printf '%s\n' "CORS_ALLOWED_ORIGINS="
+} > "$safe_env"
+
+echo "Running NAS preflight with temporary safe env..."
+PREFLIGHT_ENV_FILE="$safe_env" bash scripts/preflight-nas.sh
+
+echo "Running backup/restore drill dry-run..."
+bash scripts/test-backup-restore.sh --dry-run
+
+echo "Scanning fixtures for NAS-like raw attachment paths..."
+nas_like_attachment_path="/volume1/company-erp/""attachments"
+if scan_files "$nas_like_attachment_path" fixed apps packages scripts; then
+  echo "BLOCKED: NAS-like raw attachment path found outside dedicated redaction tests" >&2
+  exit 1
+fi
+
+echo "Checking Dashboard N+1 compliance-summary regression..."
+if scan_files "compliance-summary|getProjectSiteComplianceSummary" extended \
+  apps/web/src/components/dashboard \
+  apps/web/src/components/DashboardShell.tsx; then
+  echo "BLOCKED: Dashboard source must not request per-site compliance summaries" >&2
+  exit 1
+fi
+echo "Dashboard N+1 regression check passed"
+
+echo "Pilot local verification passed"
