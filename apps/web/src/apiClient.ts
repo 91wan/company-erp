@@ -155,6 +155,30 @@ export async function createAttachment(input: CreateAttachmentRecordInput): Prom
   return payload.attachment;
 }
 
+export type UploadAttachmentInput = {
+  file: File;
+  ownerModule: string;
+  ownerEntityType: string;
+  ownerEntityId?: string | null;
+  displayName?: string;
+  remark?: string;
+};
+
+export async function uploadAttachment(input: UploadAttachmentInput): Promise<AttachmentRecordDto> {
+  const formData = new FormData();
+  formData.set("file", input.file);
+  formData.set("ownerModule", input.ownerModule);
+  formData.set("ownerEntityType", input.ownerEntityType);
+  if (input.ownerEntityId) formData.set("ownerEntityId", input.ownerEntityId);
+  if (input.displayName) formData.set("displayName", input.displayName);
+  if (input.remark) formData.set("remark", input.remark);
+  const payload = await requestJson<{ attachment: AttachmentRecordDto }>(`${apiBaseUrl}/api/attachments/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  return payload.attachment;
+}
+
 export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppConfigDto> {
   const payload = await requestJson<{ appConfig: AppConfigDto }>(`${apiBaseUrl}/api/app-config`, {
     method: "PATCH",
