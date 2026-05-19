@@ -14,7 +14,7 @@ Scope: UI-only final regression after the ProjectSites workspace state, defaults
 
 - ProjectSitesWorkspace remains the entry component, but the state/default/view-model split is covered by focused unit tests and existing browser regression tests.
 - ProjectSitesWorkspace now delegates orchestration through the controller hook; the controller contract tests cover admin, viewer, project_site, and external_project_site inputs plus mutation handler passthrough.
-- Project-site details expose only real primary sections: 合规摘要, 物料领用, 厨房设备, and 统一附件. Fake detail tabs for roster, health certificate, insurance, and payroll remain absent until real backend detail APIs exist.
+- Project-site details expose only real primary sections: 合规摘要, 物料领用, 厨房设备, and 统一附件. 项目点现场人员、健康证、食品经营许可证、雇主责任险保单、被保人员和工资表已接入现有后端明细接口，并在总部详情和外部项目点门户中按项目点 scope 展示；没有稳定接口的内容继续保持后续开放说明。
 - Unified attachment requests use owner context, including ownerModule=project-sites, ownerEntityType=project_site, and the selected project-site id.
 - Business pages do not show the Storage Key registration form. Storage Key remains limited to system settings attachment metadata management.
 - Unsafe legacy attachment paths are redacted in business pages; safe relative compatibility references remain visible as 历史路径/兼容字段.
@@ -24,6 +24,6 @@ Scope: UI-only final regression after the ProjectSites workspace state, defaults
 
 ## 后续需要后端支持的口径
 
-- Real project-site roster, health certificate, insurance covered-person, and payroll detail lists should stay behind "待总部系统开放明细维护" until backend detail APIs exist.
+- 仍无稳定后端接口的内容继续以“待总部系统开放明细维护”呈现，不伪装成完整可办理 tab 或假按钮。
 - Real upload, signed download, OCR, attachment migration, and attachment-id replacement for legacy fields remain future backend/API work.
 - Audit-log detail tabs in ProjectSites should only become a first-class tab after a scoped audit query is available for the selected project site.

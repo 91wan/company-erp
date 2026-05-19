@@ -13,7 +13,7 @@ Scope: read-only browser QA after the ProjectSites workspace model, view-props, 
 ## 验收结论
 
 - ProjectSitesWorkspace remains the entry component, but data loading, defaults, state, derived model, view prop assembly, and dependency contracts are split behind focused tests.
-- Project-site details continue to expose only real primary sections: 合规摘要, 物料领用, 厨房设备, and 统一附件.
+- Project-site details continue to expose only real primary sections: 合规摘要, 物料领用, 厨房设备, and 统一附件. 项目点现场人员、健康证、食品经营许可证、雇主责任险保单、被保人员和工资表已接入现有后端明细接口，并在总部详情和外部项目点门户中按项目点 scope 展示。
 - Unified attachment requests use owner context: ownerModule=project-sites, ownerEntityType=project_site, and the selected project-site id.
 - Business pages do not show Storage Key metadata editing; Storage Key remains limited to system settings attachment management.
 - External and scoped project-site roles keep 成本/采购价/库存金额不可见.
@@ -21,6 +21,6 @@ Scope: read-only browser QA after the ProjectSites workspace model, view-props, 
 
 ## 后续需要后端支持的口径
 
-- Roster, health certificate, insurance covered-person, and payroll detail lists should remain behind "待总部系统开放明细维护" until backend detail APIs exist.
+- 仍无稳定后端接口的内容继续以“待总部系统开放明细维护”呈现，不伪装成完整可办理 tab 或假按钮。
 - Real upload, signed download, OCR, attachment migration, and attachment-id replacement for legacy fields remain future backend/API work.
 - Project-site operation history should only become a first-class detail section after a scoped audit-log query is available for the selected project site.

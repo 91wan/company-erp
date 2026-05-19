@@ -25,5 +25,7 @@ describe("project-sites maintainability browser QA audit", () => {
     expect(audit).toContain("ownerModule=project-sites");
     expect(audit).toContain("出库确认");
     expect(audit).toContain("成本/采购价/库存金额不可见");
+    expect(audit).toContain("项目点现场人员、健康证、食品经营许可证、雇主责任险保单、被保人员和工资表已接入现有后端明细接口");
+    expect(audit).not.toContain("Roster, health certificate, insurance covered-person, and payroll detail lists should remain behind");
   });
 });
