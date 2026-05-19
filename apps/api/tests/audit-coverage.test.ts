@@ -75,6 +75,11 @@ const requiredAttachmentAuditRoutes: ReadonlyArray<AuditRoute> = [
   ["contractsBusinessCertificatesRoutes.ts", "patch", "/api/contract-attachments/:id"],
 ];
 
+const requiredAttachmentReadAuditRoutes: ReadonlyArray<AuditRoute> = [
+  ["attachmentRoutes.ts", "get", "/api/attachments/:id/download-url"],
+  ["attachmentRoutes.ts", "get", "/api/attachments/:id/content"],
+];
+
 const requiredProjectSiteEquipmentAuditRoutes: ReadonlyArray<AuditRoute> = [
   ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment"],
   ["projectSiteRoutes.ts", "patch", "/api/project-site-kitchen-equipment/:id"],
@@ -112,6 +117,10 @@ describe("audit log mutation coverage", () => {
 
   it.each(requiredAttachmentAuditRoutes)("%s %s %s stays in the audit coverage gate", (fileName, method, path) => {
     expect(auditedMutationRoutes).toContainEqual([fileName, method, path]);
+  });
+
+  it.each(requiredAttachmentReadAuditRoutes)("%s %s %s records read/download audit events", (fileName, method, path) => {
+    expect(routeHandlerSource(fileName, method, path)).toContain("writeAuditLog(");
   });
 
   it.each(requiredProjectSiteEquipmentAuditRoutes)("%s %s %s stays in the audit coverage gate", (fileName, method, path) => {

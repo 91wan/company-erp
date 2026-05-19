@@ -80,6 +80,8 @@ function createFakeAuditLogRepository(): AuditLogRepository {
         if (filters.actorUserId && log.actorUserId !== filters.actorUserId) return false;
         if (filters.actorUsername && log.actorUsername !== filters.actorUsername) return false;
         if (filters.action && log.action !== filters.action) return false;
+        if (filters.dateFrom && log.createdAt < filters.dateFrom) return false;
+        if (filters.dateTo && log.createdAt > filters.dateTo) return false;
         return true;
       });
     },
@@ -208,7 +210,7 @@ describe("audit logs API", () => {
     const viewerCookie = await loginCookie(app, "viewer");
     const exported = await app.inject({
       method: "GET",
-      url: "/api/audit-logs/export.csv?entityType=user_account&actorUsername=admin",
+      url: "/api/audit-logs/export.csv?entityType=user_account&action=user_account.create&actorUsername=admin&dateFrom=2026-05-14T00:00:00.000Z&dateTo=2026-05-14T23:59:59.999Z",
       cookies: { company_erp_session: adminCookie },
     });
     const viewer = await app.inject({
