@@ -90,9 +90,12 @@ test("external_project_site final readonly gate stays portal-only across complia
   await nav.getByRole("button", { name: "雇主责任险", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "雇主责任险提交" })).toBeVisible();
   await expect(page.getByText("DEMO 被保人")).toBeVisible();
+  await expect(page.getByRole("form", { name: "被保人员提交" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "提交被保人员" })).toBeVisible();
   await nav.getByRole("button", { name: "工资表", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "工资表提交" })).toBeVisible();
   await expect(page.getByText("统一附件待总部登记")).toBeVisible();
+  await expect(page.getByText("附件上传后续开放，当前由总部登记附件引用")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "系统设置", exact: true })).toHaveCount(0);
   await expect(page.getByText("审计日志")).toHaveCount(0);

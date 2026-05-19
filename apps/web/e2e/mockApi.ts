@@ -390,6 +390,24 @@ const demoCoveredPerson = {
   updatedAt: "2026-05-11T09:00:00.000Z",
 };
 
+const demoRosterPerson = {
+  id: demoCoveredPerson.rosterPersonId,
+  projectSiteId: demoProjectSite.id,
+  projectSiteName: demoProjectSite.siteName,
+  personName: "DEMO 现场人员",
+  phone: "13900001111",
+  identityNoLast4: "1234",
+  workerType: "subcontractor_site_staff",
+  jobRole: "厨师",
+  startDate: "2026-05-01",
+  endDate: null,
+  status: "active",
+  sourceAttachmentPath: null,
+  remark: null,
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
 const demoPayrollSubmission = {
   id: "81818181-8181-4818-8818-818181818181",
   projectSiteId: demoProjectSite.id,
@@ -444,6 +462,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       },
     ],
     projectSites: [{ ...demoProjectSite }],
+    rosterPeople: [{ ...demoRosterPerson }],
     projectUsageRequests: [{ ...demoUsageRequest }],
     contracts: [{ ...demoContract }],
     certificates: [{ ...demoCertificate }],
@@ -995,7 +1014,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname === "/api/contracts") return { contracts: state.contracts };
   if (pathname.startsWith("/api/certificates")) return { certificates: state.certificates };
   if (pathname === "/api/import-jobs") return { importJobs: state.importJobs };
-  if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPeople: [] };
+  if (pathname.startsWith("/api/project-site-roster-persons")) return { rosterPeople: state.rosterPeople };
   if (pathname.startsWith("/api/employer-liability-insurance-policies")) return { insurancePolicies: state.insurancePolicies };
   if (pathname.startsWith("/api/employer-liability-insurance-covered-persons")) return { coveredPersons: state.coveredPersons };
   if (pathname.startsWith("/api/project-site-payroll-submissions")) return { payrollSubmissions: state.payrollSubmissions };
@@ -1015,6 +1034,7 @@ function makeStateShape() {
     inventoryMovements: [demoInventoryMovement],
     inventoryBalances: [] as Record<string, unknown>[],
     projectSites: [demoProjectSite],
+    rosterPeople: [demoRosterPerson],
     projectUsageRequests: [demoUsageRequest],
     contracts: [demoContract],
     certificates: [demoCertificate],
