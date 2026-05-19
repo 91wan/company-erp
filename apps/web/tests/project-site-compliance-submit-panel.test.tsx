@@ -3,6 +3,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectSiteComplianceSubmitPanel } from "../src/components/project-sites/ProjectSiteComplianceSubmitPanel";
 import { jsonResponse, projectSite, rosterPerson } from "./appTestHelpers";
 
+const insurancePolicy = {
+  id: "policy-1",
+  projectSiteId: projectSite.id,
+  projectSiteName: projectSite.siteName,
+  policyNo: "ELI-2026-001",
+  insurerName: "测试保险公司",
+  startDate: "2026-05-01",
+  endDate: "2027-04-30",
+  attachmentPath: null,
+  reviewStatus: "approved",
+  reviewedByEmployeeId: null,
+  reviewedByEmployeeName: null,
+  reviewedAt: null,
+  remark: null,
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -16,7 +34,7 @@ function mockSubmitPanelFetch() {
       return Promise.resolve(jsonResponse({ rosterPeople: [rosterPerson] }));
     }
     if (method === "GET" && url.includes("/api/employer-liability-insurance-policies")) {
-      return Promise.resolve(jsonResponse({ insurancePolicies: [] }));
+      return Promise.resolve(jsonResponse({ insurancePolicies: [insurancePolicy] }));
     }
     if (method === "GET" && url.includes("/api/project-site-payroll-submissions")) {
       return Promise.resolve(jsonResponse({ payrollSubmissions: [] }));
@@ -33,6 +51,9 @@ function mockSubmitPanelFetch() {
     }
     if (method === "POST" && url.includes("/api/employer-liability-insurance-policies")) {
       return Promise.resolve(jsonResponse({ insurancePolicy: { id: "policy-new" } }, true, 201));
+    }
+    if (method === "POST" && url.includes("/api/employer-liability-insurance-covered-persons")) {
+      return Promise.resolve(jsonResponse({ coveredPerson: { id: "covered-new" } }, true, 201));
     }
 
     return Promise.resolve(jsonResponse({}));
@@ -139,5 +160,38 @@ describe("ProjectSiteComplianceSubmitPanel", () => {
       expect(payload).not.toHaveProperty("attachmentPath");
       expect(payload).not.toHaveProperty("storageKey");
     });
+  });
+
+  it("submits covered people against visible policy and active roster without owner or storage fields", async () => {
+    const fetchMock = mockSubmitPanelFetch();
+
+    render(<ProjectSiteComplianceSubmitPanel site={projectSite} section="insurance" currentContactName="王项目" />);
+
+    const coveredPersonForm = await screen.findByRole("form", { name: "被保人员提交" });
+    expect(within(coveredPersonForm).getByLabelText("雇主责任险保单")).toHaveValue(insurancePolicy.id);
+    expect(within(coveredPersonForm).getByLabelText("绑定项目点现场人员")).toHaveValue(rosterPerson.id);
+    expect(screen.queryByText(/被保人员明细维护后续开放/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
+
+    fireEvent.click(within(coveredPersonForm).getByRole("button", { name: "提交被保人员" }));
+
+    await waitFor(() => {
+      const coveredPersonCall = fetchMock.mock.calls.find(([url, init]) =>
+        String(url).includes("/api/employer-liability-insurance-covered-persons") && init?.method === "POST",
+      );
+      expect(coveredPersonCall).toBeTruthy();
+      const payload = JSON.parse(String(coveredPersonCall?.[1]?.body));
+      expect(payload).toMatchObject({
+        policyId: insurancePolicy.id,
+        rosterPersonId: rosterPerson.id,
+        coveredNameSnapshot: rosterPerson.personName,
+        identityNoLast4Snapshot: rosterPerson.identityNoLast4,
+      });
+      expect(payload).not.toHaveProperty("projectSiteId");
+      expect(payload).not.toHaveProperty("ownerEntityId");
+      expect(payload).not.toHaveProperty("storageKey");
+      expect(payload).not.toHaveProperty("attachmentPath");
+    });
+    expect(await screen.findByText("被保人员已提交，等待总部复核。")).toBeInTheDocument();
   });
 });
