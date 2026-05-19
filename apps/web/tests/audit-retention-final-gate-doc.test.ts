@@ -12,6 +12,7 @@ describe("audit retention and final gate record", () => {
     expect(audit).toContain("不等同于正式合规档案系统全面上线");
     expect(audit).toContain("审计日志留存策略");
     expect(audit).toContain("至少 180 天");
+    expect(audit).toContain("CSV 导出");
     expect(audit).toContain("归档职责");
     expect(audit).toContain("password");
     expect(audit).toContain("cookie");
