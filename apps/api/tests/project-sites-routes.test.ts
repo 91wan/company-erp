@@ -115,7 +115,7 @@ function makeRosterPerson(overrides: Partial<ProjectSiteRosterPersonDto> = {}): 
     startDate: "2026-05-01",
     endDate: null,
     status: "active",
-    sourceAttachmentPath: "/volume1/company-erp/attachments/roster/site.xlsx",
+    sourceAttachmentPath: "legacy-fixtures/roster/site.xlsx",
     remark: null,
     createdAt: now,
     updatedAt: now,
@@ -134,7 +134,7 @@ function makeInsurancePolicy(
     insurerName: "太平洋保险",
     startDate: "2026-05-01",
     endDate: "2026-06-08",
-    attachmentPath: "/volume1/company-erp/attachments/insurance/ELI202605001.pdf",
+    attachmentPath: "legacy-fixtures/insurance/ELI202605001.pdf",
     reviewStatus: "pending",
     reviewedByEmployeeId: null,
     reviewedByEmployeeName: null,
@@ -169,7 +169,7 @@ function makePayrollSubmission(overrides: Partial<ProjectSitePayrollSubmissionDt
     projectSiteId: "11111111-1111-4111-8111-111111111111",
     projectSiteName: "科技园一期项目点",
     payrollMonth: "2026-05",
-    attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+    attachmentPath: "legacy-fixtures/payroll/SITE-WX-001-2026-05.xlsx",
     submittedBy: "项目点负责人",
     submittedAt: now,
     reviewStatus: "pending",
@@ -200,7 +200,7 @@ function makeKitchenEquipment(overrides: Partial<ProjectSiteKitchenEquipmentDto>
     sourceContractNo: "HT-SB-2026-001",
     sourceContractName: "厨房设备采购合同",
     lastCheckedDate: "2026-05-10",
-    attachmentPath: "/volume1/company-erp/attachments/equipment/icebox.jpg",
+    attachmentPath: "legacy-fixtures/equipment/icebox.jpg",
     remark: null,
     createdAt: now,
     updatedAt: now,
@@ -221,7 +221,7 @@ function makeKitchenEquipmentChangeRequest(
     proposedQuantity: null,
     proposedLocation: null,
     proposedStatus: "repair_needed",
-    attachmentPath: "/volume1/company-erp/attachments/equipment/repair-needed.jpg",
+    attachmentPath: "legacy-fixtures/equipment/repair-needed.jpg",
     description: "压缩机异响，需要维修",
     submittedByAccountId: "abababab-abab-4bab-8bab-abababababab",
     submittedByNameSnapshot: "王项目",
@@ -893,7 +893,7 @@ describe("project site API", () => {
         insurerName: "平安保险",
         startDate: "2026-05-13",
         endDate: "2027-05-12",
-        attachmentPath: "/volume1/company-erp/attachments/insurance/ELI202605002.pdf",
+        attachmentPath: "legacy-fixtures/insurance/ELI202605002.pdf",
       },
     });
     const createdCoverage = await app.inject({
@@ -912,7 +912,7 @@ describe("project site API", () => {
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         payrollMonth: "2026-05",
-        attachmentPath: "/volume1/company-erp/attachments/payroll/SITE-WX-001-2026-05.xlsx",
+        attachmentPath: "legacy-fixtures/payroll/SITE-WX-001-2026-05.xlsx",
         submittedBy: "项目点负责人",
       },
     });
@@ -1616,13 +1616,13 @@ describe("project-site kitchen equipment API", () => {
         unit: "台",
         location: "热厨区",
         sourceContractId: "33333333-3333-4333-8333-333333333333",
-        attachmentPath: "/volume1/company-erp/attachments/equipment/stove.jpg",
+        attachmentPath: "legacy-fixtures/equipment/stove.jpg",
       },
     });
     const updated = await app.inject({
       method: "PATCH",
       url: `/api/project-site-kitchen-equipment/${kitchenEquipmentId}`,
-      payload: { status: "damaged", location: "待维修区", attachmentPath: "/volume1/company-erp/attachments/equipment/damaged.jpg" },
+      payload: { status: "damaged", location: "待维修区", attachmentPath: "legacy-fixtures/equipment/damaged.jpg" },
     });
     const logs = await auditLogRepository.list({});
     await app.close();
@@ -1773,7 +1773,7 @@ describe("project-site kitchen equipment API", () => {
         proposedQuantity: 1,
         proposedLocation: "备餐间",
         proposedStatus: "in_use",
-        attachmentPath: "/volume1/company-erp/attachments/equipment/disinfection.jpg",
+        attachmentPath: "legacy-fixtures/equipment/disinfection.jpg",
       },
     });
     const rejected = await app.inject({
