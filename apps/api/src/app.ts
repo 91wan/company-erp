@@ -203,7 +203,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(multipart, {
     limits: {
       files: 1,
-      fileSize: 10 * 1024 * 1024,
+      fileSize: 20 * 1024 * 1024,
     },
   });
 

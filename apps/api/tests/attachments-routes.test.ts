@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -144,6 +144,33 @@ function createFakeAuditLogRepository(): AuditLogRepository {
   };
 }
 
+function multipartPayload(fields: Record<string, string | undefined>, file?: { name?: string; type?: string; content?: Buffer | string }) {
+  const boundary = "----company-erp-attachment-test-boundary";
+  const chunks: Buffer[] = [];
+  function push(value: string | Buffer) {
+    chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
+  }
+
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    push(`--${boundary}\r\n`);
+    push(`Content-Disposition: form-data; name="${name}"\r\n\r\n`);
+    push(`${value}\r\n`);
+  }
+  if (file) {
+    push(`--${boundary}\r\n`);
+    push(`Content-Disposition: form-data; name="file"; filename="${file.name ?? "attachment.pdf"}"\r\n`);
+    push(`Content-Type: ${file.type ?? "application/pdf"}\r\n\r\n`);
+    push(Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content ?? "demo attachment"));
+    push("\r\n");
+  }
+  push(`--${boundary}--\r\n`);
+  return {
+    payload: Buffer.concat(chunks),
+    headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+  };
+}
+
 async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
   const response = await app.inject({
     method: "POST",
@@ -275,6 +302,130 @@ describe("attachments API", () => {
     expect(updated.json()).toEqual({ attachment: expect.objectContaining({ displayName: "DEMO 证照附件 v2", status: "disabled" }) });
     expect(logs.map((log) => log.action)).toEqual(["attachment.create", "attachment.update"]);
     expect(JSON.stringify(logs)).not.toContain("secret");
+  });
+
+  it("uploads an attachment file with a backend-generated storage key and audit log", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const auditLogRepository = createFakeAuditLogRepository();
+    const attachmentRepository = createFakeAttachmentRepository([]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository,
+      auditLogRepository,
+    });
+
+    try {
+      const cookie = await loginCookie(app);
+      const uploaded = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: cookie },
+        ...multipartPayload(
+          {
+            ownerModule: "contracts",
+            ownerEntityType: "contract",
+            ownerEntityId: "33333333-3333-4333-8333-333333333333",
+            displayName: "合同盖章扫描件",
+            remark: "总部登记上传",
+          },
+          { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      const body = uploaded.json();
+      const storedPath = join(root, body.attachment.storageKey);
+      const storedContent = await readFile(storedPath, "utf8");
+      const logs = await auditLogRepository.list({});
+
+      expect(uploaded.statusCode).toBe(201);
+      expect(body).toEqual({
+        attachment: expect.objectContaining({
+          attachmentCode: expect.stringMatching(/^ATT-\d{8}-[A-F0-9]{8}$/),
+          displayName: "合同盖章扫描件",
+          storageKey: expect.stringMatching(/^contracts\/[0-9a-f-]+\.pdf$/),
+          originalFileName: "signed-contract.pdf",
+          fileType: "application/pdf",
+          fileSize: Buffer.byteLength("PDF demo content"),
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          ownerEntityId: "33333333-3333-4333-8333-333333333333",
+          createdByUsername: "admin",
+        }),
+      });
+      expect(storedContent).toBe("PDF demo content");
+      expect(logs.map((log) => log.action)).toContain("attachment.upload");
+      expect(JSON.stringify(logs)).not.toContain(root);
+      expect(JSON.stringify(logs)).not.toContain("PDF demo content");
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects arbitrary upload storage keys and external project-site upload attempts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: ["77777777-7777-4777-8777-777777777777"],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const adminCookie = await loginCookie(app, "admin");
+      const externalCookie = await loginCookie(app, "external-site");
+      const unsafeStorageKey = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: adminCookie },
+        ...multipartPayload(
+          {
+            ownerModule: "contracts",
+            ownerEntityType: "contract",
+            storageKey: "contracts/user-supplied.pdf",
+          },
+          { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      const externalUpload = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: externalCookie },
+        ...multipartPayload(
+          {
+            ownerModule: "project_sites",
+            ownerEntityType: "project_site",
+            ownerEntityId: "77777777-7777-4777-8777-777777777777",
+            displayName: "外部项目点附件",
+          },
+          { name: "site-license.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      await app.close();
+
+      expect(unsafeStorageKey.statusCode).toBe(400);
+      expect(unsafeStorageKey.json()).toMatchObject({
+        error: "ATTACHMENT_VALIDATION_FAILED",
+        issues: expect.arrayContaining(["storageKey cannot be supplied for upload"]),
+      });
+      expect(externalUpload.statusCode).toBe(403);
+      expect(externalUpload.json()).toMatchObject({ permissionArea: "attachments", requiredLevel: "manage" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("rejects unsafe storage keys", async () => {
