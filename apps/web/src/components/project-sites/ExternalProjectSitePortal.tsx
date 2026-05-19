@@ -1,4 +1,5 @@
 import { ClipboardCheck, FileText, ShieldCheck, Users } from "lucide-react";
+import { useState } from "react";
 import type { ProjectSiteComplianceSummaryDto, ProjectSiteDto } from "@company-erp/shared";
 import { PageHeader, SummaryCard, ComplianceChecklist, StatusBadge } from "../ui";
 import { buildProjectSiteComplianceActions, ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
@@ -56,6 +57,7 @@ export function ExternalProjectSitePortal({
   currentContactPhone?: string | null;
   onSelectSection?: (section: ExternalProjectSitePortalSection) => void;
 }) {
+  const [detailsRefreshKey, setDetailsRefreshKey] = useState(0);
   const activeCopy = sectionCopy[section];
   const primarySite = sites[0] ?? null;
   const primarySummary = primarySite ? complianceSummaries[primarySite.id] : undefined;
@@ -151,11 +153,16 @@ export function ExternalProjectSitePortal({
             <SectionGuidance section={section} pendingUsageCount={pendingUsageCount} />
             {primarySite && complianceDetailSectionFor(section) ? (
               <>
-                <ProjectSiteComplianceDetailsPanel siteId={primarySite.id} section={complianceDetailSectionFor(section)!} />
+                <ProjectSiteComplianceDetailsPanel
+                  siteId={primarySite.id}
+                  section={complianceDetailSectionFor(section)!}
+                  refreshKey={detailsRefreshKey}
+                />
                 <ProjectSiteComplianceSubmitPanel
                   site={primarySite}
                   section={complianceDetailSectionFor(section)!}
                   currentContactName={currentContactName}
+                  onSubmitted={() => setDetailsRefreshKey((current) => current + 1)}
                 />
               </>
             ) : null}
