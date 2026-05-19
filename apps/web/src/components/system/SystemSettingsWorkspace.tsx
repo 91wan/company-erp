@@ -8,6 +8,7 @@ import {
   getAppVersion,
   getAttachmentDownloadUrl,
   getAttachments,
+  getAuditLogExportUrl,
   getAuditLogs,
   updateAppConfig,
 } from "../../apiClient";
@@ -69,6 +70,15 @@ export function SystemSettingsWorkspace({
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const [attachmentDownloadError, setAttachmentDownloadError] = useState<string | null>(null);
 
+  const auditFilterInput = {
+    entityType: auditFilters.entityType.trim() || undefined,
+    action: auditFilters.action.trim() || undefined,
+    actorUsername: auditFilters.actorUsername.trim() || undefined,
+    dateFrom: toAuditDateTime(auditFilters.dateFrom, "start"),
+    dateTo: toAuditDateTime(auditFilters.dateTo, "end"),
+    limit: 20,
+  };
+
   useEffect(() => {
     let isMounted = true;
     setVersionStatus("loading");
@@ -93,14 +103,7 @@ export function SystemSettingsWorkspace({
     if (!canReadAuditLogs) return;
     let isMounted = true;
     setAuditStatus("loading");
-    getAuditLogs({
-      entityType: auditFilters.entityType.trim() || undefined,
-      action: auditFilters.action.trim() || undefined,
-      actorUsername: auditFilters.actorUsername.trim() || undefined,
-      dateFrom: toAuditDateTime(auditFilters.dateFrom, "start"),
-      dateTo: toAuditDateTime(auditFilters.dateTo, "end"),
-      limit: 20,
-    })
+    getAuditLogs(auditFilterInput)
       .then((logs) => {
         if (!isMounted) return;
         setAuditLogs(logs);
@@ -272,7 +275,16 @@ export function SystemSettingsWorkspace({
 
       {canReadAuditLogs ? (
         <SectionCard title="审计日志" badge={<UiStatusBadge tone="info">只读</UiStatusBadge>}>
-          <p className="form-hint">只读查看最近的高风险业务操作记录。</p>
+          <div className="section-inline-header">
+            <p className="form-hint">只读查看最近的高风险业务操作记录。</p>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => window.open(getAuditLogExportUrl(auditFilterInput), "_blank", "noopener,noreferrer")}
+            >
+              导出 CSV
+            </button>
+          </div>
 
           <div className="form-grid settings-filter-grid" aria-label="审计日志筛选">
             <label>

@@ -1300,6 +1300,18 @@ tbody tr.clickable-row {
   max-width: 760px;
 }
 
+.section-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-inline-header .form-hint {
+  margin: 0;
+}
+
 .settings-filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

@@ -109,12 +109,21 @@ export type AuditLogFilters = {
   limit?: number;
 };
 
-export async function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogDto[]> {
+function buildAuditLogSearchParams(filters: AuditLogFilters = {}): URLSearchParams {
   const params = new URLSearchParams();
   params.set("limit", String(filters.limit ?? 20));
   for (const key of ["entityType", "action", "actorUsername", "dateFrom", "dateTo"] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
+  return params;
+}
+
+export function getAuditLogExportUrl(filters: AuditLogFilters = {}): string {
+  return `${apiBaseUrl}/api/audit-logs/export.csv?${buildAuditLogSearchParams(filters).toString()}`;
+}
+
+export async function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogDto[]> {
+  const params = buildAuditLogSearchParams(filters);
   const payload = await requestJson<{ auditLogs: AuditLogDto[] }>(
     `${apiBaseUrl}/api/audit-logs?${params.toString()}`,
   );

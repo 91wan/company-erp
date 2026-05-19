@@ -188,6 +188,48 @@ describe("audit logs API", () => {
     expect(viewer.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "auditLogs" });
   });
 
+  it("exports filtered audit logs as redacted CSV for admin users", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] }),
+        makeAuthAccount({
+          id: "55555555-5555-4555-8555-555555555555",
+          username: "viewer",
+          passwordHash,
+          roles: ["viewer"],
+        }),
+      ]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    const adminCookie = await loginCookie(app, "admin");
+    const viewerCookie = await loginCookie(app, "viewer");
+    const exported = await app.inject({
+      method: "GET",
+      url: "/api/audit-logs/export.csv?entityType=user_account&actorUsername=admin",
+      cookies: { company_erp_session: adminCookie },
+    });
+    const viewer = await app.inject({
+      method: "GET",
+      url: "/api/audit-logs/export.csv",
+      cookies: { company_erp_session: viewerCookie },
+    });
+    await app.close();
+
+    expect(exported.statusCode).toBe(200);
+    expect(exported.headers["content-type"]).toContain("text/csv");
+    expect(exported.headers["content-disposition"]).toContain("audit-logs.csv");
+    expect(exported.headers["x-content-type-options"]).toBe("nosniff");
+    expect(exported.body).toContain("createdAt,actorUsername,action,entityType,entityId,ip,userAgent,beforeJson,afterJson");
+    expect(exported.body).toContain("admin");
+    expect(exported.body).toContain("user_account.create");
+    expect(exported.body).not.toContain("ops");
+    expect(exported.body).not.toContain("DemoPasswordForAudit123!");
+    expect(viewer.statusCode).toBe(403);
+  });
+
   it("writes redacted audit logs for sensitive account mutations and fails closed when audit write fails", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const auditRepository = createFakeAuditLogRepository();

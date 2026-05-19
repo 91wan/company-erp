@@ -97,6 +97,45 @@ describe("SystemSettingsWorkspace", () => {
     });
   });
 
+  it("exports audit logs with the current audit filters", async () => {
+    mockShellFetch(adminUser, undefined, defaultAppVersion, { auditLogs: [] });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <SystemSettingsWorkspace
+        companyName="Company ERP"
+        canManage={true}
+        canReadAuditLogs={true}
+        canReadAttachments={false}
+        canManageAttachments={false}
+        onCompanyNameChange={vi.fn()}
+      />,
+    );
+
+    await screen.findByText("暂无审计日志。");
+    fireEvent.change(screen.getByLabelText("审计对象类型"), { target: { value: "certificate" } });
+    fireEvent.change(screen.getByLabelText("审计动作"), { target: { value: "certificate.create" } });
+    fireEvent.change(screen.getByLabelText("操作账号"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("审计开始日期"), { target: { value: "2026-05-14" } });
+    fireEvent.change(screen.getByLabelText("审计结束日期"), { target: { value: "2026-05-15" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const [url, target, features] = openSpy.mock.calls[0];
+    const parsed = new URL(String(url));
+    expect(parsed.pathname).toBe("/api/audit-logs/export.csv");
+    expect(parsed.searchParams.get("entityType")).toBe("certificate");
+    expect(parsed.searchParams.get("action")).toBe("certificate.create");
+    expect(parsed.searchParams.get("actorUsername")).toBe("admin");
+    expect(parsed.searchParams.get("dateFrom")).toBe("2026-05-14T00:00:00.000Z");
+    expect(parsed.searchParams.get("dateTo")).toBe("2026-05-15T23:59:59.999Z");
+    expect(target).toBe("_blank");
+    expect(features).toBe("noopener,noreferrer");
+
+    openSpy.mockRestore();
+  });
+
   it("shows an attachment download error without exposing a server path", async () => {
     mockShellFetch(adminUser, undefined, defaultAppVersion, {
       attachments: [attachmentRecord],
