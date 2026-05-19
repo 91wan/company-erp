@@ -1,24 +1,59 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BusinessAttachmentsPanel } from "../src/components/BusinessAttachmentsPanel";
 
 describe("BusinessAttachmentsPanel", () => {
-  it("keeps business attachment references read-only even for managers", async () => {
+  it("lets headquarters managers upload unified attachments without exposing storage keys", async () => {
+    const uploadedAttachment = {
+      id: "attachment-1",
+      attachmentCode: "ATT-20260519-ABCDEF01",
+      displayName: "合同盖章扫描件",
+      storageKey: "contracts/generated.pdf",
+      originalFileName: "signed-contract.pdf",
+      fileType: "application/pdf",
+      fileSize: 12,
+      ownerModule: "contracts",
+      ownerEntityType: "contract",
+      ownerEntityId: "contract-1",
+      status: "active" as const,
+      createdAt: "2026-05-19T00:00:00.000Z",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+    };
+    const loadAttachments = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([uploadedAttachment]);
+    const uploadAttachment = vi.fn().mockResolvedValue(uploadedAttachment);
+
     render(
       <BusinessAttachmentsPanel
         ownerModule="contracts"
         ownerEntityType="contract"
         ownerEntityId="contract-1"
         canManage
-        loadAttachments={() => Promise.resolve([])}
+        loadAttachments={loadAttachments}
         getAttachmentDownloadUrl={vi.fn()}
+        uploadAttachment={uploadAttachment}
       />,
     );
 
     await waitFor(() => expect(screen.getByText("暂无统一附件。")).toBeInTheDocument());
-    expect(screen.getByText(/新增或修改附件元数据请在系统设置的附件管理中登记/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("选择附件文件"), {
+      target: { files: [new File(["signed"], "signed-contract.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.change(screen.getByLabelText("附件显示名称"), { target: { value: "合同盖章扫描件" } });
+    fireEvent.click(screen.getByRole("button", { name: "上传统一附件" }));
+
+    await waitFor(() => expect(uploadAttachment).toHaveBeenCalled());
+    expect(uploadAttachment).toHaveBeenCalledWith({
+      file: expect.any(File),
+      ownerModule: "contracts",
+      ownerEntityType: "contract",
+      ownerEntityId: "contract-1",
+      displayName: "合同盖章扫描件",
+      remark: "",
+    });
+    await waitFor(() => expect(screen.getByText("ATT-20260519-ABCDEF01")).toBeInTheDocument());
     expect(screen.queryByLabelText("Storage Key")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "登记统一附件" })).not.toBeInTheDocument();
   });
 
   it("redacts unsafe legacy attachment paths in business pages", async () => {

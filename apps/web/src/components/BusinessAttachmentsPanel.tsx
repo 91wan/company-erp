@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { AttachmentRecordDto } from "@company-erp/shared";
 import {
   ApiRequestError,
   apiBaseUrl,
   getAttachmentDownloadUrl as defaultGetAttachmentDownloadUrl,
   getAttachments as defaultGetAttachments,
+  uploadAttachment as defaultUploadAttachment,
   type AttachmentFilters,
+  type UploadAttachmentInput,
 } from "../apiClient";
 import { SectionCard, StatusBadge } from "./ui";
 
@@ -22,6 +24,7 @@ type BusinessAttachmentsPanelProps = {
   legacyPaths?: LegacyAttachmentPath[];
   loadAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   getAttachmentDownloadUrl?: (id: string) => Promise<string>;
+  uploadAttachment?: (input: UploadAttachmentInput) => Promise<AttachmentRecordDto>;
 };
 
 export function BusinessAttachmentsPanel({
@@ -32,16 +35,22 @@ export function BusinessAttachmentsPanel({
   legacyPaths = [],
   loadAttachments = defaultGetAttachments,
   getAttachmentDownloadUrl = defaultGetAttachmentDownloadUrl,
+  uploadAttachment = defaultUploadAttachment,
 }: BusinessAttachmentsPanelProps) {
   const [attachments, setAttachments] = useState<AttachmentRecordDto[]>([]);
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [downloadError, setDownloadError] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDisplayName, setUploadDisplayName] = useState("");
+  const [uploadRemark, setUploadRemark] = useState("");
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "saving">("idle");
+  const [uploadError, setUploadError] = useState("");
 
-  useEffect(() => {
+  function reloadAttachments() {
     if (!ownerEntityId) {
       setAttachments([]);
       setStatus("success");
-      return;
+      return () => undefined;
     }
 
     let mounted = true;
@@ -61,6 +70,10 @@ export function BusinessAttachmentsPanel({
     return () => {
       mounted = false;
     };
+  }
+
+  useEffect(() => {
+    return reloadAttachments();
   }, [loadAttachments, ownerEntityId, ownerEntityType, ownerModule]);
 
   async function handleDownload(attachment: AttachmentRecordDto) {
@@ -75,6 +88,31 @@ export function BusinessAttachmentsPanel({
     }
   }
 
+  async function handleUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!ownerEntityId || !uploadFile || uploadStatus === "saving") return;
+    setUploadError("");
+    setUploadStatus("saving");
+    try {
+      await uploadAttachment({
+        file: uploadFile,
+        ownerModule,
+        ownerEntityType,
+        ownerEntityId,
+        displayName: uploadDisplayName.trim(),
+        remark: uploadRemark.trim(),
+      });
+      setUploadFile(null);
+      setUploadDisplayName("");
+      setUploadRemark("");
+      reloadAttachments();
+    } catch (error) {
+      setUploadError(formatAttachmentUploadError(error));
+    } finally {
+      setUploadStatus("idle");
+    }
+  }
+
   return (
     <SectionCard
       title="统一附件"
@@ -84,7 +122,37 @@ export function BusinessAttachmentsPanel({
       {downloadError ? <p className="form-error">{downloadError}</p> : null}
 
       {canManage && ownerEntityId ? (
-        <p className="form-hint">业务页面仅查看和下载统一附件。新增或修改附件元数据请在系统设置的附件管理中登记，避免业务用户填写服务器路径。</p>
+        <form className="inline-form-grid" onSubmit={(event) => void handleUpload(event)}>
+          <p className="form-hint full-row">总部用户可在当前业务对象下上传统一附件；系统会自动生成存储引用，业务页面不填写服务器路径或技术字段。</p>
+          {uploadError ? <p className="form-error full-row">{uploadError}</p> : null}
+          <label>
+            <span>选择附件文件</span>
+            <input
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label>
+            <span>附件显示名称</span>
+            <input
+              value={uploadDisplayName}
+              onChange={(event) => setUploadDisplayName(event.target.value)}
+              placeholder={uploadFile?.name ?? "例如：合同盖章扫描件"}
+            />
+          </label>
+          <label className="full-row">
+            <span>备注</span>
+            <input
+              value={uploadRemark}
+              onChange={(event) => setUploadRemark(event.target.value)}
+              placeholder="可选"
+            />
+          </label>
+          <button type="submit" className="primary-button" disabled={!uploadFile || uploadStatus === "saving"}>
+            {uploadStatus === "saving" ? "上传中..." : "上传统一附件"}
+          </button>
+        </form>
       ) : null}
 
       {status === "loading" ? <p className="form-hint">统一附件加载中。</p> : null}
@@ -165,4 +233,13 @@ function formatAttachmentDownloadError(error: unknown): string {
     if (error.status === 403) return "无权限下载该附件。";
   }
   return "附件内容不可用，请检查权限或文件是否已登记到服务器。";
+}
+
+function formatAttachmentUploadError(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.issues.length > 0) return error.issues.join("；");
+    if (error.status === 401) return "请登录后再上传附件。";
+    if (error.status === 403) return "无权限上传该附件。";
+  }
+  return "附件上传失败，请检查文件格式或稍后重试。";
 }

@@ -9,7 +9,7 @@ import {
 } from "./appTestHelpers";
 
 describe("project-sites business entry QA", () => {
-  it("keeps project-site details limited to real sections and read-only unified attachments", async () => {
+  it("keeps project-site details limited to real sections and unified attachment upload bounded", async () => {
     const loadAttachments = vi.fn().mockResolvedValue([]);
 
     render(
@@ -44,7 +44,8 @@ describe("project-sites business entry QA", () => {
       });
     });
     expect(screen.getByText("暂无统一附件。")).toBeInTheDocument();
-    expect(screen.getByText(/新增或修改附件元数据请在系统设置的附件管理中登记/)).toBeInTheDocument();
+    expect(screen.getByText(/系统会自动生成存储引用/)).toBeInTheDocument();
+    expect(screen.getByLabelText("选择附件文件")).toBeInTheDocument();
     expect(screen.queryByLabelText("Storage Key")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "登记附件路径" })).not.toBeInTheDocument();
   });
