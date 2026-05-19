@@ -2,12 +2,37 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AttachmentRecordDto, CreateAttachmentRecordInput, UpdateAttachmentRecordInput } from "@company-erp/shared";
+import type {
+  AttachmentRecordDto,
+  CertificateRecordDto,
+  CreateAttachmentRecordInput,
+  ProjectSiteComplianceSummaryDto,
+  ProjectSiteDto,
+  ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
+  ProjectSiteEmployerLiabilityInsurancePolicyDto,
+  ProjectSitePayrollSubmissionDto,
+  ProjectSiteRosterPersonDto,
+  UpdateAttachmentRecordInput,
+} from "@company-erp/shared";
 import { buildApp } from "../src/app";
 import type { AttachmentRecordRepository } from "../src/attachments";
 import type { AuditLogRepository } from "../src/auditLogs";
 import type { AuthAccountRecord, AuthRepository } from "../src/auth";
+import type { CertificateListFilters, CertificateRepository } from "../src/certificates";
 import { hashPassword } from "../src/password";
+import type {
+  CreateProjectSiteInsuranceCoveredPersonInput,
+  CreateProjectSiteInsurancePolicyInput,
+  CreateProjectSitePayrollSubmissionInput,
+  CreateProjectSiteRosterPersonInput,
+  ProjectSiteComplianceRepository,
+  ProjectSiteInsuranceCoveredPersonListFilters,
+  ProjectSiteInsurancePolicyListFilters,
+  ProjectSiteListFilters,
+  ProjectSitePayrollSubmissionListFilters,
+  ProjectSiteRepository,
+  ProjectSiteRosterPersonListFilters,
+} from "../src/projectSites";
 
 const now = "2026-05-14T10:00:00.000Z";
 
@@ -68,6 +93,131 @@ function makeAttachment(overrides: Partial<AttachmentRecordDto> = {}): Attachmen
   };
 }
 
+const assignedProjectSiteId = "77777777-7777-4777-8777-777777777777";
+const otherProjectSiteId = "88888888-8888-4888-8888-888888888888";
+const assignedCertificateId = "99999999-9999-4999-8999-999999999999";
+const otherCertificateId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const assignedPolicyId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const assignedPayrollSubmissionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+function makeProjectSite(overrides: Partial<ProjectSiteDto> = {}): ProjectSiteDto {
+  return {
+    id: assignedProjectSiteId,
+    siteCode: "SITE-A",
+    siteName: "科技园项目点",
+    businessProjectId: null,
+    businessProjectName: null,
+    clientPartyId: null,
+    clientPartyName: null,
+    operatorPartyId: null,
+    operatorPartyName: null,
+    serviceMode: "subcontracted",
+    subcontractorPartyId: null,
+    subcontractorPartyName: null,
+    region: "华东",
+    siteAddress: "科技园一号楼",
+    serviceType: "食堂运营",
+    status: "active",
+    primaryManagerEmployeeId: null,
+    primaryManagerEmployeeName: null,
+    clientContactName: "王项目",
+    clientContactPhone: "13900000000",
+    subcontractorContactName: null,
+    subcontractorContactPhone: null,
+    startDate: "2026-05-01",
+    endDate: null,
+    payrollAgencyRequired: true,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeCertificate(overrides: Partial<CertificateRecordDto> = {}): CertificateRecordDto {
+  return {
+    id: assignedCertificateId,
+    certificateCode: "CERT-SITE-A",
+    certificateName: "科技园项目点食品经营许可证",
+    certificateType: "food_operation_license",
+    ownerType: "project_site",
+    ownerEmployeeId: null,
+    ownerEmployeeName: null,
+    ownerRosterPersonId: null,
+    ownerRosterPersonName: null,
+    ownerRosterPersonProjectSiteId: null,
+    ownerProjectSiteId: assignedProjectSiteId,
+    ownerProjectSiteName: "科技园项目点",
+    ownerPartyId: null,
+    ownerPartyName: null,
+    ownerNameSnapshot: "科技园项目点",
+    certificateNumber: "JY13202000000001",
+    issuingAuthority: "市场监督管理局",
+    certificateScope: "食堂经营",
+    issueDate: "2026-05-01",
+    validityType: "fixed_expiry",
+    expiryDate: "2027-04-30",
+    nextReviewDate: null,
+    reminderDays: 30,
+    computedStatus: "valid",
+    isComplianceCritical: true,
+    attachmentPath: null,
+    sourceFilePath: null,
+    sourcePageNo: null,
+    responsibleEmployeeId: null,
+    responsibleEmployeeName: null,
+    confirmedByEmployeeId: null,
+    confirmedByEmployeeName: null,
+    confirmedAt: null,
+    isDisabled: false,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeInsurancePolicy(overrides: Partial<ProjectSiteEmployerLiabilityInsurancePolicyDto> = {}): ProjectSiteEmployerLiabilityInsurancePolicyDto {
+  return {
+    id: assignedPolicyId,
+    projectSiteId: assignedProjectSiteId,
+    projectSiteName: "科技园项目点",
+    policyNo: "ELI202605001",
+    insurerName: "太平洋保险",
+    startDate: "2026-05-01",
+    endDate: "2027-04-30",
+    attachmentPath: null,
+    reviewStatus: "pending",
+    reviewedByEmployeeId: null,
+    reviewedByEmployeeName: null,
+    reviewedAt: null,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makePayrollSubmission(overrides: Partial<ProjectSitePayrollSubmissionDto> = {}): ProjectSitePayrollSubmissionDto {
+  return {
+    id: assignedPayrollSubmissionId,
+    projectSiteId: assignedProjectSiteId,
+    projectSiteName: "科技园项目点",
+    payrollMonth: "2026-05",
+    attachmentPath: "unified-attachment-pending",
+    submittedBy: "王项目",
+    submittedAt: now,
+    reviewStatus: "pending",
+    reviewedByEmployeeId: null,
+    reviewedByEmployeeName: null,
+    reviewedAt: null,
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 function createFakeAttachmentRepository(seed: AttachmentRecordDto[] = [makeAttachment()]): AttachmentRecordRepository {
   const attachments = [...seed];
   return {
@@ -114,6 +264,114 @@ function createFakeAttachmentRepository(seed: AttachmentRecordDto[] = [makeAttac
       if (index === -1) return null;
       attachments[index] = { ...attachments[index], ...input, updatedAt: now };
       return attachments[index];
+    },
+  };
+}
+
+function createFakeProjectSiteRepository(seed: ProjectSiteDto[] = [makeProjectSite()]): ProjectSiteRepository {
+  const projectSites = [...seed];
+  return {
+    async list(filters: ProjectSiteListFilters) {
+      return projectSites.filter((site) => {
+        const matchesScope = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(site.id) : true;
+        return matchesScope;
+      });
+    },
+    async getById(id) {
+      return projectSites.find((site) => site.id === id) ?? null;
+    },
+    async getInvestmentSummary() {
+      return null;
+    },
+    async create() {
+      throw new Error("not used");
+    },
+    async update() {
+      return null;
+    },
+  };
+}
+
+function createFakeCertificateRepository(seed: CertificateRecordDto[] = [makeCertificate()]): CertificateRepository {
+  const certificates = [...seed];
+  return {
+    async list(filters: CertificateListFilters) {
+      return certificates.filter((certificate) => {
+        const matchesScope = filters.projectSiteIds
+          ? filters.projectSiteIds.includes(certificate.ownerProjectSiteId ?? "") ||
+            filters.projectSiteIds.includes(certificate.ownerRosterPersonProjectSiteId ?? "")
+          : true;
+        return matchesScope;
+      });
+    },
+    async getById(id) {
+      return certificates.find((certificate) => certificate.id === id) ?? null;
+    },
+    async create() {
+      throw new Error("not used");
+    },
+    async update() {
+      return null;
+    },
+  };
+}
+
+function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
+  const policies = [
+    makeInsurancePolicy(),
+    makeInsurancePolicy({
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      projectSiteId: otherProjectSiteId,
+      projectSiteName: "其他项目点",
+      policyNo: "ELI-OTHER",
+    }),
+  ];
+  const payrollSubmissions = [
+    makePayrollSubmission(),
+    makePayrollSubmission({
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      projectSiteId: otherProjectSiteId,
+      projectSiteName: "其他项目点",
+      payrollMonth: "2026-05",
+    }),
+  ];
+
+  return {
+    async listRosterPeople(_filters: ProjectSiteRosterPersonListFilters): Promise<ProjectSiteRosterPersonDto[]> {
+      return [];
+    },
+    async createRosterPerson(_input: CreateProjectSiteRosterPersonInput): Promise<ProjectSiteRosterPersonDto> {
+      throw new Error("not used");
+    },
+    async listInsurancePolicies(filters: ProjectSiteInsurancePolicyListFilters): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto[]> {
+      return policies.filter((policy) => {
+        const matchesSite = filters.projectSiteId ? policy.projectSiteId === filters.projectSiteId : true;
+        const matchesScope = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(policy.projectSiteId) : true;
+        return matchesSite && matchesScope;
+      });
+    },
+    async createInsurancePolicy(_input: CreateProjectSiteInsurancePolicyInput): Promise<ProjectSiteEmployerLiabilityInsurancePolicyDto> {
+      throw new Error("not used");
+    },
+    async listCoveredPeople(_filters: ProjectSiteInsuranceCoveredPersonListFilters): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto[]> {
+      return [];
+    },
+    async createCoveredPerson(_input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto> {
+      throw new Error("not used");
+    },
+    async listPayrollSubmissions(filters: ProjectSitePayrollSubmissionListFilters): Promise<ProjectSitePayrollSubmissionDto[]> {
+      return payrollSubmissions.filter((submission) => {
+        const matchesSite = filters.projectSiteId ? submission.projectSiteId === filters.projectSiteId : true;
+        const matchesScope = filters.projectSiteIds?.length ? filters.projectSiteIds.includes(submission.projectSiteId) : true;
+        const matchesMonth = filters.payrollMonth ? submission.payrollMonth === filters.payrollMonth : true;
+        return matchesSite && matchesScope && matchesMonth;
+      });
+    },
+    async createPayrollSubmission(_input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto> {
+      throw new Error("not used");
+    },
+    async getComplianceSummary(_projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null> {
+      return null;
     },
   };
 }
@@ -424,6 +682,245 @@ describe("attachments API", () => {
       expect(externalUpload.statusCode).toBe(403);
       expect(externalUpload.json()).toMatchObject({ permissionArea: "attachments", requiredLevel: "manage" });
     } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("allows external project-site accounts to upload attachments only through scoped business targets", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-business-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const auditLogRepository = createFakeAuditLogRepository();
+    const attachmentRepository = createFakeAttachmentRepository([]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [assignedProjectSiteId],
+        }),
+      ]),
+      attachmentRepository,
+      auditLogRepository,
+      certificateRepository: createFakeCertificateRepository([
+        makeCertificate(),
+        makeCertificate({ id: otherCertificateId, ownerProjectSiteId: otherProjectSiteId, ownerProjectSiteName: "其他项目点" }),
+      ]),
+      projectSiteRepository: createFakeProjectSiteRepository([
+        makeProjectSite(),
+        makeProjectSite({ id: otherProjectSiteId, siteCode: "SITE-B", siteName: "其他项目点" }),
+      ]),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+    });
+
+    try {
+      const externalCookie = await loginCookie(app, "external-site");
+      const uploaded = await app.inject({
+        method: "POST",
+        url: "/api/project-site-attachment-uploads",
+        cookies: { company_erp_session: externalCookie },
+        ...multipartPayload(
+          {
+            targetType: "certificate_record",
+            targetId: assignedCertificateId,
+            displayName: "食品经营许可证附件",
+            remark: "外部项目点提交",
+          },
+          { name: "food-license.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      const body = uploaded.json();
+      const [createdAttachment] = await attachmentRepository.list({});
+      const storedContent = await readFile(join(root, createdAttachment.storageKey), "utf8");
+      const logs = await auditLogRepository.list({});
+
+      expect(uploaded.statusCode).toBe(201);
+      expect(body).toEqual({
+        attachment: expect.objectContaining({
+          attachmentCode: expect.stringMatching(/^ATT-\d{8}-[A-F0-9]{8}$/),
+          displayName: "食品经营许可证附件",
+          storageKey: "",
+          originalFileName: "food-license.pdf",
+          fileType: "application/pdf",
+          fileSize: Buffer.byteLength("PDF demo content"),
+          ownerModule: "certificates",
+          ownerEntityType: "certificate",
+          ownerEntityId: assignedCertificateId,
+          createdByUsername: "external-site",
+        }),
+      });
+      expect(createdAttachment.storageKey).toMatch(/^certificates\/[0-9a-f-]+\.pdf$/);
+      expect(JSON.stringify(body)).not.toContain(createdAttachment.storageKey);
+      expect(storedContent).toBe("PDF demo content");
+      expect(logs.map((log) => log.action)).toContain("attachment.business_upload");
+      expect(JSON.stringify(logs)).not.toContain(root);
+      expect(JSON.stringify(logs)).not.toContain("PDF demo content");
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("derives project-site business attachment owners for policy, payroll, and site-level targets", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-business-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const attachmentRepository = createFakeAttachmentRepository([]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [assignedProjectSiteId],
+        }),
+      ]),
+      attachmentRepository,
+      auditLogRepository: createFakeAuditLogRepository(),
+      certificateRepository: createFakeCertificateRepository(),
+      projectSiteRepository: createFakeProjectSiteRepository(),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+    });
+
+    try {
+      const externalCookie = await loginCookie(app, "external-site");
+      for (const target of [
+        { targetType: "employer_liability_policy", targetId: assignedPolicyId },
+        { targetType: "payroll_submission", targetId: assignedPayrollSubmissionId },
+        { targetType: "project_site_food_license", targetId: assignedProjectSiteId },
+      ]) {
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/project-site-attachment-uploads",
+          cookies: { company_erp_session: externalCookie },
+          ...multipartPayload(
+            {
+              ...target,
+              displayName: `${target.targetType} 附件`,
+            },
+            { name: `${target.targetType}.pdf`, type: "application/pdf", content: "PDF demo content" },
+          ),
+        });
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().attachment.storageKey).toBe("");
+      }
+
+      const attachments = await attachmentRepository.list({});
+      expect(attachments).toEqual([
+        expect.objectContaining({
+          ownerModule: "project-sites",
+          ownerEntityType: "employer_liability_insurance_policy",
+          ownerEntityId: assignedPolicyId,
+        }),
+        expect.objectContaining({
+          ownerModule: "project-sites",
+          ownerEntityType: "payroll_submission",
+          ownerEntityId: assignedPayrollSubmissionId,
+        }),
+        expect.objectContaining({
+          ownerModule: "project-sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: assignedProjectSiteId,
+        }),
+      ]);
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects cross-project business attachment uploads and caller-supplied owner fields", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-business-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [assignedProjectSiteId],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+      certificateRepository: createFakeCertificateRepository([
+        makeCertificate(),
+        makeCertificate({ id: otherCertificateId, ownerProjectSiteId: otherProjectSiteId, ownerProjectSiteName: "其他项目点" }),
+      ]),
+      projectSiteRepository: createFakeProjectSiteRepository([
+        makeProjectSite(),
+        makeProjectSite({ id: otherProjectSiteId, siteCode: "SITE-B", siteName: "其他项目点" }),
+      ]),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+    });
+
+    try {
+      const externalCookie = await loginCookie(app, "external-site");
+      const crossProjectCertificate = await app.inject({
+        method: "POST",
+        url: "/api/project-site-attachment-uploads",
+        cookies: { company_erp_session: externalCookie },
+        ...multipartPayload(
+          {
+            targetType: "certificate_record",
+            targetId: otherCertificateId,
+            displayName: "其他项目点证照",
+          },
+          { name: "other-license.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      const callerOwner = await app.inject({
+        method: "POST",
+        url: "/api/project-site-attachment-uploads",
+        cookies: { company_erp_session: externalCookie },
+        ...multipartPayload(
+          {
+            targetType: "payroll_submission",
+            targetId: assignedPayrollSubmissionId,
+            ownerModule: "project-sites",
+            ownerEntityType: "project_site",
+            ownerEntityId: otherProjectSiteId,
+            storageKey: "project-sites/user-supplied.pdf",
+          },
+          { name: "payroll.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+      const invalidTarget = await app.inject({
+        method: "POST",
+        url: "/api/project-site-attachment-uploads",
+        cookies: { company_erp_session: externalCookie },
+        ...multipartPayload(
+          {
+            targetType: "supplier_certificate",
+            targetId: assignedCertificateId,
+          },
+          { name: "supplier.pdf", type: "application/pdf", content: "PDF demo content" },
+        ),
+      });
+
+      expect(crossProjectCertificate.statusCode).toBe(404);
+      expect(crossProjectCertificate.json()).toEqual({ error: "ATTACHMENT_UPLOAD_TARGET_NOT_FOUND" });
+      expect(callerOwner.statusCode).toBe(400);
+      expect(callerOwner.json()).toMatchObject({
+        error: "ATTACHMENT_VALIDATION_FAILED",
+        issues: expect.arrayContaining(["owner and storageKey fields cannot be supplied for business uploads"]),
+      });
+      expect(invalidTarget.statusCode).toBe(400);
+      expect(invalidTarget.json()).toMatchObject({
+        error: "ATTACHMENT_VALIDATION_FAILED",
+        issues: expect.arrayContaining(["targetType is unsupported"]),
+      });
+    } finally {
+      await app.close();
       await rm(root, { recursive: true, force: true });
     }
   });

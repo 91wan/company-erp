@@ -343,6 +343,9 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
   if (pathname.startsWith("/api/attachments")) {
     return { area: "attachments", requiredLevel };
   }
+  if (pathname.startsWith("/api/project-site-attachment-uploads")) {
+    return { area: "certificates", requiredLevel: "manage" };
+  }
   if (pathname.startsWith("/api/app-config")) {
     return { area: "systemSettings", requiredLevel };
   }

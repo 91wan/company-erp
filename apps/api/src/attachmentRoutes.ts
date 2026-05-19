@@ -116,6 +116,151 @@ function generatedAttachmentCode(): string {
   return `ATT-${date}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
+type BusinessAttachmentUploadTargetType =
+  | "certificate_record"
+  | "employer_liability_policy"
+  | "payroll_submission"
+  | "project_site_food_license";
+
+type BusinessAttachmentOwner = {
+  ownerModule: string;
+  ownerEntityType: string;
+  ownerEntityId: string;
+};
+
+type BusinessAttachmentTargetResult =
+  | { ok: true; owner: BusinessAttachmentOwner }
+  | { ok: false; statusCode: number; body: Record<string, unknown> };
+
+const forbiddenBusinessUploadFields = ["storageKey", "ownerModule", "ownerEntityType", "ownerEntityId", "attachmentCode"];
+
+function validateBusinessUploadFields(fields: Record<string, unknown>): { targetType?: BusinessAttachmentUploadTargetType; targetId?: string } {
+  const issues: string[] = [];
+  if (forbiddenBusinessUploadFields.some((field) => multipartFieldValue(fields[field]) !== undefined)) {
+    issues.push("owner and storageKey fields cannot be supplied for business uploads");
+  }
+  const targetType = multipartFieldValue(fields.targetType);
+  const targetId = multipartFieldValue(fields.targetId);
+  const supportedTargetTypes = new Set<BusinessAttachmentUploadTargetType>([
+    "certificate_record",
+    "employer_liability_policy",
+    "payroll_submission",
+    "project_site_food_license",
+  ]);
+  if (!targetType) {
+    issues.push("targetType is required");
+  } else if (!supportedTargetTypes.has(targetType as BusinessAttachmentUploadTargetType)) {
+    issues.push("targetType is unsupported");
+  }
+  if (!targetId) issues.push("targetId is required");
+  if (issues.length > 0) throw new AttachmentValidationError(issues);
+  return { targetType: targetType as BusinessAttachmentUploadTargetType, targetId };
+}
+
+async function resolveBusinessAttachmentTarget(
+  request: unknown,
+  options: BuildAppOptions,
+  targetType: BusinessAttachmentUploadTargetType,
+  targetId: string,
+): Promise<BusinessAttachmentTargetResult> {
+  const scope = scopedProjectSiteIds(request);
+
+  if (targetType === "certificate_record") {
+    if (!options.certificateRepository) {
+      return { ok: false, statusCode: 503, body: { error: "CERTIFICATE_REPOSITORY_NOT_CONFIGURED" } };
+    }
+    const certificate = await options.certificateRepository.getById(targetId);
+    if (!certificate || isOutsideCertificateScope(request, certificate)) {
+      return { ok: false, statusCode: 404, body: { error: "ATTACHMENT_UPLOAD_TARGET_NOT_FOUND" } };
+    }
+    return {
+      ok: true,
+      owner: { ownerModule: "certificates", ownerEntityType: "certificate", ownerEntityId: certificate.id },
+    };
+  }
+
+  if (targetType === "project_site_food_license") {
+    if (!options.projectSiteRepository) {
+      return { ok: false, statusCode: 503, body: { error: "PROJECT_SITE_REPOSITORY_NOT_CONFIGURED" } };
+    }
+    const projectSite = await options.projectSiteRepository.getById(targetId);
+    if (!projectSite || isOutsideProjectSiteScope(scope, projectSite.id)) {
+      return { ok: false, statusCode: 404, body: { error: "ATTACHMENT_UPLOAD_TARGET_NOT_FOUND" } };
+    }
+    return {
+      ok: true,
+      owner: { ownerModule: "project-sites", ownerEntityType: "project_site", ownerEntityId: projectSite.id },
+    };
+  }
+
+  if (!options.projectSiteComplianceRepository) {
+    return { ok: false, statusCode: 503, body: { error: "PROJECT_SITE_COMPLIANCE_REPOSITORY_NOT_CONFIGURED" } };
+  }
+
+  if (targetType === "employer_liability_policy") {
+    const policies = await options.projectSiteComplianceRepository.listInsurancePolicies(scope ? { projectSiteIds: scope } : {});
+    const policy = policies.find((item) => item.id === targetId);
+    if (!policy) {
+      return { ok: false, statusCode: 404, body: { error: "ATTACHMENT_UPLOAD_TARGET_NOT_FOUND" } };
+    }
+    return {
+      ok: true,
+      owner: { ownerModule: "project-sites", ownerEntityType: "employer_liability_insurance_policy", ownerEntityId: policy.id },
+    };
+  }
+
+  const payrollSubmissions = await options.projectSiteComplianceRepository.listPayrollSubmissions(scope ? { projectSiteIds: scope } : {});
+  const payrollSubmission = payrollSubmissions.find((item) => item.id === targetId);
+  if (!payrollSubmission) {
+    return { ok: false, statusCode: 404, body: { error: "ATTACHMENT_UPLOAD_TARGET_NOT_FOUND" } };
+  }
+  return {
+    ok: true,
+    owner: { ownerModule: "project-sites", ownerEntityType: "payroll_submission", ownerEntityId: payrollSubmission.id },
+  };
+}
+
+async function createUploadedAttachment(
+  request: unknown,
+  options: BuildAppOptions,
+  file: {
+    mimetype: string;
+    filename?: string;
+    toBuffer(): Promise<Buffer>;
+  },
+  fields: Record<string, unknown>,
+  owner: BusinessAttachmentOwner,
+) {
+  const extension = uploadMimeExtensions.get(file.mimetype);
+  if (!extension) {
+    throw new AttachmentValidationError(["file must be a PDF, JPEG, or PNG"]);
+  }
+  const originalFileName = safeFileName(file.filename);
+  const storageKey = `${uploadStoragePrefix(owner.ownerModule)}/${randomUUID()}.${extension}`;
+  const buffer = await file.toBuffer();
+  const input = {
+    ...normalizeCreateAttachmentInput({
+      attachmentCode: generatedAttachmentCode(),
+      displayName: multipartFieldValue(fields.displayName) ?? originalFileName,
+      storageKey,
+      originalFileName,
+      fileType: file.mimetype,
+      fileSize: buffer.length,
+      ownerModule: owner.ownerModule,
+      ownerEntityType: owner.ownerEntityType,
+      ownerEntityId: owner.ownerEntityId,
+      status: "active",
+      remark: multipartFieldValue(fields.remark),
+    }),
+    ...actorFields(request),
+  };
+
+  const contentPath = resolveAttachmentContentPath(input.storageKey);
+  await mkdir(dirname(contentPath), { recursive: true });
+  await writeFile(contentPath, buffer);
+  return options.attachmentRepository!.create(input);
+}
+
 export function registerAttachmentRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/attachments", async (request, reply) => {
     if (!options.attachmentRepository) {
@@ -248,7 +393,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
         entityId: attachment.id,
         afterJson: attachment,
       });
-      return reply.status(201).send({ attachment });
+      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -321,7 +466,49 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
           storageKey: "[generated]",
         },
       });
-      return reply.status(201).send({ attachment });
+      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
+    } catch (error) {
+      if (error instanceof AttachmentValidationError) {
+        return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
+      }
+      if (error instanceof AttachmentConflictError) {
+        return reply.status(409).send({ error: "ATTACHMENT_CONFLICT" });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/project-site-attachment-uploads", async (request, reply) => {
+    if (!options.attachmentRepository) {
+      return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    try {
+      const file = await request.file();
+      if (!file) {
+        return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: ["file is required"] });
+      }
+      const fields = file.fields as Record<string, unknown>;
+      const { targetType, targetId } = validateBusinessUploadFields(fields);
+      const target = await resolveBusinessAttachmentTarget(request, options, targetType!, targetId!);
+      if (!target.ok) return reply.status(target.statusCode).send(target.body);
+      const attachment = await createUploadedAttachment(
+        request,
+        options,
+        file,
+        fields,
+        target.owner,
+      );
+      await writeAuditLog(request, options, {
+        action: "attachment.business_upload",
+        entityType: "attachment",
+        entityId: attachment.id,
+        afterJson: {
+          ...attachment,
+          storageKey: "[generated]",
+        },
+      });
+      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
