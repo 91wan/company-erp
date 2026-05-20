@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { DEMO_CODES } from "../src/pilotSmoke.js";
@@ -393,6 +394,84 @@ describe("attachment legacy migration readiness report", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("DATABASE_URL is required");
     expect(result.stderr).toContain("--dry-run");
+  });
+
+  it("formats machine-readable JSON and CSV without exposing raw legacy paths", async () => {
+    type AttachmentLegacyReportRow = {
+      module: string;
+      label?: string;
+      legacyCount: number;
+      unifiedCount: number;
+      pendingPlaceholderCount?: number;
+      note?: string;
+      notes?: string;
+    };
+    type AttachmentLegacyMachineRow = {
+      module: string;
+      legacyCount: number;
+      unifiedCount: number;
+      gapEstimate: number;
+      pendingPlaceholderCount: number;
+      notes: string;
+    };
+    const {
+      formatCsvReport,
+      formatJsonReport,
+      toMachineRows,
+    } = (await import(pathToFileURL(join(repoRoot, "scripts/attachments-legacy-report.mjs")).href)) as {
+      formatCsvReport: (rows: AttachmentLegacyReportRow[]) => string;
+      formatJsonReport: (rows: AttachmentLegacyReportRow[]) => string;
+      toMachineRows: (rows: AttachmentLegacyReportRow[]) => AttachmentLegacyMachineRow[];
+    };
+    const rows = toMachineRows([
+      {
+        module: "contracts",
+        label: "合同",
+        legacyCount: 4,
+        unifiedCount: 1,
+        pendingPlaceholderCount: 0,
+        notes: "contract_attachments.file_path only; report does not print file paths",
+      },
+      {
+        module: "payroll",
+        label: "工资表",
+        legacyCount: 0,
+        unifiedCount: 2,
+        pendingPlaceholderCount: 3,
+        notes: "unified-attachment-pending rows use the controlled pending placeholder",
+      },
+    ]);
+
+    const json = formatJsonReport(rows);
+    const csv = formatCsvReport(rows);
+
+    expect(JSON.parse(json)).toEqual({
+      generatedAt: expect.any(String),
+      mode: "read-only-counts",
+      rows: [
+        {
+          module: "contracts",
+          legacyCount: 4,
+          unifiedCount: 1,
+          gapEstimate: 3,
+          pendingPlaceholderCount: 0,
+          notes: "contract_attachments.file_path only; report does not print file paths",
+        },
+        {
+          module: "payroll",
+          legacyCount: 0,
+          unifiedCount: 2,
+          gapEstimate: 0,
+          pendingPlaceholderCount: 3,
+          notes: "unified-attachment-pending rows use the controlled pending placeholder",
+        },
+      ],
+    });
+    expect(csv).toContain("module,legacyCount,unifiedCount,gapEstimate,pendingPlaceholderCount,notes");
+    expect(csv).toContain("contracts,4,1,3,0,contract_attachments.file_path only; report does not print file paths");
+    expect(csv).toContain("payroll,0,2,0,3,unified-attachment-pending rows use the controlled pending placeholder");
+    expect(`${json}\n${csv}`).not.toContain("nas-raw-root");
+    expect(`${json}\n${csv}`).not.toContain("legacy-fixtures/");
   });
 });
 

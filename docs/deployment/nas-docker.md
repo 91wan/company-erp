@@ -150,6 +150,8 @@ attachment panel, run a read-only legacy attachment readiness report:
 ```bash
 npm run attachments:legacy-report -- --dry-run
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --json
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --csv
 ```
 
 The report groups counts for contracts, certificates, payroll submissions,
@@ -157,7 +159,9 @@ employer liability insurance, kitchen equipment, and project-site materials. It
 does not read `.env`, NAS attachment directories, attachment bytes, or legacy
 path values, and it does not migrate data. Use it only to estimate the gap
 between legacy raw attachment fields and unified attachment metadata before a
-future migration PR.
+future migration PR. The machine-readable `--json` and `--csv` modes use fixed
+fields: `module`, `legacyCount`, `unifiedCount`, `gapEstimate`,
+`pendingPlaceholderCount`, and `notes`.
 
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
