@@ -160,29 +160,6 @@
   gap: 14px;
 }
 
-.project-site-detail-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.project-site-detail-tabs button {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #475467;
-  background: #f8fafc;
-  font-size: 12px;
-  font-weight: 680;
-}
-
-.project-site-detail-tabs button[aria-selected="true"] {
-  border-color: rgb(37 99 235 / 34%);
-  color: var(--blue);
-  background: var(--blue-soft);
-}
-
 .project-sites-workspace {
   margin-top: 2px;
 }
