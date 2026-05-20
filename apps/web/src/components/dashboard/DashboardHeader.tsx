@@ -1,6 +1,5 @@
 import type { AuthenticatedUserDto } from "@company-erp/shared";
 import { workflowSteps } from "../../dashboardData";
-import { PageHeader } from "../ui";
 
 export type DashboardWorkspaceKey =
   | "总览"
@@ -20,15 +19,13 @@ type DashboardHeaderProps = {
   onNavigate: (workspace: DashboardWorkspaceKey) => void;
 };
 
-export function DashboardHeader({ currentUser, onNavigate }: DashboardHeaderProps) {
+export function DashboardHeader({
+  currentUser,
+  onNavigate,
+}: DashboardHeaderProps) {
+  void currentUser;
   return (
-    <section className="dashboard-header">
-      <PageHeader
-        eyebrow="总部运营驾驶舱"
-        title="工作台"
-        subtitle={`${currentUser.username}，这里汇总待办、风险、审核和最近动态。所有数字来自现有业务 API；接口不可用时不会显示假数据。`}
-      />
-
+    <section className="dashboard-header" aria-label="业务流程">
       <div className="workflow-panel" aria-label="业务流程">
         <strong>业务流程</strong>
         <div className="workflow-steps">
@@ -43,7 +40,9 @@ export function DashboardHeader({ currentUser, onNavigate }: DashboardHeaderProp
                 <step.icon aria-hidden="true" size={14} />
               </span>
               <span>{step.label}</span>
-              {index < workflowSteps.length - 1 ? <span className="flow-arrow">→</span> : null}
+              {index < workflowSteps.length - 1 ? (
+                <span className="flow-arrow">→</span>
+              ) : null}
             </button>
           ))}
         </div>

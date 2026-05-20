@@ -25,11 +25,15 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("公司名称"), { target: { value: "无锡餐服 ERP" } });
+    fireEvent.change(screen.getByLabelText("公司名称"), {
+      target: { value: "无锡餐服 ERP" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
 
     expect(await screen.findByText("系统设置已保存。")).toBeInTheDocument();
-    expect(onCompanyNameChange).toHaveBeenCalledWith({ companyName: "无锡餐服 ERP" });
+    expect(onCompanyNameChange).toHaveBeenCalledWith({
+      companyName: "无锡餐服 ERP",
+    });
   });
 
   it("shows a clear deployment version failure state", async () => {
@@ -46,6 +50,7 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "版本与健康检查" }));
     expect(await screen.findByText("版本信息不可用")).toBeInTheDocument();
   });
 
@@ -79,21 +84,37 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "审计日志" }));
     expect(await screen.findByText("certificate.create")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("审计对象类型"), { target: { value: "certificate" } });
-    fireEvent.change(screen.getByLabelText("审计动作"), { target: { value: "certificate.create" } });
-    fireEvent.change(screen.getByLabelText("审计开始日期"), { target: { value: "2026-05-14" } });
-    fireEvent.change(screen.getByLabelText("审计结束日期"), { target: { value: "2026-05-15" } });
+    fireEvent.change(screen.getByLabelText("审计对象类型"), {
+      target: { value: "certificate" },
+    });
+    fireEvent.change(screen.getByLabelText("审计动作"), {
+      target: { value: "certificate.create" },
+    });
+    fireEvent.change(screen.getByLabelText("审计开始日期"), {
+      target: { value: "2026-05-14" },
+    });
+    fireEvent.change(screen.getByLabelText("审计结束日期"), {
+      target: { value: "2026-05-15" },
+    });
 
     await waitFor(() => {
-      const auditUrls = fetchSpy.mock.calls.map(([input]) => String(input)).filter((url) => url.includes("/api/audit-logs"));
-      expect(auditUrls.some((url) => {
-        const parsed = new URL(url);
-        return parsed.searchParams.get("entityType") === "certificate"
-          && parsed.searchParams.get("action") === "certificate.create"
-          && parsed.searchParams.get("dateFrom") === "2026-05-14T00:00:00.000Z"
-          && parsed.searchParams.get("dateTo") === "2026-05-15T23:59:59.999Z";
-      })).toBe(true);
+      const auditUrls = fetchSpy.mock.calls
+        .map(([input]) => String(input))
+        .filter((url) => url.includes("/api/audit-logs"));
+      expect(
+        auditUrls.some((url) => {
+          const parsed = new URL(url);
+          return (
+            parsed.searchParams.get("entityType") === "certificate" &&
+            parsed.searchParams.get("action") === "certificate.create" &&
+            parsed.searchParams.get("dateFrom") ===
+              "2026-05-14T00:00:00.000Z" &&
+            parsed.searchParams.get("dateTo") === "2026-05-15T23:59:59.999Z"
+          );
+        }),
+      ).toBe(true);
     });
   });
 
@@ -112,13 +133,26 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "审计日志" }));
     await screen.findByText("暂无审计日志。");
-    expect(screen.getByText(/下载后记录 SHA256、筛选条件、导出人和部署版本/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("审计对象类型"), { target: { value: "certificate" } });
-    fireEvent.change(screen.getByLabelText("审计动作"), { target: { value: "certificate.create" } });
-    fireEvent.change(screen.getByLabelText("操作账号"), { target: { value: "admin" } });
-    fireEvent.change(screen.getByLabelText("审计开始日期"), { target: { value: "2026-05-14" } });
-    fireEvent.change(screen.getByLabelText("审计结束日期"), { target: { value: "2026-05-15" } });
+    expect(
+      screen.getByText(/下载后记录 SHA256、筛选条件、导出人和部署版本/),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("审计对象类型"), {
+      target: { value: "certificate" },
+    });
+    fireEvent.change(screen.getByLabelText("审计动作"), {
+      target: { value: "certificate.create" },
+    });
+    fireEvent.change(screen.getByLabelText("操作账号"), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByLabelText("审计开始日期"), {
+      target: { value: "2026-05-14" },
+    });
+    fireEvent.change(screen.getByLabelText("审计结束日期"), {
+      target: { value: "2026-05-15" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }));
 
@@ -129,7 +163,9 @@ describe("SystemSettingsWorkspace", () => {
     expect(parsed.searchParams.get("entityType")).toBe("certificate");
     expect(parsed.searchParams.get("action")).toBe("certificate.create");
     expect(parsed.searchParams.get("actorUsername")).toBe("admin");
-    expect(parsed.searchParams.get("dateFrom")).toBe("2026-05-14T00:00:00.000Z");
+    expect(parsed.searchParams.get("dateFrom")).toBe(
+      "2026-05-14T00:00:00.000Z",
+    );
     expect(parsed.searchParams.get("dateTo")).toBe("2026-05-15T23:59:59.999Z");
     expect(target).toBe("_blank");
     expect(features).toBe("noopener,noreferrer");
@@ -154,10 +190,17 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
-    expect(await screen.findByText("contracts/demo-contract.pdf")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }));
+    fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
+    expect(
+      await screen.findByText("contracts/demo-contract.pdf"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }),
+    );
 
-    const error = await screen.findByText("附件内容不可用，请检查权限或文件是否已登记到服务器。");
+    const error = await screen.findByText(
+      "附件内容不可用，请检查权限或文件是否已登记到服务器。",
+    );
     expect(error).toBeInTheDocument();
     expect(error).not.toHaveTextContent("/volume1");
   });
@@ -176,9 +219,20 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "保存设置" })).not.toBeInTheDocument();
-    expect(screen.getByText("当前账号没有 systemSettings.manage 权限，不能修改公司名称。")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "保存设置" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "当前账号没有 systemSettings.manage 权限，不能修改公司名称。",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("公司名称")).toBeDisabled();
-    expect(await screen.findByText("当前账号只能查看附件元数据，不能登记或修改附件引用。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
+    expect(
+      await screen.findByText(
+        "当前账号只能查看附件元数据，不能登记或修改附件引用。",
+      ),
+    ).toBeInTheDocument();
   });
 });

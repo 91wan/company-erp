@@ -11,7 +11,9 @@ function read(relativePath: string): string {
 
 describe("UI subtractive refactor final gate", () => {
   it("records the one-primary-task workspace boundary and role coverage", () => {
-    const doc = read("docs/audits/2026-05-20-ui-subtractive-refactor-final-gate.md");
+    const doc = read(
+      "docs/audits/2026-05-20-ui-subtractive-refactor-final-gate.md",
+    );
 
     expect(doc).toContain("UI subtractive refactor final gate");
     expect(doc).toContain("WorkspaceScaffold");
@@ -22,7 +24,12 @@ describe("UI subtractive refactor final gate", () => {
     expect(doc).toContain("external_project_site");
     expect(doc).toContain("不是正式合规档案系统全面上线");
 
-    for (const role of ["admin", "viewer", "project_site", "external_project_site"]) {
+    for (const role of [
+      "admin",
+      "viewer",
+      "project_site",
+      "external_project_site",
+    ]) {
       expect(doc).toContain(role);
     }
   });
@@ -44,10 +51,18 @@ describe("UI subtractive refactor final gate", () => {
     for (const file of checkedFiles) {
       const content = read(file);
 
-      expect(content, file).not.toMatch(/inventory-tabs|inventory-heading|project-site-detail-tabs/);
-      expect(content, file).not.toMatch(/role="button".*后续开放|后续开放.*role="button"/s);
-      expect(content, file).not.toMatch(/员工名单|项目员工|项目点员工|食品证|承包商账号|供应商账号/);
-      expect(content, file).not.toMatch(/Storage Key|登记附件路径|raw path 下载入口/);
+      expect(content, file).not.toMatch(
+        /inventory-tabs|inventory-heading|project-site-detail-tabs/,
+      );
+      expect(content, file).not.toMatch(
+        /role="button".*后续开放|后续开放.*role="button"/s,
+      );
+      expect(content, file).not.toMatch(
+        /员工名单|项目员工|项目点员工|食品证|承包商账号|供应商账号/,
+      );
+      expect(content, file).not.toMatch(
+        /Storage Key|登记附件路径|raw path 下载入口/,
+      );
     }
   });
 
@@ -75,7 +90,10 @@ describe("UI subtractive refactor final gate", () => {
     expect(mainEntry).toContain("./styles/index.css");
     expect(mainEntry).not.toContain("./styles.css");
     for (const layer of requiredLayers) {
-      expect(existsSync(join(repoRoot, `apps/web/src/styles/${layer}.css`)), layer).toBe(true);
+      expect(
+        existsSync(join(repoRoot, `apps/web/src/styles/${layer}.css`)),
+        layer,
+      ).toBe(true);
       expect(indexCss, layer).toContain(`@import "./${layer}.css"`);
     }
 
@@ -93,6 +111,9 @@ describe("UI subtractive refactor final gate", () => {
       "apps/web/src/components/MaterialsWarehousesWorkspace.tsx",
       "apps/web/src/components/BusinessProjectsWorkspace.tsx",
       "apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx",
+      "apps/web/src/components/ExcelImportWorkspace.tsx",
+      "apps/web/src/components/system/SystemSettingsWorkspace.tsx",
+      "apps/web/src/components/dashboard/DashboardOverview.tsx",
     ];
 
     for (const file of scaffoldedFiles) {
