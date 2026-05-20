@@ -60,7 +60,7 @@ export function registerAppCoreRoutes(app: FastifyInstance, options: BuildAppOpt
       await writeAuditLog(request, options, {
         action: "app_config.update",
         entityType: "app_config",
-        entityId: "system",
+        entityId: null,
         beforeJson: before,
         afterJson: appConfig,
       });
