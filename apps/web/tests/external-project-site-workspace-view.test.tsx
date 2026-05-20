@@ -116,4 +116,15 @@ describe("ExternalProjectSiteWorkspaceView", () => {
     expect(screen.queryByText(/Storage Key/i)).not.toBeInTheDocument();
     expect(screen.getAllByText(/附件由总部登记或后续上传接口支持/).length).toBeGreaterThan(0);
   });
+
+  it("keeps the usage section focused on usage actions only", () => {
+    const { onSelectSection } = renderExternalView("usage");
+
+    expect(screen.getByRole("button", { name: "新增领用申请" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "出库登记" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上报设备变更" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "现场人员/健康证" }));
+    expect(onSelectSection).toHaveBeenCalledWith("rosterHealth");
+  });
 });

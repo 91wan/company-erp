@@ -165,6 +165,15 @@ describe("ProjectSiteComplianceSubmitPanel", () => {
     });
   });
 
+  it("shows a clear no-submit state when payroll submission is not required", async () => {
+    render(<ProjectSiteComplianceSubmitPanel site={{ ...projectSite, payrollAgencyRequired: false }} section="payroll" currentContactName="王项目" />);
+
+    expect(screen.getByText("工资表不需要提交")).toBeInTheDocument();
+    expect(screen.getByText("当前项目点未启用工资代发资料提交。")).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "工资表提交" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Storage Key/i)).not.toBeInTheDocument();
+  });
+
   it("submits covered people against visible policy and active roster without owner or storage fields", async () => {
     const fetchMock = mockSubmitPanelFetch();
 
