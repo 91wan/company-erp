@@ -413,7 +413,7 @@ export function ReplenishmentSuggestionsWorkspace({
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>

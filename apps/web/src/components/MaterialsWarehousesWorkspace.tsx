@@ -442,7 +442,7 @@ export function MaterialsWarehousesWorkspace({
         onClose={() => setOpenFormDrawer(null)}
       >
         <form
-          className="dashboard-panel party-form"
+          className="dashboard-panel workspace-form"
           onSubmit={handleMaterialSubmit}
         >
           <div className="panel-header">
@@ -614,7 +614,7 @@ export function MaterialsWarehousesWorkspace({
         onClose={() => setOpenFormDrawer(null)}
       >
         <form
-          className="dashboard-panel party-form"
+          className="dashboard-panel workspace-form"
           onSubmit={handleWarehouseSubmit}
         >
           <div className="panel-header">
@@ -805,7 +805,7 @@ function WarehousesTable({ warehouses }: { warehouses: WarehouseDto[] }) {
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>

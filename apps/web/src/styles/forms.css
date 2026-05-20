@@ -39,8 +39,11 @@
   opacity: 0.6;
 }
 
+.workspace-search input,
 .party-search input,
 .party-filter select,
+.workspace-form input,
+.workspace-form select,
 .party-form input,
 .party-form select {
   width: 100%;
@@ -52,16 +55,19 @@
   font-size: 13px;
 }
 
+.workspace-form,
 .party-form {
   display: grid;
   align-content: start;
   gap: 12px;
 }
 
+.workspace-form .panel-header,
 .party-form .panel-header {
   margin-bottom: 0;
 }
 
+.workspace-form .panel-header button,
 .party-form .panel-header button,
 .table-action {
   display: inline-flex;
@@ -70,15 +76,19 @@
   gap: 6px;
 }
 
+.workspace-form .panel-header button:disabled,
 .party-form .panel-header button:disabled {
   opacity: 0.55;
 }
 
+.workspace-form label,
 .party-form label {
   display: grid;
   gap: 6px;
 }
 
+.workspace-form label > span,
+.workspace-form legend,
 .party-form label > span,
 .party-form legend {
   color: #475467;
@@ -86,6 +96,8 @@
   font-weight: 650;
 }
 
+.workspace-form label > input,
+.workspace-form label > select,
 .party-form label > input,
 .party-form label > select {
   min-height: 38px;
@@ -95,18 +107,21 @@
   background: #ffffff;
 }
 
+.workspace-form .form-check-row,
 .party-form .form-check-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.workspace-form .form-check-row > input,
 .party-form .form-check-row > input {
   width: 16px;
   min-height: 16px;
   padding: 0;
 }
 
+.workspace-form fieldset,
 .party-form fieldset {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -117,10 +132,12 @@
   border-radius: 8px;
 }
 
+.workspace-form legend,
 .party-form legend {
   padding: 0 4px;
 }
 
+.workspace-check-option,
 .party-type-check {
   grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
@@ -129,9 +146,37 @@
   font-size: 12px;
 }
 
+.workspace-check-option input,
 .party-type-check input {
   width: 14px;
   height: 14px;
+}
+
+.workspace-search {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted-2);
+  background: #ffffff;
+}
+
+.workspace-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 190px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fbfcff;
+  font-size: 13px;
+  font-weight: 620;
 }
 
 .form-helper {
@@ -223,6 +268,7 @@
   font-weight: 620;
 }
 
+.read-only-shell .workspace-form,
 .read-only-shell .party-form,
 .read-only-shell .table-action,
 .read-only-shell .primary-action,

@@ -456,7 +456,7 @@ export function BusinessProjectsWorkspace({
         onClose={() => setIsCreateDrawerOpen(false)}
       >
         <form
-          className="dashboard-panel party-form"
+          className="dashboard-panel workspace-form"
           onSubmit={handleSubmit}
         >
           <div className="panel-header">
@@ -619,7 +619,7 @@ export function BusinessProjectsWorkspace({
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>

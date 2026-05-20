@@ -124,4 +124,23 @@ describe("UI subtractive refactor final gate", () => {
       expect(content, file).not.toMatch(/import\s+\{[^}]*PageHeader/);
     }
   });
+
+  it("keeps generic workspaces from reusing party-specific form and state classes", () => {
+    const genericWorkspaceFiles = [
+      "apps/web/src/components/MaterialsWarehousesWorkspace.tsx",
+      "apps/web/src/components/BusinessProjectsWorkspace.tsx",
+      "apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx",
+      "apps/web/src/components/ExcelImportWorkspace.tsx",
+      "apps/web/src/components/PeoplePermissionsWorkspace.tsx",
+      "apps/web/src/components/system/SystemSettingsWorkspace.tsx",
+    ];
+
+    for (const file of genericWorkspaceFiles) {
+      const content = read(file);
+
+      expect(content, file).not.toMatch(
+        /party-form|party-state|party-search|party-type-check/,
+      );
+    }
+  });
 });
