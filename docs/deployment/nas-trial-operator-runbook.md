@@ -62,6 +62,18 @@
 
 11. 将 deploy revision、构建时间、操作员、PR 或 release reference 写入同一个 Git 仓库外证据目录。
 
+## 本地 smoke 命令
+
+操作员在正式收集证据前可以先运行这些只读 smoke 命令，确认本机脚本入口可用。它们不读取真实 `.env`、不访问 NAS、不连接生产数据库，也不写 Git 仓库内文件。
+
+```bash
+npm run preflight:nas -- --help
+npm run pilot:verify-local -- --dry-run
+npm run pilot:verify-evidence -- --help
+npm run attachments:legacy-report -- --help
+npm run audit:verify-export -- --help
+```
+
 ## 角色验收
 
 - `admin`: 可访问 Dashboard、项目点风险台账、系统设置、全局附件管理、审计日志和审计导出。
