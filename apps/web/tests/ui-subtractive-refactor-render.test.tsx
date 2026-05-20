@@ -1,15 +1,24 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CertificatesWorkspace } from "../src/components/CertificatesWorkspace";
+import { BusinessProjectsWorkspace } from "../src/components/BusinessProjectsWorkspace";
+import { ContractsWorkspace } from "../src/components/ContractsWorkspace";
+import { InventoryWorkspace } from "../src/components/InventoryWorkspace";
+import { PartiesWorkspace } from "../src/components/PartiesWorkspace";
 import { ProjectSitesWorkspace } from "../src/components/ProjectSitesWorkspace";
 import { ExternalProjectSitePortal } from "../src/components/project-sites/ExternalProjectSitePortal";
 import { PurchaseWorkspace } from "../src/components/PurchaseWorkspace";
+import { ReplenishmentSuggestionsWorkspace } from "../src/components/ReplenishmentSuggestionsWorkspace";
 import {
   businessProject,
+  businessProjectSummary,
   certificate,
   contract,
   expiredCertificate,
   externalProjectSiteUser,
+  employee,
+  inventoryBalance,
+  inventoryMovement,
   material,
   party,
   projectSite,
@@ -20,6 +29,7 @@ import {
   projectUsageRequest,
   purchaseRecord,
   purchaseRequest,
+  replenishmentSuggestion,
   warehouse,
 } from "./appTestHelpers";
 
@@ -131,5 +141,80 @@ describe("UI subtractive refactor rendered surfaces", () => {
     expect(screen.queryByText("系统设置")).not.toBeInTheDocument();
     expect(screen.queryByText("全局附件管理")).not.toBeInTheDocument();
     expect(screen.queryByText(/成本价|采购价|库存金额|Storage Key/)).not.toBeInTheDocument();
+  });
+
+  it("keeps inventory, contracts, and master-data create flows out of the default page body", async () => {
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([inventoryMovement])}
+        loadInventoryBalances={() => Promise.resolve([inventoryBalance])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
+      />,
+    );
+
+    expect(await screen.findByRole("tab", { name: "库存风险" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByLabelText("库存出入库登记表单")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
+    expect(await screen.findByRole("button", { name: "新增入库流水" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("库存出入库登记表单")).not.toBeInTheDocument();
+  });
+
+  it("keeps contract and counterparty creation in drawer-only flows", async () => {
+    const { unmount } = render(
+      <ContractsWorkspace
+        loadContracts={() => Promise.resolve([contract])}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadUnifiedAttachments={() => Promise.resolve([])}
+      />,
+    );
+
+    expect(await screen.findByRole("tab", { name: "合同风险" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByLabelText("合同编号")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
+    expect(screen.getByRole("button", { name: "新增合同" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("合同编号")).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <PartiesWorkspace
+        loadParties={() => Promise.resolve([party])}
+        createParty={() => Promise.resolve(party)}
+      />,
+    );
+    expect(await screen.findByText(party.partyCode)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增往来方" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("往来方编码")).not.toBeInTheDocument();
+  });
+
+  it("keeps business-project and replenishment conversion forms behind drawer actions", async () => {
+    const { unmount } = render(
+      <BusinessProjectsWorkspace
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+        loadEmployees={() => Promise.resolve([employee])}
+        loadInvestmentSummary={() => Promise.resolve(businessProjectSummary)}
+      />,
+    );
+
+    expect(await screen.findByRole("tab", { name: "项目台账" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "新增业务项目" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("项目编码")).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <ReplenishmentSuggestionsWorkspace
+        loadSuggestions={() => Promise.resolve([replenishmentSuggestion])}
+        generateSuggestions={() => Promise.resolve({ created: [], existingOpen: [replenishmentSuggestion], skipped: 0 })}
+        updateSuggestion={() => Promise.resolve({ ...replenishmentSuggestion, status: "dismissed" })}
+      />,
+    );
+
+    expect(await screen.findByText(replenishmentSuggestion.materialCode)).toBeInTheDocument();
+    expect(screen.queryByLabelText("采购需求编号")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "转采购需求" }));
+    expect(screen.getByLabelText("采购需求编号")).toBeInTheDocument();
   });
 });
