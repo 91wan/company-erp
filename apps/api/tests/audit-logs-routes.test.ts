@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AuditLogDto } from "@company-erp/shared";
 import { buildApp } from "../src/app";
@@ -225,6 +226,8 @@ describe("audit logs API", () => {
     expect(exported.headers["content-type"]).toContain("text/csv");
     expect(exported.headers["content-disposition"]).toContain("audit-logs.csv");
     expect(exported.headers["x-content-type-options"]).toBe("nosniff");
+    expect(exported.headers["x-audit-export-record-count"]).toBe("1");
+    expect(exported.headers["x-audit-export-sha256"]).toBe(createHash("sha256").update(exported.body).digest("hex"));
     expect(exported.body).toContain("createdAt,actorUsername,action,entityType,entityId,ip,userAgent,beforeJson,afterJson");
     expect(exported.body).toContain("admin");
     expect(exported.body).toContain("user_account.create");
@@ -269,6 +272,8 @@ describe("audit logs API", () => {
     await app.close();
 
     expect(exported.statusCode).toBe(200);
+    expect(exported.headers["x-audit-export-record-count"]).toBe("1");
+    expect(exported.headers["x-audit-export-sha256"]).toBe(createHash("sha256").update(exported.body).digest("hex"));
     expect(exported.body).toContain("\"'=cmd,operator\"");
     expect(exported.body).toContain("\"browser,\nagent\"");
     expect(exported.body).toContain("receipt,\\n");

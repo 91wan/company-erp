@@ -113,6 +113,7 @@ describe("SystemSettingsWorkspace", () => {
     );
 
     await screen.findByText("暂无审计日志。");
+    expect(screen.getByText(/下载后记录 SHA256、筛选条件、导出人和 deploy revision/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("审计对象类型"), { target: { value: "certificate" } });
     fireEvent.change(screen.getByLabelText("审计动作"), { target: { value: "certificate.create" } });
     fireEvent.change(screen.getByLabelText("操作账号"), { target: { value: "admin" } });
