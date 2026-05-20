@@ -1,1 +1,385 @@
+/* Dashboard-only layout and panel styles. */
+
 /* Dashboard-specific styles are being migrated out of legacy.css incrementally. */
+
+.dashboard-scroll {
+  min-width: 0;
+  overflow: auto;
+  padding: 24px 28px 26px;
+}
+
+.dashboard-header {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(420px, 560px);
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 29px;
+  font-weight: 780;
+  line-height: 1.14;
+  letter-spacing: 0;
+}
+
+.dashboard-header p {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.workflow-panel,
+.dashboard-panel,
+.metric-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(18px);
+}
+
+.workflow-panel {
+  min-height: 70px;
+  padding: 13px 13px;
+  overflow: hidden;
+}
+
+.workflow-panel > strong {
+  display: block;
+  margin-bottom: 11px;
+  color: #344054;
+  font-size: 12px;
+}
+
+.workflow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.workflow-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  color: #475467;
+  background: transparent;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mini-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.flow-arrow {
+  color: #98a2b3;
+  font-size: 14px;
+}
+
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 92px;
+  padding: 16px;
+}
+
+.metric-card-action {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.metric-card-action:hover,
+.metric-card-action:focus-visible,
+.clickable-row:hover,
+.clickable-row:focus-visible {
+  outline: 0;
+  background: rgb(234 242 255 / 72%);
+}
+
+.metric-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+}
+
+.metric-card h3 {
+  margin: 0 0 4px;
+  color: #5f6b7a;
+  font-size: 14px;
+  font-weight: 610;
+}
+
+.metric-card strong {
+  display: block;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.metric-card p {
+  margin: 5px 0 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.metric-card .metric-alert::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 5px 2px 0;
+  border-radius: 999px;
+  background: #ef4444;
+}
+
+.blue {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.green {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.orange {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.purple {
+  color: var(--purple);
+  background: var(--purple-soft);
+}
+
+.cyan {
+  color: var(--cyan);
+  background: var(--cyan-soft);
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dashboard-grid-primary {
+  grid-template-columns: 1.02fr 1.38fr 1.38fr;
+}
+
+.dashboard-grid-secondary {
+  grid-template-columns: 1.32fr 1fr 0.82fr;
+}
+
+.dashboard-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.approval-list {
+  display: grid;
+  padding: 11px 14px 13px;
+}
+
+.approval-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.document-icon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+  color: #f59e0b;
+  background: var(--orange-soft);
+}
+
+.approval-item strong {
+  display: block;
+  overflow: hidden;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-item small {
+  display: flex;
+  gap: 12px;
+  margin-top: 3px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.approval-age {
+  text-align: right;
+}
+
+.approval-age span {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+}
+
+.approval-age em {
+  display: block;
+  margin-top: 3px;
+  color: #ef4444;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.system-list {
+  display: grid;
+}
+
+.system-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 61px;
+  padding: 0 15px;
+  border-bottom: 1px solid #eef1f5;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.system-item:last-child {
+  border-bottom: 0;
+}
+
+.system-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.system-dot::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.system-dot.success {
+  color: #22a06b;
+  background: var(--green-soft);
+}
+
+.system-dot.info {
+  color: #3b82f6;
+  background: var(--blue-soft);
+}
+
+.system-item strong {
+  display: block;
+  color: #344054;
+  font-size: 13px;
+}
+
+.system-item small {
+  color: #22a06b;
+  font-size: 11px;
+}
+
+.system-item > span:last-child {
+  color: #667085;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+
+  .dashboard-header,
+  .dashboard-grid-primary,
+  .dashboard-grid-secondary,
+  .parties-layout,
+  .people-section-grid,
+  .replenishment-card,
+  .inventory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+
+  .dashboard-scroll {
+    padding: 20px 14px 28px;
+  }
+
+  .dashboard-header h2 {
+    font-size: 27px;
+  }
+
+  .workflow-panel {
+    overflow: visible;
+  }
+
+  .workflow-steps {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .metric-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    min-height: 84px;
+  }
+
+  .approval-item {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .approval-age {
+    grid-column: 2;
+    text-align: left;
+  }
+}

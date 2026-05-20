@@ -1,3 +1,5 @@
+/* Shared workspace layout and workspace-scoped helper classes. */
+
 .workspace-primary-actions {
   display: flex;
   flex-wrap: wrap;
@@ -15,4 +17,122 @@
   gap: 8px;
   color: var(--muted);
   font-size: 14px;
+}
+
+.inventory-workspace {
+  margin-top: 2px;
+}
+
+.system-settings-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.settings-form {
+  max-width: 680px;
+}
+
+.settings-version-panel {
+  max-width: 760px;
+}
+
+.section-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-inline-header .form-hint {
+  margin: 0;
+}
+
+.settings-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin: 12px 0;
+}
+
+.settings-filter-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-filter-grid label > span {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-filter-grid input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: end;
+}
+
+.version-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.version-grid div {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.version-grid dt {
+  margin-bottom: 5px;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.version-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.parties-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.materials-warehouses-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.people-permissions-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.purchase-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
 }

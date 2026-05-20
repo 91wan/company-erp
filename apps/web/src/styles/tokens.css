@@ -1,4 +1,25 @@
 :root {
+  --surface: rgb(255 255 255 / 86%);
+  --surface-solid: #ffffff;
+  --line: #e6e9ef;
+  --line-strong: #d9dee8;
+  --text: #101828;
+  --muted: #667085;
+  --muted-2: #98a2b3;
+  --blue: #2563eb;
+  --blue-soft: #eaf2ff;
+  --green: #22a06b;
+  --green-soft: #e8f8ef;
+  --orange: #f59e0b;
+  --orange-soft: #fff4df;
+  --purple: #7c3aed;
+  --purple-soft: #f0e9ff;
+  --cyan: #0ea5a8;
+  --cyan-soft: #e6f7f7;
+  --red: #ef4444;
+  --red-soft: #ffecec;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 4%);
+  --shadow-md: 0 14px 36px rgb(16 24 40 / 7%);
   --radius-sm: 6px;
   --radius-md: 10px;
   --space-2: 8px;
