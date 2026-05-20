@@ -1,7 +1,6 @@
-import { AlertTriangle, FileBadge, Filter, RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, FileBadge, Save, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  CERTIFICATE_COMPUTED_STATUSES,
   CERTIFICATE_OWNER_TYPES,
   CERTIFICATE_TYPES,
   CERTIFICATE_VALIDITY_TYPES,
@@ -20,19 +19,21 @@ import {
 import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
 import {
-  DataTable,
   DetailDrawer,
-  EmptyState,
   FormDrawer,
   SectionCard,
   SegmentedTabs,
-  StatusBadge,
   SummaryCard,
-  Toolbar,
   WorkspaceScaffold,
 } from "./ui";
 import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
-import { certificateStatusToBadge } from "./statusMappers";
+import {
+  CertificateDetailFields,
+  CertificateFilterToolbar,
+  CertificatePanelHeader,
+  CertificateRiskTable,
+  CertificateStateLine,
+} from "./certificates/CertificatesWorkspaceParts";
 
 type CertificatesWorkspaceProps = {
   loadCertificates?: () => Promise<CertificateRecordDto[]>;
@@ -77,9 +78,6 @@ const certificateTabs: { key: CertificateTab; label: string }[] = [
   { key: "food", label: "食品经营许可证" },
   { key: "other", label: "其他资质" },
 ];
-
-const typeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
-const ownerLabel = new Map(CERTIFICATE_OWNER_TYPES.map((item) => [item.code, item.label]));
 
 const certificatePortalCopy: Partial<Record<ExternalProjectSitePortalSection, { title: string; description: string }>> = {
   rosterHealth: {
@@ -417,67 +415,21 @@ export function CertificatesWorkspace({
         </SectionCard>
       ) : null}
 
-      <Toolbar
-        search={(
-          <label className="table-search">
-            <Search aria-hidden="true" size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索证照、归属对象或证照编号" />
-          </label>
-        )}
-        filters={(
-          <label className="table-filter">
-            <Filter aria-hidden="true" size={16} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | CertificateComputedStatusCode)}>
-              <option value="all">全部状态</option>
-              {CERTIFICATE_COMPUTED_STATUSES.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+      <CertificateFilterToolbar
+        query={query}
+        onQueryChange={setQuery}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
       <>
         <SectionCard title="证照风险台账" action={<FileBadge aria-hidden="true" size={18} />}>
-          {status === "loading" ? <StateLine icon={<RefreshCw size={16} />} text="正在加载证照台账..." /> : null}
-          {status === "error" ? <StateLine icon={<AlertTriangle size={16} />} text="证照台账加载失败" tone="danger" /> : null}
-          {status === "ready" ? (
-            <DataTable
-              headers={["证照", "类型", "归属对象", "适用项目点", "到期/复核", "剩余天数", "状态", "审核状态", "人员匹配"]}
-              rows={visibleCertificates.map((certificate) => {
-                const computedStatus = certificateStatusToBadge(certificate.computedStatus);
-                const statusTone =
-                  certificate.isDisabled || certificate.computedStatus === "disabled" || certificate.computedStatus === "archived"
-                    ? "disabled"
-                    : computedStatus.tone;
-                return [
-                  <span key={`${certificate.id}-name`} className="table-cell-stack">
-                    <strong>{certificate.certificateName}</strong>
-                    <small>
-                      <span>{certificate.certificateCode}</span>
-                      <span>{certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : " / 未录入证号"}</span>
-                    </small>
-                  </span>,
-                  typeLabel.get(certificate.certificateType) ?? certificate.certificateType,
-                  `${ownerLabel.get(certificate.ownerType) ?? certificate.ownerType} / ${certificate.ownerNameSnapshot}`,
-                  certificate.ownerProjectSiteName ?? rosterProjectSiteName(certificate, rosterPeople) ?? "待后端支持",
-                  certificate.expiryDate ?? certificate.nextReviewDate ?? "-",
-                  remainingDaysLabel(certificate),
-                  <StatusBadge key={`${certificate.id}-status`} tone={statusTone}>
-                    {computedStatus.label}
-                  </StatusBadge>,
-                  <StatusBadge key={`${certificate.id}-review`} tone={certificate.confirmedAt ? "success" : "info"}>
-                    {certificate.confirmedAt ? "已确认" : "待审核"}
-                  </StatusBadge>,
-                  healthMatchLabel(certificate),
-                ];
-              })}
-              emptyState={<EmptyState title="暂无证照资料" description="可通过新增证照登记资料，或调整筛选条件。" />}
-              onRowClick={(index) => setSelectedCertificateId(visibleCertificates[index].id)}
-            />
-          ) : null}
+          <CertificateRiskTable
+            status={status}
+            certificates={visibleCertificates}
+            rosterPeople={rosterPeople}
+            onSelectCertificate={(certificate) => setSelectedCertificateId(certificate.id)}
+          />
         </SectionCard>
 
         <FormDrawer
@@ -488,8 +440,8 @@ export function CertificatesWorkspace({
         >
         {canManage ? (
           <section className="workspace-panel certificate-create-panel">
-            <PanelHeader title="新增证照" icon={<ShieldCheck size={18} />} />
-            {masterStatus === "error" ? <StateLine icon={<AlertTriangle size={16} />} text="人员、项目点或往来方接口暂不可用，仍可填写名称快照。" tone="danger" /> : null}
+            <CertificatePanelHeader title="新增证照" icon={<ShieldCheck size={18} />} />
+            {masterStatus === "error" ? <CertificateStateLine icon={<AlertTriangle size={16} />} text="人员、项目点或往来方接口暂不可用，仍可填写名称快照。" tone="danger" /> : null}
             <form className="stacked-form" onSubmit={handleSubmit}>
               <label>
                 证照编码
@@ -616,8 +568,8 @@ export function CertificatesWorkspace({
                 <Save aria-hidden="true" size={16} />
                 保存证照
               </button>
-              {submitState === "saved" ? <StateLine text="证照已保存" /> : null}
-              {submitState === "error" ? <StateLine text={submitError || "证照保存失败，请检查编码、归属对象或日期。"} tone="danger" /> : null}
+              {submitState === "saved" ? <CertificateStateLine text="证照已保存" /> : null}
+              {submitState === "error" ? <CertificateStateLine text={submitError || "证照保存失败，请检查编码、归属对象或日期。"} tone="danger" /> : null}
             </form>
           </section>
         ) : null}
@@ -631,18 +583,7 @@ export function CertificatesWorkspace({
       >
         {selectedCertificate ? (
           <>
-            <dl className="detail-list">
-              <dt>归属对象</dt>
-              <dd>{ownerLabel.get(selectedCertificate.ownerType)} / {selectedCertificate.ownerNameSnapshot}</dd>
-              <dt>适用项目点</dt>
-              <dd>{selectedCertificate.ownerProjectSiteName ?? rosterProjectSiteName(selectedCertificate, rosterPeople) ?? "待后端支持"}</dd>
-              <dt>到期/复核</dt>
-              <dd>{selectedCertificate.expiryDate ?? selectedCertificate.nextReviewDate ?? "-"}</dd>
-              <dt>人员匹配</dt>
-              <dd>{healthMatchLabel(selectedCertificate)}</dd>
-              <dt>审核状态</dt>
-              <dd>{selectedCertificate.confirmedAt ? `已确认：${selectedCertificate.confirmedByEmployeeName ?? "-"}` : "待审核"}</dd>
-            </dl>
+            <CertificateDetailFields certificate={selectedCertificate} rosterPeople={rosterPeople} />
             <BusinessAttachmentsPanel
               ownerModule="certificates"
               ownerEntityType="certificate"
@@ -660,48 +601,4 @@ export function CertificatesWorkspace({
       </DetailDrawer>
     </WorkspaceScaffold>
   );
-}
-
-function PanelHeader({ title, icon }: { title: string; icon: ReactNode }) {
-  return (
-    <div className="workspace-panel-header">
-      <h3>
-        {icon}
-        {title}
-      </h3>
-    </div>
-  );
-}
-
-function StateLine({ text, icon, tone = "muted" }: { text: string; icon?: ReactNode; tone?: "muted" | "danger" }) {
-  return (
-    <p className={`state-line ${tone}`}>
-      {icon}
-      {text}
-    </p>
-  );
-}
-
-function remainingDaysLabel(certificate: CertificateRecordDto): string {
-  const targetDate = certificate.expiryDate ?? certificate.nextReviewDate;
-  if (!targetDate) return certificate.validityType === "long_term" ? "长期有效" : "待后端支持";
-  const today = new Date();
-  const target = new Date(targetDate);
-  if (Number.isNaN(target.getTime())) return "-";
-  const days = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return `已过期 ${Math.abs(days)} 天`;
-  return `${days} 天`;
-}
-
-function rosterProjectSiteName(certificate: CertificateRecordDto, rosterPeople: ProjectSiteRosterPersonDto[]): string | null {
-  if (!certificate.ownerRosterPersonProjectSiteId) return null;
-  return rosterPeople.find((person) => person.projectSiteId === certificate.ownerRosterPersonProjectSiteId)?.projectSiteName ?? null;
-}
-
-function healthMatchLabel(certificate: CertificateRecordDto): string {
-  if (certificate.certificateType !== "person_health_cert") return "不适用";
-  if (!certificate.ownerRosterPersonId) return "未绑定项目点现场人员";
-  if (!certificate.ownerRosterPersonName) return "待后端支持";
-  if (certificate.ownerNameSnapshot && certificate.ownerRosterPersonName !== certificate.ownerNameSnapshot) return "姓名不一致";
-  return "人员已绑定，身份证后四位待后端支持";
 }
