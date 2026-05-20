@@ -409,7 +409,7 @@ export function InventoryWorkspace({
             <StateMessage icon={<PackageCheck size={16} />} text="暂无库存流水" />
           ) : (
             <DataTable
-              headers={["单号", "日期", "类型", "仓库", "物料", "数量", "来源", "经办人"]}
+              headers={["单号", "日期", "类型", "仓库", "物料", "数量", "处理摘要"]}
               rows={activeTabMovements.map((movement) => [
                 movement.movementNo,
                 movement.movementDate,
@@ -417,8 +417,10 @@ export function InventoryWorkspace({
                 movement.warehouseCode,
                 `${movement.materialCode} ${movement.materialName}`,
                 `${movement.quantity} ${movement.unit}`,
-                movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "-",
-                movement.handledBy ?? "-",
+                <span key={movement.id} className="table-cell-stack">
+                  <strong>{movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "未指定来源"}</strong>
+                  <small>{movement.handledBy ?? "未记录经办人"}</small>
+                </span>,
               ])}
               onRowClick={(rowIndex) => setSelectedMovementId(activeTabMovements[rowIndex]?.id ?? "")}
             />

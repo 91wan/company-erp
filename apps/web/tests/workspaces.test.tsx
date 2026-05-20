@@ -499,6 +499,11 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     expect(screen.getByText("新增入库流水")).toBeInTheDocument();
     expect(await screen.findByText("RK20260511001")).toBeInTheDocument();
+    const movementHeaders = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(movementHeaders).toHaveLength(7);
+    expect(movementHeaders).toContain("处理摘要");
+    expect(movementHeaders).not.toContain("来源");
+    expect(movementHeaders).not.toContain("经办人");
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/MAT0001/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("低库存").length).toBeGreaterThan(0);
@@ -507,6 +512,8 @@ describe("Company ERP workspace components", () => {
     expect(
       await screen.findByRole("heading", { name: "库存流水详情" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("来源")).toBeInTheDocument();
+    expect(screen.getByText("经办人")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
