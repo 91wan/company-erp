@@ -553,6 +553,85 @@ describe("pilot evidence manifest verifier", () => {
   });
 });
 
+describe("audit export evidence verifier", () => {
+  it("prints help without reading a CSV file", () => {
+    const result = spawnSync("node", ["scripts/verify-audit-export.mjs", "--help"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run audit:verify-export");
+    expect(result.stdout).toContain("--csv");
+    expect(result.stdout).toContain("--sha256");
+    expect(result.stderr).toBe("");
+  });
+
+  it("verifies an exported audit CSV SHA256 and record count", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-audit-export-verify-"));
+    const csvPath = join(tempRoot, "audit-export.csv");
+    const csv = "createdAt,actorUsername,action\n2026-05-20T00:00:00.000Z,admin,attachment.content_read\n";
+    writeFileSync(csvPath, csv);
+    const hash = createHash("sha256").update(csv).digest("hex");
+
+    const result = spawnSync(
+      "node",
+      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "1"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Audit export verified");
+    expect(result.stdout).toContain("1 records");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("fails when the audit CSV SHA256 does not match the recorded value", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-audit-export-hash-"));
+    const csvPath = join(tempRoot, "audit-export.csv");
+    writeFileSync(csvPath, "createdAt,actorUsername,action\n2026-05-20T00:00:00.000Z,admin,attachment.content_read\n");
+
+    const result = spawnSync(
+      "node",
+      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", "0".repeat(64), "--record-count", "1"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("SHA256 mismatch");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("fails when the audit CSV record count does not match the recorded header", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-audit-export-count-"));
+    const csvPath = join(tempRoot, "audit-export.csv");
+    const csv = "createdAt,actorUsername,action\n2026-05-20T00:00:00.000Z,admin,attachment.content_read\n";
+    writeFileSync(csvPath, csv);
+    const hash = createHash("sha256").update(csv).digest("hex");
+
+    const result = spawnSync(
+      "node",
+      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("record count mismatch");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("rejects audit CSV files inside the repository", () => {
+    const result = spawnSync(
+      "node",
+      ["scripts/verify-audit-export.mjs", "--csv", join(repoRoot, "docs", "audit-export.csv"), "--sha256", "0".repeat(64), "--record-count", "0"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Audit export CSV must be outside the repository");
+  });
+});
+
 describe("attachment legacy migration readiness report", () => {
   it("prints help without requiring DATABASE_URL or reading deployment env", () => {
     const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--help"], {

@@ -26,6 +26,8 @@ contain:
   retained as the manifest integrity verification record.
 - `audit CSV` export from `/api/audit-logs/export.csv`, using the same filters
   shown in the UI.
+- `npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>`
+  output, retained beside the audit export.
 - `deploy revision` record: Git commit, build time, deployment operator, and PR
   or release reference.
 
@@ -40,6 +42,8 @@ Before sign-off, the operator must verify:
   successfully and reports the expected evidence file count.
 - The audit CSV export response headers include the record count and SHA256; the
   exported file's SHA256 is recorded beside the filter conditions.
+- `npm run audit:verify-export` exits successfully for the retained audit CSV
+  using the recorded response header values.
 - The legacy attachment report is count-only and does not contain raw paths,
   `Storage Key`, NAS storage roots, attachment bytes, or real business data.
 - The reviewer records the 责任人, review time, filter conditions, and deploy
