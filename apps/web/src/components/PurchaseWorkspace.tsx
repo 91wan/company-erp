@@ -1,5 +1,5 @@
-import { Check, ClipboardList, Filter, PackageCheck, RefreshCw, Save, Search, ShoppingCart, X } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Check, ClipboardList, PackageCheck, RefreshCw, Save, ShoppingCart, X } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   PURCHASE_RECORD_STATUSES,
   PURCHASE_REQUEST_STATUSES,
@@ -14,7 +14,16 @@ import {
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold } from "./ui";
+import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, SummaryCard, WorkspaceScaffold } from "./ui";
+import {
+  formatDateTime,
+  PurchaseFilterToolbar,
+  PurchaseRecordDetail,
+  PurchaseRecordsTable,
+  PurchaseRequestDetail,
+  PurchaseRequestsTable,
+  PurchaseStateMessage,
+} from "./purchase/PurchaseWorkspaceParts";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -67,9 +76,6 @@ const purchaseTabs: { key: PurchaseTab; label: string }[] = [
   { key: "arrivals", label: "到货记录" },
 ];
 
-const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
-const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
-const sourceTypeLabel = new Map(PURCHASE_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
 const emptyRequestForm: RequestFormState = {
   requestNo: "",
   requesterName: "",
@@ -435,7 +441,7 @@ export function PurchaseWorkspace({
         )}
       >
       {activeTab === "todo" ? <SectionCard title="待审批" action={<Check aria-hidden="true" size={17} />}>
-        {pendingApprovalRequests.length === 0 ? <StateMessage text="暂无待审批采购需求" /> : null}
+        {pendingApprovalRequests.length === 0 ? <PurchaseStateMessage text="暂无待审批采购需求" /> : null}
         {pendingApprovalRequests.length > 0 ? (
           <>
             <label className="full-width-field">
@@ -514,7 +520,7 @@ export function PurchaseWorkspace({
 
       {activeTab === "requests" ? <div className="project-site-list-layout">
         <SectionCard title="采购需求" action={<ClipboardList aria-hidden="true" size={17} />}>
-          <Toolbar
+          <PurchaseFilterToolbar
             query={requestQuery}
             onQueryChange={setRequestQuery}
             filter={requestFilter}
@@ -522,9 +528,9 @@ export function PurchaseWorkspace({
             options={PURCHASE_REQUEST_STATUSES}
             searchLabel="搜索采购需求"
           />
-          {requestStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载采购需求..." /> : null}
-          {requestStatus === "error" ? <StateMessage text="采购需求加载失败" /> : null}
-          {requestStatus === "ready" && filteredRequests.length === 0 ? <StateMessage text="暂无采购需求" /> : null}
+          {requestStatus === "loading" ? <PurchaseStateMessage icon={<RefreshCw size={18} />} text="加载采购需求..." /> : null}
+          {requestStatus === "error" ? <PurchaseStateMessage text="采购需求加载失败" /> : null}
+          {requestStatus === "ready" && filteredRequests.length === 0 ? <PurchaseStateMessage text="暂无采购需求" /> : null}
           {requestStatus === "ready" && filteredRequests.length > 0 ? (
             <PurchaseRequestsTable
               requests={filteredRequests}
@@ -585,7 +591,7 @@ export function PurchaseWorkspace({
 
       {activeTab === "records" ? <div className="project-site-list-layout">
         <SectionCard title="采购执行" action={<PackageCheck aria-hidden="true" size={17} />}>
-          <Toolbar
+          <PurchaseFilterToolbar
             query={recordQuery}
             onQueryChange={setRecordQuery}
             filter={recordFilter}
@@ -593,9 +599,9 @@ export function PurchaseWorkspace({
             options={PURCHASE_RECORD_STATUSES}
             searchLabel="搜索采购记录"
           />
-          {recordStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载采购记录..." /> : null}
-          {recordStatus === "error" ? <StateMessage text="采购记录加载失败" /> : null}
-          {recordStatus === "ready" && filteredRecords.length === 0 ? <StateMessage text="暂无采购记录" /> : null}
+          {recordStatus === "loading" ? <PurchaseStateMessage icon={<RefreshCw size={18} />} text="加载采购记录..." /> : null}
+          {recordStatus === "error" ? <PurchaseStateMessage text="采购记录加载失败" /> : null}
+          {recordStatus === "ready" && filteredRecords.length === 0 ? <PurchaseStateMessage text="暂无采购记录" /> : null}
           {recordStatus === "ready" && filteredRecords.length > 0 ? <PurchaseRecordsTable records={filteredRecords} onSelectRecord={(record) => setSelectedRecordId(record.id)} /> : null}
         </SectionCard>
 
@@ -688,230 +694,4 @@ export function PurchaseWorkspace({
       </DetailDrawer>
     </WorkspaceScaffold>
   );
-}
-
-function Toolbar({
-  query,
-  onQueryChange,
-  filter,
-  onFilterChange,
-  options,
-  searchLabel,
-}: {
-  query: string;
-  onQueryChange: (value: string) => void;
-  filter: string;
-  onFilterChange: (value: string) => void;
-  options: readonly { code: string; label: string }[];
-  searchLabel: string;
-}) {
-  return (
-    <UiToolbar
-      search={(
-        <label className="table-search">
-          <Search aria-hidden="true" size={16} />
-          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={searchLabel} />
-        </label>
-      )}
-      filters={(
-        <label className="table-filter">
-          <Filter aria-hidden="true" size={16} />
-          <select aria-label={searchLabel} value={filter} onChange={(event) => onFilterChange(event.target.value)}>
-            <option value="all">全部状态</option>
-            {options.map((option) => (
-              <option key={option.code} value={option.code}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-    />
-  );
-}
-
-function PurchaseRequestsTable({
-  requests,
-  canManage,
-  reviewState,
-  onSubmitRequest,
-  onSelectRequest,
-}: {
-  requests: PurchaseRequestDto[];
-  canManage: boolean;
-  reviewState: "idle" | "saving" | "error";
-  onSubmitRequest: (request: PurchaseRequestDto) => void;
-  onSelectRequest: (request: PurchaseRequestDto) => void;
-}) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>编号</th>
-            <th>申请人</th>
-            <th>部门/项目点</th>
-            <th>物料</th>
-            <th>数量</th>
-            <th>来源</th>
-            <th>状态</th>
-            <th>提交时间</th>
-            <th>审批人/备注</th>
-            <th>期望到货</th>
-            <th>更新时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((request) => {
-            const firstLine = request.lines[0];
-            return (
-              <tr key={request.id} tabIndex={0} onClick={() => onSelectRequest(request)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRequest(request); }}>
-                <td>{request.requestNo}</td>
-                <td>{request.requesterName}</td>
-                <td>{request.projectSiteName || request.departmentName}</td>
-                <td>{firstLine?.materialName ?? "-"}</td>
-                <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
-                <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
-                <td>
-                  <StatusBadge tone={purchaseRequestTone(request.status)}>
-                    {requestStatusLabel.get(request.status)}
-                  </StatusBadge>
-                </td>
-                <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
-                <td>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "-"}</td>
-                <td>{request.expectedArrivalDate || "-"}</td>
-                <td>{formatDateTime(request.updatedAt)}</td>
-                <td>
-                  {canManage && request.status === "draft" ? (
-                    <button type="button" disabled={reviewState === "saving"} onClick={(event) => { event.stopPropagation(); onSubmitRequest(request); }}>
-                      提交 {request.requestNo}
-                    </button>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PurchaseRecordsTable({ records, onSelectRecord }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>采购单号</th>
-            <th>采购人</th>
-            <th>来源</th>
-            <th>供应商/平台/店铺</th>
-            <th>合同</th>
-            <th>物料</th>
-            <th>采购数量</th>
-            <th>采购日期</th>
-            <th>状态</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((record) => {
-            const firstLine = record.lines[0];
-            const sourceText = record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || record.purchaseDescription || "未建供应商";
-            return (
-              <tr key={record.id} tabIndex={0} onClick={() => onSelectRecord(record)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRecord(record); }}>
-                <td>{record.purchaseNo}</td>
-                <td>{record.purchaserName}</td>
-                <td>{sourceTypeLabel.get(record.sourceType)}</td>
-                <td>{sourceText}</td>
-                <td>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "-"}</td>
-                <td>{firstLine?.materialName ?? "-"}</td>
-                <td>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</td>
-                <td>{record.purchaseDate}</td>
-                <td>
-                  <StatusBadge tone={record.status === "cancelled" ? "warning" : "success"}>
-                    {recordStatusLabel.get(record.status)}
-                  </StatusBadge>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PurchaseRequestDetail({ request }: { request: PurchaseRequestDto }) {
-  const firstLine = request.lines[0];
-  return (
-    <dl className="detail-grid">
-      <dt>需求编号</dt>
-      <dd>{request.requestNo}</dd>
-      <dt>申请人</dt>
-      <dd>{request.requesterName}</dd>
-      <dt>部门/项目点</dt>
-      <dd>{request.projectSiteName || request.departmentName || "-"}</dd>
-      <dt>物料</dt>
-      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</dd>
-      <dt>状态</dt>
-      <dd>{requestStatusLabel.get(request.status)}</dd>
-      <dt>审批信息</dt>
-      <dd>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "暂无"}</dd>
-      <dt>更新时间</dt>
-      <dd>{formatDateTime(request.updatedAt)}</dd>
-    </dl>
-  );
-}
-
-function PurchaseRecordDetail({ record }: { record: PurchaseRecordDto }) {
-  const firstLine = record.lines[0];
-  return (
-    <dl className="detail-grid">
-      <dt>采购单号</dt>
-      <dd>{record.purchaseNo}</dd>
-      <dt>采购人</dt>
-      <dd>{record.purchaserName}</dd>
-      <dt>来源</dt>
-      <dd>{sourceTypeLabel.get(record.sourceType)}</dd>
-      <dt>供应商/平台</dt>
-      <dd>{record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || "-"}</dd>
-      <dt>合同</dt>
-      <dd>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "未关联"}</dd>
-      <dt>物料</dt>
-      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</dd>
-      <dt>状态</dt>
-      <dd>{recordStatusLabel.get(record.status)}</dd>
-    </dl>
-  );
-}
-
-function purchaseRequestTone(status: PurchaseRequestStatusCode): "info" | "success" | "warning" | "danger" | "rejected" {
-  if (status === "rejected") return "rejected";
-  if (status === "cancelled") return "warning";
-  if (status === "completed") return "success";
-  if (status === "pending_approval") return "warning";
-  if (status === "draft") return "info";
-  return "success";
-}
-
-function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
-  return (
-    <div className="workspace-state">
-      {icon}
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
