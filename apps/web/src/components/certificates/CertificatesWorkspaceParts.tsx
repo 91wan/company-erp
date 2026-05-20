@@ -65,7 +65,7 @@ export function CertificateRiskTable({
   if (status === "error") return <CertificateStateLine icon={<AlertTriangle size={16} />} text="证照台账加载失败" tone="danger" />;
   return (
     <DataTable
-      headers={["证照", "类型", "归属对象", "适用项目点", "到期/复核", "剩余天数", "状态", "审核状态", "人员匹配"]}
+      headers={["证照", "类型", "归属对象", "适用项目点", "到期/复核", "状态", "关键状态"]}
       rows={certificates.map((certificate) => {
         const computedStatus = certificateStatusToBadge(certificate.computedStatus);
         const statusTone =
@@ -84,14 +84,16 @@ export function CertificateRiskTable({
           `${ownerLabel.get(certificate.ownerType) ?? certificate.ownerType} / ${certificate.ownerNameSnapshot}`,
           certificate.ownerProjectSiteName ?? rosterProjectSiteName(certificate, rosterPeople) ?? "待后端支持",
           certificate.expiryDate ?? certificate.nextReviewDate ?? "-",
-          remainingDaysLabel(certificate),
           <StatusBadge key={`${certificate.id}-status`} tone={statusTone}>
             {computedStatus.label}
           </StatusBadge>,
-          <StatusBadge key={`${certificate.id}-review`} tone={certificate.confirmedAt ? "success" : "info"}>
-            {certificate.confirmedAt ? "已确认" : "待审核"}
-          </StatusBadge>,
-          healthMatchLabel(certificate),
+          <span key={`${certificate.id}-key-status`} className="table-cell-stack">
+            <span>{remainingDaysLabel(certificate)}</span>
+            <small>
+              <span>{certificate.confirmedAt ? "已确认" : "待审核"}</span>
+              {certificate.certificateType === "person_health_cert" ? <span>{` / ${healthMatchLabel(certificate)}`}</span> : null}
+            </small>
+          </span>,
         ];
       })}
       emptyState={<EmptyState title="暂无证照资料" description="可通过新增证照登记资料，或调整筛选条件。" />}

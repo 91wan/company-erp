@@ -1950,12 +1950,15 @@ describe("Company ERP workspace components", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByText("CERT0001")).toBeInTheDocument();
     expect(screen.getByText("证照风险台账")).toBeInTheDocument();
-    expect(screen.getByText("人员匹配")).toBeInTheDocument();
-    expect(screen.getByText("审核状态")).toBeInTheDocument();
+    expect(screen.getByText("关键状态")).toBeInTheDocument();
+    expect(screen.queryByText("人员匹配")).not.toBeInTheDocument();
+    expect(screen.queryByText("审核状态")).not.toBeInTheDocument();
     expect(screen.getByText("项目点食品经营许可证")).toBeInTheDocument();
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("CERT0001"));
+    expect(screen.getByText("人员匹配")).toBeInTheDocument();
+    expect(screen.getByText("审核状态")).toBeInTheDocument();
     expect(screen.queryByText("附件引用")).not.toBeInTheDocument();
     expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
     expect(
