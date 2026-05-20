@@ -20,6 +20,7 @@ import {
 import { apiBaseUrl, requestJson } from "../apiClient";
 import {
   DataTable,
+  FormDrawer,
   SectionCard,
   SegmentedTabs,
   SummaryCard,
@@ -133,6 +134,7 @@ export function BusinessProjectsWorkspace({
   >("loading");
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<BusinessProjectsTab>("ledger");
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [submitState, setSubmitState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -268,6 +270,7 @@ export function BusinessProjectsWorkspace({
         endDate: "",
         remark: "",
       });
+      setIsCreateDrawerOpen(false);
       setSubmitState("saved");
     } catch {
       setSubmitState("error");
@@ -318,238 +321,83 @@ export function BusinessProjectsWorkspace({
       title="业务项目"
       subtitle="归集自营建设项目和项目点投入合同。"
       actions={
-        <span className="parties-total">
-          <BriefcaseBusiness aria-hidden="true" size={18} />
-          {projects.length} 个业务项目
-        </span>
+        <>
+          <span className="parties-total">
+            <BriefcaseBusiness aria-hidden="true" size={18} />
+            {projects.length} 个业务项目
+          </span>
+          {canManage ? (
+            <button type="button" className="primary-action" onClick={() => setIsCreateDrawerOpen(true)}>
+              新增业务项目
+            </button>
+          ) : null}
+        </>
       }
       summary={summaryCards}
       tabs={tabs}
     >
       <section className="business-projects-workspace" aria-label="业务项目">
         {activeTab === "ledger" ? (
-          <div className="people-section-grid">
-            <SectionCard
-              title="业务项目台账"
-              action={<BriefcaseBusiness aria-hidden="true" size={17} />}
-            >
-              <Toolbar
-                search={
-                  <label className="table-search">
-                    <input
-                      aria-label="搜索业务项目"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="搜索编码、名称、地点、负责人"
-                    />
-                  </label>
+          <SectionCard
+            title="业务项目台账"
+            action={<BriefcaseBusiness aria-hidden="true" size={17} />}
+          >
+            <Toolbar
+              search={
+                <label className="table-search">
+                  <input
+                    aria-label="搜索业务项目"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="搜索编码、名称、地点、负责人"
+                  />
+                </label>
+              }
+            />
+            {projectStatus === "loading" ? (
+              <StateMessage
+                icon={<RefreshCw size={18} />}
+                text="加载业务项目..."
+              />
+            ) : null}
+            {projectStatus === "error" ? (
+              <StateMessage text="业务项目加载失败" />
+            ) : null}
+            {projectStatus === "ready" && projects.length === 0 ? (
+              <StateMessage text="暂无业务项目" />
+            ) : null}
+            {projectStatus === "ready" &&
+            projects.length > 0 &&
+            filteredProjects.length === 0 ? (
+              <StateMessage text="没有匹配的业务项目" />
+            ) : null}
+            {projectStatus === "ready" && filteredProjects.length > 0 ? (
+              <DataTable
+                headers={[
+                  "项目编码",
+                  "项目名称",
+                  "类型",
+                  "状态",
+                  "地点",
+                  "负责人",
+                  "起止日期",
+                ]}
+                rows={filteredProjects.map((project) => [
+                  project.projectCode,
+                  project.projectName,
+                  projectTypeLabel.get(project.projectType) ??
+                    project.projectType,
+                  statusLabel.get(project.status) ?? project.status,
+                  project.location ?? "-",
+                  project.managerEmployeeName ?? "-",
+                  `${project.startDate ?? "-"} / ${project.endDate ?? "-"}`,
+                ])}
+                onRowClick={(rowIndex) =>
+                  setSelectedProjectId(filteredProjects[rowIndex]?.id ?? "")
                 }
               />
-              {projectStatus === "loading" ? (
-                <StateMessage
-                  icon={<RefreshCw size={18} />}
-                  text="加载业务项目..."
-                />
-              ) : null}
-              {projectStatus === "error" ? (
-                <StateMessage text="业务项目加载失败" />
-              ) : null}
-              {projectStatus === "ready" && projects.length === 0 ? (
-                <StateMessage text="暂无业务项目" />
-              ) : null}
-              {projectStatus === "ready" &&
-              projects.length > 0 &&
-              filteredProjects.length === 0 ? (
-                <StateMessage text="没有匹配的业务项目" />
-              ) : null}
-              {projectStatus === "ready" && filteredProjects.length > 0 ? (
-                <DataTable
-                  headers={[
-                    "项目编码",
-                    "项目名称",
-                    "类型",
-                    "状态",
-                    "地点",
-                    "负责人",
-                    "起止日期",
-                  ]}
-                  rows={filteredProjects.map((project) => [
-                    project.projectCode,
-                    project.projectName,
-                    projectTypeLabel.get(project.projectType) ??
-                      project.projectType,
-                    statusLabel.get(project.status) ?? project.status,
-                    project.location ?? "-",
-                    project.managerEmployeeName ?? "-",
-                    `${project.startDate ?? "-"} / ${project.endDate ?? "-"}`,
-                  ])}
-                  onRowClick={(rowIndex) =>
-                    setSelectedProjectId(filteredProjects[rowIndex]?.id ?? "")
-                  }
-                />
-              ) : null}
-            </SectionCard>
-
-            {canManage ? (
-              <form
-                className="dashboard-panel party-form"
-                onSubmit={handleSubmit}
-              >
-                <div className="panel-header">
-                  <h3>新增业务项目</h3>
-                  <button type="submit" disabled={submitState === "saving"}>
-                    <Save aria-hidden="true" size={15} />
-                    保存业务项目
-                  </button>
-                </div>
-                {masterStatus === "error" ? (
-                  <p className="form-error">
-                    员工资料接口暂不可用，可先不填负责人。
-                  </p>
-                ) : null}
-                <label>
-                  <span>项目编码</span>
-                  <input
-                    required
-                    value={form.projectCode}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        projectCode: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>项目名称</span>
-                  <input
-                    required
-                    value={form.projectName}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        projectName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>项目类型</span>
-                  <select
-                    value={form.projectType}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        projectType: event.target
-                          .value as BusinessProjectTypeCode,
-                      }))
-                    }
-                  >
-                    {BUSINESS_PROJECT_TYPES.map((type) => (
-                      <option key={type.code} value={type.code}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>状态</span>
-                  <select
-                    value={form.status}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        status: event.target.value as BusinessProjectStatusCode,
-                      }))
-                    }
-                  >
-                    {BUSINESS_PROJECT_STATUSES.map((status) => (
-                      <option key={status.code} value={status.code}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>地点</span>
-                  <input
-                    value={form.location}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        location: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>负责人</span>
-                  <select
-                    value={form.managerEmployeeId}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        managerEmployeeId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">不指定</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.employeeNo} {employee.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>开始日期</span>
-                  <input
-                    type="date"
-                    value={form.startDate}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        startDate: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>结束日期</span>
-                  <input
-                    type="date"
-                    value={form.endDate}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        endDate: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>备注</span>
-                  <input
-                    value={form.remark}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        remark: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                {submitState === "saved" ? (
-                  <p className="form-success">业务项目已保存。</p>
-                ) : null}
-                {submitState === "error" ? (
-                  <p className="form-error">
-                    业务项目保存失败，请检查编码、日期或负责人。
-                  </p>
-                ) : null}
-              </form>
             ) : null}
-          </div>
+          </SectionCard>
         ) : null}
 
         {activeTab === "investment" ? (
@@ -602,6 +450,169 @@ export function BusinessProjectsWorkspace({
           </SectionCard>
         ) : null}
       </section>
+      <FormDrawer
+        title="新增业务项目"
+        open={isCreateDrawerOpen}
+        onClose={() => setIsCreateDrawerOpen(false)}
+      >
+        <form
+          className="dashboard-panel party-form"
+          onSubmit={handleSubmit}
+        >
+          <div className="panel-header">
+            <h3>新增业务项目</h3>
+            <button type="submit" disabled={submitState === "saving"}>
+              <Save aria-hidden="true" size={15} />
+              保存业务项目
+            </button>
+          </div>
+          {masterStatus === "error" ? (
+            <p className="form-error">
+              员工资料接口暂不可用，可先不填负责人。
+            </p>
+          ) : null}
+          <label>
+            <span>项目编码</span>
+            <input
+              required
+              value={form.projectCode}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  projectCode: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>项目名称</span>
+            <input
+              required
+              value={form.projectName}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  projectName: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>项目类型</span>
+            <select
+              value={form.projectType}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  projectType: event.target
+                    .value as BusinessProjectTypeCode,
+                }))
+              }
+            >
+              {BUSINESS_PROJECT_TYPES.map((type) => (
+                <option key={type.code} value={type.code}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>状态</span>
+            <select
+              value={form.status}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  status: event.target.value as BusinessProjectStatusCode,
+                }))
+              }
+            >
+              {BUSINESS_PROJECT_STATUSES.map((status) => (
+                <option key={status.code} value={status.code}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>地点</span>
+            <input
+              value={form.location}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  location: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>负责人</span>
+            <select
+              value={form.managerEmployeeId}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  managerEmployeeId: event.target.value,
+                }))
+              }
+            >
+              <option value="">不指定</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.employeeNo} {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>开始日期</span>
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  startDate: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>结束日期</span>
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  endDate: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>备注</span>
+            <input
+              value={form.remark}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  remark: event.target.value,
+                }))
+              }
+            />
+          </label>
+          {submitState === "saved" ? (
+            <p className="form-success">业务项目已保存。</p>
+          ) : null}
+          {submitState === "error" ? (
+            <p className="form-error">
+              业务项目保存失败，请检查编码、日期或负责人。
+            </p>
+          ) : null}
+        </form>
+      </FormDrawer>
     </WorkspaceScaffold>
   );
 }
