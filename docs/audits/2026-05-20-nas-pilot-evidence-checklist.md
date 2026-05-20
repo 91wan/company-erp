@@ -15,6 +15,7 @@ Keep these files or command outputs in the non-Git trial evidence folder for the
 - `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` output, including the local verification summary and any explicit `BLOCKED` or `SKIPPED` dependency messages. The evidence directory must stay outside the repository.
 - `npm run preflight:nas` output from the final deployment environment file, with real secrets redacted before sharing outside the deployment operator group.
 - `backup restore drill` result, including the dry-run or local restore evidence and the exact tool versions used.
+- `legacy-report.json` from `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` when `PILOT_LEGACY_REPORT_DATABASE_URL` is explicitly set to a temporary or approved pilot database URL. If the variable is not set, retain the generated `SKIPPED` record and run `npm run attachments:legacy-report -- --json --output <outside-git-path>/legacy-report.json` separately before sign-off.
 - `npm run attachments:legacy-report -- --json` or `npm run attachments:legacy-report -- --csv` output, retained as the legacy attachment gap snapshot.
 - `audit CSV export` from `/api/audit-logs/export.csv`, filtered for the trial period or the pre-trial smoke window.
 - `deploy revision`, including Git commit SHA, PR number or release note, build time, and operator.

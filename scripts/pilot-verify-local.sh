@@ -97,7 +97,7 @@ const { existsSync, readFileSync, statSync, writeFileSync } = require("node:fs")
 const { join } = require("node:path");
 
 const [, , evidenceDir, repoRoot, command] = process.argv;
-const names = ["summary.txt", "legacy-report-dry-run.txt", "environment-checks.txt"];
+const names = ["summary.txt", "legacy-report-dry-run.txt", "legacy-report.json", "environment-checks.txt"];
 const files = names
   .filter((name) => existsSync(join(evidenceDir, name)))
   .map((name) => {
@@ -232,6 +232,17 @@ legacy_report_output="$(npm run attachments:legacy-report -- --dry-run)"
 printf '%s\n' "$legacy_report_output"
 if [[ -n "$evidence_dir" ]]; then
   printf '%s\n' "$legacy_report_output" > "$evidence_dir/legacy-report-dry-run.txt"
+  if [[ -n "${PILOT_LEGACY_REPORT_DATABASE_URL:-}" ]]; then
+    echo "Running attachment legacy machine report with explicit pilot database URL..."
+    DATABASE_URL="$PILOT_LEGACY_REPORT_DATABASE_URL" npm run attachments:legacy-report -- --json --output "$evidence_dir/legacy-report.json"
+  else
+    cat > "$evidence_dir/legacy-report.json" <<'EOF'
+{
+  "status": "SKIPPED",
+  "reason": "PILOT_LEGACY_REPORT_DATABASE_URL is not set; no database-backed legacy gap snapshot was generated."
+}
+EOF
+  fi
 fi
 
 echo "Checking audit CSV export source..."

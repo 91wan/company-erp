@@ -390,6 +390,8 @@ describe("local NAS pilot verification pack", () => {
     expect(readFile(join(evidenceDir, "summary.txt"))).toContain("Pilot local verification passed");
     expect(readFile(join(evidenceDir, "legacy-report-dry-run.txt"))).toContain("Attachment legacy migration readiness dry-run");
     expect(readFile(join(evidenceDir, "environment-checks.txt"))).toContain("NAS preflight passed");
+    expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("SKIPPED");
+    expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("PILOT_LEGACY_REPORT_DATABASE_URL");
     const manifest = JSON.parse(readFile(join(evidenceDir, "manifest.json"))) as {
       generatedAt: string;
       gitCommit: string;
@@ -404,6 +406,7 @@ describe("local NAS pilot verification pack", () => {
     expect(manifest.files.map((file) => file.name).sort()).toEqual([
       "environment-checks.txt",
       "legacy-report-dry-run.txt",
+      "legacy-report.json",
       "summary.txt",
     ]);
     for (const file of manifest.files) {
@@ -414,6 +417,50 @@ describe("local NAS pilot verification pack", () => {
     expect(`${readFile(join(evidenceDir, "summary.txt"))}\n${readFile(join(evidenceDir, "environment-checks.txt"))}`).not.toContain(
       "POSTGRES_PASSWORD=",
     );
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("writes a machine legacy report when an explicit pilot legacy report database URL is provided", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-verify-machine-report-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash
+if [[ "$*" == "run attachments:legacy-report -- --dry-run" ]]; then
+  echo "Attachment legacy migration readiness dry-run"
+  exit 0
+fi
+if [[ "$*" == "run attachments:legacy-report -- --json --output "* ]]; then
+  output="\${@: -1}"
+  printf '{"mode":"read-only-counts","rows":[]}\n' > "$output"
+  exit 0
+fi
+echo unexpected npm args: "$@" >&2
+exit 9
+`,
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+        PILOT_LEGACY_REPORT_DATABASE_URL: "postgresql://company_erp:company_erp@localhost:5432/company_erp_ci",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("\"mode\":\"read-only-counts\"");
+    expect(readFile(join(evidenceDir, "manifest.json"))).toContain("legacy-report.json");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 });
