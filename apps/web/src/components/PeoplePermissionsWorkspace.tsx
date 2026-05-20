@@ -22,7 +22,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold, type TabItem } from "./ui";
+import { FormDrawer, SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold, type TabItem } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -54,6 +54,7 @@ const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const relationTypeLabel = new Map(EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => [relation.code, relation.label]));
 
 type PeoplePermissionsTab = "employees" | "departments" | "userAccounts" | "externalAccounts" | "assignments" | "permissions";
+type PeopleFormDrawer = Exclude<PeoplePermissionsTab, "permissions">;
 
 const peoplePermissionsTabs: TabItem<PeoplePermissionsTab>[] = [
   { key: "employees", label: "公司员工" },
@@ -63,6 +64,14 @@ const peoplePermissionsTabs: TabItem<PeoplePermissionsTab>[] = [
   { key: "assignments", label: "项目点分配" },
   { key: "permissions", label: "权限说明" },
 ];
+
+const peopleFormActions: Partial<Record<PeoplePermissionsTab, { drawer: PeopleFormDrawer; label: string }>> = {
+  employees: { drawer: "employees", label: "新增员工" },
+  departments: { drawer: "departments", label: "新增部门" },
+  userAccounts: { drawer: "userAccounts", label: "新增账号" },
+  externalAccounts: { drawer: "externalAccounts", label: "新增项目点账号" },
+  assignments: { drawer: "assignments", label: "新增项目点分配" },
+};
 
 async function defaultLoadDepartments(): Promise<DepartmentDto[]> {
   const payload = await requestJson<{ departments: DepartmentDto[] }>(`${apiBaseUrl}/api/departments`);
@@ -190,6 +199,7 @@ export function PeoplePermissionsWorkspace({
   const [assignmentStatus, setAssignmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<PeoplePermissionsTab>("employees");
+  const [openFormDrawer, setOpenFormDrawer] = useState<PeopleFormDrawer | null>(null);
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
@@ -395,6 +405,7 @@ export function PeoplePermissionsWorkspace({
       setDepartments((current) => [created, ...current.filter((department) => department.id !== created.id)]);
       setDepartmentForm({ departmentCode: "", name: "", status: "enabled" });
       setDepartmentSubmit("idle");
+      setOpenFormDrawer(null);
     } catch (error) {
       setDepartmentSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setDepartmentSubmit("error");
@@ -415,6 +426,7 @@ export function PeoplePermissionsWorkspace({
         employmentStatus: "active",
       });
       setEmployeeSubmit("idle");
+      setOpenFormDrawer(null);
     } catch (error) {
       setEmployeeSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setEmployeeSubmit("error");
@@ -436,6 +448,7 @@ export function PeoplePermissionsWorkspace({
         roles: ["viewer"],
       });
       setAccountSubmit("idle");
+      setOpenFormDrawer(null);
     } catch (error) {
       setAccountSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setAccountSubmit("error");
@@ -461,6 +474,7 @@ export function PeoplePermissionsWorkspace({
         status: "active",
       });
       setExternalAccountSubmit("idle");
+      setOpenFormDrawer(null);
     } catch (error) {
       setExternalAccountSubmitError(formatApiError(error, "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"));
       setExternalAccountSubmit("error");
@@ -503,6 +517,7 @@ export function PeoplePermissionsWorkspace({
         isPrimary: false,
       }));
       setAssignmentSubmit("idle");
+      setOpenFormDrawer(null);
     } catch (error) {
       setAssignmentSubmitError(formatApiError(error, "保存失败，请检查是否重复分配或项目点是否有效。"));
       setAssignmentSubmit("error");
@@ -527,13 +542,26 @@ export function PeoplePermissionsWorkspace({
     </div>
   );
 
+  const activeFormAction = canManage ? peopleFormActions[activeTab] : undefined;
   const tabs = (
-    <SegmentedTabs
-      items={peoplePermissionsTabs}
-      activeKey={activeTab}
-      onChange={setActiveTab}
-      ariaLabel="人员权限分区"
-    />
+    <>
+      <SegmentedTabs
+        items={peoplePermissionsTabs}
+        activeKey={activeTab}
+        onChange={(nextTab) => {
+          setActiveTab(nextTab);
+          setOpenFormDrawer(null);
+        }}
+        ariaLabel="人员权限分区"
+      />
+      {activeFormAction ? (
+        <div className="workspace-primary-actions">
+          <button type="button" onClick={() => setOpenFormDrawer(activeFormAction.drawer)}>
+            {activeFormAction.label}
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 
   return (
@@ -564,18 +592,6 @@ export function PeoplePermissionsWorkspace({
           {departmentStatus === "ready" && filteredDepartments.length === 0 ? <StateMessage text="暂无部门资料" /> : null}
           {departmentStatus === "ready" && filteredDepartments.length > 0 ? <DepartmentsTable departments={filteredDepartments} /> : null}
         </section>
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleDepartmentSubmit}>
-          <FormHeader title="新增部门" buttonText="保存部门" saving={departmentSubmit === "saving"} />
-          <label>
-            <span>部门编码</span>
-            <input required value={departmentForm.departmentCode} onChange={(event) => setDepartmentForm((current) => ({ ...current, departmentCode: event.target.value }))} />
-          </label>
-          <label>
-            <span>部门名称</span>
-            <input required value={departmentForm.name} onChange={(event) => setDepartmentForm((current) => ({ ...current, name: event.target.value }))} />
-          </label>
-          {departmentSubmit === "error" ? <p className="form-error">{departmentSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
-        </form> : null}
       </section>
       ) : null}
 
@@ -604,7 +620,135 @@ export function PeoplePermissionsWorkspace({
             />
           ) : null}
         </section>
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleExternalAccountSubmit}>
+      </section>
+      ) : null}
+
+      {activeTab === "employees" ? (
+      <section className="people-section-grid">
+        <section className="dashboard-panel table-panel">
+          <PanelTitle icon={<IdCard size={18} />} title="公司员工" />
+          {employeeStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载员工资料..." /> : null}
+          {employeeStatus === "error" ? <StateMessage text="员工资料加载失败" /> : null}
+          {employeeStatus === "ready" && filteredEmployees.length === 0 ? <StateMessage text="暂无员工资料" /> : null}
+          {employeeStatus === "ready" && filteredEmployees.length > 0 ? <EmployeesTable employees={filteredEmployees} /> : null}
+        </section>
+      </section>
+      ) : null}
+
+      {activeTab === "userAccounts" ? (
+      <section className="people-section-grid">
+        <section className="dashboard-panel table-panel">
+          <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
+          <p className="form-hint">总部内部账号按固定角色授权；项目点账号不混入普通用户账号操作区。</p>
+          {accountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载账号资料..." /> : null}
+          {accountStatus === "error" ? <StateMessage text="账号资料加载失败" /> : null}
+          {accountStatus === "ready" && filteredUserAccounts.length === 0 ? <StateMessage text="暂无账号资料" /> : null}
+          {accountStatus === "ready" && filteredUserAccounts.length > 0 ? <UserAccountsTable userAccounts={filteredUserAccounts} /> : null}
+        </section>
+      </section>
+      ) : null}
+
+      {activeTab === "assignments" ? (
+      <section className="people-section-grid">
+        <section className="dashboard-panel table-panel">
+          <PanelTitle icon={<MapPin size={18} />} title="项目点分配" />
+          {assignmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点分配..." /> : null}
+          {assignmentStatus === "error" ? <StateMessage text="项目点分配加载失败" /> : null}
+          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length === 0 ? (
+            <StateMessage text="暂无项目点分配" />
+          ) : null}
+          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length > 0 ? (
+            <ProjectSiteAssignmentsTable assignments={filteredProjectSiteAssignments} />
+          ) : null}
+        </section>
+      </section>
+      ) : null}
+
+      {activeTab === "permissions" ? (
+      <section className="dashboard-panel table-panel">
+        <PanelTitle icon={<ShieldCheck size={18} />} title="权限矩阵" />
+        <PermissionMatrix />
+      </section>
+      ) : null}
+
+      <FormDrawer title="新增部门" open={openFormDrawer === "departments"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleDepartmentSubmit}>
+          <FormHeader title="新增部门" buttonText="保存部门" saving={departmentSubmit === "saving"} />
+          <label>
+            <span>部门编码</span>
+            <input required value={departmentForm.departmentCode} onChange={(event) => setDepartmentForm((current) => ({ ...current, departmentCode: event.target.value }))} />
+          </label>
+          <label>
+            <span>部门名称</span>
+            <input required value={departmentForm.name} onChange={(event) => setDepartmentForm((current) => ({ ...current, name: event.target.value }))} />
+          </label>
+          {departmentSubmit === "error" ? <p className="form-error">{departmentSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
+        </form>
+      </FormDrawer>
+
+      <FormDrawer title="新增员工" open={openFormDrawer === "employees"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleEmployeeSubmit}>
+          <FormHeader title="新增员工" buttonText="保存员工" saving={employeeSubmit === "saving"} />
+          <label>
+            <span>员工编号</span>
+            <input required value={employeeForm.employeeNo} onChange={(event) => setEmployeeForm((current) => ({ ...current, employeeNo: event.target.value }))} />
+          </label>
+          <label>
+            <span>员工姓名</span>
+            <input required value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} />
+          </label>
+          <label>
+            <span>所属部门</span>
+            <select required value={employeeForm.departmentId} onChange={(event) => setEmployeeForm((current) => ({ ...current, departmentId: event.target.value }))}>
+              <option value="">请选择</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {employeeSubmit === "error" ? <p className="form-error">{employeeSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
+        </form>
+      </FormDrawer>
+
+      <FormDrawer title="新增账号" open={openFormDrawer === "userAccounts"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleAccountSubmit}>
+          <FormHeader title="新增账号" buttonText="保存账号" saving={accountSubmit === "saving"} />
+          <label>
+            <span>绑定员工</span>
+            <select value={accountForm.employeeId ?? ""} onChange={(event) => setAccountForm((current) => ({ ...current, employeeId: event.target.value || null }))}>
+              <option value="">不绑定</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.employeeNo} {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>登录账号</span>
+            <input required value={accountForm.username} onChange={(event) => setAccountForm((current) => ({ ...current, username: event.target.value }))} />
+          </label>
+          <label>
+            <span>初始密码</span>
+            <input required type="password" value={accountForm.initialPassword} onChange={(event) => setAccountForm((current) => ({ ...current, initialPassword: event.target.value }))} />
+          </label>
+          <fieldset>
+            <legend>固定角色</legend>
+            {MVP_ROLES.map((role) => (
+              <label key={role.code} className="party-type-check">
+                <input type="checkbox" checked={(accountForm.roles ?? []).includes(role.code)} onChange={() => toggleRole(role.code)} />
+                <span>{role.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          {accountSubmit === "error" ? <p className="form-error">{accountSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
+        </form>
+      </FormDrawer>
+
+      <FormDrawer title="新增项目点账号" open={openFormDrawer === "externalAccounts"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleExternalAccountSubmit}>
           <FormHeader title="新增项目点账号" buttonText="保存项目点账号" saving={externalAccountSubmit === "saving"} />
           <p className="form-hint">一个项目点最多一个当前有效项目点账号；更换项目经理建议停用旧账号并创建新账号。</p>
           <label>
@@ -681,104 +825,11 @@ export function PeoplePermissionsWorkspace({
             />
           </label>
           {externalAccountSubmit === "error" ? <p className="form-error">{externalAccountSubmitError || "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"}</p> : null}
-        </form> : null}
-      </section>
-      ) : null}
+        </form>
+      </FormDrawer>
 
-      {activeTab === "employees" ? (
-      <section className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<IdCard size={18} />} title="公司员工" />
-          {employeeStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载员工资料..." /> : null}
-          {employeeStatus === "error" ? <StateMessage text="员工资料加载失败" /> : null}
-          {employeeStatus === "ready" && filteredEmployees.length === 0 ? <StateMessage text="暂无员工资料" /> : null}
-          {employeeStatus === "ready" && filteredEmployees.length > 0 ? <EmployeesTable employees={filteredEmployees} /> : null}
-        </section>
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleEmployeeSubmit}>
-          <FormHeader title="新增员工" buttonText="保存员工" saving={employeeSubmit === "saving"} />
-          <label>
-            <span>员工编号</span>
-            <input required value={employeeForm.employeeNo} onChange={(event) => setEmployeeForm((current) => ({ ...current, employeeNo: event.target.value }))} />
-          </label>
-          <label>
-            <span>员工姓名</span>
-            <input required value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} />
-          </label>
-          <label>
-            <span>所属部门</span>
-            <select required value={employeeForm.departmentId} onChange={(event) => setEmployeeForm((current) => ({ ...current, departmentId: event.target.value }))}>
-              <option value="">请选择</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {employeeSubmit === "error" ? <p className="form-error">{employeeSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
-        </form> : null}
-      </section>
-      ) : null}
-
-      {activeTab === "userAccounts" ? (
-      <section className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
-          <p className="form-hint">总部内部账号按固定角色授权；项目点账号不混入普通用户账号操作区。</p>
-          {accountStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载账号资料..." /> : null}
-          {accountStatus === "error" ? <StateMessage text="账号资料加载失败" /> : null}
-          {accountStatus === "ready" && filteredUserAccounts.length === 0 ? <StateMessage text="暂无账号资料" /> : null}
-          {accountStatus === "ready" && filteredUserAccounts.length > 0 ? <UserAccountsTable userAccounts={filteredUserAccounts} /> : null}
-        </section>
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAccountSubmit}>
-          <FormHeader title="新增账号" buttonText="保存账号" saving={accountSubmit === "saving"} />
-          <label>
-            <span>绑定员工</span>
-            <select value={accountForm.employeeId ?? ""} onChange={(event) => setAccountForm((current) => ({ ...current, employeeId: event.target.value || null }))}>
-              <option value="">不绑定</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.employeeNo} {employee.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>登录账号</span>
-            <input required value={accountForm.username} onChange={(event) => setAccountForm((current) => ({ ...current, username: event.target.value }))} />
-          </label>
-          <label>
-            <span>初始密码</span>
-            <input required type="password" value={accountForm.initialPassword} onChange={(event) => setAccountForm((current) => ({ ...current, initialPassword: event.target.value }))} />
-          </label>
-          <fieldset>
-            <legend>固定角色</legend>
-            {MVP_ROLES.map((role) => (
-              <label key={role.code} className="party-type-check">
-                <input type="checkbox" checked={(accountForm.roles ?? []).includes(role.code)} onChange={() => toggleRole(role.code)} />
-                <span>{role.label}</span>
-              </label>
-            ))}
-          </fieldset>
-          {accountSubmit === "error" ? <p className="form-error">{accountSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
-        </form> : null}
-      </section>
-      ) : null}
-
-      {activeTab === "assignments" ? (
-      <section className="people-section-grid">
-        <section className="dashboard-panel table-panel">
-          <PanelTitle icon={<MapPin size={18} />} title="项目点分配" />
-          {assignmentStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载项目点分配..." /> : null}
-          {assignmentStatus === "error" ? <StateMessage text="项目点分配加载失败" /> : null}
-          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length === 0 ? (
-            <StateMessage text="暂无项目点分配" />
-          ) : null}
-          {assignmentStatus === "ready" && filteredProjectSiteAssignments.length > 0 ? (
-            <ProjectSiteAssignmentsTable assignments={filteredProjectSiteAssignments} />
-          ) : null}
-        </section>
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleAssignmentSubmit}>
+      <FormDrawer title="新增项目点分配" open={openFormDrawer === "assignments"} onClose={() => setOpenFormDrawer(null)}>
+        <form className="dashboard-panel party-form" onSubmit={handleAssignmentSubmit}>
           <FormHeader title="新增项目点分配" buttonText="保存分配" saving={assignmentSubmit === "saving"} />
           <label>
             <span>员工</span>
@@ -843,16 +894,8 @@ export function PeoplePermissionsWorkspace({
             <span>设为主项目点</span>
           </label>
           {assignmentSubmit === "error" ? <p className="form-error">{assignmentSubmitError || "保存失败，请检查是否重复分配或项目点是否有效。"}</p> : null}
-        </form> : null}
-      </section>
-      ) : null}
-
-      {activeTab === "permissions" ? (
-      <section className="dashboard-panel table-panel">
-        <PanelTitle icon={<ShieldCheck size={18} />} title="权限矩阵" />
-        <PermissionMatrix />
-      </section>
-      ) : null}
+        </form>
+      </FormDrawer>
       </section>
     </WorkspaceScaffold>
   );
