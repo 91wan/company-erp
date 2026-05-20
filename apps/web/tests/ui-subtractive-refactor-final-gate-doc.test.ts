@@ -86,4 +86,21 @@ describe("UI subtractive refactor final gate", () => {
     expect(legacyCss).not.toMatch(/\.dashboard-grid\s*\{/);
     expect(legacyCss).not.toMatch(/\.project-site-action-bar\s*\{/);
   });
+
+  it("keeps remaining business workspaces on the shared scaffold instead of local page headers", () => {
+    const scaffoldedFiles = [
+      "apps/web/src/components/PartiesWorkspace.tsx",
+      "apps/web/src/components/MaterialsWarehousesWorkspace.tsx",
+      "apps/web/src/components/BusinessProjectsWorkspace.tsx",
+      "apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx",
+    ];
+
+    for (const file of scaffoldedFiles) {
+      const content = read(file);
+
+      expect(content, file).toContain("WorkspaceScaffold");
+      expect(content, file).not.toContain("<PageHeader");
+      expect(content, file).not.toMatch(/import\s+\{[^}]*PageHeader/);
+    }
+  });
 });
