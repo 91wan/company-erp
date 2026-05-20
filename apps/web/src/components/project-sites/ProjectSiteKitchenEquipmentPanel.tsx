@@ -3,7 +3,7 @@ import type {
   ProjectSiteKitchenEquipmentChangeRequestDto,
   ProjectSiteKitchenEquipmentDto,
 } from "@company-erp/shared";
-import { DataTable, DetailDrawer, EmptyState, SectionCard } from "../ui";
+import { ConfirmAction, DataTable, DetailDrawer, EmptyState, SectionCard } from "../ui";
 
 export function ProjectSiteKitchenEquipmentPanel({
   kitchenEquipment,
@@ -73,45 +73,35 @@ export function ProjectSiteKitchenEquipmentPanel({
               : [
                   request.reviewStatus === "pending" ? (
                     <div className="table-actions" key={request.id}>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPendingReview({ id: request.id, reviewStatus: "approved" });
-                        }}
-                      >
-                        通过
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPendingReview({ id: request.id, reviewStatus: "rejected" });
-                        }}
-                      >
-                        驳回
-                      </button>
-                      {pendingReview?.id === request.id ? (
-                        <div
-                          className="inline-confirm-actions"
-                          aria-label={`确认${pendingReview.reviewStatus === "approved" ? "通过" : "驳回"} ${request.equipmentName}`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <span>确认{pendingReview.reviewStatus === "approved" ? "通过" : "驳回"}？</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onReviewChangeRequest(request.id, pendingReview.reviewStatus);
-                              setPendingReview(null);
-                            }}
-                          >
-                            确认{pendingReview.reviewStatus === "approved" ? "通过" : "驳回"}
-                          </button>
-                          <button type="button" onClick={() => setPendingReview(null)}>
-                            取消
-                          </button>
-                        </div>
-                      ) : null}
+                      <span onClick={(event) => event.stopPropagation()}>
+                        <ConfirmAction
+                          actionLabel="通过"
+                          confirmationText={`确认通过 ${request.equipmentName}？`}
+                          confirmLabel="确认通过"
+                          confirming={pendingReview?.id === request.id && pendingReview.reviewStatus === "approved"}
+                          onRequestConfirm={() => setPendingReview({ id: request.id, reviewStatus: "approved" })}
+                          onCancel={() => setPendingReview(null)}
+                          onConfirm={() => {
+                            onReviewChangeRequest(request.id, "approved");
+                            setPendingReview(null);
+                          }}
+                        />
+                      </span>
+                      <span onClick={(event) => event.stopPropagation()}>
+                        <ConfirmAction
+                          actionLabel="驳回"
+                          confirmationText={`确认驳回 ${request.equipmentName}？`}
+                          confirmLabel="确认驳回"
+                          danger
+                          confirming={pendingReview?.id === request.id && pendingReview.reviewStatus === "rejected"}
+                          onRequestConfirm={() => setPendingReview({ id: request.id, reviewStatus: "rejected" })}
+                          onCancel={() => setPendingReview(null)}
+                          onConfirm={() => {
+                            onReviewChangeRequest(request.id, "rejected");
+                            setPendingReview(null);
+                          }}
+                        />
+                      </span>
                     </div>
                   ) : "-",
                 ]),

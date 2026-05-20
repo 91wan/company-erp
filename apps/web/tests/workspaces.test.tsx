@@ -363,12 +363,12 @@ describe("Company ERP workspace components", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     fireEvent.click(screen.getByRole("button", { name: "停用" }));
-    expect(screen.getByText("确认停用？")).toBeInTheDocument();
+    expect(screen.getByText("确认停用 site-manager？")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "确认停用" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
-    expect(screen.queryByText("确认停用？")).not.toBeInTheDocument();
+    expect(screen.queryByText("确认停用 site-manager？")).not.toBeInTheDocument();
   });
 
   it("renders purchase request and purchase record workspace data", async () => {
@@ -1355,9 +1355,9 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
     expect(reviewKitchenEquipmentChangeRequest).not.toHaveBeenCalled();
-    expect(screen.getByText("确认通过？")).toBeInTheDocument();
+    expect(screen.getByText("确认通过 六门冰柜？")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
-    expect(screen.queryByText("确认通过？")).not.toBeInTheDocument();
+    expect(screen.queryByText("确认通过 六门冰柜？")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
     fireEvent.click(screen.getByRole("button", { name: "确认通过" }));
 
