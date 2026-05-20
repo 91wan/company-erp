@@ -11,6 +11,7 @@ describe("NAS pilot evidence checklist", () => {
     expect(audit).toContain("可进入 NAS 内网试点");
     expect(audit).toContain("不是正式合规档案系统全面上线");
     expect(audit).toContain("npm run pilot:verify-local");
+    expect(audit).toContain("--evidence-dir");
     expect(audit).toContain("npm run preflight:nas");
     expect(audit).toContain("backup restore drill");
     expect(audit).toContain("attachments:legacy-report");
