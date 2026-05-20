@@ -27,6 +27,6 @@ describe("DashboardMetricStrip", () => {
 
     fireEvent.click(riskButton);
 
-    expect(onNavigate).toHaveBeenCalledWith("证照资质");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "证照资质", tab: "risk" });
   });
 });

@@ -10,6 +10,13 @@ import type { ExternalProjectSitePortalSection } from "../project-sites/External
 
 export type WorkspaceKey = (typeof navigationItems)[number]["workspace"] | "系统设置";
 
+export type NavigationIntent = {
+  workspace: WorkspaceKey;
+  tab?: string;
+  portalSection?: ExternalProjectSitePortalSection;
+  entityId?: string;
+};
+
 export function isExternalProjectSiteUser(currentUser: AuthenticatedUserDto): boolean {
   return currentUser.roles.includes("external_project_site");
 }
@@ -32,7 +39,7 @@ export function isReadOnlyUser(currentUser: AuthenticatedUserDto): boolean {
 }
 
 export function workspaceForExternalPortalSection(section: ExternalProjectSitePortalSection): WorkspaceKey {
-  void section;
+  if (section === "rosterHealth" || section === "foodLicense") return "证照资质";
   return "项目点";
 }
 
@@ -60,9 +67,14 @@ export function resolveNavigationSelection(item: NavigationItem): {
 } {
   if (item.portalSection) {
     return {
-      workspace: workspaceForExternalPortalSection(item.portalSection),
+      workspace: item.workspace as WorkspaceKey,
       portalSection: item.portalSection,
     };
   }
   return { workspace: item.workspace as WorkspaceKey };
+}
+
+export function normalizeNavigationIntent(intent: WorkspaceKey | NavigationIntent): NavigationIntent {
+  if (typeof intent === "string") return { workspace: intent };
+  return intent;
 }

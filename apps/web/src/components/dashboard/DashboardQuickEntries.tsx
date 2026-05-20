@@ -1,21 +1,21 @@
 import { SectionCard, SummaryCard } from "../ui";
-import type { DashboardWorkspaceKey } from "./DashboardHeader";
+import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 
 type QuickEntry = {
   label: string;
   detail: string;
-  target: DashboardWorkspaceKey;
+  target: NavigationIntent;
   tone: "info" | "success" | "warning" | "danger";
 };
 
 const quickEntries: QuickEntry[] = [
-  { label: "新建采购需求", detail: "进入采购工作区登记需求", target: "采购", tone: "info" },
-  { label: "新建项目点", detail: "进入项目点台账维护", target: "项目点", tone: "success" },
-  { label: "提交证照", detail: "进入证照资质台账", target: "证照资质", tone: "warning" },
-  { label: "查看低库存", detail: "进入库存风险列表", target: "库存", tone: "danger" },
+  { label: "新建采购需求", detail: "进入采购工作区登记需求", target: { workspace: "采购", tab: "requests" }, tone: "info" },
+  { label: "新建项目点", detail: "进入项目点台账维护", target: { workspace: "项目点", tab: "risk" }, tone: "success" },
+  { label: "提交证照", detail: "进入证照资质台账", target: { workspace: "证照资质", tab: "risk" }, tone: "warning" },
+  { label: "查看低库存", detail: "进入库存风险列表", target: { workspace: "库存", tab: "risk" }, tone: "danger" },
 ];
 
-export function DashboardQuickEntries({ onNavigate }: { onNavigate: (workspace: DashboardWorkspaceKey) => void }) {
+export function DashboardQuickEntries({ onNavigate }: { onNavigate: (intent: NavigationIntent) => void }) {
   return (
     <SectionCard title="快捷入口">
       <div className="quick-entry-grid">

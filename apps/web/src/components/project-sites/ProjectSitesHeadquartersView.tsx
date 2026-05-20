@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
   PROJECT_USAGE_STATUSES,
@@ -116,18 +116,23 @@ export type ProjectSitesHeadquartersViewProps = {
   onReviewKitchenEquipmentChangeRequest: (id: string, reviewStatus: "approved" | "rejected") => Promise<void>;
   loadAttachments: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   getAttachmentDownloadUrl: (id: string) => Promise<string>;
+  initialTab?: string;
 };
 
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
-type HeadquartersTab = "risk" | "usage" | "equipment" | "investment" | "review";
+export type ProjectSitesHeadquartersTab = "risk" | "usage" | "equipment" | "investment" | "review";
 
-const headquartersTabs: { key: HeadquartersTab; label: string }[] = [
+const headquartersTabs: { key: ProjectSitesHeadquartersTab; label: string }[] = [
   { key: "risk", label: "风险台账" },
   { key: "usage", label: "物料领用" },
   { key: "equipment", label: "厨房设备" },
   { key: "investment", label: "投入合同" },
   { key: "review", label: "资料审核" },
 ];
+
+export function isProjectSitesHeadquartersTab(value: string | undefined): value is ProjectSitesHeadquartersTab {
+  return headquartersTabs.some((tab) => tab.key === value);
+}
 
 export function ProjectSitesHeadquartersView({
   sites,
@@ -203,8 +208,14 @@ export function ProjectSitesHeadquartersView({
   onReviewKitchenEquipmentChangeRequest,
   loadAttachments,
   getAttachmentDownloadUrl,
+  initialTab,
 }: ProjectSitesHeadquartersViewProps) {
-  const [activeTab, setActiveTab] = useState<HeadquartersTab>("risk");
+  const [activeTab, setActiveTab] = useState<ProjectSitesHeadquartersTab>(
+    isProjectSitesHeadquartersTab(initialTab) ? initialTab : "risk",
+  );
+  useEffect(() => {
+    if (isProjectSitesHeadquartersTab(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
   const tabActions = (
     <div className="workspace-primary-actions" aria-label="当前分区操作">
       {activeTab === "risk" && canEditSites ? <button type="button" onClick={() => onOpenForm("site")}>新增项目点</button> : null}

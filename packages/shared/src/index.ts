@@ -92,6 +92,7 @@ export type DashboardSummaryItemDto = {
   statusLabel?: string | null;
   tone: DashboardSummaryItemTone;
   targetWorkspace: string;
+  targetTab?: string | null;
   updatedAt?: string | null;
 };
 

@@ -1,22 +1,12 @@
 import type { AuthenticatedUserDto } from "@company-erp/shared";
 import { workflowSteps } from "../../dashboardData";
+import type { NavigationIntent, WorkspaceKey } from "../shell/dashboardShellNavigation";
 
-export type DashboardWorkspaceKey =
-  | "总览"
-  | "基础资料"
-  | "采购"
-  | "库存"
-  | "合同"
-  | "业务项目"
-  | "证照资质"
-  | "项目点"
-  | "人员权限"
-  | "Excel 导入"
-  | "系统设置";
+export type DashboardWorkspaceKey = WorkspaceKey;
 
 type DashboardHeaderProps = {
   currentUser: AuthenticatedUserDto;
-  onNavigate: (workspace: DashboardWorkspaceKey) => void;
+  onNavigate: (intent: NavigationIntent) => void;
 };
 
 export function DashboardHeader({
@@ -51,11 +41,18 @@ export function DashboardHeader({
   );
 }
 
-export function dashboardTarget(label: string): DashboardWorkspaceKey {
-  if (/证照|资质|临期|红色风险|待审核资料/.test(label)) return "证照资质";
-  if (/合同/.test(label)) return "合同";
-  if (/入库|库存/.test(label)) return "库存";
-  if (/项目点|领用/.test(label)) return "项目点";
-  if (/系统|数据库|API|附件|版本/.test(label)) return "系统设置";
-  return "采购";
+export function dashboardTarget(label: string): NavigationIntent {
+  if (/食品经营许可证/.test(label)) return { workspace: "证照资质", tab: "food" };
+  if (/健康证/.test(label)) return { workspace: "证照资质", tab: "health" };
+  if (/待审核资料/.test(label)) return { workspace: "证照资质", tab: "review" };
+  if (/证照|资质|临期|红色风险/.test(label)) return { workspace: "证照资质", tab: "risk" };
+  if (/合同/.test(label)) return { workspace: "合同", tab: "risk" };
+  if (/入库/.test(label)) return { workspace: "库存", tab: "inbound" };
+  if (/库存|低库存/.test(label)) return { workspace: "库存", tab: "risk" };
+  if (/项目点领用|领用/.test(label)) return { workspace: "项目点", tab: "usage" };
+  if (/项目点/.test(label)) return { workspace: "项目点", tab: "risk" };
+  if (/系统|数据库|API|附件|版本/.test(label)) return { workspace: "系统设置" };
+  if (/采购执行/.test(label)) return { workspace: "采购", tab: "records" };
+  if (/采购需求|待审批/.test(label)) return { workspace: "采购", tab: "todo" };
+  return { workspace: "采购", tab: "todo" };
 }

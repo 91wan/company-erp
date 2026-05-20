@@ -14,7 +14,7 @@ describe("DashboardRecentActivities", () => {
             owner: "王采购",
             status: "采购中",
             updatedAt: "2026-05-11 10:00",
-            target: "采购",
+            target: { workspace: "采购", tab: "records" },
           },
         ]}
         onNavigate={onNavigate}
@@ -26,6 +26,6 @@ describe("DashboardRecentActivities", () => {
 
     fireEvent.click(screen.getByRole("cell", { name: "采购 PO20260511001" }));
 
-    expect(onNavigate).toHaveBeenCalledWith("采购");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "采购", tab: "records" });
   });
 });

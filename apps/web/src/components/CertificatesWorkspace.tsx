@@ -47,6 +47,7 @@ type CertificatesWorkspaceProps = {
   allowedOwnerTypes?: readonly CertificateOwnerTypeCode[];
   allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
   portalSection?: ExternalProjectSitePortalSection;
+  initialTab?: string;
 };
 
 type CertificateFormState = {
@@ -78,6 +79,16 @@ const certificateTabs: { key: CertificateTab; label: string }[] = [
   { key: "food", label: "食品经营许可证" },
   { key: "other", label: "其他资质" },
 ];
+
+function isCertificateTab(value: string | undefined): value is CertificateTab {
+  return certificateTabs.some((tab) => tab.key === value);
+}
+
+function tabForPortalSection(section: ExternalProjectSitePortalSection | undefined): CertificateTab {
+  if (section === "foodLicense") return "food";
+  if (section === "rosterHealth") return "health";
+  return "risk";
+}
 
 const certificatePortalCopy: Partial<Record<ExternalProjectSitePortalSection, { title: string; description: string }>> = {
   rosterHealth: {
@@ -163,6 +174,7 @@ export function CertificatesWorkspace({
   allowedOwnerTypes,
   allowedPersonOwnerSources,
   portalSection,
+  initialTab,
 }: CertificatesWorkspaceProps) {
   const ownerTypeOptions = useMemo(
     () => CERTIFICATE_OWNER_TYPES.filter((item) => !allowedOwnerTypes || allowedOwnerTypes.includes(item.code)),
@@ -193,8 +205,14 @@ export function CertificatesWorkspace({
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<CertificateFormState>(() => createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
-  const [activeTab, setActiveTab] = useState<CertificateTab>(portalSection === "foodLicense" ? "food" : portalSection === "rosterHealth" ? "health" : "risk");
+  const [activeTab, setActiveTab] = useState<CertificateTab>(
+    isCertificateTab(initialTab) ? initialTab : tabForPortalSection(portalSection),
+  );
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(isCertificateTab(initialTab) ? initialTab : tabForPortalSection(portalSection));
+  }, [initialTab, portalSection]);
 
   useEffect(() => {
     if (!portalOwnerType || !ownerTypeOptions.some((item) => item.code === portalOwnerType)) return;

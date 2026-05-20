@@ -80,6 +80,7 @@ function item(input: Omit<DashboardSummaryItemDto, "id"> & { id?: string }): Das
     statusLabel: input.statusLabel ?? null,
     tone: input.tone,
     targetWorkspace: input.targetWorkspace,
+    targetTab: input.targetTab ?? null,
     updatedAt: input.updatedAt ?? null,
   };
 }
@@ -105,6 +106,7 @@ function procurementTodosFrom(requests: readonly PurchaseRequestDto[]): Dashboar
         statusLabel: "待审批",
         tone: "info",
         targetWorkspace: "采购",
+        targetTab: "todo",
         updatedAt: request.updatedAt,
       }),
     );
@@ -123,6 +125,7 @@ function projectUsageTodosFrom(requests: readonly ProjectUsageRequestDto[]): Das
         statusLabel: request.status === "pending" ? "待处理" : "待出库",
         tone: "info",
         targetWorkspace: "项目点",
+        targetTab: "usage",
         updatedAt: request.updatedAt,
       }),
     );
@@ -147,6 +150,7 @@ function certificateRisksFrom(certificates: readonly CertificateRecordDto[]): Da
         statusLabel: isExpired ? "已过期" : isExpiring ? "即将到期" : "待审核",
         tone: isExpired ? "danger" : isExpiring ? "warning" : "info",
         targetWorkspace: "证照资质",
+        targetTab: certificate.certificateType === "food_operation_license" ? "food" : certificate.certificateType === "person_health_cert" ? "health" : "risk",
         updatedAt: certificate.updatedAt,
       });
     });
@@ -165,6 +169,7 @@ function contractRisksFrom(contracts: readonly ContractDto[]): DashboardSummaryI
         statusLabel: contract.expiryState === "expired" ? "已到期" : "30 天内到期",
         tone: contract.expiryState === "expired" ? "danger" : "warning",
         targetWorkspace: "合同",
+        targetTab: "risk",
         updatedAt: contract.updatedAt,
       }),
     );
@@ -184,6 +189,7 @@ function projectSiteComplianceRisksFrom(summaries: readonly ProjectSiteComplianc
         statusLabel: summary.blockingIssueCount > 0 ? "红色风险" : "黄色预警",
         tone: summary.blockingIssueCount > 0 ? "danger" : "warning",
         targetWorkspace: "项目点",
+        targetTab: "risk",
         updatedAt: summary.generatedAt,
       }),
     );
@@ -202,6 +208,7 @@ function lowStockItemsFrom(balances: readonly InventoryBalanceDto[]): DashboardS
         statusLabel: "低库存",
         tone: "danger",
         targetWorkspace: "库存",
+        targetTab: "risk",
         updatedAt: balance.lastMovementAt,
       }),
     );
@@ -223,6 +230,7 @@ function recentActivitiesFrom(input: {
         statusLabel: "最近采购",
         tone: "neutral",
         targetWorkspace: "采购",
+        targetTab: "records",
         updatedAt: record.updatedAt,
       }),
     ),
@@ -235,6 +243,7 @@ function recentActivitiesFrom(input: {
         statusLabel: "最近入库",
         tone: "neutral",
         targetWorkspace: "库存",
+        targetTab: movement.movementType === "outbound" || movement.movementType === "adjustment_out" ? "outbound" : "inbound",
         updatedAt: movement.updatedAt,
       }),
     ),
@@ -247,6 +256,7 @@ function recentActivitiesFrom(input: {
         statusLabel: "最近领用",
         tone: "neutral",
         targetWorkspace: "项目点",
+        targetTab: "usage",
         updatedAt: request.updatedAt,
       }),
     ),
@@ -259,6 +269,7 @@ function recentActivitiesFrom(input: {
         statusLabel: "最近证照",
         tone: "neutral",
         targetWorkspace: "证照资质",
+        targetTab: certificate.certificateType === "food_operation_license" ? "food" : certificate.certificateType === "person_health_cert" ? "health" : "risk",
         updatedAt: certificate.updatedAt,
       }),
     ),

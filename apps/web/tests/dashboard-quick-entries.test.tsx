@@ -14,6 +14,6 @@ describe("DashboardQuickEntries", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /查看低库存/ }));
 
-    expect(onNavigate).toHaveBeenCalledWith("库存");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "库存", tab: "risk" });
   });
 });

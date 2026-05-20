@@ -19,9 +19,9 @@ describe("DashboardHeader", () => {
     render(<DashboardHeader currentUser={adminUser} onNavigate={onNavigate} />);
 
     fireEvent.click(screen.getByRole("button", { name: /库存/ }));
-    expect(onNavigate).toHaveBeenCalledWith("库存");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "库存", tab: "risk" });
 
     fireEvent.click(screen.getByRole("button", { name: /项目点/ }));
-    expect(onNavigate).toHaveBeenCalledWith("项目点");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "项目点", tab: "usage" });
   });
 });

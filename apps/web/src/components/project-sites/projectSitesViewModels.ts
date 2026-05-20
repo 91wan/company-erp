@@ -94,6 +94,7 @@ export type HeadquartersViewModelInput = {
     | "onReviewKitchenEquipmentChangeRequest"
   >;
   attachments: Pick<ProjectSitesHeadquartersViewProps, "loadAttachments" | "getAttachmentDownloadUrl">;
+  navigation?: Pick<ProjectSitesHeadquartersViewProps, "initialTab">;
 };
 
 type ExternalMetrics = Pick<
@@ -192,6 +193,7 @@ export function buildProjectSitesHeadquartersViewProps(
     ...input.submit,
     ...input.handlers,
     ...input.attachments,
+    ...input.navigation,
     onMaterialChange: input.model.updateSelectedMaterial,
   };
 }

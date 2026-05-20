@@ -24,6 +24,7 @@ type InventoryWorkspaceProps = {
   loadEmployees?: () => Promise<EmployeeDto[]>;
   canManage?: boolean;
   showBalances?: boolean;
+  initialTab?: string;
 };
 
 type MovementFormState = {
@@ -49,6 +50,10 @@ const inventoryTabs: { key: InventoryTab; label: string }[] = [
   { key: "outbound", label: "出库流水" },
   { key: "replenishment", label: "补货建议" },
 ];
+
+function isInventoryTab(value: string | undefined): value is InventoryTab {
+  return inventoryTabs.some((tab) => tab.key === value);
+}
 
 const movementTypeLabel = new Map(INVENTORY_MOVEMENT_TYPES.map((movementType) => [movementType.code, movementType.label]));
 const sourceTypeLabel = new Map(INVENTORY_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
@@ -105,6 +110,7 @@ export function InventoryWorkspace({
   loadEmployees = defaultLoadEmployees,
   canManage = true,
   showBalances = true,
+  initialTab,
 }: InventoryWorkspaceProps) {
   const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
   const [balances, setBalances] = useState<InventoryBalanceDto[]>([]);
@@ -118,7 +124,7 @@ export function InventoryWorkspace({
   const [movementFilter, setMovementFilter] = useState<"all" | InventoryMovementTypeCode>("all");
   const [selectedMovementId, setSelectedMovementId] = useState("");
   const [selectedBalanceKey, setSelectedBalanceKey] = useState("");
-  const [activeTab, setActiveTab] = useState<InventoryTab>("risk");
+  const [activeTab, setActiveTab] = useState<InventoryTab>(isInventoryTab(initialTab) ? initialTab : "risk");
   const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [submitError, setSubmitError] = useState("");
@@ -136,6 +142,10 @@ export function InventoryWorkspace({
     handledBy: "",
     remark: "",
   });
+
+  useEffect(() => {
+    if (isInventoryTab(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     let mounted = true;

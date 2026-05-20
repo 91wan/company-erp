@@ -34,6 +34,7 @@ type ContractsWorkspaceProps = {
   loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   getUnifiedAttachmentDownloadUrl?: (id: string) => Promise<string>;
   canManage?: boolean;
+  initialTab?: string;
 };
 
 type ContractFormState = {
@@ -66,6 +67,10 @@ const contractTabs: { key: ContractTab; label: string }[] = [
   { key: "attachments", label: "附件" },
   { key: "archive", label: "归档" },
 ];
+
+function isContractTab(value: string | undefined): value is ContractTab {
+  return contractTabs.some((tab) => tab.key === value);
+}
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
 const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
@@ -109,6 +114,7 @@ export function ContractsWorkspace({
   loadUnifiedAttachments = getAttachments,
   getUnifiedAttachmentDownloadUrl = getAttachmentDownloadUrl,
   canManage = true,
+  initialTab,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
@@ -122,7 +128,7 @@ export function ContractsWorkspace({
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
-  const [activeTab, setActiveTab] = useState<ContractTab>("risk");
+  const [activeTab, setActiveTab] = useState<ContractTab>(isContractTab(initialTab) ? initialTab : "risk");
   const [selectedContractId, setSelectedContractId] = useState("");
   const [contractForm, setContractForm] = useState<ContractFormState>({
     contractNo: "",
@@ -143,6 +149,10 @@ export function ContractsWorkspace({
     attachmentRef: "",
     remark: "",
   });
+
+  useEffect(() => {
+    if (isContractTab(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     let mounted = true;
