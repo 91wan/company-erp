@@ -24,6 +24,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
 import {
+  FormDrawer,
   SectionCard,
   SegmentedTabs,
   StatusBadge,
@@ -42,6 +43,7 @@ type MaterialsWarehousesWorkspaceProps = {
 };
 
 type MaterialsWarehousesTab = "materials" | "warehouses";
+type MaterialsWarehousesFormDrawer = MaterialsWarehousesTab | null;
 
 const materialsWarehousesTabs: TabItem<MaterialsWarehousesTab>[] = [
   { key: "materials", label: "物料" },
@@ -125,6 +127,8 @@ export function MaterialsWarehousesWorkspace({
   const [warehouseSubmitState, setWarehouseSubmitState] = useState<
     "idle" | "saving" | "error"
   >("idle");
+  const [openFormDrawer, setOpenFormDrawer] =
+    useState<MaterialsWarehousesFormDrawer>(null);
   const [materialForm, setMaterialForm] = useState<CreateMaterialInput>({
     materialCode: "",
     materialName: "",
@@ -240,6 +244,7 @@ export function MaterialsWarehousesWorkspace({
         isConsumable: false,
         status: "enabled",
       });
+      setOpenFormDrawer(null);
       setMaterialSubmitState("idle");
     } catch {
       setMaterialSubmitState("error");
@@ -262,6 +267,7 @@ export function MaterialsWarehousesWorkspace({
         warehouseType: "headquarters",
         status: "enabled",
       });
+      setOpenFormDrawer(null);
       setWarehouseSubmitState("idle");
     } catch {
       setWarehouseSubmitState("error");
@@ -294,12 +300,24 @@ export function MaterialsWarehousesWorkspace({
   );
 
   const tabs = (
-    <SegmentedTabs
-      items={materialsWarehousesTabs}
-      activeKey={activeTab}
-      onChange={setActiveTab}
-      ariaLabel="物料仓库分区"
-    />
+    <>
+      <SegmentedTabs
+        items={materialsWarehousesTabs}
+        activeKey={activeTab}
+        onChange={(nextTab) => {
+          setActiveTab(nextTab);
+          setOpenFormDrawer(null);
+        }}
+        ariaLabel="物料仓库分区"
+      />
+      {canManage ? (
+        <div className="workspace-primary-actions">
+          <button type="button" onClick={() => setOpenFormDrawer(activeTab)}>
+            {activeTab === "materials" ? "新增物料" : "新增仓库"}
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 
   return (
@@ -321,7 +339,7 @@ export function MaterialsWarehousesWorkspace({
         aria-label="物料和仓库基础资料"
       >
         {activeTab === "materials" ? (
-          <div className="parties-layout">
+          <>
             <SectionCard
               title="物料台账"
               action={<Boxes aria-hidden="true" size={17} />}
@@ -374,187 +392,11 @@ export function MaterialsWarehousesWorkspace({
                 <MaterialsTable materials={filteredMaterials} />
               ) : null}
             </SectionCard>
-
-            {canManage ? (
-              <form
-                className="dashboard-panel party-form"
-                onSubmit={handleMaterialSubmit}
-              >
-                <div className="panel-header">
-                  <h3>新增物料</h3>
-                  <button
-                    type="submit"
-                    disabled={materialSubmitState === "saving"}
-                  >
-                    <Save aria-hidden="true" size={15} />
-                    保存物料
-                  </button>
-                </div>
-
-                <label>
-                  <span>物料编码</span>
-                  <input
-                    required
-                    value={materialForm.materialCode}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        materialCode: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>物料名称</span>
-                  <input
-                    required
-                    value={materialForm.materialName}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        materialName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>物料类别</span>
-                  <select
-                    value={materialForm.materialCategory}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        materialCategory: event.target.value,
-                      }))
-                    }
-                  >
-                    {MATERIAL_CATEGORIES.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>基本单位</span>
-                  <input
-                    required
-                    value={materialForm.baseUnit}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        baseUnit: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <p className="form-hint">
-                  当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。
-                </p>
-                <label>
-                  <span>安全库存</span>
-                  <input
-                    min="0"
-                    type="number"
-                    value={materialForm.safeStock ?? ""}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        safeStock: event.target.value
-                          ? Number(event.target.value)
-                          : null,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="form-check-row">
-                  <input
-                    type="checkbox"
-                    checked={materialForm.isProjectSiteSaleEnabled ?? false}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        isProjectSiteSaleEnabled: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>项目点领用收费</span>
-                </label>
-                <label>
-                  <span>采购参考价</span>
-                  <input
-                    min="0"
-                    step="0.0001"
-                    type="number"
-                    value={materialForm.purchaseReferencePrice ?? ""}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        purchaseReferencePrice: event.target.value
-                          ? Number(event.target.value)
-                          : null,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>项目点收费价</span>
-                  <input
-                    min="0"
-                    step="0.0001"
-                    type="number"
-                    value={materialForm.projectSiteSalePrice ?? ""}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        projectSiteSalePrice: event.target.value
-                          ? Number(event.target.value)
-                          : null,
-                      }))
-                    }
-                  />
-                </label>
-                <p className="form-hint">
-                  金额单位固定为人民币元；物料领用和库存数量单位使用上方基本单位。
-                </p>
-                <label>
-                  <span>收费备注</span>
-                  <input
-                    value={materialForm.projectSiteSaleRemark ?? ""}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        projectSiteSaleRemark: event.target.value || null,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="form-check-row">
-                  <input
-                    type="checkbox"
-                    checked={materialForm.isConsumable ?? false}
-                    onChange={(event) =>
-                      setMaterialForm((current) => ({
-                        ...current,
-                        isConsumable: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>耗材</span>
-                </label>
-
-                {materialSubmitState === "error" ? (
-                  <p className="form-error">
-                    保存失败，请检查编码是否重复或稍后重试。
-                  </p>
-                ) : null}
-              </form>
-            ) : null}
-          </div>
+          </>
         ) : null}
 
         {activeTab === "warehouses" ? (
-          <div className="parties-layout">
+          <>
             <SectionCard
               title="仓库台账"
               action={<Warehouse aria-hidden="true" size={17} />}
@@ -591,106 +433,273 @@ export function MaterialsWarehousesWorkspace({
                 <WarehousesTable warehouses={filteredWarehouses} />
               ) : null}
             </SectionCard>
-
-            {canManage ? (
-              <form
-                className="dashboard-panel party-form"
-                onSubmit={handleWarehouseSubmit}
-              >
-                <div className="panel-header">
-                  <h3>新增仓库</h3>
-                  <button
-                    type="submit"
-                    disabled={warehouseSubmitState === "saving"}
-                  >
-                    <PackagePlus aria-hidden="true" size={15} />
-                    保存仓库
-                  </button>
-                </div>
-
-                <label>
-                  <span>仓库编码</span>
-                  <input
-                    required
-                    value={warehouseForm.warehouseCode}
-                    onChange={(event) =>
-                      setWarehouseForm((current) => ({
-                        ...current,
-                        warehouseCode: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>仓库名称</span>
-                  <input
-                    required
-                    value={warehouseForm.warehouseName}
-                    onChange={(event) =>
-                      setWarehouseForm((current) => ({
-                        ...current,
-                        warehouseName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>仓库类型</span>
-                  <select
-                    value={warehouseForm.warehouseType}
-                    onChange={(event) =>
-                      setWarehouseForm((current) => ({
-                        ...current,
-                        warehouseType: event.target
-                          .value as CreateWarehouseInput["warehouseType"],
-                      }))
-                    }
-                  >
-                    {WAREHOUSE_TYPES.map((warehouseType) => (
-                      <option
-                        key={warehouseType.code}
-                        value={warehouseType.code}
-                      >
-                        {warehouseType.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>负责人</span>
-                  <input
-                    value={warehouseForm.managerName ?? ""}
-                    onChange={(event) =>
-                      setWarehouseForm((current) => ({
-                        ...current,
-                        managerName: event.target.value || null,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>负责人电话</span>
-                  <input
-                    value={warehouseForm.managerPhone ?? ""}
-                    onChange={(event) =>
-                      setWarehouseForm((current) => ({
-                        ...current,
-                        managerPhone: event.target.value || null,
-                      }))
-                    }
-                  />
-                </label>
-
-                {warehouseSubmitState === "error" ? (
-                  <p className="form-error">
-                    保存失败，请检查编码是否重复或稍后重试。
-                  </p>
-                ) : null}
-              </form>
-            ) : null}
-          </div>
+          </>
         ) : null}
       </section>
+      <FormDrawer
+        title="新增物料"
+        open={openFormDrawer === "materials"}
+        onClose={() => setOpenFormDrawer(null)}
+      >
+        <form
+          className="dashboard-panel party-form"
+          onSubmit={handleMaterialSubmit}
+        >
+          <div className="panel-header">
+            <h3>新增物料</h3>
+            <button type="submit" disabled={materialSubmitState === "saving"}>
+              <Save aria-hidden="true" size={15} />
+              保存物料
+            </button>
+          </div>
+
+          <label>
+            <span>物料编码</span>
+            <input
+              required
+              value={materialForm.materialCode}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  materialCode: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>物料名称</span>
+            <input
+              required
+              value={materialForm.materialName}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  materialName: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>物料类别</span>
+            <select
+              value={materialForm.materialCategory}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  materialCategory: event.target.value,
+                }))
+              }
+            >
+              {MATERIAL_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>基本单位</span>
+            <input
+              required
+              value={materialForm.baseUnit}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  baseUnit: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <p className="form-hint">
+            当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。
+          </p>
+          <label>
+            <span>安全库存</span>
+            <input
+              min="0"
+              type="number"
+              value={materialForm.safeStock ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  safeStock: event.target.value ? Number(event.target.value) : null,
+                }))
+              }
+            />
+          </label>
+          <label className="form-check-row">
+            <input
+              type="checkbox"
+              checked={materialForm.isProjectSiteSaleEnabled ?? false}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  isProjectSiteSaleEnabled: event.target.checked,
+                }))
+              }
+            />
+            <span>项目点领用收费</span>
+          </label>
+          <label>
+            <span>采购参考价</span>
+            <input
+              min="0"
+              step="0.0001"
+              type="number"
+              value={materialForm.purchaseReferencePrice ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  purchaseReferencePrice: event.target.value
+                    ? Number(event.target.value)
+                    : null,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>项目点收费价</span>
+            <input
+              min="0"
+              step="0.0001"
+              type="number"
+              value={materialForm.projectSiteSalePrice ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  projectSiteSalePrice: event.target.value
+                    ? Number(event.target.value)
+                    : null,
+                }))
+              }
+            />
+          </label>
+          <p className="form-hint">
+            金额单位固定为人民币元；物料领用和库存数量单位使用上方基本单位。
+          </p>
+          <label>
+            <span>收费备注</span>
+            <input
+              value={materialForm.projectSiteSaleRemark ?? ""}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  projectSiteSaleRemark: event.target.value || null,
+                }))
+              }
+            />
+          </label>
+          <label className="form-check-row">
+            <input
+              type="checkbox"
+              checked={materialForm.isConsumable ?? false}
+              onChange={(event) =>
+                setMaterialForm((current) => ({
+                  ...current,
+                  isConsumable: event.target.checked,
+                }))
+              }
+            />
+            <span>耗材</span>
+          </label>
+
+          {materialSubmitState === "error" ? (
+            <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p>
+          ) : null}
+        </form>
+      </FormDrawer>
+      <FormDrawer
+        title="新增仓库"
+        open={openFormDrawer === "warehouses"}
+        onClose={() => setOpenFormDrawer(null)}
+      >
+        <form
+          className="dashboard-panel party-form"
+          onSubmit={handleWarehouseSubmit}
+        >
+          <div className="panel-header">
+            <h3>新增仓库</h3>
+            <button type="submit" disabled={warehouseSubmitState === "saving"}>
+              <PackagePlus aria-hidden="true" size={15} />
+              保存仓库
+            </button>
+          </div>
+
+          <label>
+            <span>仓库编码</span>
+            <input
+              required
+              value={warehouseForm.warehouseCode}
+              onChange={(event) =>
+                setWarehouseForm((current) => ({
+                  ...current,
+                  warehouseCode: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>仓库名称</span>
+            <input
+              required
+              value={warehouseForm.warehouseName}
+              onChange={(event) =>
+                setWarehouseForm((current) => ({
+                  ...current,
+                  warehouseName: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>仓库类型</span>
+            <select
+              value={warehouseForm.warehouseType}
+              onChange={(event) =>
+                setWarehouseForm((current) => ({
+                  ...current,
+                  warehouseType: event.target
+                    .value as CreateWarehouseInput["warehouseType"],
+                }))
+              }
+            >
+              {WAREHOUSE_TYPES.map((warehouseType) => (
+                <option key={warehouseType.code} value={warehouseType.code}>
+                  {warehouseType.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>负责人</span>
+            <input
+              value={warehouseForm.managerName ?? ""}
+              onChange={(event) =>
+                setWarehouseForm((current) => ({
+                  ...current,
+                  managerName: event.target.value || null,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>负责人电话</span>
+            <input
+              value={warehouseForm.managerPhone ?? ""}
+              onChange={(event) =>
+                setWarehouseForm((current) => ({
+                  ...current,
+                  managerPhone: event.target.value || null,
+                }))
+              }
+            />
+          </label>
+
+          {warehouseSubmitState === "error" ? (
+            <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p>
+          ) : null}
+        </form>
+      </FormDrawer>
     </WorkspaceScaffold>
   );
 }
@@ -702,16 +711,12 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
         <thead>
           <tr>
             <th>编码</th>
-            <th>名称</th>
-            <th>类别</th>
+            <th>名称/类别</th>
             <th>单位</th>
             <th>默认仓库</th>
-            <th>默认供应商</th>
-            <th>安全库存</th>
-            <th>项目点收费</th>
-            <th>耗材</th>
+            <th>库存口径</th>
+            <th>项目点计价</th>
             <th>状态</th>
-            <th>更新时间</th>
           </tr>
         </thead>
         <tbody>
@@ -720,16 +725,18 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
               <td>{material.materialCode}</td>
               <td>
                 <strong>{material.materialName}</strong>
+                <small>{material.materialCategory}</small>
                 <small>{material.specification || "未设置规格"}</small>
               </td>
-              <td>{material.materialCategory}</td>
               <td>
                 {material.baseUnit}
                 <small>数量口径：整数</small>
               </td>
               <td>{material.defaultWarehouseName || "-"}</td>
-              <td>{material.defaultSupplierPartyName || "-"}</td>
-              <td>{material.safeStock ?? "-"}</td>
+              <td>
+                安全库存 {material.safeStock ?? "-"}
+                <small>{material.isConsumable ? "耗材" : "非耗材"}</small>
+              </td>
               <td>
                 {material.isProjectSiteSaleEnabled &&
                 material.projectSiteSalePrice !== null &&
@@ -741,15 +748,14 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
                   <small>{material.projectSiteSaleRemark}</small>
                 ) : null}
               </td>
-              <td>{material.isConsumable ? "是" : "否"}</td>
               <td>
                 <StatusBadge
                   tone={material.status === "enabled" ? "success" : "disabled"}
                 >
                   {statusLabel.get(material.status)}
                 </StatusBadge>
+                <small>{formatDateTime(material.updatedAt)}</small>
               </td>
-              <td>{formatDateTime(material.updatedAt)}</td>
             </tr>
           ))}
         </tbody>

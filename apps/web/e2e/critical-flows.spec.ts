@@ -24,6 +24,7 @@ test("admin can create master data records and sees failed save feedback", async
   await page.getByRole("button", { name: "保存往来方" }).click();
   await expect(page.getByText("DEMO-E2E-PARTY")).toBeVisible();
 
+  await page.getByRole("button", { name: "新增物料" }).click();
   await page.getByLabel("物料编码").fill("DEMO-E2E-MAT-FAIL");
   await page.getByLabel("物料名称").fill("DEMO E2E 失败物料");
   await page.getByLabel("基本单位").fill("套");
@@ -39,6 +40,7 @@ test("admin can create master data records and sees failed save feedback", async
   await expect(page.getByText("DEMO-E2E-MAT")).toBeVisible();
 
   await page.getByRole("tab", { name: "仓库" }).click();
+  await page.getByRole("button", { name: "新增仓库" }).click();
   await page.getByLabel("仓库编码").fill("DEMO-E2E-WH");
   await page.getByLabel("仓库名称").fill("DEMO E2E 仓库");
   await page.getByRole("button", { name: "保存仓库" }).click();
