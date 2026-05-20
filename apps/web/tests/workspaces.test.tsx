@@ -315,6 +315,8 @@ describe("Company ERP workspace components", () => {
       "aria-selected",
       "true",
     );
+    expect(screen.getByRole("button", { name: "新增员工" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存员工" })).not.toBeInTheDocument();
     expect(screen.queryByText("普通用户账号")).not.toBeInTheDocument();
     expect(screen.queryByText("权限矩阵")).not.toBeInTheDocument();
     expect(await screen.findByText("EMP0001")).toBeInTheDocument();
@@ -2770,6 +2772,7 @@ describe("Company ERP workspace components", () => {
 
     await screen.findByText("EMP0001");
     fireEvent.click(screen.getByRole("tab", { name: "部门" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增部门" }));
     fireEvent.change(screen.getByLabelText("部门编码"), {
       target: { value: "DEP-WH" },
     });
@@ -2779,6 +2782,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增员工" }));
     fireEvent.change(screen.getByLabelText("员工编号"), {
       target: { value: "EMP0002" },
     });
@@ -2788,6 +2792,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增账号" }));
     fireEvent.change(screen.getByLabelText("登录账号"), {
       target: { value: "lisi" },
     });
@@ -2797,6 +2802,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增项目点账号" }));
     fireEvent.change(screen.getByLabelText("当前联系人"), {
       target: { value: "赵项目" },
     });
@@ -2812,6 +2818,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存项目点账号" }));
 
     fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增项目点分配" }));
     fireEvent.change(screen.getByLabelText("员工"), {
       target: { value: employee.id },
     });
@@ -2880,6 +2887,7 @@ describe("Company ERP workspace components", () => {
 
     await screen.findByText("EMP0001");
     fireEvent.click(screen.getByRole("tab", { name: "部门" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增部门" }));
     fireEvent.change(screen.getByLabelText("部门编码"), {
       target: { value: "DEP-WH" },
     });
@@ -2887,8 +2895,10 @@ describe("Company ERP workspace components", () => {
       target: { value: "仓储部" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
+    expect(await screen.findByText("部门编码已存在")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增员工" }));
     fireEvent.change(screen.getByLabelText("员工编号"), {
       target: { value: "EMP0002" },
     });
@@ -2896,8 +2906,10 @@ describe("Company ERP workspace components", () => {
       target: { value: "李四" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
+    expect(await screen.findByText("员工编号已存在")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增账号" }));
     fireEvent.change(screen.getByLabelText("登录账号"), {
       target: { value: "lisi" },
     });
@@ -2905,8 +2917,10 @@ describe("Company ERP workspace components", () => {
       target: { value: "ChangeMe123!" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+    expect(await screen.findByText("登录账号已存在")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增项目点分配" }));
     fireEvent.change(screen.getByLabelText("员工"), {
       target: { value: employee.id },
     });
@@ -2918,14 +2932,6 @@ describe("Company ERP workspace components", () => {
       target: { value: projectSite.id },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
-
-    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
-    expect(await screen.findByText("部门编码已存在")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
-    expect(await screen.findByText("员工编号已存在")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
-    expect(await screen.findByText("登录账号已存在")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     expect(
       await screen.findByText("该员工已分配到该项目点"),
     ).toBeInTheDocument();
