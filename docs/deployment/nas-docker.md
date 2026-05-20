@@ -4,6 +4,8 @@ Company ERP is deployed for company internal network use only. This guide does
 not configure public internet exposure, HTTPS, external domains, or automatic
 certificates.
 
+禁止公网暴露 API/PostgreSQL.
+
 Keep real NAS IPs, SSH users, passwords, production `.env` files, scanned
 contracts, staff data, WeChat exports, and business attachments outside Git.
 
@@ -165,6 +167,18 @@ future migration PR. The machine-readable `--json` and `--csv` modes use fixed
 fields: `module`, `legacyCount`, `unifiedCount`, `gapEstimate`,
 `pendingPlaceholderCount`, and `notes`. The optional `--output` path must point
 outside the Git repository and is intended for the non-Git pilot evidence folder.
+
+For trial evidence retention, also verify the local evidence manifest and the
+retained audit CSV export before sign-off:
+
+```bash
+npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>
+npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
+```
+
+These commands are local evidence checks only. They do not deploy NAS, read
+production `.env` files, or turn the system into a formal compliance archive.
+Current status: 可进入 NAS 内网试点，但不是正式合规档案系统全面上线.
 
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce
@@ -449,6 +463,10 @@ Keep these artifacts together for a recoverable snapshot:
   a documented blocker if Docker was not available on the operator machine.
 - A read-only `npm run attachments:legacy-report` summary if legacy attachment
   fields still exist; keep only counts and migration notes, not raw file paths.
+- `npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>` output
+  proving the retained manifest and evidence files still match.
+- `npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>`
+  output proving the retained audit CSV matches the response headers.
 
 ## Restore
 
