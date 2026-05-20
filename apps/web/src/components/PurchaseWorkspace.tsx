@@ -676,7 +676,7 @@ export function PurchaseWorkspace({
       </div> : null}
 
       {activeTab === "arrivals" ? (
-        <EmptyState title="到货记录后续开放" description="当前到货与入库闭环在库存模块登记；稳定接口开放后在此展示到货记录。" />
+        <EmptyState title="暂无到货记录" description="当前到货与入库闭环在库存模块登记；稳定接口开放后在此分区展示到货记录。" />
       ) : null}
 
       <DetailDrawer title="采购需求详情" open={Boolean(selectedRequest)} onClose={() => setSelectedRequestId("")}>

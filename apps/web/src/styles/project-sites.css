@@ -12,7 +12,7 @@
 }
 
 .project-site-module-note,
-.project-site-module-tabs {
+.project-site-module-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -22,6 +22,17 @@
 .project-site-module-note p {
   margin: 0;
   color: var(--muted);
+}
+
+.project-site-module-meta span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1d4ed8;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .external-portal-hero {
