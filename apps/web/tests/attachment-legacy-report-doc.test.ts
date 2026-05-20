@@ -11,6 +11,7 @@ describe("attachment legacy report deployment docs", () => {
     expect(doc).toContain("--dry-run");
     expect(doc).toContain("--json");
     expect(doc).toContain("--csv");
+    expect(doc).toContain("--output");
     expect(doc).toContain("module");
     expect(doc).toContain("legacyCount");
     expect(doc).toContain("unifiedCount");

@@ -152,6 +152,8 @@ npm run attachments:legacy-report -- --dry-run
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --json
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --csv
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --json --output /path/outside/git/legacy-report.json
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --csv --output /path/outside/git/legacy-report.csv
 ```
 
 The report groups counts for contracts, certificates, payroll submissions,
@@ -161,7 +163,8 @@ path values, and it does not migrate data. Use it only to estimate the gap
 between legacy raw attachment fields and unified attachment metadata before a
 future migration PR. The machine-readable `--json` and `--csv` modes use fixed
 fields: `module`, `legacyCount`, `unifiedCount`, `gapEstimate`,
-`pendingPlaceholderCount`, and `notes`.
+`pendingPlaceholderCount`, and `notes`. The optional `--output` path must point
+outside the Git repository and is intended for the non-Git pilot evidence folder.
 
 The default container memory caps are conservative for a lightweight internal
 ERP: PostgreSQL `1g`, API `512m`, and Web/Nginx `128m`. Increase or reduce

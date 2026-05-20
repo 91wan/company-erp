@@ -552,6 +552,51 @@ describe("attachment legacy migration readiness report", () => {
     expect(`${json}\n${csv}`).not.toContain("nas-raw-root");
     expect(`${json}\n${csv}`).not.toContain("legacy-fixtures/");
   });
+
+  it("writes JSON and CSV output files only outside the repository", async () => {
+    type AttachmentLegacyReportRow = {
+      module: string;
+      legacyCount: number;
+      unifiedCount: number;
+      pendingPlaceholderCount?: number;
+      notes?: string;
+    };
+    const {
+      formatCsvReport,
+      formatJsonReport,
+      writeReportOutput,
+    } = (await import(pathToFileURL(join(repoRoot, "scripts/attachments-legacy-report.mjs")).href)) as {
+      formatCsvReport: (rows: AttachmentLegacyReportRow[]) => string;
+      formatJsonReport: (rows: AttachmentLegacyReportRow[]) => string;
+      writeReportOutput: (outputPath: string, content: string, repoRoot: string) => void;
+    };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-legacy-report-output-"));
+    const rows = [{ module: "contracts", legacyCount: 4, unifiedCount: 1, pendingPlaceholderCount: 0, notes: "count only" }];
+    const jsonPath = join(tempRoot, "legacy-report.json");
+    const csvPath = join(tempRoot, "legacy-report.csv");
+
+    writeReportOutput(jsonPath, formatJsonReport(rows), repoRoot);
+    writeReportOutput(csvPath, formatCsvReport(rows), repoRoot);
+
+    expect(readFile(jsonPath)).toContain("\"module\": \"contracts\"");
+    expect(readFile(csvPath)).toContain("contracts,4,1,3,0,count only");
+    expect(() => writeReportOutput(join(repoRoot, "legacy-report.json"), "{}", repoRoot)).toThrow(
+      "Output path must be outside the repository",
+    );
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("rejects dry-run output files instead of writing misleading evidence", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-legacy-report-dry-output-"));
+    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--dry-run", "--output", join(tempRoot, "report.json")], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("--output cannot be used with --dry-run");
+  });
 });
 
 function createCleanupPrisma() {
