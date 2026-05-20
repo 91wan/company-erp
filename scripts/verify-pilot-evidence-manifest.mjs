@@ -16,8 +16,9 @@ Options:
   --evidence-dir <path>  Repository-external evidence directory containing manifest.json and manifest.sha256.`);
 }
 
-function fail(message) {
+function fail(message, suggestion = "重新运行 npm run pilot:verify-local -- --evidence-dir <outside-git-path> 生成仓库外证据包，然后再运行 npm run pilot:verify-evidence 复核。") {
   console.error(message);
+  console.error(`处理建议: ${suggestion}`);
   process.exit(1);
 }
 
@@ -65,7 +66,7 @@ if (!evidenceDir) {
 
 const evidenceRoot = resolve(evidenceDir);
 if (isInside(repoRoot, evidenceRoot)) {
-  fail("Evidence directory must be outside the repository");
+  fail("Evidence directory must be outside the repository", "将 evidence 目录移到 Git 仓库外，例如系统临时目录或受控归档目录。");
 }
 
 const manifestPath = join(evidenceRoot, "manifest.json");

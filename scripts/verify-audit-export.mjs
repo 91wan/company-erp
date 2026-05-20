@@ -13,8 +13,9 @@ returned by /api/audit-logs/export.csv. The CSV evidence file must be outside
 the Git repository.`);
 }
 
-function fail(message) {
+function fail(message, suggestion = "从审计日志导出重新记录 CSV、X-Audit-Export-SHA256、X-Audit-Export-Record-Count 和筛选条件，然后再运行 npm run audit:verify-export 复核。") {
   console.error(message);
+  console.error(`处理建议: ${suggestion}`);
   process.exit(1);
 }
 
@@ -91,7 +92,7 @@ if (!/^[0-9a-f]{64}$/i.test(options.sha256)) fail("--sha256 must be a 64-charact
 if (!/^\d+$/.test(options.recordCount)) fail("--record-count must be a non-negative integer");
 
 const csvPath = resolve(options.csv);
-if (isInside(repoRoot, csvPath)) fail("Audit export CSV must be outside the repository");
+if (isInside(repoRoot, csvPath)) fail("Audit export CSV must be outside the repository", "将 audit CSV 保存在 Git 仓库外的受控证据目录，不要提交到仓库。");
 if (!existsSync(csvPath)) fail("Audit export CSV file does not exist");
 
 const content = readFileSync(csvPath);
