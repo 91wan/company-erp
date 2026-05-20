@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { createMemoryAppConfigRepository } from "../src/appConfig";
+import type { CreateAuditLogInput } from "../src/auditLogs";
 import type { AuthAccountRecord, AuthRepository } from "../src/auth";
 import { hashPassword } from "../src/password";
 
@@ -83,6 +84,55 @@ describe("app config API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ appConfig: { companyName: "无锡餐服 ERP" } });
     expect(readBack.json()).toEqual({ appConfig: { companyName: "无锡餐服 ERP" } });
+  });
+
+  it("audits company name updates without writing a non-UUID entity id", async () => {
+    const auditLogs: CreateAuditLogInput[] = [];
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      appConfigRepository: createMemoryAppConfigRepository(),
+      auditLogRepository: {
+        async list() {
+          return [];
+        },
+        async create(input) {
+          auditLogs.push(input);
+          return {
+            id: "55555555-5555-4555-8555-555555555555",
+            actorUserId: input.actorUserId ?? null,
+            actorUsername: input.actorUsername ?? null,
+            action: input.action,
+            entityType: input.entityType,
+            entityId: input.entityId ?? null,
+            beforeJson: input.beforeJson ?? null,
+            afterJson: input.afterJson ?? null,
+            ip: input.ip ?? null,
+            userAgent: input.userAgent ?? null,
+            createdAt: now,
+          };
+        },
+      },
+    });
+
+    const cookie = await loginCookie(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/app-config",
+      cookies: { company_erp_session: cookie },
+      payload: { companyName: "无锡市帝都餐饮服务有限公司" },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      action: "app_config.update",
+      entityType: "app_config",
+      entityId: null,
+      afterJson: { companyName: "无锡市帝都餐饮服务有限公司" },
+    });
   });
 
   it("rejects empty company names and viewer writes", async () => {
