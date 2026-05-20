@@ -19,6 +19,7 @@ test("admin can create master data records and sees failed save feedback", async
   await page.goto("/");
   await page.getByRole("button", { name: "基础资料" }).click();
 
+  await page.getByRole("button", { name: "新增往来方" }).click();
   await page.getByLabel("往来方编码").fill("DEMO-E2E-PARTY");
   await page.getByLabel("往来方名称").fill("DEMO E2E 往来方");
   await page.getByRole("button", { name: "保存往来方" }).click();

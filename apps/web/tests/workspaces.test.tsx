@@ -71,6 +71,9 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByText("SUP0001")).toBeInTheDocument();
     expect(screen.getAllByText("供应商").length).toBeGreaterThan(0);
     expect(screen.getByText("启用")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增往来方" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存往来方" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader").length).toBeLessThanOrEqual(7);
   });
 
   it("renders empty and error states for counterparty loading", async () => {
@@ -105,6 +108,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无往来方资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增往来方" }));
     fireEvent.change(screen.getByLabelText("往来方编码"), {
       target: { value: "CLI0001" },
     });

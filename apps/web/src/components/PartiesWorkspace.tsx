@@ -1,4 +1,4 @@
-import { Building2, Filter, Plus, RefreshCw, Save, Search } from "lucide-react";
+import { Building2, Filter, RefreshCw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   PARTY_METADATA,
@@ -7,7 +7,7 @@ import {
   type PartyTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
+import { FormDrawer, SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
@@ -41,6 +41,7 @@ export function PartiesWorkspace({
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | PartyTypeCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreatePartyInput>({
     partyCode: "",
     partyName: "",
@@ -91,6 +92,7 @@ export function PartiesWorkspace({
       const created = await createParty(form);
       setParties((current) => [created, ...current.filter((party) => party.id !== created.id)]);
       setForm({ partyCode: "", partyName: "", partyTypes: ["supplier"], status: "enabled" });
+      setIsCreateDrawerOpen(false);
       setSubmitState("idle");
     } catch {
       setSubmitState("error");
@@ -126,15 +128,21 @@ export function PartiesWorkspace({
       title="往来单位"
       subtitle="统一维护客户、供应商、分包主体、个人承包人和运营主体。"
       actions={(
-        <span className="parties-total">
-          <Building2 aria-hidden="true" size={18} />
-          {parties.length} 个往来方
-        </span>
+        <>
+          <span className="parties-total">
+            <Building2 aria-hidden="true" size={18} />
+            {parties.length} 个往来方
+          </span>
+          {canManage ? (
+            <button type="button" className="primary-action" onClick={() => setIsCreateDrawerOpen(true)}>
+              新增往来方
+            </button>
+          ) : null}
+        </>
       )}
       summary={summary}
     >
       <section className="parties-workspace" aria-label="往来方基础资料">
-      <div className="parties-layout">
         <SectionCard title="往来单位台账">
           <Toolbar
             search={(
@@ -171,8 +179,13 @@ export function PartiesWorkspace({
           {status === "ready" && filteredParties.length === 0 ? <StateMessage text="暂无往来方资料" /> : null}
           {status === "ready" && filteredParties.length > 0 ? <PartiesTable parties={filteredParties} /> : null}
         </SectionCard>
-
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
+      </section>
+      <FormDrawer
+        title="新增往来方"
+        open={isCreateDrawerOpen}
+        onClose={() => setIsCreateDrawerOpen(false)}
+      >
+        <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
           <div className="panel-header">
             <h3>新增往来方</h3>
             <button type="submit" disabled={submitState === "saving"}>
@@ -246,9 +259,8 @@ export function PartiesWorkspace({
           </label>
 
           {submitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
-        </form> : null}
-      </div>
-      </section>
+        </form>
+      </FormDrawer>
     </WorkspaceScaffold>
   );
 }
@@ -262,11 +274,9 @@ function PartiesTable({ parties }: { parties: PartyDto[] }) {
             <th>编码</th>
             <th>名称</th>
             <th>类型</th>
-            <th>联系人</th>
-            <th>电话</th>
+            <th>联系方式</th>
             <th>状态</th>
             <th>更新时间</th>
-            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -281,20 +291,16 @@ function PartiesTable({ parties }: { parties: PartyDto[] }) {
                   ))}
                 </div>
               </td>
-              <td>{party.primaryContactName || "-"}</td>
-              <td>{party.primaryContactPhone || "-"}</td>
+              <td>
+                {party.primaryContactName || "-"}
+                <small>{party.primaryContactPhone || "未设置电话"}</small>
+              </td>
               <td>
                 <StatusBadge tone={party.status === "enabled" ? "success" : "disabled"}>
                   {statusLabel.get(party.status)}
                 </StatusBadge>
               </td>
               <td>{formatDateTime(party.updatedAt)}</td>
-              <td>
-                <button type="button" className="table-action">
-                  <Plus aria-hidden="true" size={14} />
-                  编辑
-                </button>
-              </td>
             </tr>
           ))}
         </tbody>
