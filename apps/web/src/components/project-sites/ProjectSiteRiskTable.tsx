@@ -3,10 +3,6 @@ import { DataTable, EmptyState, SectionCard, StatusBadge, type StatusTone } from
 import { payrollStatusToBadge, projectSiteComplianceStatusToBadge } from "../statusMappers";
 import { complianceRiskLabel } from "./projectSiteComplianceStatus";
 
-function dated(value: string | null | undefined) {
-  return value ? value.slice(0, 10) : "-";
-}
-
 function keyRiskSummary(site: ProjectSiteDto, summary: ProjectSiteComplianceSummaryDto | undefined) {
   if (!summary) return { label: "数据暂不可用", tone: "warning" as StatusTone };
   const risks: string[] = [];
@@ -50,7 +46,6 @@ export function ProjectSiteRiskTable({
             "项目经理",
             "合规状态",
             "关键风险",
-            "最近更新时间",
             "操作",
           ]}
           rows={status === "ready" ? sites.map((site) => {
@@ -76,7 +71,6 @@ export function ProjectSiteRiskTable({
               <StatusBadge key={`${site.id}-key-risk`} tone={keyRisk.tone}>
                 {keyRisk.label}
               </StatusBadge>,
-              dated(site.updatedAt),
               <button
                 key={`${site.id}-details`}
                 type="button"
