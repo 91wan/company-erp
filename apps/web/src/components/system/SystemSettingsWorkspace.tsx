@@ -286,7 +286,7 @@ export function SystemSettingsWorkspace({
       <section className="system-settings-workspace">
         {activeTab === "company" ? (
           <form
-            className="dashboard-panel party-form settings-form"
+            className="dashboard-panel workspace-form settings-form"
             onSubmit={handleSubmit}
           >
             <div className="form-header">
@@ -549,7 +549,7 @@ export function SystemSettingsWorkspace({
 
             {canManageAttachments ? (
               <form
-                className="party-form settings-form"
+                className="workspace-form settings-form"
                 onSubmit={handleAttachmentSubmit}
               >
                 <div className="form-grid">

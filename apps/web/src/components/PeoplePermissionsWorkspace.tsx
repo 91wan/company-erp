@@ -570,7 +570,7 @@ export function PeoplePermissionsWorkspace({
       title="人员权限"
       subtitle="维护公司员工、登录账号、项目点账号和项目点人员分配；项目点现场人员名单在项目点模块维护。"
       actions={(
-        <label className="party-search people-search">
+        <label className="workspace-search people-search">
           <Search aria-hidden="true" size={16} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索部门、员工、账号" />
         </label>
@@ -672,7 +672,7 @@ export function PeoplePermissionsWorkspace({
       ) : null}
 
       <FormDrawer title="新增部门" open={openFormDrawer === "departments"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleDepartmentSubmit}>
+        <form className="dashboard-panel workspace-form" onSubmit={handleDepartmentSubmit}>
           <FormHeader title="新增部门" buttonText="保存部门" saving={departmentSubmit === "saving"} />
           <label>
             <span>部门编码</span>
@@ -687,7 +687,7 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增员工" open={openFormDrawer === "employees"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleEmployeeSubmit}>
+        <form className="dashboard-panel workspace-form" onSubmit={handleEmployeeSubmit}>
           <FormHeader title="新增员工" buttonText="保存员工" saving={employeeSubmit === "saving"} />
           <label>
             <span>员工编号</span>
@@ -713,7 +713,7 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增账号" open={openFormDrawer === "userAccounts"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleAccountSubmit}>
+        <form className="dashboard-panel workspace-form" onSubmit={handleAccountSubmit}>
           <FormHeader title="新增账号" buttonText="保存账号" saving={accountSubmit === "saving"} />
           <label>
             <span>绑定员工</span>
@@ -737,7 +737,7 @@ export function PeoplePermissionsWorkspace({
           <fieldset>
             <legend>固定角色</legend>
             {MVP_ROLES.map((role) => (
-              <label key={role.code} className="party-type-check">
+              <label key={role.code} className="workspace-check-option">
                 <input type="checkbox" checked={(accountForm.roles ?? []).includes(role.code)} onChange={() => toggleRole(role.code)} />
                 <span>{role.label}</span>
               </label>
@@ -748,7 +748,7 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增项目点账号" open={openFormDrawer === "externalAccounts"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleExternalAccountSubmit}>
+        <form className="dashboard-panel workspace-form" onSubmit={handleExternalAccountSubmit}>
           <FormHeader title="新增项目点账号" buttonText="保存项目点账号" saving={externalAccountSubmit === "saving"} />
           <p className="form-hint">一个项目点最多一个当前有效项目点账号；更换项目经理建议停用旧账号并创建新账号。</p>
           <label>
@@ -829,7 +829,7 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增项目点分配" open={openFormDrawer === "assignments"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel party-form" onSubmit={handleAssignmentSubmit}>
+        <form className="dashboard-panel workspace-form" onSubmit={handleAssignmentSubmit}>
           <FormHeader title="新增项目点分配" buttonText="保存分配" saving={assignmentSubmit === "saving"} />
           <label>
             <span>员工</span>
@@ -883,7 +883,7 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
-          <label className="party-type-check">
+          <label className="workspace-check-option">
             <input
               type="checkbox"
               checked={Boolean(assignmentForm.isPrimary)}
@@ -1189,7 +1189,7 @@ function PermissionMatrix() {
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>

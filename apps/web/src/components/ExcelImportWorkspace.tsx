@@ -261,7 +261,7 @@ export function ExcelImportWorkspace({
       >
         {activeTab === "preview" && canManage ? (
           <form
-            className="dashboard-panel party-form import-preview-form"
+            className="dashboard-panel workspace-form import-preview-form"
             onSubmit={handlePreview}
             aria-label="导入预检表单"
           >
@@ -401,7 +401,7 @@ export function ExcelImportWorkspace({
 
 function StateMessage({ text, icon }: { text: string; icon?: ReactNode }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>
