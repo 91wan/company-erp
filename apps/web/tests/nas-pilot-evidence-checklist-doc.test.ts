@@ -11,6 +11,7 @@ describe("NAS pilot evidence checklist", () => {
     expect(audit).toContain("可进入 NAS 内网试点");
     expect(audit).toContain("不是正式合规档案系统全面上线");
     expect(audit).toContain("npm run pilot:verify-local");
+    expect(audit).toContain("npm run pilot:verify-evidence");
     expect(audit).toContain("--evidence-dir");
     expect(audit).toContain("npm run preflight:nas");
     expect(audit).toContain("backup restore drill");
@@ -18,6 +19,7 @@ describe("NAS pilot evidence checklist", () => {
     expect(audit).toContain("PILOT_LEGACY_REPORT_DATABASE_URL");
     expect(audit).toContain("legacy-report.json");
     expect(audit).toContain("audit CSV export");
+    expect(audit).toContain("npm run audit:verify-export");
     expect(audit).toContain("deploy revision");
     expect(audit).toContain("admin");
     expect(audit).toContain("viewer");
