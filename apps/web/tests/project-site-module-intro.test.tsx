@@ -6,7 +6,7 @@ describe("ProjectSiteModuleIntro", () => {
   it("shows headquarters module scope and enabled tabs", () => {
     render(<ProjectSiteModuleIntro usageOnly={false} canIssueUsage />);
 
-    expect(screen.getByText("当前库存余额 -> 项目点领用申请 -> 总部仓库出库 -> 库存流水扣减")).toBeInTheDocument();
+    expect(screen.getByText("项目点事务按风险台账、物料领用、厨房设备和投入合同分区处理。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "项目点台账" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: "总部出库" })).not.toBeDisabled();
     expect(screen.getByText(/月度经营报表、现场库存尚未开放/)).toBeInTheDocument();

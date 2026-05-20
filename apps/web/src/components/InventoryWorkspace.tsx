@@ -12,7 +12,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DataTable, DetailDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
+import { DataTable, DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
 import { inventoryRiskToBadge } from "./statusMappers";
 
 type InventoryWorkspaceProps = {
@@ -40,6 +40,15 @@ type MovementFormState = {
   handledBy: string;
   remark: string;
 };
+type InventoryTab = "risk" | "balances" | "inbound" | "outbound" | "replenishment";
+
+const inventoryTabs: { key: InventoryTab; label: string }[] = [
+  { key: "risk", label: "库存风险" },
+  { key: "balances", label: "当前库存" },
+  { key: "inbound", label: "入库流水" },
+  { key: "outbound", label: "出库流水" },
+  { key: "replenishment", label: "补货建议" },
+];
 
 const movementTypeLabel = new Map(INVENTORY_MOVEMENT_TYPES.map((movementType) => [movementType.code, movementType.label]));
 const sourceTypeLabel = new Map(INVENTORY_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
@@ -109,6 +118,8 @@ export function InventoryWorkspace({
   const [movementFilter, setMovementFilter] = useState<"all" | InventoryMovementTypeCode>("all");
   const [selectedMovementId, setSelectedMovementId] = useState("");
   const [selectedBalanceKey, setSelectedBalanceKey] = useState("");
+  const [activeTab, setActiveTab] = useState<InventoryTab>("risk");
+  const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<MovementFormState>({
@@ -221,6 +232,11 @@ export function InventoryWorkspace({
   const inboundQuantity = movements
     .filter((movement) => movement.movementType === "inbound")
     .reduce((sum, movement) => sum + movement.quantity, 0);
+  const activeTabMovements = filteredMovements.filter((movement) => {
+    if (activeTab === "inbound") return movement.movementType === "inbound" || movement.movementType === "opening" || movement.movementType === "adjustment_in";
+    if (activeTab === "outbound") return movement.movementType === "outbound" || movement.movementType === "adjustment_out";
+    return true;
+  });
   const selectedMovement = movements.find((movement) => movement.id === selectedMovementId) ?? null;
   const selectedBalance =
     balances.find((balance) => `${balance.warehouseId}:${balance.materialId}` === selectedBalanceKey) ?? null;
@@ -280,6 +296,7 @@ export function InventoryWorkspace({
         remark: "",
       }));
       setSubmitState("idle");
+      setMovementDrawerOpen(false);
     } catch (error) {
       setSubmitError(formatApiError(error, "入库登记失败，请检查必填项或单号是否重复。"));
       setSubmitState("error");
@@ -287,40 +304,74 @@ export function InventoryWorkspace({
   }
 
   return (
-    <section className="inventory-workspace" aria-label="库存管理">
-      <PageHeader
+    <WorkspaceScaffold
         eyebrow="库存风险与流水"
         title="库存管理"
-        subtitle="总部仓库入库登记、库存流水和当前库存余额查询；低库存风险在工作台与本页同步突出。"
+        subtitle="默认查看库存风险；入库、出库和当前库存分区处理。"
         actions={(
           <span className="parties-total">
             <Warehouse aria-hidden="true" size={18} />
             {balances.length} 个库存项
           </span>
         )}
-      />
+        summary={(
+          <div className="summary-grid compact-summary" aria-label="库存指标摘要">
+            <SummaryCard label="库存流水" value={movements.length} detail="最近出入库记录" tone="info" />
+            <SummaryCard label="当前库存项" value={balances.length} detail={showBalances ? "按仓库和物料汇总" : "无权限查看余额"} tone={showBalances ? "neutral" : "disabled"} />
+            <SummaryCard label="低库存" value={lowStockCount} detail="低于安全库存" tone={lowStockCount > 0 ? "danger" : "success"} />
+            <SummaryCard label="本轮入库数量" value={inboundQuantity} detail="入库流水合计" tone="success" />
+          </div>
+        )}
+        tabs={(
+          <>
+            <SegmentedTabs items={inventoryTabs.filter((tab) => showBalances || tab.key !== "balances")} activeKey={activeTab} onChange={setActiveTab} ariaLabel="库存分区" />
+            {canManage && (activeTab === "inbound" || activeTab === "outbound") ? (
+              <div className="workspace-primary-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm((current) => ({
+                      ...current,
+                      movementType: activeTab === "outbound" ? "outbound" : "inbound",
+                      sourceType: activeTab === "outbound" ? "other" : "purchase",
+                    }));
+                    setMovementDrawerOpen(true);
+                  }}
+                >
+                  {activeTab === "outbound" ? "新增出库流水" : "新增入库流水"}
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      >
+      {activeTab === "risk" ? (
+        <SectionCard title="库存风险" action={<Warehouse aria-hidden="true" size={16} />}>
+          {balanceStatus === "loading" ? <StateMessage icon={<RefreshCw size={16} />} text="库存风险加载中" /> : null}
+          {balanceStatus === "error" ? <StateMessage icon={<Warehouse size={16} />} text="库存风险接口暂不可用" /> : null}
+          {balanceStatus === "ready" && balances.filter((balance) => balance.isLowStock).length === 0 ? <EmptyState title="暂无低库存风险" /> : null}
+          {balanceStatus === "ready" && balances.filter((balance) => balance.isLowStock).length > 0 ? (
+            <DataTable
+              headers={["仓库", "物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
+              rows={balances.filter((balance) => balance.isLowStock).map((balance) => [
+                balance.warehouseCode,
+                balance.materialCode,
+                balance.materialName,
+                `${balance.currentQuantity} ${balance.unit}`,
+                balance.safeStock ?? "-",
+                <InventoryStockBadge key={`${balance.warehouseId}-${balance.materialId}`} low={balance.isLowStock} />,
+              ])}
+              onRowClick={(rowIndex) => {
+                const balance = balances.filter((item) => item.isLowStock)[rowIndex];
+                setSelectedBalanceKey(balance ? `${balance.warehouseId}:${balance.materialId}` : "");
+              }}
+            />
+          ) : null}
+        </SectionCard>
+      ) : null}
 
-      <div className="inventory-heading">
-        <p>{"采购记录 -> 仓库入库 -> 库存流水 -> 当前库存余额"}</p>
-        <span>当前库存 = 库存流水数量按仓库 + 物料汇总</span>
-      </div>
-
-      <div className="inventory-tabs" aria-label="库存模块功能">
-        <button type="button" aria-current="page">入库登记</button>
-        <button type="button">库存流水</button>
-        {showBalances ? <button type="button">当前库存查询</button> : null}
-      </div>
-      <p className="form-hint">项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。</p>
-
-      <div className="summary-grid" aria-label="库存指标摘要">
-        <SummaryCard label="库存流水" value={movements.length} detail="最近出入库记录" tone="info" />
-        <SummaryCard label="当前库存项" value={balances.length} detail={showBalances ? "按仓库和物料汇总" : "无权限查看余额"} tone={showBalances ? "neutral" : "disabled"} />
-        <SummaryCard label="低库存" value={lowStockCount} detail="低于安全库存" tone={lowStockCount > 0 ? "danger" : "success"} />
-        <SummaryCard label="本轮入库数量" value={inboundQuantity} detail="入库流水合计" tone="success" />
-      </div>
-
-      <div className="people-section-grid">
-        <SectionCard title="库存流水" action={<ClipboardList aria-hidden="true" size={16} />}>
+      {(activeTab === "inbound" || activeTab === "outbound") ? (
+        <SectionCard title={activeTab === "outbound" ? "出库流水" : "入库流水"} action={<ClipboardList aria-hidden="true" size={16} />}>
           <Toolbar
             search={(
               <label className="table-search">
@@ -354,12 +405,12 @@ export function InventoryWorkspace({
             <StateMessage icon={<RefreshCw size={16} />} text="库存流水加载中" />
           ) : movementStatus === "error" ? (
             <StateMessage icon={<PackageCheck size={16} />} text="库存流水接口暂不可用" />
-          ) : filteredMovements.length === 0 ? (
+          ) : activeTabMovements.length === 0 ? (
             <StateMessage icon={<PackageCheck size={16} />} text="暂无库存流水" />
           ) : (
             <DataTable
               headers={["单号", "日期", "类型", "仓库", "物料", "数量", "来源", "经办人"]}
-              rows={filteredMovements.map((movement) => [
+              rows={activeTabMovements.map((movement) => [
                 movement.movementNo,
                 movement.movementDate,
                 movementTypeLabel.get(movement.movementType) ?? movement.movementType,
@@ -369,12 +420,19 @@ export function InventoryWorkspace({
                 movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "-",
                 movement.handledBy ?? "-",
               ])}
-              onRowClick={(rowIndex) => setSelectedMovementId(filteredMovements[rowIndex]?.id ?? "")}
+              onRowClick={(rowIndex) => setSelectedMovementId(activeTabMovements[rowIndex]?.id ?? "")}
             />
           )}
         </SectionCard>
+      ) : null}
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="库存出入库登记表单" noValidate>
+      <FormDrawer
+        title={isOutboundMovement ? "新增出库流水" : "新增入库流水"}
+        open={movementDrawerOpen}
+        dirty={Boolean(form.quantity || form.purchaseRecordNo || form.purchaseRecordLineId || form.remark)}
+        onClose={() => setMovementDrawerOpen(false)}
+      >
+        {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleSubmit} aria-label="库存出入库登记表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <PackageCheck aria-hidden="true" size={16} />
@@ -507,9 +565,9 @@ export function InventoryWorkspace({
           {masterStatus === "ready" && employees.length === 0 ? <p className="form-error">缺少在职总部员工，暂不能登记出入库。</p> : null}
           {submitState === "error" ? <p className="form-error">{submitError || "入库登记失败，请检查必填项或单号是否重复。"}</p> : null}
         </form> : null}
-      </div>
+      </FormDrawer>
 
-      {showBalances ? <SectionCard title="当前库存查询" action={<Warehouse aria-hidden="true" size={16} />}>
+      {activeTab === "balances" && showBalances ? <SectionCard title="当前库存查询" action={<Warehouse aria-hidden="true" size={16} />}>
         {balanceStatus === "loading" ? (
           <StateMessage icon={<RefreshCw size={16} />} text="当前库存加载中" />
         ) : balanceStatus === "error" ? (
@@ -536,6 +594,10 @@ export function InventoryWorkspace({
         )}
       </SectionCard> : null}
 
+      {activeTab === "replenishment" ? (
+        <EmptyState title="补货建议后续开放" description="当前低库存风险会在库存风险分区展示；补货建议稳定接口开放后在此处理。" />
+      ) : null}
+
       <DetailDrawer
         title="库存流水详情"
         open={Boolean(selectedMovement)}
@@ -551,13 +613,13 @@ export function InventoryWorkspace({
       >
         {selectedBalance ? <InventoryBalanceDetail balance={selectedBalance} /> : null}
       </DetailDrawer>
-    </section>
+    </WorkspaceScaffold>
   );
 }
 
 function StateMessage({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       {text}
     </div>

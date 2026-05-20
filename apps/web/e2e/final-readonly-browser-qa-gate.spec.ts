@@ -64,6 +64,7 @@ test("project_site final readonly gate keeps scoped usage without global invento
   await page.goto("/");
   await expect(page.getByText("1 个项目点").first()).toBeVisible();
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await expect(page.getByRole("button", { name: "新增领用申请" })).toBeVisible();
   await expect(page.getByRole("button", { name: "出库登记" })).toHaveCount(0);
   await expect(page.getByText("采购价")).toHaveCount(0);
@@ -78,7 +79,7 @@ test("external_project_site final readonly gate stays portal-only across complia
 
   await page.goto("/");
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
-  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByLabel("项目点任务卡")).toBeVisible();
 
   const nav = page.getByLabel("ERP 模块");
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();

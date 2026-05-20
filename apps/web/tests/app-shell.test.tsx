@@ -95,6 +95,7 @@ describe("Company ERP app shell", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /^采购$/ }));
+    fireEvent.click(await screen.findByRole("tab", { name: "采购需求" }));
     fireEvent.click(await screen.findByRole("button", { name: "新增采购需求" }));
 
     const drawer = await screen.findByRole("dialog", { name: "新增采购需求" });
@@ -109,6 +110,7 @@ describe("Company ERP app shell", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "新增采购需求" })).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     fireEvent.click(screen.getByRole("button", { name: "新增采购需求" }));
     expect(await screen.findByRole("dialog", { name: "新增采购需求" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增采购需求 背景遮罩" }));
@@ -728,16 +730,16 @@ describe("Company ERP app shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^库存$/ }));
 
     expect(await screen.findByRole("heading", { name: "库存管理" })).toBeInTheDocument();
-    expect(screen.getByText("采购记录 -> 仓库入库 -> 库存流水 -> 当前库存余额")).toBeInTheDocument();
+    expect(screen.getByText("默认查看库存风险；入库、出库和当前库存分区处理。")).toBeInTheDocument();
 
-    for (const tab of ["入库登记", "库存流水", "当前库存查询"]) {
-      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    for (const tab of ["库存风险", "当前库存", "入库流水", "出库流水", "补货建议"]) {
+      expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
     }
 
     expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
-    expect(screen.getByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).toBeInTheDocument();
-    expect(screen.getByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).toBeInTheDocument();
+    expect(screen.queryByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).not.toBeInTheDocument();
+    expect(screen.queryByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).not.toBeInTheDocument();
   });
 
   it("hides management forms for viewer sessions", async () => {
@@ -773,6 +775,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^项目点$/ }));
     expect(screen.queryByRole("button", { name: "保存项目点" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     expect(screen.getByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "执行出库" })).not.toBeInTheDocument();
@@ -802,6 +805,7 @@ describe("Company ERP app shell", () => {
     expect(screen.queryByRole("button", { name: /^库存$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^系统设置$/ })).not.toBeInTheDocument();
 
+    fireEvent.click(await screen.findByRole("button", { name: /^物料领用$/ }));
     fireEvent.click(await screen.findByRole("button", { name: "新增领用申请" }));
     expect(await screen.findByRole("button", { name: "保存领用申请" })).toBeInTheDocument();
     expect(screen.queryByText("项目点台账")).not.toBeInTheDocument();

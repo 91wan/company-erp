@@ -51,6 +51,7 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
 
   await page.goto("/");
   await page.getByRole("button", { name: "采购", exact: true }).click();
+  await page.getByRole("tab", { name: "采购需求" }).click();
 
   await page.getByRole("button", { name: "新增采购需求" }).click();
   await page.getByLabel("采购需求编号").fill("DEMO-E2E-PR");
@@ -62,6 +63,7 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.getByRole("button", { name: "保存采购需求" }).click();
   await expect(page.getByRole("cell", { name: "DEMO-E2E-PR", exact: true })).toBeVisible();
 
+  await page.getByRole("tab", { name: "采购执行" }).click();
   await page.getByRole("button", { name: "新增采购记录" }).click();
   await page.getByLabel("采购单号").fill("DEMO-E2E-PO");
   await page.getByLabel("采购人").fill("DEMO 采购人");
@@ -74,11 +76,14 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await expect(page.getByText("DEMO-E2E-PO")).toBeVisible();
 
   await page.getByRole("button", { name: "库存", exact: true }).click();
+  await page.getByRole("tab", { name: "入库流水" }).click();
+  await page.getByRole("button", { name: "新增入库流水" }).click();
   await page.getByLabel("入库日期").fill("2026-05-13");
   await page.getByLabel("入库数量").fill("5");
   await page.getByLabel("经办人").selectOption("DEMO 仓管");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText("AUTO-2")).toBeVisible();
+  await page.getByRole("tab", { name: "当前库存" }).click();
   await expect(page.getByText("25 套")).toBeVisible();
 
   expect(mockApi.capturedRequests.map((request) => `${request.method} ${request.path}`)).toEqual(
@@ -98,6 +103,7 @@ test("project-site scoped users can request usage while issue actions stay wareh
 
   await page.goto("/");
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await expect(page.getByRole("button", { name: "保存项目点" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "执行出库" })).toHaveCount(0);
 
@@ -121,6 +127,7 @@ test("warehouse-capable admin can issue usage and sees charge snapshot refresh",
 
   await page.goto("/");
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
 
   await page.getByRole("button", { name: "出库登记" }).click();
   await page.getByLabel("出库单号").fill("DEMO-E2E-OUT");
@@ -147,6 +154,7 @@ test("contract failure and Excel import permissions are visible in the browser",
 
   await page.goto("/");
   await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("tab", { name: "合同台账" }).click();
   await page.getByRole("button", { name: "新增合同" }).click();
   await page.getByLabel("合同编号").fill("DEMO-E2E-CONTRACT");
   await page.getByLabel("合同名称").fill("DEMO E2E 合同");
@@ -186,6 +194,13 @@ test("critical workspaces keep vertical and horizontal scrolling in desktop and 
   await page.goto("/");
   for (const workspace of ["基础资料", "采购", "库存", "项目点", "合同"] as const) {
     await page.getByRole("button", { name: workspace, exact: true }).click();
+    if (workspace === "采购") {
+      await page.getByRole("tab", { name: "采购需求" }).click();
+    } else if (workspace === "库存") {
+      await page.getByRole("tab", { name: "当前库存" }).click();
+    } else if (workspace === "合同") {
+      await page.getByRole("tab", { name: "合同台账" }).click();
+    }
     const scrollMetrics = await page.locator(".dashboard-scroll").evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,

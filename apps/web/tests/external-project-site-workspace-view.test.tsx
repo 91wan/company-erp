@@ -78,22 +78,22 @@ describe("ExternalProjectSiteWorkspaceView", () => {
     expect(screen.getByText(projectSite.siteName)).toBeInTheDocument();
     expect(screen.getByText("暂无可见领用申请。")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "我的项目点" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "我的项目点" })).toBeInTheDocument();
-    expect(screen.getByText("由后台账号绑定")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "总览" })).toBeInTheDocument();
+    expect(screen.getByText(/我的项目点 1/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "出库登记" })).not.toBeInTheDocument();
   });
 
   it("shows action-first compliance tasks without leaking raw status enums", () => {
     renderExternalView();
 
+    expect(screen.getByText("资料待处理")).toBeInTheDocument();
+    expect(screen.getByText("健康证/食品经营许可证")).toBeInTheDocument();
+    expect(screen.getByText("雇主责任险/工资表")).toBeInTheDocument();
     expect(screen.getAllByText("补充健康证").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("更新临期健康证").length).toBeGreaterThan(0);
     expect(screen.getAllByText("立即更新过期健康证").length).toBeGreaterThan(0);
     expect(screen.getAllByText("补充被保人员").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("更新临期雇主责任险").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("工资表待总部审核").length).toBeGreaterThan(0);
-    expect(screen.getByText("食品经营许可证：")).toBeInTheDocument();
-    expect(screen.getAllByText("临期").length).toBeGreaterThan(0);
+    expect(screen.getByText(/食品经营许可证：/)).toBeInTheDocument();
+    expect(screen.getByText(/食品经营许可证：临期/)).toBeInTheDocument();
     expect(screen.queryByText("expiring_soon")).not.toBeInTheDocument();
     expect(screen.queryByText("pending")).not.toBeInTheDocument();
   });
@@ -101,10 +101,10 @@ describe("ExternalProjectSiteWorkspaceView", () => {
   it("routes portal section buttons to the matching scoped section", () => {
     const { onSelectSection } = renderExternalView();
 
-    fireEvent.click(screen.getByRole("button", { name: "雇主责任险提交" }));
+    fireEvent.click(screen.getByText("雇主责任险/工资表").closest("button")!);
     expect(onSelectSection).toHaveBeenCalledWith("insurance");
 
-    fireEvent.click(screen.getByRole("button", { name: "工资表提交" }));
+    fireEvent.click(screen.getByRole("tab", { name: "工资表" }));
     expect(onSelectSection).toHaveBeenCalledWith("payroll");
   });
 

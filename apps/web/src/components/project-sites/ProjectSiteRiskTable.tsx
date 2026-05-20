@@ -7,59 +7,37 @@ function dated(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
 }
 
-function healthCertificateStatus(summary: ProjectSiteComplianceSummaryDto) {
-  if (summary.missingHealthCertificateCount > 0 || summary.expiredHealthCertificateCount > 0) {
-    return {
-      label: `缺失 ${summary.missingHealthCertificateCount} / 临期 ${summary.expiringHealthCertificateCount} / 过期 ${summary.expiredHealthCertificateCount}`,
-      tone: "danger" as StatusTone,
-    };
+function keyRiskSummary(site: ProjectSiteDto, summary: ProjectSiteComplianceSummaryDto | undefined) {
+  if (!summary) return { label: "数据暂不可用", tone: "warning" as StatusTone };
+  const risks: string[] = [];
+  if (summary.missingHealthCertificateCount > 0) risks.push(`健康证缺失 ${summary.missingHealthCertificateCount}`);
+  if (summary.expiredHealthCertificateCount > 0) risks.push(`健康证过期 ${summary.expiredHealthCertificateCount}`);
+  if (summary.insuranceUncoveredActiveRosterCount > 0) risks.push(`雇主责任险未覆盖 ${summary.insuranceUncoveredActiveRosterCount}`);
+  if (summary.insuranceExpiredCount > 0) risks.push(`雇主责任险过期 ${summary.insuranceExpiredCount}`);
+  if (["missing", "expired", "rejected", "review_due"].includes(summary.foodOperationLicenseStatus)) {
+    risks.push(`食品经营许可证${projectSiteComplianceStatusToBadge(summary.foodOperationLicenseStatus).label}`);
   }
-  if (summary.expiringHealthCertificateCount > 0) {
-    return {
-      label: `临期 ${summary.expiringHealthCertificateCount}`,
-      tone: "warning" as StatusTone,
-    };
+  if (site.payrollAgencyRequired && summary.payrollCurrentMonthStatus && ["missing", "pending", "rejected"].includes(summary.payrollCurrentMonthStatus)) {
+    risks.push(`工资表${payrollStatusToBadge(summary.payrollCurrentMonthStatus).label}`);
   }
-  return {
-    label: "正常",
-    tone: "success" as StatusTone,
-  };
-}
-
-function insuranceStatus(summary: ProjectSiteComplianceSummaryDto) {
-  if (summary.insuranceUncoveredActiveRosterCount > 0 || summary.insuranceExpiredCount > 0) {
-    return {
-      label: `未覆盖 ${summary.insuranceUncoveredActiveRosterCount} / 临期 ${summary.insuranceExpiringSoonCount} / 过期 ${summary.insuranceExpiredCount}`,
-      tone: "danger" as StatusTone,
-    };
+  if (risks.length > 0) return { label: risks.slice(0, 2).join("；"), tone: "danger" as StatusTone };
+  if (summary.expiringHealthCertificateCount > 0 || summary.insuranceExpiringSoonCount > 0) {
+    return { label: "存在临期资料", tone: "warning" as StatusTone };
   }
-  if (summary.insuranceExpiringSoonCount > 0) {
-    return {
-      label: `临期 ${summary.insuranceExpiringSoonCount}`,
-      tone: "warning" as StatusTone,
-    };
-  }
-  return {
-    label: "正常",
-    tone: "success" as StatusTone,
-  };
+  return { label: "正常", tone: "success" as StatusTone };
 }
 
 export function ProjectSiteRiskTable({
   sites,
   status,
   serviceModeLabel,
-  siteStatusLabel,
   complianceSummaries,
   onSelectSite,
 }: {
   sites: ProjectSiteDto[];
   status: "loading" | "ready" | "error";
   serviceModeLabel: Map<string, string>;
-  siteStatusLabel: Map<string, string>;
   complianceSummaries: Record<string, ProjectSiteComplianceSummaryDto>;
-  complianceComputedStatusLabel: Map<string, string>;
-  complianceReviewStatusLabel: Map<string, string>;
   onSelectSite: (site: ProjectSiteDto) => void;
 }) {
   return (
@@ -70,22 +48,14 @@ export function ProjectSiteRiskTable({
             "经营模式",
             "分包主体",
             "项目经理",
-            "项目状态",
             "合规状态",
-            "项目点现场人员",
-            "健康证",
-            "雇主责任险",
-            "食品经营许可证",
-            "工资表",
+            "关键风险",
             "最近更新时间",
             "操作",
           ]}
           rows={status === "ready" ? sites.map((site) => {
             const summary = complianceSummaries[site.id];
-            const healthStatus = summary ? healthCertificateStatus(summary) : null;
-            const insurance = summary ? insuranceStatus(summary) : null;
-            const foodLicense = summary ? projectSiteComplianceStatusToBadge(summary.foodOperationLicenseStatus) : null;
-            const payroll = summary && site.payrollAgencyRequired ? payrollStatusToBadge(summary.payrollCurrentMonthStatus ?? "missing") : null;
+            const keyRisk = keyRiskSummary(site, summary);
             return [
               <span key={`${site.id}-identity`} className="project-site-identity">
                 <span>{site.siteCode}</span>
@@ -94,7 +64,6 @@ export function ProjectSiteRiskTable({
               serviceModeLabel.get(site.serviceMode) ?? site.serviceMode,
               site.subcontractorPartyName ?? "-",
               site.primaryManagerEmployeeName ?? site.subcontractorContactName ?? "-",
-              siteStatusLabel.get(site.status) ?? site.status,
               summary ? (
                 <StatusBadge key={`${site.id}-risk`} tone={summary.blockingIssueCount > 0 ? "danger" : summary.warningIssueCount > 0 ? "warning" : "success"}>
                   {complianceRiskLabel(summary)}
@@ -104,41 +73,9 @@ export function ProjectSiteRiskTable({
                   数据暂不可用
                 </StatusBadge>
               ),
-              summary ? `${summary.activeRosterCount} 人` : "数据暂不可用",
-              healthStatus ? (
-                <StatusBadge key={`${site.id}-health`} tone={healthStatus.tone}>
-                  {healthStatus.label}
-                </StatusBadge>
-              ) : (
-                "数据暂不可用"
-              ),
-              insurance ? (
-                <StatusBadge key={`${site.id}-insurance`} tone={insurance.tone}>
-                  {insurance.label}
-                </StatusBadge>
-              ) : (
-                "数据暂不可用"
-              ),
-              summary ? (
-                <StatusBadge key={`${site.id}-food`} tone={foodLicense?.tone ?? "neutral"}>
-                  {foodLicense?.label ?? "数据暂不可用"}
-                </StatusBadge>
-              ) : (
-                "数据暂不可用"
-              ),
-              summary ? (
-                site.payrollAgencyRequired ? (
-                  <StatusBadge key={`${site.id}-payroll`} tone={payroll?.tone ?? "neutral"}>
-                    {payroll?.label ?? "数据暂不可用"}
-                  </StatusBadge>
-                ) : (
-                  <StatusBadge key={`${site.id}-payroll-not-required`} tone="notApplicable">
-                    不需要
-                  </StatusBadge>
-                )
-              ) : (
-                "数据暂不可用"
-              ),
+              <StatusBadge key={`${site.id}-key-risk`} tone={keyRisk.tone}>
+                {keyRisk.label}
+              </StatusBadge>,
               dated(site.updatedAt),
               <button
                 key={`${site.id}-details`}

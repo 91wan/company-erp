@@ -46,7 +46,7 @@ export function ProjectSiteKitchenEquipmentChangeFormDrawer({
 }) {
   return (
     <FormDrawer title="上报设备变更" open={open} onClose={onClose}>
-      <form className="dashboard-panel party-form" onSubmit={onSubmit} aria-label="厨房设备变更上报表单" noValidate>
+      <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="厨房设备变更上报表单" noValidate>
         <div className="panel-header people-panel-title">
           <h3>
             <ClipboardList aria-hidden="true" size={16} />

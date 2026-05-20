@@ -127,6 +127,7 @@ test("business contract details use unified attachments instead of legacy contra
   await page.goto("/");
 
   await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("tab", { name: "合同台账" }).click();
   await page.getByRole("cell", { name: "DEMO-HT-001", exact: true }).click();
   await expect(page.getByRole("heading", { name: "合同详情" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
@@ -214,6 +215,7 @@ test("drawers open and close without blocking workspace navigation", async ({ pa
   await expect(page.getByText("⌘ K")).toHaveCount(0);
 
   await page.getByRole("button", { name: "采购", exact: true }).click();
+  await page.getByRole("tab", { name: "采购需求" }).click();
   await page.getByRole("cell", { name: "DEMO-PR-001", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "采购需求详情" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -229,17 +231,20 @@ test("drawers open and close without blocking workspace navigation", async ({ pa
   await expect(page.getByRole("dialog", { name: "新增采购需求" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "采购", exact: true }).click();
+  await page.getByRole("tab", { name: "采购需求" }).click();
   await page.getByRole("button", { name: "新增采购需求" }).click();
   await page.getByRole("button", { name: "关闭" }).click();
   await expect(page.getByRole("button", { name: "保存采购需求" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "库存", exact: true }).click();
+  await page.getByRole("tab", { name: "入库流水" }).click();
   await page.getByRole("cell", { name: "DEMO-IN-001", exact: true }).click();
   await expect(page.getByRole("heading", { name: "库存流水详情" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
   await expect(page.getByRole("heading", { name: "库存流水详情" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "合同", exact: true }).click();
+  await page.getByRole("tab", { name: "合同台账" }).click();
   await page.getByRole("cell", { name: "DEMO-HT-001", exact: true }).click();
   await expect(page.getByRole("heading", { name: "合同详情" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
@@ -286,6 +291,7 @@ test("project-site users see usage actions but not global inventory actions", as
   await expect(page.getByText("1 个项目点")).toBeVisible();
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存项目点" })).toHaveCount(0);
@@ -308,15 +314,14 @@ test("external project-site accounts render only scoped project-site compliance 
   const externalSidebar = page.getByLabel("ERP 模块");
   const portalTabs = page.getByLabel("项目点门户分区");
   await expect(externalSidebar.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
-  await expect(portalTabs.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
+  await expect(portalTabs.getByRole("tab", { name: "总览", exact: true })).toBeVisible();
   await expect(externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true })).toBeVisible();
-  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByLabel("项目点任务卡")).toBeVisible();
   await expect(page.getByLabel("当前门户分区").getByText("补充健康证")).toBeVisible();
-  await expect(page.getByRole("button", { name: "处理补充健康证" })).toBeVisible();
-  await page.getByRole("button", { name: "处理补充健康证" }).click();
+  await externalSidebar.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
   await expect(page.getByRole("heading", { name: "证照资质" })).toHaveCount(0);
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "现场人员/健康证提交" })).toBeVisible();
-  await externalSidebar.getByRole("button", { name: "我的项目点", exact: true }).click();
+  await externalSidebar.getByRole("button", { name: "物料领用", exact: true }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();

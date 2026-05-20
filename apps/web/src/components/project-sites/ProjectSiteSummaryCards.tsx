@@ -24,7 +24,7 @@ export function ProjectSiteSummaryCards({
   complianceWarningIssueCount,
 }: ProjectSiteSummaryCardsProps) {
   return (
-    <div className="party-summary people-summary" aria-label="项目点指标摘要">
+    <div className="project-site-summary people-summary" aria-label="项目点指标摘要">
       <article>
         <span>{usageOnly ? "可见项目点" : "项目点总数"}</span>
         <strong>{siteCount}</strong>

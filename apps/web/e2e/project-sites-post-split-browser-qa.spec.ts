@@ -20,9 +20,11 @@ test("admin project-site QA covers risk ledger, detail drawer, unified attachmen
   await expect(page.getByRole("heading", { name: "项目点", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "项目点风险台账" })).toBeVisible();
   await expect(page.getByText("红色风险").first()).toBeVisible();
+  await page.getByRole("tab", { name: "厨房设备" }).click();
   await expect(page.getByRole("heading", { name: "厨房设备", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "厨房设备变更上报" })).toBeVisible();
 
+  await page.getByRole("tab", { name: "风险台账" }).click();
   await page.locator("tr.clickable-row", { hasText: "DEMO-SITE-001" }).click();
   await expect(page.getByRole("heading", { name: "DEMO-SITE-001 DEMO 项目点" })).toBeVisible();
   await page.getByRole("tab", { name: "统一附件" }).click();
@@ -38,6 +40,7 @@ test("admin project-site QA covers risk ledger, detail drawer, unified attachmen
     .toBe(true);
   await page.getByRole("button", { name: "关闭" }).click();
 
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "出库登记" }).click();
   await page.getByLabel("出库单号").fill("DEMO-QA-OUT-POST-SPLIT");
   await page.getByLabel("领用时间").fill("2026-05-18");
@@ -75,6 +78,7 @@ test("project-site scoped QA can request usage without headquarters-only issue o
 
   await page.goto("/");
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
 
   await expect(page.getByText("1 个项目点").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "新增领用申请" })).toBeVisible();
@@ -92,7 +96,7 @@ test("external project-site QA switches portal sections and never exposes headqu
 
   await page.goto("/");
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
-  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByLabel("项目点任务卡")).toBeVisible();
 
   const nav = page.getByLabel("ERP 模块");
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();

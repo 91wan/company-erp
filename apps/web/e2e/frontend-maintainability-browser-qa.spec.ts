@@ -24,6 +24,7 @@ test("admin readonly QA gate covers dashboard, attachments, audit logs, and conf
   await expect(page.getByText("DEMO 合同附件")).toBeVisible();
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "出库登记" }).click();
   await page.getByLabel("出库单号").fill("DEMO-QA-OUT");
   await page.getByLabel("领用时间").fill("2026-05-17");
@@ -73,6 +74,7 @@ test("project-site scoped QA gate keeps usage visible and global inventory hidde
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
   await expect(page.getByRole("heading", { name: "项目点", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
   await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
   await expect(page.getByLabel("出库单号")).toHaveCount(0);
@@ -93,7 +95,7 @@ test("external project-site QA gate stays in the portal and keeps restricted sur
   await page.goto("/");
   await expect(page.getByText("site-manager").first()).toBeVisible();
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
-  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByLabel("项目点任务卡")).toBeVisible();
 
   const externalSidebar = page.getByLabel("ERP 模块");
   await externalSidebar.getByRole("button", { name: "物料领用", exact: true }).click();

@@ -8,7 +8,7 @@ import type {
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
 import { BusinessAttachmentsPanel } from "../BusinessAttachmentsPanel";
-import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState, type StatusTone } from "../ui";
+import { ComplianceChecklist, DataTable, DetailDrawer, EmptyState, SegmentedTabs, type StatusTone } from "../ui";
 import { payrollStatusToBadge, projectSiteComplianceStatusToBadge } from "../statusMappers";
 import { ProjectSiteComplianceActionQueue } from "./ProjectSiteComplianceActionQueue";
 import { complianceRiskLabel } from "./projectSiteComplianceStatus";
@@ -68,19 +68,12 @@ export function ProjectSiteDetailDrawer({
   return (
     <DetailDrawer title={`${site.siteCode} ${site.siteName}`} open={Boolean(site)} onClose={onClose}>
       <div className="project-site-detail-drawer">
-        <div className="project-site-detail-tabs" role="tablist" aria-label="项目点详情">
-          {detailTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          ariaLabel="项目点详情"
+          items={detailTabs}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+        />
 
         {activeTab === "overview" ? (
           <>

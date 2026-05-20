@@ -23,11 +23,13 @@ import {
   DataTable,
   DetailDrawer,
   EmptyState,
-  PageHeader,
+  FormDrawer,
   SectionCard,
+  SegmentedTabs,
   StatusBadge,
   SummaryCard,
   Toolbar,
+  WorkspaceScaffold,
 } from "./ui";
 import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
 import { certificateStatusToBadge } from "./statusMappers";
@@ -66,6 +68,15 @@ type CertificateFormState = {
   responsibleEmployeeId: string;
   remark: string;
 };
+type CertificateTab = "risk" | "review" | "health" | "food" | "other";
+
+const certificateTabs: { key: CertificateTab; label: string }[] = [
+  { key: "risk", label: "风险" },
+  { key: "review", label: "待审核" },
+  { key: "health", label: "健康证" },
+  { key: "food", label: "食品经营许可证" },
+  { key: "other", label: "其他资质" },
+];
 
 const typeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
 const ownerLabel = new Map(CERTIFICATE_OWNER_TYPES.map((item) => [item.code, item.label]));
@@ -184,6 +195,8 @@ export function CertificatesWorkspace({
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<CertificateFormState>(() => createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
+  const [activeTab, setActiveTab] = useState<CertificateTab>(portalSection === "foodLicense" ? "food" : portalSection === "rosterHealth" ? "health" : "risk");
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!portalOwnerType || !ownerTypeOptions.some((item) => item.code === portalOwnerType)) return;
@@ -342,6 +355,7 @@ export function CertificatesWorkspace({
       setCertificates((current) => [created, ...current.filter((certificate) => certificate.id !== created.id)]);
       setForm(createEmptyForm(defaultOwnerType, defaultPersonOwnerSource));
       setSubmitState("saved");
+      setCreateDrawerOpen(false);
     } catch (error) {
       setSubmitError(formatApiError(error, "证照保存失败，请检查编码、归属对象或日期。"));
       setSubmitState("error");
@@ -351,36 +365,57 @@ export function CertificatesWorkspace({
   const expiringCount = certificates.filter((certificate) => certificate.computedStatus === "expiring_soon").length;
   const expiredCount = certificates.filter((certificate) => certificate.computedStatus === "expired").length;
   const validCount = certificates.filter((certificate) => certificate.computedStatus === "valid").length;
-  const reviewCount = certificates.filter((certificate) =>
-    certificate.computedStatus === "review_due" || certificate.computedStatus === "review_due_soon"
-  ).length;
   const pendingReviewCount = certificates.filter((certificate) =>
     certificate.isComplianceCritical && !certificate.confirmedAt && !certificate.isDisabled
   ).length;
+  const visibleCertificates = filteredCertificates.filter((certificate) => {
+    if (activeTab === "review") return certificate.isComplianceCritical && !certificate.confirmedAt && !certificate.isDisabled;
+    if (activeTab === "health") return certificate.certificateType === "person_health_cert";
+    if (activeTab === "food") return certificate.certificateType === "food_operation_license";
+    if (activeTab === "other") return certificate.certificateType !== "person_health_cert" && certificate.certificateType !== "food_operation_license";
+    return certificate.computedStatus === "expired" || certificate.computedStatus === "expiring_soon" || certificate.computedStatus === "review_due" || certificate.computedStatus === "review_due_soon";
+  });
   const selectedCertificate = filteredCertificates.find((certificate) => certificate.id === selectedCertificateId) ?? null;
   const portalCopy = portalSection ? certificatePortalCopy[portalSection] : undefined;
 
   return (
-    <section className="workspace-section" aria-label="证照资质">
-      <PageHeader
+    <WorkspaceScaffold
         eyebrow="证照风险与审核中心"
         title="证照资质"
-        subtitle="按风险、到期、复核和总部确认状态管理营业执照、食品经营许可证、人员健康证、供应商资质和项目点许可证。"
-      />
+        subtitle="默认查看证照风险；审核、健康证和食品经营许可证分区处理。"
+        summary={(
+          <div className="summary-grid compact-summary">
+            <SummaryCard label="有效证照" value={validCount} detail="当前有效" tone="success" />
+            <SummaryCard label="即将到期" value={expiringCount} detail="30 天内风险" tone={expiringCount > 0 ? "warning" : "success"} />
+            <SummaryCard label="已过期" value={expiredCount} detail="阻断风险" tone={expiredCount > 0 ? "danger" : "success"} />
+            <SummaryCard label="待审核" value={pendingReviewCount} detail="总部确认口径" tone={pendingReviewCount > 0 ? "info" : "success"} />
+          </div>
+        )}
+        tabs={(
+          <>
+            <SegmentedTabs
+              items={certificateTabs.filter((tab) => {
+                if (!portalSection) return true;
+                return tab.key === "health" || tab.key === "food";
+              })}
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              ariaLabel="证照分区"
+            />
+            {canManage ? (
+              <div className="workspace-primary-actions">
+                <button type="button" onClick={() => setCreateDrawerOpen(true)}>新增证照</button>
+              </div>
+            ) : null}
+          </>
+        )}
+      >
 
       {portalCopy ? (
         <SectionCard title={portalCopy.title} badge="项目点账号入口">
           <p className="form-helper">{portalCopy.description}</p>
         </SectionCard>
       ) : null}
-
-      <div className="summary-grid">
-        <SummaryCard label="有效证照" value={validCount} detail="当前有效" tone="success" />
-        <SummaryCard label="即将到期" value={expiringCount} detail="30 天内风险" tone={expiringCount > 0 ? "warning" : "success"} />
-        <SummaryCard label="已过期" value={expiredCount} detail="阻断风险" tone={expiredCount > 0 ? "danger" : "success"} />
-        <SummaryCard label="待复核" value={reviewCount} detail="复核日期提醒" tone={reviewCount > 0 ? "warning" : "neutral"} />
-        <SummaryCard label="待审核" value={pendingReviewCount} detail="总部确认口径" tone={pendingReviewCount > 0 ? "info" : "success"} />
-      </div>
 
       <Toolbar
         search={(
@@ -404,14 +439,14 @@ export function CertificatesWorkspace({
         )}
       />
 
-      <div className="workspace-grid two-column">
+      <>
         <SectionCard title="证照风险台账" action={<FileBadge aria-hidden="true" size={18} />}>
           {status === "loading" ? <StateLine icon={<RefreshCw size={16} />} text="正在加载证照台账..." /> : null}
           {status === "error" ? <StateLine icon={<AlertTriangle size={16} />} text="证照台账加载失败" tone="danger" /> : null}
           {status === "ready" ? (
             <DataTable
               headers={["证照", "类型", "归属对象", "适用项目点", "到期/复核", "剩余天数", "状态", "审核状态", "人员匹配"]}
-              rows={filteredCertificates.map((certificate) => {
+              rows={visibleCertificates.map((certificate) => {
                 const computedStatus = certificateStatusToBadge(certificate.computedStatus);
                 const statusTone =
                   certificate.isDisabled || certificate.computedStatus === "disabled" || certificate.computedStatus === "archived"
@@ -439,12 +474,18 @@ export function CertificatesWorkspace({
                   healthMatchLabel(certificate),
                 ];
               })}
-              emptyState={<EmptyState title="暂无证照资料" description="可通过右侧表单登记证照，或调整筛选条件。" />}
-              onRowClick={(index) => setSelectedCertificateId(filteredCertificates[index].id)}
+              emptyState={<EmptyState title="暂无证照资料" description="可通过新增证照登记资料，或调整筛选条件。" />}
+              onRowClick={(index) => setSelectedCertificateId(visibleCertificates[index].id)}
             />
           ) : null}
         </SectionCard>
 
+        <FormDrawer
+          title="新增证照"
+          open={createDrawerOpen}
+          dirty={Boolean(form.certificateCode || form.certificateName || form.ownerNameSnapshot || form.certificateNumber || form.remark)}
+          onClose={() => setCreateDrawerOpen(false)}
+        >
         {canManage ? (
           <section className="workspace-panel certificate-create-panel">
             <PanelHeader title="新增证照" icon={<ShieldCheck size={18} />} />
@@ -580,7 +621,8 @@ export function CertificatesWorkspace({
             </form>
           </section>
         ) : null}
-      </div>
+        </FormDrawer>
+      </>
 
       <DetailDrawer
         title={selectedCertificate ? `${selectedCertificate.certificateCode} ${selectedCertificate.certificateName}` : "证照详情"}
@@ -616,7 +658,7 @@ export function CertificatesWorkspace({
           </>
         ) : null}
       </DetailDrawer>
-    </section>
+    </WorkspaceScaffold>
   );
 }
 

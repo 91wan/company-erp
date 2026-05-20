@@ -14,7 +14,7 @@ import {
   type PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
+import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold } from "./ui";
 
 type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
@@ -58,6 +58,14 @@ type RecordFormState = {
 };
 
 type PurchaseFormDrawer = "request" | "record" | null;
+type PurchaseTab = "todo" | "requests" | "records" | "arrivals";
+
+const purchaseTabs: { key: PurchaseTab; label: string }[] = [
+  { key: "todo", label: "待办" },
+  { key: "requests", label: "采购需求" },
+  { key: "records", label: "采购执行" },
+  { key: "arrivals", label: "到货记录" },
+];
 
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
@@ -171,6 +179,7 @@ export function PurchaseWorkspace({
     requestId: string;
   } | null>(null);
   const [openFormDrawer, setOpenFormDrawer] = useState<PurchaseFormDrawer>(null);
+  const [activeTab, setActiveTab] = useState<PurchaseTab>("todo");
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
   const [requestForm, setRequestForm] = useState<RequestFormState>({
@@ -395,35 +404,37 @@ export function PurchaseWorkspace({
   }
 
   return (
-    <section className="purchase-workspace" aria-label="采购管理">
-      <PageHeader
+    <WorkspaceScaffold
         eyebrow="经营业务"
         title="采购管理"
-        subtitle="登记采购需求、提交审批并跟踪采购执行；采购入库由库存模块完成闭环。"
+        subtitle="默认处理采购待办；需求、执行和到货记录分区查看。"
         actions={(
           <span className="parties-total">
             <ShoppingCart aria-hidden="true" size={18} />
             {purchaseRequests.length + purchaseRecords.length} 条采购数据
           </span>
         )}
-      />
-
-      <div className="summary-grid" aria-label="采购摘要指标">
-        <SummaryCard label="采购需求" value={purchaseRequests.length} detail="需求台账" tone="info" />
-        <SummaryCard label="待审批" value={pendingApprovalRequests.length} detail="需要采购管理处理" tone={pendingApprovalRequests.length > 0 ? "warning" : "success"} />
-        <SummaryCard label="待采购" value={purchaseRequests.filter((request) => request.status === "pending_purchase").length} detail="已准入未采购" tone="neutral" />
-        <SummaryCard label="采购记录" value={purchaseRecords.length} detail="采购执行" tone="info" />
-        <SummaryCard label="已下单" value={purchaseRecords.filter((record) => record.status === "ordered").length} detail="等待到货/入库" tone="success" />
-      </div>
-
-      {canManage ? (
-        <div className="project-site-action-bar" aria-label="采购快捷操作">
-          <button type="button" onClick={() => setOpenFormDrawer("request")}>新增采购需求</button>
-          <button type="button" onClick={() => setOpenFormDrawer("record")}>新增采购记录</button>
-        </div>
-      ) : null}
-
-      <SectionCard title="待审批" action={<Check aria-hidden="true" size={17} />}>
+        summary={(
+          <div className="summary-grid compact-summary" aria-label="采购摘要指标">
+            <SummaryCard label="采购需求" value={purchaseRequests.length} detail="需求台账" tone="info" />
+            <SummaryCard label="待审批" value={pendingApprovalRequests.length} detail="需要采购管理处理" tone={pendingApprovalRequests.length > 0 ? "warning" : "success"} />
+            <SummaryCard label="待采购" value={purchaseRequests.filter((request) => request.status === "pending_purchase").length} detail="已准入未采购" tone="neutral" />
+            <SummaryCard label="采购记录" value={purchaseRecords.length} detail="采购执行" tone="info" />
+          </div>
+        )}
+        tabs={(
+          <>
+            <SegmentedTabs items={purchaseTabs} activeKey={activeTab} onChange={setActiveTab} ariaLabel="采购分区" />
+            {canManage && activeTab === "requests" ? (
+              <div className="workspace-primary-actions"><button type="button" onClick={() => setOpenFormDrawer("request")}>新增采购需求</button></div>
+            ) : null}
+            {canManage && activeTab === "records" ? (
+              <div className="workspace-primary-actions"><button type="button" onClick={() => setOpenFormDrawer("record")}>新增采购记录</button></div>
+            ) : null}
+          </>
+        )}
+      >
+      {activeTab === "todo" ? <SectionCard title="待审批" action={<Check aria-hidden="true" size={17} />}>
         {pendingApprovalRequests.length === 0 ? <StateMessage text="暂无待审批采购需求" /> : null}
         {pendingApprovalRequests.length > 0 ? (
           <>
@@ -499,9 +510,9 @@ export function PurchaseWorkspace({
           </>
         ) : null}
         {reviewState === "error" ? <p className="form-error">{reviewError || "审批操作失败"}</p> : null}
-      </SectionCard>
+      </SectionCard> : null}
 
-      <div className="project-site-list-layout">
+      {activeTab === "requests" ? <div className="project-site-list-layout">
         <SectionCard title="采购需求" action={<ClipboardList aria-hidden="true" size={17} />}>
           <Toolbar
             query={requestQuery}
@@ -531,7 +542,7 @@ export function PurchaseWorkspace({
           dirty={requestFormDirty && requestSubmitState !== "saving"}
           onClose={() => setOpenFormDrawer(null)}
         >
-          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRequestSubmit} noValidate>
+          {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleRequestSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购需求</h3>
             <button type="submit" disabled={requestSubmitState === "saving"}>
@@ -570,9 +581,9 @@ export function PurchaseWorkspace({
           {requestSubmitState === "error" ? <p className="form-error">{requestSubmitError || "保存失败，请检查单号是否重复或稍后重试。"}</p> : null}
           </form> : null}
         </FormDrawer>
-      </div>
+      </div> : null}
 
-      <div className="project-site-list-layout">
+      {activeTab === "records" ? <div className="project-site-list-layout">
         <SectionCard title="采购执行" action={<PackageCheck aria-hidden="true" size={17} />}>
           <Toolbar
             query={recordQuery}
@@ -594,7 +605,7 @@ export function PurchaseWorkspace({
           dirty={recordFormDirty && recordSubmitState !== "saving"}
           onClose={() => setOpenFormDrawer(null)}
         >
-          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleRecordSubmit} noValidate>
+          {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleRecordSubmit} noValidate>
           <div className="panel-header">
             <h3>新增采购记录</h3>
             <button type="submit" disabled={recordSubmitState === "saving"}>
@@ -662,7 +673,11 @@ export function PurchaseWorkspace({
           {recordSubmitState === "error" ? <p className="form-error">{recordSubmitError || "保存失败，请检查单号是否重复或稍后重试。"}</p> : null}
           </form> : null}
         </FormDrawer>
-      </div>
+      </div> : null}
+
+      {activeTab === "arrivals" ? (
+        <EmptyState title="到货记录后续开放" description="当前到货与入库闭环在库存模块登记；稳定接口开放后在此展示到货记录。" />
+      ) : null}
 
       <DetailDrawer title="采购需求详情" open={Boolean(selectedRequest)} onClose={() => setSelectedRequestId("")}>
         {selectedRequest ? <PurchaseRequestDetail request={selectedRequest} /> : null}
@@ -671,7 +686,7 @@ export function PurchaseWorkspace({
       <DetailDrawer title="采购记录详情" open={Boolean(selectedRecord)} onClose={() => setSelectedRecordId("")}>
         {selectedRecord ? <PurchaseRecordDetail record={selectedRecord} /> : null}
       </DetailDrawer>
-    </section>
+    </WorkspaceScaffold>
   );
 }
 
@@ -885,7 +900,7 @@ function purchaseRequestTone(status: PurchaseRequestStatusCode): "info" | "succe
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>
