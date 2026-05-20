@@ -7,7 +7,7 @@ import {
   type PartyTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar } from "./ui";
+import { SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
@@ -111,27 +111,29 @@ export function PartiesWorkspace({
     });
   }
 
+  const summary = (
+    <div className="summary-grid" aria-label="往来方指标摘要">
+      {PARTY_METADATA.partyTypes.map((partyType) => {
+        const count = parties.filter((party) => party.partyTypes.includes(partyType.code)).length;
+        return <SummaryCard key={partyType.code} label={partyType.label} value={count} detail="往来单位分类" tone="neutral" />;
+      })}
+    </div>
+  );
+
   return (
-    <section className="parties-workspace" aria-label="往来方基础资料">
-      <PageHeader
-        eyebrow="基础资料"
-        title="往来单位"
-        subtitle="统一维护客户、供应商、分包商、个人承包人和运营主体；个人承包人仍作为 Party 个人主体管理。"
-        actions={(
-          <span className="parties-total">
-            <Building2 aria-hidden="true" size={18} />
-            {parties.length} 个往来方
-          </span>
-        )}
-      />
-
-      <div className="summary-grid" aria-label="往来方指标摘要">
-        {PARTY_METADATA.partyTypes.map((partyType) => {
-          const count = parties.filter((party) => party.partyTypes.includes(partyType.code)).length;
-          return <SummaryCard key={partyType.code} label={partyType.label} value={count} detail="往来单位分类" tone="neutral" />;
-        })}
-      </div>
-
+    <WorkspaceScaffold
+      eyebrow="基础资料"
+      title="往来单位"
+      subtitle="统一维护客户、供应商、分包主体、个人承包人和运营主体。"
+      actions={(
+        <span className="parties-total">
+          <Building2 aria-hidden="true" size={18} />
+          {parties.length} 个往来方
+        </span>
+      )}
+      summary={summary}
+    >
+      <section className="parties-workspace" aria-label="往来方基础资料">
       <div className="parties-layout">
         <SectionCard title="往来单位台账">
           <Toolbar
@@ -246,7 +248,8 @@ export function PartiesWorkspace({
           {submitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
         </form> : null}
       </div>
-    </section>
+      </section>
+    </WorkspaceScaffold>
   );
 }
 

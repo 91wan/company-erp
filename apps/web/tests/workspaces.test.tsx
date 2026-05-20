@@ -99,13 +99,17 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(screen.getByRole("heading", { name: "物料与仓库" })).toBeInTheDocument();
-    expect(screen.getByText("仓库基础")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "物料" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
     expect(screen.getByText("98 元")).toBeInTheDocument();
     expect(screen.getByText("项目点领用核算价")).toBeInTheDocument();
+    expect(screen.queryByText("仓库台账")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
+    expect(screen.getByRole("tab", { name: "仓库" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("无锡总部仓库").length).toBeGreaterThan(0);
-    expect(screen.getByText("当前阶段只管理无锡总部真实库存，不管理项目点现场库存。")).toBeInTheDocument();
+    expect(screen.queryByText("物料台账")).not.toBeInTheDocument();
   });
 
   it("renders empty and error states for material and warehouse loading", async () => {
@@ -117,6 +121,7 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("暂无物料资料")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
     expect(await screen.findByText("暂无仓库资料")).toBeInTheDocument();
 
     rerender(
@@ -126,7 +131,9 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "物料" }));
     expect(await screen.findByText("物料资料加载失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
     expect(await screen.findByText("仓库资料加载失败")).toBeInTheDocument();
   });
 
@@ -156,12 +163,13 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("收费备注"), { target: { value: "项目点耗材核算" } });
     fireEvent.click(screen.getByLabelText("耗材"));
     fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
+    expect(await screen.findByText("定制纸杯")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
     fireEvent.change(screen.getByLabelText("仓库编码"), { target: { value: "WH-TEMP-01" } });
     fireEvent.change(screen.getByLabelText("仓库名称"), { target: { value: "临时周转仓" } });
     fireEvent.click(screen.getByRole("button", { name: "保存仓库" }));
 
-    expect(await screen.findByText("定制纸杯")).toBeInTheDocument();
     expect(await screen.findByText("临时周转仓")).toBeInTheDocument();
     expect(createMaterial).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -190,12 +198,14 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("物料名称"), { target: { value: "定制纸杯" } });
     fireEvent.change(screen.getByLabelText("基本单位"), { target: { value: "箱" } });
     fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
+    expect(await screen.findByText("保存失败，请检查编码是否重复或稍后重试。")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
     fireEvent.change(screen.getByLabelText("仓库编码"), { target: { value: "WH-TEMP-01" } });
     fireEvent.change(screen.getByLabelText("仓库名称"), { target: { value: "临时周转仓" } });
     fireEvent.click(screen.getByRole("button", { name: "保存仓库" }));
 
-    expect(await screen.findAllByText("保存失败，请检查编码是否重复或稍后重试。")).toHaveLength(2);
+    expect(await screen.findByText("保存失败，请检查编码是否重复或稍后重试。")).toBeInTheDocument();
   });
 
   it("renders populated people and permissions master data", async () => {
@@ -1325,9 +1335,14 @@ describe("Company ERP workspace components", () => {
 
     expect(screen.getByRole("heading", { name: "业务项目" })).toBeInTheDocument();
     expect((await screen.findAllByText("扬中中央厨房")).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText("CNY 1,680,000")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("tab", { name: "项目台账" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("投入合同金额汇总")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "投入汇总" }));
+    expect((await screen.findAllByText("1,680,000 元")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("装修/改造").length).toBeGreaterThan(0);
 
+    fireEvent.click(screen.getByRole("tab", { name: "项目台账" }));
     fireEvent.change(screen.getByLabelText("项目编码"), { target: { value: "BP-YZ-CK-002" } });
     fireEvent.change(screen.getByLabelText("项目名称"), { target: { value: "扬中中央厨房二期" } });
     fireEvent.change(screen.getByLabelText("地点"), { target: { value: "扬中" } });
