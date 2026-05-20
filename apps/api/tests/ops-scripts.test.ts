@@ -574,6 +574,7 @@ describe("pilot evidence manifest verifier", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("summary.txt");
     expect(result.stderr).toContain("SHA256 mismatch");
+    expect(result.stderr).toContain("处理建议");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
@@ -585,6 +586,24 @@ describe("pilot evidence manifest verifier", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Evidence directory must be outside the repository");
+    expect(result.stderr).toContain("处理建议");
+  });
+
+  it("reports missing manifest files with an actionable verifier hint", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-missing-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("manifest.json is required");
+    expect(result.stderr).toContain("处理建议");
+    expect(result.stderr).not.toContain("/volume1");
+    rmSync(tempRoot, { recursive: true, force: true });
   });
 });
 
@@ -658,6 +677,7 @@ describe("audit export evidence verifier", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("SHA256 mismatch");
+    expect(result.stderr).toContain("处理建议");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
@@ -676,6 +696,7 @@ describe("audit export evidence verifier", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("record count mismatch");
+    expect(result.stderr).toContain("处理建议");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
@@ -688,6 +709,7 @@ describe("audit export evidence verifier", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Audit export CSV must be outside the repository");
+    expect(result.stderr).toContain("处理建议");
   });
 });
 
