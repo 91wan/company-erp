@@ -135,9 +135,11 @@ describe("Company ERP workspace components", () => {
       "aria-selected",
       "true",
     );
+    expect(screen.getByRole("button", { name: "新增物料" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存物料" })).not.toBeInTheDocument();
     expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
-    expect(screen.getByText("98 元")).toBeInTheDocument();
-    expect(screen.getByText("项目点领用核算价")).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(7);
     expect(screen.queryByText("仓库台账")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
@@ -200,6 +202,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无物料资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增物料" }));
     fireEvent.change(screen.getByLabelText("物料编码"), {
       target: { value: "MAT0002" },
     });
@@ -228,8 +231,12 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByLabelText("耗材"));
     fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
     expect(await screen.findByText("定制纸杯")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存物料" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
+    expect(screen.getByRole("button", { name: "新增仓库" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存仓库" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增仓库" }));
     fireEvent.change(screen.getByLabelText("仓库编码"), {
       target: { value: "WH-TEMP-01" },
     });
@@ -264,6 +271,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无物料资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增物料" }));
     fireEvent.change(screen.getByLabelText("物料编码"), {
       target: { value: "MAT0002" },
     });
@@ -279,6 +287,7 @@ describe("Company ERP workspace components", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "仓库" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增仓库" }));
     fireEvent.change(screen.getByLabelText("仓库编码"), {
       target: { value: "WH-TEMP-01" },
     });
