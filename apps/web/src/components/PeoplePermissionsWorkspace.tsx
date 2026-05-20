@@ -22,7 +22,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { PageHeader, StatusBadge, SummaryCard } from "./ui";
+import { SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold, type TabItem } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -52,6 +52,17 @@ const employeeStatusLabel = new Map(EMPLOYEE_STATUSES.map((status) => [status.co
 const accountStatusLabel = new Map(USER_ACCOUNT_STATUSES.map((status) => [status.code, status.label]));
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 const relationTypeLabel = new Map(EMPLOYEE_PROJECT_SITE_RELATION_TYPES.map((relation) => [relation.code, relation.label]));
+
+type PeoplePermissionsTab = "employees" | "departments" | "userAccounts" | "externalAccounts" | "assignments" | "permissions";
+
+const peoplePermissionsTabs: TabItem<PeoplePermissionsTab>[] = [
+  { key: "employees", label: "公司员工" },
+  { key: "departments", label: "部门" },
+  { key: "userAccounts", label: "用户账号" },
+  { key: "externalAccounts", label: "项目点账号" },
+  { key: "assignments", label: "项目点分配" },
+  { key: "permissions", label: "权限说明" },
+];
 
 async function defaultLoadDepartments(): Promise<DepartmentDto[]> {
   const payload = await requestJson<{ departments: DepartmentDto[] }>(`${apiBaseUrl}/api/departments`);
@@ -178,6 +189,7 @@ export function PeoplePermissionsWorkspace({
   const [externalAccountStatus, setExternalAccountStatus] = useState<"loading" | "ready" | "error">("loading");
   const [assignmentStatus, setAssignmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<PeoplePermissionsTab>("employees");
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
@@ -505,32 +517,45 @@ export function PeoplePermissionsWorkspace({
     });
   }
 
+  const summary = (
+    <div className="summary-grid" aria-label="人员权限指标摘要">
+      <SummaryCard label="部门" value={departments.length} detail="组织基础" tone="neutral" />
+      <SummaryCard label="公司员工" value={employees.filter((employee) => employee.employmentStatus === "active").length} detail="HR 员工台账" tone="success" />
+      <SummaryCard label="启用账号" value={userAccounts.filter((account) => account.status === "active").length} detail="内部登录账号" tone="info" />
+      <SummaryCard label="项目点账号" value={externalProjectSiteAccounts.filter((account) => account.status === "active").length} detail="当前有效项目经理账号" tone="warning" />
+      <SummaryCard label="Admin账号" value={userAccounts.filter((account) => account.roles.includes("admin")).length} detail="高权限账号" tone="danger" />
+    </div>
+  );
+
+  const tabs = (
+    <SegmentedTabs
+      items={peoplePermissionsTabs}
+      activeKey={activeTab}
+      onChange={setActiveTab}
+      ariaLabel="人员权限分区"
+    />
+  );
+
   return (
-    <section className="people-permissions-workspace" aria-label="人员权限基础">
-      <PageHeader
-        eyebrow="合规与人员"
-        title="人员权限"
-        subtitle="维护公司员工、登录账号、项目点账号和项目点人员分配；项目点现场人员名单在项目点模块维护。"
-        actions={(
-          <label className="party-search people-search">
-            <Search aria-hidden="true" size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索部门、员工、账号" />
-          </label>
-        )}
-      />
+    <WorkspaceScaffold
+      eyebrow="合规与人员"
+      title="人员权限"
+      subtitle="维护公司员工、登录账号、项目点账号和项目点人员分配；项目点现场人员名单在项目点模块维护。"
+      actions={(
+        <label className="party-search people-search">
+          <Search aria-hidden="true" size={16} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索部门、员工、账号" />
+        </label>
+      )}
+      summary={summary}
+      tabs={tabs}
+    >
+      <section className="people-permissions-workspace" aria-label="人员权限基础">
+        <p className="form-hint people-safety-note">
+          项目点账号单独管理；一个项目点最多一个当前有效项目点账号，更换项目经理建议停用旧账号并创建新账号。
+        </p>
 
-      <div className="summary-grid" aria-label="人员权限指标摘要">
-        <SummaryCard label="部门" value={departments.length} detail="组织基础" tone="neutral" />
-        <SummaryCard label="公司员工" value={employees.filter((employee) => employee.employmentStatus === "active").length} detail="HR 员工台账" tone="success" />
-        <SummaryCard label="启用账号" value={userAccounts.filter((account) => account.status === "active").length} detail="内部登录账号" tone="info" />
-        <SummaryCard label="项目点账号" value={externalProjectSiteAccounts.filter((account) => account.status === "active").length} detail="当前有效项目经理账号" tone="warning" />
-        <SummaryCard label="Admin账号" value={userAccounts.filter((account) => account.roles.includes("admin")).length} detail="高权限账号" tone="danger" />
-      </div>
-
-      <p className="form-hint people-safety-note">
-        项目点账号单独管理；一个项目点最多一个当前有效项目点账号，更换项目经理建议停用旧账号并创建新账号。
-      </p>
-
+      {activeTab === "departments" ? (
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<Users size={18} />} title="部门管理" />
@@ -552,7 +577,9 @@ export function PeoplePermissionsWorkspace({
           {departmentSubmit === "error" ? <p className="form-error">{departmentSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
+      ) : null}
 
+      {activeTab === "externalAccounts" ? (
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<KeyRound size={18} />} title="项目点账号" />
@@ -656,7 +683,9 @@ export function PeoplePermissionsWorkspace({
           {externalAccountSubmit === "error" ? <p className="form-error">{externalAccountSubmitError || "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"}</p> : null}
         </form> : null}
       </section>
+      ) : null}
 
+      {activeTab === "employees" ? (
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<IdCard size={18} />} title="公司员工" />
@@ -689,7 +718,9 @@ export function PeoplePermissionsWorkspace({
           {employeeSubmit === "error" ? <p className="form-error">{employeeSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
+      ) : null}
 
+      {activeTab === "userAccounts" ? (
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
@@ -732,7 +763,9 @@ export function PeoplePermissionsWorkspace({
           {accountSubmit === "error" ? <p className="form-error">{accountSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form> : null}
       </section>
+      ) : null}
 
+      {activeTab === "assignments" ? (
       <section className="people-section-grid">
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<MapPin size={18} />} title="项目点分配" />
@@ -812,12 +845,16 @@ export function PeoplePermissionsWorkspace({
           {assignmentSubmit === "error" ? <p className="form-error">{assignmentSubmitError || "保存失败，请检查是否重复分配或项目点是否有效。"}</p> : null}
         </form> : null}
       </section>
+      ) : null}
 
+      {activeTab === "permissions" ? (
       <section className="dashboard-panel table-panel">
         <PanelTitle icon={<ShieldCheck size={18} />} title="权限矩阵" />
         <PermissionMatrix />
       </section>
-    </section>
+      ) : null}
+      </section>
+    </WorkspaceScaffold>
   );
 }
 
