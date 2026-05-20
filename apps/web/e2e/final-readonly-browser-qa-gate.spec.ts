@@ -149,8 +149,9 @@ test("external_project_site final readonly gate routes scoped compliance section
   ).toBeVisible();
   await expect(page.getByText("统一附件待总部登记")).toBeVisible();
   await expect(
-    page.getByText("附件上传后续开放，当前由总部登记附件引用"),
+    page.getByText("工资表不需要提交"),
   ).toBeVisible();
+  await expect(page.getByText("当前项目点未启用工资代发资料提交。")).toBeVisible();
 
   await expect(
     page.getByRole("button", { name: "系统设置", exact: true }),

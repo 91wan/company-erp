@@ -238,10 +238,14 @@ export function ProjectSiteComplianceSubmitPanel({
           </div>
         ) : null}
         {section === "payroll" ? (
-          <div className="compliance-submit-grid">
-            <PayrollSubmissionForm site={site} currentContactName={currentContactName} onSubmitted={onSubmitted} />
-            <BusinessTargetUploadForm targets={payrollTargets} onUploaded={onSubmitted} />
-          </div>
+          site.payrollAgencyRequired ? (
+            <div className="compliance-submit-grid">
+              <PayrollSubmissionForm site={site} currentContactName={currentContactName} onSubmitted={onSubmitted} />
+              <BusinessTargetUploadForm targets={payrollTargets} onUploaded={onSubmitted} />
+            </div>
+          ) : (
+            <EmptyState title="工资表不需要提交" description="当前项目点未启用工资代发资料提交。" />
+          )
         ) : null}
       </SectionCard>
     </section>

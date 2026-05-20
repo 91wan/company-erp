@@ -24,7 +24,7 @@ describe("ProjectSiteActionBar", () => {
     expect(onOpenForm).toHaveBeenCalledWith("issue");
   });
 
-  it("keeps external project-site actions scoped to request and equipment-change entry points", () => {
+  it("keeps external project-site usage actions focused on usage requests", () => {
     const onOpenForm = vi.fn();
 
     render(
@@ -41,6 +41,6 @@ describe("ProjectSiteActionBar", () => {
     expect(screen.getByRole("button", { name: "新增领用申请" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "出库登记" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新增厨房设备" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "上报设备变更" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上报设备变更" })).not.toBeInTheDocument();
   });
 });
