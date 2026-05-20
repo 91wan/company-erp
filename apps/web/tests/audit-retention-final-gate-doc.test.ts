@@ -19,6 +19,9 @@ describe("audit retention and final gate record", () => {
     expect(audit).toContain("actorUsername");
     expect(audit).toContain("date range");
     expect(audit).toContain("每周导出一次 CSV");
+    expect(audit).toContain("SHA256");
+    expect(audit).toContain("导出人");
+    expect(audit).toContain("筛选条件");
     expect(audit).toContain("归档职责");
     expect(audit).toContain("deploy revision");
     expect(audit).toContain("password");
