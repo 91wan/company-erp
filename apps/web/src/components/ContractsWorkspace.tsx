@@ -549,16 +549,10 @@ function ContractsTable({ contracts, onSelectContract }: { contracts: ContractDt
             <th>合同编号</th>
             <th>名称</th>
             <th>相对方</th>
-            <th>方向</th>
-            <th>合同形态</th>
-            <th>合同标的</th>
-            <th>投入分类</th>
-            <th>业务项目</th>
-            <th>项目点</th>
+            <th>关联对象</th>
             <th>开始/结束日期</th>
             <th>金额/预算</th>
             <th>到期状态</th>
-            <th>更新时间</th>
           </tr>
         </thead>
         <tbody>
@@ -567,12 +561,12 @@ function ContractsTable({ contracts, onSelectContract }: { contracts: ContractDt
               <td>{contract.contractNo}</td>
               <td>{contract.contractName}</td>
               <td>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</td>
-              <td>{directionLabel.get(contract.direction)}</td>
-              <td>{contractFormLabel.get(contract.contractForm)}</td>
-              <td>{subjectCategoryLabel.get(contract.subjectCategory)}</td>
-              <td>{contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : "-"}</td>
-              <td>{contract.businessProjectName ?? "-"}</td>
-              <td>{contract.projectSiteName ?? "-"}</td>
+              <td>
+                <span className="table-cell-stack">
+                  <strong>{contract.projectSiteName ?? contract.businessProjectName ?? "-"}</strong>
+                  <small>{contract.projectSiteName && contract.businessProjectName ? contract.businessProjectName : "项目点 / 业务项目"}</small>
+                </span>
+              </td>
               <td>
                 {contract.startDate} / {contract.endDate ?? "长期"}
               </td>
@@ -582,7 +576,6 @@ function ContractsTable({ contracts, onSelectContract }: { contracts: ContractDt
                   {contractExpiryToBadge(contract.expiryState).label}
                 </StatusBadge>
               </td>
-              <td>{formatDateTime(contract.updatedAt)}</td>
             </tr>
           ))}
         </tbody>
@@ -600,16 +593,26 @@ function ContractDetail({ contract }: { contract: ContractDto }) {
       <dd>{contract.contractName}</dd>
       <dt>相对方</dt>
       <dd>{contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot}</dd>
-      <dt>方向/形态</dt>
-      <dd>{directionLabel.get(contract.direction)} / {contractFormLabel.get(contract.contractForm)}</dd>
-      <dt>项目点/业务项目</dt>
-      <dd>{contract.projectSiteName ?? "-"} / {contract.businessProjectName ?? "-"}</dd>
+      <dt>合同方向</dt>
+      <dd>{directionLabel.get(contract.direction)}</dd>
+      <dt>合同形态</dt>
+      <dd>{contractFormLabel.get(contract.contractForm)}</dd>
+      <dt>合同标的</dt>
+      <dd>{subjectCategoryLabel.get(contract.subjectCategory)}</dd>
+      <dt>投入分类</dt>
+      <dd>{contract.investmentCategory ? investmentCategoryLabel.get(contract.investmentCategory) : "非投入类合同"}</dd>
+      <dt>项目点</dt>
+      <dd>{contract.projectSiteName ?? "-"}</dd>
+      <dt>业务项目</dt>
+      <dd>{contract.businessProjectName ?? "-"}</dd>
       <dt>起止日期</dt>
       <dd>{contract.startDate} / {contract.endDate ?? "长期"}</dd>
       <dt>金额/预算</dt>
       <dd>{formatMoney(contract.amount, contract.currency)} / {formatMoney(contract.budgetAmount, contract.currency)}</dd>
       <dt>到期状态</dt>
       <dd>{contractExpiryToBadge(contract.expiryState).label}</dd>
+      <dt>更新时间</dt>
+      <dd>{formatDateTime(contract.updatedAt)}</dd>
       <dt>附件</dt>
       <dd>{contract.attachmentRef ?? "暂无主附件引用"}</dd>
     </dl>

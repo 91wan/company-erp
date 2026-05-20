@@ -1594,12 +1594,14 @@ describe("Company ERP workspace components", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByText("HT20260511001")).toBeInTheDocument();
     expect(screen.getByText("无锡项目点服务合同")).toBeInTheDocument();
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toHaveLength(7);
+    expect(headers).not.toContain("投入分类");
+    expect(headers).not.toContain("合同形态");
+    expect(headers).not.toContain("合同标的");
+    expect(headers).not.toContain("业务项目");
     expect(screen.getAllByText("即将到期").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已到期").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("投入分类").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("合同形态").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("合同标的").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("业务项目").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
     const directionSelect = screen.getByLabelText(
       "合同方向",
@@ -1608,6 +1610,10 @@ describe("Company ERP workspace components", () => {
       Array.from(directionSelect.options).map((option) => option.textContent),
     ).not.toContain("框架合同");
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    expect(screen.getAllByText("投入分类").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("合同形态").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("合同标的").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("业务项目").length).toBeGreaterThan(0);
     expect(await screen.findByText("统一附件")).toBeInTheDocument();
     expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
     expect(screen.getByText("主附件引用（历史路径）")).toBeInTheDocument();
@@ -1834,14 +1840,14 @@ describe("Company ERP workspace components", () => {
       ),
     ).toBe(false);
     expect(await screen.findByText("HT20260511002")).toBeInTheDocument();
-    expect(screen.getAllByText("框架合同").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("食材").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
     expect(screen.getByText("扬中中央厨房")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511002" }));
     expect(
       screen.getByRole("heading", { name: "合同详情" }),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("框架合同").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("食材").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("button", { name: "登记附件路径" }),
     ).not.toBeInTheDocument();
