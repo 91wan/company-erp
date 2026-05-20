@@ -15,6 +15,8 @@ describe("NAS pilot evidence checklist", () => {
     expect(audit).toContain("npm run preflight:nas");
     expect(audit).toContain("backup restore drill");
     expect(audit).toContain("attachments:legacy-report");
+    expect(audit).toContain("PILOT_LEGACY_REPORT_DATABASE_URL");
+    expect(audit).toContain("legacy-report.json");
     expect(audit).toContain("audit CSV export");
     expect(audit).toContain("deploy revision");
     expect(audit).toContain("admin");
