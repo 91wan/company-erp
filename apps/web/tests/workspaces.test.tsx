@@ -1347,7 +1347,12 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("tab", { name: "厨房设备" })[0]!);
-    expect(await screen.findByText("压缩机异响，需要维修")).toBeInTheDocument();
+    expect(await screen.findByText("状态变化")).toBeInTheDocument();
+    expect(screen.queryByText("压缩机异响，需要维修")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("状态变化"));
+    expect(await screen.findByRole("dialog", { name: "设备变更详情" })).toBeInTheDocument();
+    expect(screen.getByText("压缩机异响，需要维修")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
     expect(reviewKitchenEquipmentChangeRequest).not.toHaveBeenCalled();
     expect(screen.getByText("确认通过？")).toBeInTheDocument();
@@ -1552,12 +1557,15 @@ describe("Company ERP workspace components", () => {
       expect.objectContaining({ outboundNo: "OUT20260511001", quantity: 10 }),
     );
     expect((await screen.findAllByText("已出库")).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText("10 套")).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/已出 10 套/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("USE20260511001"));
+    expect(await screen.findByRole("dialog", { name: "领用申请详情" })).toBeInTheDocument();
     expect(await screen.findByText("¥980.00")).toBeInTheDocument();
-    expect(await screen.findByText("项目点领用人")).toBeInTheDocument();
+    expect((await screen.findAllByText("项目点领用人")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("2026-05-11")).length).toBeGreaterThan(
       0,
     );
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
 
     rerender(
       <ProjectSitesWorkspace

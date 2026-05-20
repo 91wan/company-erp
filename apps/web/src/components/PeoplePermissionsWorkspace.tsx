@@ -1056,12 +1056,10 @@ function ExternalProjectSiteAccountsTable({
         <thead>
           <tr>
             <th>项目点</th>
-            <th>当前联系人</th>
-            <th>手机号</th>
+            <th>联系人</th>
             <th>登录账号</th>
-            <th>外包方</th>
-            <th>状态</th>
-            <th>有效期</th>
+            <th>分包主体</th>
+            <th>状态/有效期</th>
             {canManage ? <th>操作</th> : null}
           </tr>
         </thead>
@@ -1071,17 +1069,21 @@ function ExternalProjectSiteAccountsTable({
               <td>
                 {account.siteCode} {account.siteName}
               </td>
-              <td>{account.currentContactName}</td>
-              <td>{account.currentContactPhone}</td>
+              <td>
+                <strong>{account.currentContactName}</strong>
+                <br />
+                <span>{account.currentContactPhone}</span>
+              </td>
               <td>{account.username}</td>
               <td>{account.subcontractorPartyName || "-"}</td>
               <td>
                 <StatusBadge tone={account.status === "active" ? "success" : "disabled"}>
                   {accountStatusLabel.get(account.status)}
                 </StatusBadge>
-              </td>
-              <td>
-                {account.startDate ?? "-"} / {account.endDate ?? "长期"}
+                <br />
+                <span>
+                  {account.startDate ?? "-"} / {account.endDate ?? "长期"}
+                </span>
               </td>
               {canManage ? (
                 <td>
