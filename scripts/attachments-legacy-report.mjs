@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { PrismaClient } from "@prisma/client";
-import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+import { resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PAYROLL_ATTACHMENT_PENDING = "unified-attachment-pending";
 
@@ -47,8 +49,8 @@ const plannedChecks = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run attachments:legacy-report [-- --dry-run|--json|--csv]
-       scripts/attachments-legacy-report.mjs [--help|--dry-run|--json|--csv]
+  console.log(`Usage: npm run attachments:legacy-report [-- --dry-run|--json|--csv|--output <path>]
+       scripts/attachments-legacy-report.mjs [--help|--dry-run|--json|--csv|--output <path>]
 
 Generates a read-only attachment migration readiness report from DATABASE_URL.
 The report prints counts only. It never reads .env files, NAS attachment
@@ -58,7 +60,8 @@ Options:
   --help     Show this help and exit without requiring DATABASE_URL.
   --dry-run  Print the planned checks without opening a database connection.
   --json     Print machine-readable JSON counts.
-  --csv      Print machine-readable CSV counts.`);
+  --csv      Print machine-readable CSV counts.
+  --output   Write JSON or CSV output to a repository-external evidence file.`);
 }
 
 export function printDryRun() {
@@ -208,6 +211,15 @@ export function formatCsvReport(rows) {
   return `${headers.join(",")}\n${lines.join("\n")}\n`;
 }
 
+export function writeReportOutput(outputPath, content, repoRoot = fileURLToPath(new URL("..", import.meta.url))) {
+  const root = resolve(repoRoot);
+  const target = resolve(outputPath);
+  if (target === root || target.startsWith(`${root}${sep}`)) {
+    throw new Error("Output path must be outside the repository");
+  }
+  writeFileSync(target, content);
+}
+
 function printReport(rows) {
   console.log("Attachment legacy migration readiness report");
   console.log("Mode: read-only counts");
@@ -224,9 +236,29 @@ function printReport(rows) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = [];
+  let outputPath = "";
+  for (let index = 2; index < process.argv.length; index += 1) {
+    const arg = process.argv[index];
+    if (arg === "--output") {
+      outputPath = process.argv[index + 1] ?? "";
+      if (!outputPath) {
+        console.error("--output requires a path");
+        process.exitCode = 2;
+        return;
+      }
+      index += 1;
+    } else {
+      args.push(arg);
+    }
+  }
   if (args.includes("--help") || args.includes("-h")) {
     usage();
+    return;
+  }
+  if (args.includes("--dry-run") && outputPath) {
+    console.error("--output cannot be used with --dry-run");
+    process.exitCode = 2;
     return;
   }
   if (args.includes("--dry-run")) {
@@ -256,10 +288,19 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     const rows = await buildReport(prisma);
+    if (outputPath && !outputModes[0]) {
+      console.error("--output requires --json or --csv");
+      process.exitCode = 2;
+      return;
+    }
     if (outputModes[0] === "--json") {
-      process.stdout.write(formatJsonReport(rows));
+      const content = formatJsonReport(rows);
+      if (outputPath) writeReportOutput(outputPath, content);
+      else process.stdout.write(content);
     } else if (outputModes[0] === "--csv") {
-      process.stdout.write(formatCsvReport(rows));
+      const content = formatCsvReport(rows);
+      if (outputPath) writeReportOutput(outputPath, content);
+      else process.stdout.write(content);
     } else {
       printReport(rows);
     }
