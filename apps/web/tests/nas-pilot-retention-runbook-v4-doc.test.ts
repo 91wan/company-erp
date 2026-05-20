@@ -9,6 +9,7 @@ describe("NAS pilot retention runbook v4", () => {
 
     expect(doc).toContain("manifest.json");
     expect(doc).toContain("manifest.sha256");
+    expect(doc).toContain("npm run pilot:verify-evidence");
     expect(doc).toContain("legacy-report.json");
     expect(doc).toContain("audit CSV");
     expect(doc).toContain("SHA256");

@@ -17,6 +17,7 @@
     "preflight:nas": "bash scripts/preflight-nas.sh",
     "test:backup-restore": "bash scripts/test-backup-restore.sh",
     "pilot:verify-local": "bash scripts/pilot-verify-local.sh",
+    "pilot:verify-evidence": "node scripts/verify-pilot-evidence-manifest.mjs",
     "attachments:legacy-report": "node scripts/attachments-legacy-report.mjs"
   },
   "devDependencies": {
