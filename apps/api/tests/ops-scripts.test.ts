@@ -635,6 +635,42 @@ describe("audit export evidence verifier", () => {
   });
 });
 
+describe("evidence script static safety gate", () => {
+  const scriptPaths = [
+    "scripts/verify-pilot-evidence-manifest.mjs",
+    "scripts/verify-audit-export.mjs",
+    "scripts/attachments-legacy-report.mjs",
+  ];
+
+  it("keeps evidence verifier scripts away from deployment env and NAS roots", () => {
+    for (const scriptPath of scriptPaths) {
+      const source = readFile(join(repoRoot, scriptPath));
+      expect(source, scriptPath).not.toMatch(/dotenv|config\(\)/);
+      expect(source, scriptPath).not.toContain("NAS_ATTACHMENTS_ROOT");
+      expect(source, scriptPath).not.toContain("NAS_DATA_ROOT");
+      expect(source, scriptPath).not.toContain("/volume1");
+      expect(source, scriptPath).not.toMatch(/readFileSync\([^)]*\.env/);
+    }
+  });
+
+  it("keeps legacy attachment reporting count-only and path-value free", () => {
+    const source = readFile(join(repoRoot, "scripts/attachments-legacy-report.mjs"));
+    expect(source).toContain("count(");
+    expect(source).not.toContain("findMany");
+    expect(source).not.toMatch(/select:\s*{[^}]*attachmentPath/s);
+    expect(source).not.toMatch(/select:\s*{[^}]*sourceFilePath/s);
+    expect(source).not.toMatch(/select:\s*{[^}]*filePath/s);
+  });
+
+  it("keeps verifier evidence paths outside the repository", () => {
+    for (const scriptPath of ["scripts/verify-pilot-evidence-manifest.mjs", "scripts/verify-audit-export.mjs"]) {
+      const source = readFile(join(repoRoot, scriptPath));
+      expect(source, scriptPath).toContain("isInside(repoRoot");
+      expect(source, scriptPath).toMatch(/outside the (Git )?repository|must be outside the repository/);
+    }
+  });
+});
+
 describe("attachment legacy migration readiness report", () => {
   it("prints help without requiring DATABASE_URL or reading deployment env", () => {
     const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--help"], {
