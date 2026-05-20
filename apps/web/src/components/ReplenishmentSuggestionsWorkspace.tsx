@@ -14,7 +14,7 @@ import type {
   UpdateReplenishmentSuggestionInput,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { SectionCard, SummaryCard, WorkspaceScaffold } from "./ui";
+import { FormDrawer, SectionCard, SummaryCard, WorkspaceScaffold } from "./ui";
 
 type ConvertResult = {
   replenishmentSuggestion: ReplenishmentSuggestionDto;
@@ -103,6 +103,8 @@ export function ReplenishmentSuggestionsWorkspace({
   const [actionStatus, setActionStatus] = useState<"idle" | "saving" | "error">(
     "idle",
   );
+  const [selectedConvertSuggestionId, setSelectedConvertSuggestionId] =
+    useState("");
   const [form, setForm] = useState<ConvertFormState>({
     requestNo: "",
     requesterName: "",
@@ -136,6 +138,9 @@ export function ReplenishmentSuggestionsWorkspace({
     (sum, item) => sum + item.suggestedQuantity,
     0,
   );
+  const selectedConvertSuggestion =
+    openSuggestions.find((suggestion) => suggestion.id === selectedConvertSuggestionId) ??
+    null;
 
   async function handleGenerate() {
     setActionStatus("saving");
@@ -200,6 +205,7 @@ export function ReplenishmentSuggestionsWorkspace({
         departmentName: "",
         expectedArrivalDate: "",
       });
+      setSelectedConvertSuggestionId("");
       setActionStatus("idle");
     } catch {
       setActionStatus("error");
@@ -266,10 +272,9 @@ export function ReplenishmentSuggestionsWorkspace({
 
         <SectionCard title="待确认补货建议">
           {openSuggestions.map((suggestion) => (
-            <form
+            <article
               className="dashboard-panel replenishment-card"
               key={suggestion.id}
-              onSubmit={(event) => handleConvert(event, suggestion.id)}
             >
               <div>
                 <strong>{suggestion.materialCode}</strong>
@@ -283,58 +288,6 @@ export function ReplenishmentSuggestionsWorkspace({
               <span className="suggestion-quantity">
                 建议 {suggestion.suggestedQuantity} {suggestion.unit}
               </span>
-              <label>
-                <span>采购需求编号</span>
-                <input
-                  required
-                  value={form.requestNo}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      requestNo: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>申请人</span>
-                <input
-                  required
-                  value={form.requesterName}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      requesterName: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>申请部门</span>
-                <input
-                  required
-                  value={form.departmentName}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      departmentName: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>期望到货日期</span>
-                <input
-                  type="date"
-                  value={form.expectedArrivalDate}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      expectedArrivalDate: event.target.value,
-                    }))
-                  }
-                />
-              </label>
               {canManage ? (
                 <div className="replenishment-actions">
                   <button
@@ -345,13 +298,20 @@ export function ReplenishmentSuggestionsWorkspace({
                     <XCircle aria-hidden="true" size={15} />
                     忽略
                   </button>
-                  <button type="submit" disabled={actionStatus === "saving"}>
+                  <button
+                    type="button"
+                    disabled={actionStatus === "saving"}
+                    onClick={() => {
+                      setActionStatus("idle");
+                      setSelectedConvertSuggestionId(suggestion.id);
+                    }}
+                  >
                     <Send aria-hidden="true" size={15} />
                     转采购需求
                   </button>
                 </div>
               ) : null}
-            </form>
+            </article>
           ))}
         </SectionCard>
 
@@ -361,6 +321,92 @@ export function ReplenishmentSuggestionsWorkspace({
           </p>
         ))}
       </section>
+      <FormDrawer
+        title="转采购需求"
+        open={Boolean(selectedConvertSuggestion)}
+        onClose={() => setSelectedConvertSuggestionId("")}
+      >
+        {selectedConvertSuggestion ? (
+          <form
+            className="dashboard-panel replenishment-card"
+            onSubmit={(event) => handleConvert(event, selectedConvertSuggestion.id)}
+          >
+            <div>
+              <strong>{selectedConvertSuggestion.materialCode}</strong>
+              <h3>{selectedConvertSuggestion.materialName}</h3>
+              <p>
+                {selectedConvertSuggestion.warehouseName} / 当前{" "}
+                {selectedConvertSuggestion.currentStock}{" "}
+                {selectedConvertSuggestion.unit} / 安全库存{" "}
+                {selectedConvertSuggestion.safeStock}{" "}
+                {selectedConvertSuggestion.unit}
+              </p>
+            </div>
+            <span className="suggestion-quantity">
+              建议 {selectedConvertSuggestion.suggestedQuantity}{" "}
+              {selectedConvertSuggestion.unit}
+            </span>
+            <label>
+              <span>采购需求编号</span>
+              <input
+                required
+                value={form.requestNo}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    requestNo: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              <span>申请人</span>
+              <input
+                required
+                value={form.requesterName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    requesterName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              <span>申请部门</span>
+              <input
+                required
+                value={form.departmentName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    departmentName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              <span>期望到货日期</span>
+              <input
+                type="date"
+                value={form.expectedArrivalDate}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    expectedArrivalDate: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <div className="replenishment-actions">
+              <button type="submit" disabled={actionStatus === "saving"}>
+                <Send aria-hidden="true" size={15} />
+                确认转采购需求
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </FormDrawer>
     </WorkspaceScaffold>
   );
 }

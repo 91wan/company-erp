@@ -453,6 +453,7 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("补货建议")).toBeInTheDocument();
     expect(screen.getByText("MAT0001")).toBeInTheDocument();
     expect(screen.getByText("建议 24 套")).toBeInTheDocument();
+    expect(screen.queryByLabelText("采购需求编号")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "生成补货建议" }));
     expect(
@@ -461,7 +462,11 @@ describe("Company ERP workspace components", () => {
     expect(
       within(screen.getByLabelText("补货建议摘要")).getByText("1"),
     ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "转采购需求" })).not.toBeDisabled(),
+    );
 
+    fireEvent.click(screen.getByRole("button", { name: "转采购需求" }));
     fireEvent.change(screen.getByLabelText("采购需求编号"), {
       target: { value: "PR-REP-20260511001" },
     });
@@ -471,9 +476,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("申请部门"), {
       target: { value: "仓储部" },
     });
-    fireEvent.submit(
-      screen.getByRole("button", { name: "转采购需求" }).closest("form")!,
-    );
+    fireEvent.click(screen.getByRole("button", { name: "确认转采购需求" }));
 
     expect(
       await screen.findByText("已转采购需求：PR-REP-20260511001"),
