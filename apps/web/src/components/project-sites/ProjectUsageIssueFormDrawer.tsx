@@ -1,7 +1,7 @@
 import { PackageMinus, Save } from "lucide-react";
 import type { FormEvent } from "react";
 import type { ProjectUsageRequestDto } from "@company-erp/shared";
-import { DrawerFormHeader, FormDrawer, InlineActions } from "../ui";
+import { ConfirmAction, DrawerFormHeader, FormDrawer, InlineActions } from "../ui";
 
 export type ProjectUsageIssueFormState = {
   requestId: string;
@@ -48,17 +48,24 @@ export function ProjectUsageIssueFormDrawer({
             icon={<PackageMinus aria-hidden="true" size={16} />}
             action={(
               <InlineActions>
-                <button type="submit" disabled={submitState === "saving" || usageRequests.length === 0 || pendingIssueConfirm}>
-                  <Save aria-hidden="true" size={15} />
-                  执行出库
-                </button>
-                {pendingIssueConfirm ? (
-                  <div className="inline-confirm-actions" aria-label="确认执行出库">
-                    <span>确认执行本次出库？</span>
-                    <button type="submit" disabled={submitState === "saving"}>确认出库</button>
-                    <button type="button" onClick={onCancelConfirm}>取消</button>
-                  </div>
-                ) : null}
+                <ConfirmAction
+                  actionLabel={(
+                    <>
+                      <Save aria-hidden="true" size={15} />
+                      执行出库
+                    </>
+                  )}
+                  actionButtonType="submit"
+                  confirmButtonType="submit"
+                  confirmationText="确认执行本次出库？"
+                  confirmLabel="确认出库"
+                  disabled={submitState === "saving" || usageRequests.length === 0}
+                  pending={submitState === "saving"}
+                  confirming={pendingIssueConfirm}
+                  onRequestConfirm={() => undefined}
+                  onCancel={onCancelConfirm}
+                  onConfirm={() => undefined}
+                />
               </InlineActions>
             )}
           />

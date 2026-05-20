@@ -22,7 +22,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { FormDrawer, SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold, type TabItem } from "./ui";
+import { ConfirmAction, FormDrawer, SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold, type TabItem } from "./ui";
 
 type PeoplePermissionsWorkspaceProps = {
   loadDepartments?: () => Promise<DepartmentDto[]>;
@@ -1087,31 +1087,18 @@ function ExternalProjectSiteAccountsTable({
               </td>
               {canManage ? (
                 <td>
-                  {pendingDeactivateId === account.id ? (
-                    <div className="inline-confirm-actions" aria-label={`确认停用 ${account.username}`}>
-                      <span>确认停用？</span>
-                      <button
-                        type="button"
-                        className="table-action danger"
-                        disabled={saving}
-                        onClick={() => onConfirmDeactivate(account)}
-                      >
-                        确认停用
-                      </button>
-                      <button type="button" className="table-action" disabled={saving} onClick={onCancelDeactivate}>
-                        取消
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="table-action"
-                      disabled={saving || account.status !== "active"}
-                      onClick={() => onRequestDeactivate(account)}
-                    >
-                      停用
-                    </button>
-                  )}
+                  <ConfirmAction
+                    actionLabel="停用"
+                    confirmationText={`确认停用 ${account.username}？`}
+                    confirmLabel="确认停用"
+                    danger
+                    disabled={saving || account.status !== "active"}
+                    pending={saving && pendingDeactivateId === account.id}
+                    confirming={pendingDeactivateId === account.id}
+                    onRequestConfirm={() => onRequestDeactivate(account)}
+                    onCancel={onCancelDeactivate}
+                    onConfirm={() => onConfirmDeactivate(account)}
+                  />
                 </td>
               ) : null}
             </tr>

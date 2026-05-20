@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 export { WorkspaceScaffold } from "./WorkspaceScaffold";
 export { SegmentedTabs, type TabItem } from "./SegmentedTabs";
+export { ConfirmAction } from "./ConfirmAction";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "rejected" | "disabled" | "notApplicable";
 
