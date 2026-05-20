@@ -960,6 +960,23 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
         mapComplianceError(error);
       }
     },
+    async getComplianceSummaries(projectSiteIds?: readonly string[]) {
+      const ids = projectSiteIds
+        ? [...new Set(projectSiteIds)]
+        : (
+            await client.projectSite.findMany({
+              select: { id: true },
+              orderBy: [{ siteCode: "asc" }, { siteName: "asc" }],
+            })
+          ).map((site) => site.id);
+
+      if (ids.length === 0) return [];
+
+      // TODO(compliance-summary): replace this per-site composition with aggregate queries
+      // when the compliance checklist grows beyond the current pilot data volume.
+      const summaries = await Promise.all(ids.map((projectSiteId) => this.getComplianceSummary(projectSiteId)));
+      return summaries.filter((summary): summary is ProjectSiteComplianceSummaryDto => Boolean(summary));
+    },
     async getComplianceSummary(projectSiteId: string) {
       const now = new Date();
       const site = await client.projectSite.findUnique({ where: { id: projectSiteId } });
