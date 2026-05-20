@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { PrismaClient } from "@prisma/client";
+import { pathToFileURL } from "node:url";
 
 const PAYROLL_ATTACHMENT_PENDING = "unified-attachment-pending";
 
@@ -46,8 +47,8 @@ const plannedChecks = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run attachments:legacy-report [-- --dry-run]
-       scripts/attachments-legacy-report.mjs [--help|--dry-run]
+  console.log(`Usage: npm run attachments:legacy-report [-- --dry-run|--json|--csv]
+       scripts/attachments-legacy-report.mjs [--help|--dry-run|--json|--csv]
 
 Generates a read-only attachment migration readiness report from DATABASE_URL.
 The report prints counts only. It never reads .env files, NAS attachment
@@ -55,10 +56,12 @@ directories, or legacy file contents, and it never migrates data.
 
 Options:
   --help     Show this help and exit without requiring DATABASE_URL.
-  --dry-run  Print the planned checks without opening a database connection.`);
+  --dry-run  Print the planned checks without opening a database connection.
+  --json     Print machine-readable JSON counts.
+  --csv      Print machine-readable CSV counts.`);
 }
 
-function printDryRun() {
+export function printDryRun() {
   console.log("Attachment legacy migration readiness dry-run");
   console.log("No database connection will be opened.");
   console.log("No .env file, NAS path, attachment content, or legacy path value will be read.");
@@ -120,42 +123,89 @@ async function buildReport(prisma) {
 
   return [
     {
+      module: "contracts",
       label: "合同",
       legacyCount: contractLegacy,
       unifiedCount: contractUnified,
+      pendingPlaceholderCount: 0,
       note: "contract_attachments.file_path only; report does not print file paths",
     },
     {
+      module: "certificates",
       label: "证照",
       legacyCount: certificateLegacy,
       unifiedCount: certificateUnified,
+      pendingPlaceholderCount: 0,
       note: "attachment_path/source_file_path only; values are not printed",
     },
     {
+      module: "payroll",
       label: "工资表",
       legacyCount: payrollLegacy,
       unifiedCount: payrollUnified,
+      pendingPlaceholderCount: payrollPendingPlaceholder,
       note: `${payrollPendingPlaceholder} rows use the controlled pending placeholder`,
     },
     {
+      module: "employerLiability",
       label: "雇主责任险",
       legacyCount: employerLiabilityLegacy,
       unifiedCount: employerLiabilityUnified,
+      pendingPlaceholderCount: 0,
       note: "policy attachment_path only; values are not printed",
     },
     {
+      module: "kitchenEquipment",
       label: "厨房设备",
       legacyCount: kitchenEquipmentLegacy + kitchenEquipmentChangeLegacy,
       unifiedCount: kitchenEquipmentUnified + kitchenEquipmentChangeUnified,
+      pendingPlaceholderCount: 0,
       note: `equipment ${kitchenEquipmentLegacy}, change requests ${kitchenEquipmentChangeLegacy}`,
     },
     {
+      module: "projectSiteMaterials",
       label: "项目点资料",
       legacyCount: rosterLegacy,
       unifiedCount: projectSiteUnified,
+      pendingPlaceholderCount: 0,
       note: "roster source_attachment_path plus project-site owner attachments",
     },
   ];
+}
+
+export function toMachineRows(rows) {
+  return rows.map((row) => ({
+    module: row.module,
+    legacyCount: row.legacyCount,
+    unifiedCount: row.unifiedCount,
+    gapEstimate: Math.max(row.legacyCount - row.unifiedCount, 0),
+    pendingPlaceholderCount: row.pendingPlaceholderCount ?? 0,
+    notes: row.notes ?? row.note ?? "",
+  }));
+}
+
+export function formatJsonReport(rows) {
+  return `${JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      mode: "read-only-counts",
+      rows: toMachineRows(rows),
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+function formatCsvField(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  const escaped = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return /[",\n\r]/.test(escaped) ? `"${escaped.replace(/"/g, '""')}"` : escaped;
+}
+
+export function formatCsvReport(rows) {
+  const headers = ["module", "legacyCount", "unifiedCount", "gapEstimate", "pendingPlaceholderCount", "notes"];
+  const lines = toMachineRows(rows).map((row) => headers.map((header) => formatCsvField(row[header])).join(","));
+  return `${headers.join(",")}\n${lines.join("\n")}\n`;
 }
 
 function printReport(rows) {
@@ -165,9 +215,9 @@ function printReport(rows) {
   console.log("");
   console.log(["Module", "Legacy field records", "Unified attachment records", "Gap estimate", "Note"].join(" | "));
   console.log(["---", "---:", "---:", "---:", "---"].join(" | "));
-  for (const row of rows) {
-    const gap = Math.max(row.legacyCount - row.unifiedCount, 0);
-    console.log([row.label, row.legacyCount, row.unifiedCount, gap, row.note].join(" | "));
+  for (const [index, row] of rows.entries()) {
+    const machineRow = toMachineRows(rows)[index];
+    console.log([row.label, machineRow.legacyCount, machineRow.unifiedCount, machineRow.gapEstimate, machineRow.notes].join(" | "));
   }
   console.log("");
   console.log("This report is for trial readiness inventory only. It does not migrate or modify data.");
@@ -183,8 +233,15 @@ async function main() {
     printDryRun();
     return;
   }
-  if (args.length > 0) {
-    console.error(`Unknown option: ${args[0]}`);
+  const outputModes = args.filter((arg) => arg === "--json" || arg === "--csv");
+  if (outputModes.length > 1) {
+    console.error("--json and --csv are mutually exclusive");
+    process.exitCode = 2;
+    return;
+  }
+  const unknown = args.find((arg) => arg !== "--json" && arg !== "--csv");
+  if (unknown) {
+    console.error(`Unknown option: ${unknown}`);
     usage();
     process.exitCode = 2;
     return;
@@ -199,13 +256,21 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     const rows = await buildReport(prisma);
-    printReport(rows);
+    if (outputModes[0] === "--json") {
+      process.stdout.write(formatJsonReport(rows));
+    } else if (outputModes[0] === "--csv") {
+      process.stdout.write(formatCsvReport(rows));
+    } else {
+      printReport(rows);
+    }
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

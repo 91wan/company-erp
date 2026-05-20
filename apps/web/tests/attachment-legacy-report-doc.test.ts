@@ -9,6 +9,13 @@ describe("attachment legacy report deployment docs", () => {
 
     expect(doc).toContain("npm run attachments:legacy-report");
     expect(doc).toContain("--dry-run");
+    expect(doc).toContain("--json");
+    expect(doc).toContain("--csv");
+    expect(doc).toContain("module");
+    expect(doc).toContain("legacyCount");
+    expect(doc).toContain("unifiedCount");
+    expect(doc).toContain("gapEstimate");
+    expect(doc).toContain("pendingPlaceholderCount");
     expect(doc).toContain("contracts");
     expect(doc).toContain("certificates");
     expect(doc).toContain("payroll");
