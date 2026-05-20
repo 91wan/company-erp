@@ -23,6 +23,29 @@ function readFile(path: string): string {
   return readFileSync(path, "utf8");
 }
 
+function writePilotEvidenceManifestFixture(evidenceDir: string, files: Record<string, string>): void {
+  const manifestFiles = Object.entries(files).map(([name, content]) => {
+    writeFileSync(join(evidenceDir, name), content);
+    return {
+      name,
+      bytes: Buffer.byteLength(content),
+      sha256: createHash("sha256").update(content).digest("hex"),
+    };
+  });
+  const manifest = `${JSON.stringify(
+    {
+      generatedAt: "2026-05-20T00:00:00.000Z",
+      gitCommit: "a".repeat(40),
+      command: "scripts/pilot-verify-local.sh --evidence-dir /tmp/evidence",
+      files: manifestFiles,
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(join(evidenceDir, "manifest.json"), manifest);
+  writeFileSync(join(evidenceDir, "manifest.sha256"), `${createHash("sha256").update(manifest).digest("hex")}  manifest.json\n`);
+}
+
 describe("account ops", () => {
   it("rejects missing and placeholder reset credentials", async () => {
     const prisma = {
@@ -462,6 +485,71 @@ exit 9
     expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("\"mode\":\"read-only-counts\"");
     expect(readFile(join(evidenceDir, "manifest.json"))).toContain("legacy-report.json");
     rmSync(tempRoot, { recursive: true, force: true });
+  });
+});
+
+describe("pilot evidence manifest verifier", () => {
+  it("prints help without reading an evidence directory", () => {
+    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--help"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run pilot:verify-evidence");
+    expect(result.stdout).toContain("--evidence-dir");
+    expect(result.stderr).toBe("");
+  });
+
+  it("verifies manifest SHA256 and listed evidence file hashes", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-verify-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+    writePilotEvidenceManifestFixture(evidenceDir, {
+      "summary.txt": "Pilot local verification passed\n",
+      "legacy-report-dry-run.txt": "Attachment legacy migration readiness dry-run\n",
+      "environment-checks.txt": "NAS preflight passed\n",
+    });
+
+    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Pilot evidence manifest verified");
+    expect(result.stdout).toContain("3 files");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("fails when an evidence file has been modified after manifest generation", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-tamper-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+    writePilotEvidenceManifestFixture(evidenceDir, {
+      "summary.txt": "Pilot local verification passed\n",
+    });
+    writeFileSync(join(evidenceDir, "summary.txt"), "Pilot local verification failed\n");
+
+    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("summary.txt");
+    expect(result.stderr).toContain("SHA256 mismatch");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("rejects evidence directories inside the repository", () => {
+    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", join(repoRoot, "docs")], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Evidence directory must be outside the repository");
   });
 });
 
