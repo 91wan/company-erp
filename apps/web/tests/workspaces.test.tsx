@@ -1940,6 +1940,9 @@ describe("Company ERP workspace components", () => {
       "true",
     );
     expect(screen.queryByText("投入合同金额汇总")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增业务项目" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存业务项目" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader").length).toBeLessThanOrEqual(7);
 
     fireEvent.click(screen.getByRole("tab", { name: "投入汇总" }));
     expect((await screen.findAllByText("1,680,000 元")).length).toBeGreaterThan(
@@ -1948,6 +1951,7 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("装修/改造").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("tab", { name: "项目台账" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增业务项目" }));
     fireEvent.change(screen.getByLabelText("项目编码"), {
       target: { value: "BP-YZ-CK-002" },
     });
