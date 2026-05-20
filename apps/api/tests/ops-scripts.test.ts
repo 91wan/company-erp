@@ -301,6 +301,54 @@ describe("backup restore drill script", () => {
   });
 });
 
+describe("operator runbook command smoke", () => {
+  const runbookPath = join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md");
+  const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+
+  it("keeps documented npm commands backed by package scripts and safe smoke modes", () => {
+    const runbook = readFile(runbookPath);
+    expect(runbook).toContain("本地 smoke 命令");
+
+    for (const scriptName of [
+      "preflight:nas",
+      "pilot:verify-local",
+      "pilot:verify-evidence",
+      "attachments:legacy-report",
+      "audit:verify-export",
+      "test:backup-restore",
+    ]) {
+      expect(packageJson.scripts, scriptName).toHaveProperty(scriptName);
+    }
+
+    const smokeCommands: Array<{ args: string[]; expected: string }> = [
+      { args: ["run", "preflight:nas", "--", "--help"], expected: "Usage: npm run preflight:nas" },
+      { args: ["run", "pilot:verify-local", "--", "--dry-run"], expected: "Pilot local verification dry-run" },
+      { args: ["run", "pilot:verify-evidence", "--", "--help"], expected: "Usage: npm run pilot:verify-evidence" },
+      { args: ["run", "attachments:legacy-report", "--", "--help"], expected: "Usage: npm run attachments:legacy-report" },
+      { args: ["run", "audit:verify-export", "--", "--help"], expected: "Usage: npm run audit:verify-export" },
+    ];
+
+    for (const command of smokeCommands) {
+      const result = spawnSync("npm", command.args, {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-runbook-smoke-missing.env"),
+          DOCKER_BIN: join(tmpdir(), "company-erp-runbook-smoke-missing-docker"),
+          DATABASE_URL: "",
+          NAS_DATA_ROOT: "/volume1/should-not-be-read",
+          NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+        },
+        encoding: "utf8",
+      });
+
+      expect(result.status, command.args.join(" ")).toBe(0);
+      expect(result.stdout, command.args.join(" ")).toContain(command.expected);
+      expect(`${result.stdout}\n${result.stderr}`).not.toContain("/volume1/should-not-be-read");
+    }
+  });
+});
+
 describe("local NAS pilot verification pack", () => {
   it("prints help without reading deployment env or checking Docker", () => {
     const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--help"], {
