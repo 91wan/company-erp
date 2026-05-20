@@ -45,4 +45,22 @@ describe("certificates workspace presentation parts", () => {
     fireEvent.click(screen.getByText(expiredCertificate.certificateCode));
     expect(onSelectCertificate).toHaveBeenCalledWith(expiredCertificate);
   });
+
+  it("keeps the certificate risk ledger dense enough for the main workspace table", () => {
+    render(
+      <CertificateRiskTable
+        status="ready"
+        certificates={[certificate]}
+        rosterPeople={[rosterPerson]}
+        onSelectCertificate={vi.fn()}
+      />,
+    );
+
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toHaveLength(7);
+    expect(headers).not.toContain("剩余天数");
+    expect(headers).not.toContain("审核状态");
+    expect(headers).not.toContain("人员匹配");
+    expect(headers).toContain("关键状态");
+  });
 });
