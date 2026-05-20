@@ -64,6 +64,18 @@ Options:
   --output   Write JSON or CSV output to a repository-external evidence file.`);
 }
 
+function fail(message, suggestion = "使用 --dry-run 做只读检查；需要真实 count 时显式提供临时或试点 DATABASE_URL，并将 --output 写到 Git 仓库外证据目录。", status = 1) {
+  console.error(message);
+  console.error(`处理建议: ${suggestion}`);
+  process.exit(status);
+}
+
+function isInsideRepository(outputPath, repoRoot = fileURLToPath(new URL("..", import.meta.url))) {
+  const root = resolve(repoRoot);
+  const target = resolve(outputPath);
+  return target === root || target.startsWith(`${root}${sep}`);
+}
+
 export function printDryRun() {
   console.log("Attachment legacy migration readiness dry-run");
   console.log("No database connection will be opened.");
@@ -212,9 +224,8 @@ export function formatCsvReport(rows) {
 }
 
 export function writeReportOutput(outputPath, content, repoRoot = fileURLToPath(new URL("..", import.meta.url))) {
-  const root = resolve(repoRoot);
   const target = resolve(outputPath);
-  if (target === root || target.startsWith(`${root}${sep}`)) {
+  if (isInsideRepository(outputPath, repoRoot)) {
     throw new Error("Output path must be outside the repository");
   }
   writeFileSync(target, content);
@@ -243,9 +254,7 @@ async function main() {
     if (arg === "--output") {
       outputPath = process.argv[index + 1] ?? "";
       if (!outputPath) {
-        console.error("--output requires a path");
-        process.exitCode = 2;
-        return;
+        fail("--output requires a path", "选择 --json 或 --csv 后再写入仓库外 evidence 文件。", 2);
       }
       index += 1;
     } else {
@@ -257,9 +266,7 @@ async function main() {
     return;
   }
   if (args.includes("--dry-run") && outputPath) {
-    console.error("--output cannot be used with --dry-run");
-    process.exitCode = 2;
-    return;
+    fail("--output cannot be used with --dry-run", "dry-run 只输出到 stdout；需要文件证据时使用 --json 或 --csv 加仓库外 --output。", 2);
   }
   if (args.includes("--dry-run")) {
     printDryRun();
@@ -267,32 +274,26 @@ async function main() {
   }
   const outputModes = args.filter((arg) => arg === "--json" || arg === "--csv");
   if (outputModes.length > 1) {
-    console.error("--json and --csv are mutually exclusive");
-    process.exitCode = 2;
-    return;
+    fail("--json and --csv are mutually exclusive", "一次只选择 --json 或 --csv 其中一种输出格式。", 2);
   }
   const unknown = args.find((arg) => arg !== "--json" && arg !== "--csv");
   if (unknown) {
-    console.error(`Unknown option: ${unknown}`);
     usage();
-    process.exitCode = 2;
-    return;
+    fail(`Unknown option: ${unknown}`, "检查命令参数；可先运行 npm run attachments:legacy-report -- --help。", 2);
+  }
+  if (outputPath && !outputModes[0]) {
+    fail("--output requires --json or --csv", "选择 --json 或 --csv 后再写入仓库外 evidence 文件。", 2);
+  }
+  if (outputPath && isInsideRepository(outputPath)) {
+    fail("Output path must be outside the repository", "将 legacy report 输出到 Git 仓库外的受控证据目录。");
   }
   if (!process.env.DATABASE_URL) {
-    console.error("DATABASE_URL is required for attachments:legacy-report.");
-    console.error("Use --dry-run to inspect planned checks without opening a database connection.");
-    process.exitCode = 1;
-    return;
+    fail("DATABASE_URL is required for attachments:legacy-report.", "使用 --dry-run 做计划检查；生成真实 count 前显式设置临时或试点 DATABASE_URL。");
   }
 
   const prisma = new PrismaClient();
   try {
     const rows = await buildReport(prisma);
-    if (outputPath && !outputModes[0]) {
-      console.error("--output requires --json or --csv");
-      process.exitCode = 2;
-      return;
-    }
     if (outputModes[0] === "--json") {
       const content = formatJsonReport(rows);
       if (outputPath) writeReportOutput(outputPath, content);
@@ -311,7 +312,6 @@ async function main() {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    fail(error instanceof Error ? error.message : String(error), "确认 DATABASE_URL 指向可访问的临时或试点数据库；不要从 .env 或 NAS 路径隐式读取。");
   });
 }

@@ -852,6 +852,23 @@ describe("attachment legacy migration readiness report", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("DATABASE_URL is required");
     expect(result.stderr).toContain("--dry-run");
+    expect(result.stderr).toContain("处理建议");
+  });
+
+  it("reports repo-inside output paths with an actionable hint", () => {
+    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--json", "--output", join(repoRoot, "legacy-report.json")], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DATABASE_URL: "postgresql://company_erp:company_erp@localhost:5432/company_erp_ci",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Output path must be outside the repository");
+    expect(result.stderr).toContain("处理建议");
+    expect(result.stderr).not.toContain("/volume1");
   });
 
   it("formats machine-readable JSON and CSV without exposing raw legacy paths", async () => {
