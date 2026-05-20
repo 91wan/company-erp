@@ -13,6 +13,7 @@ import {
   ExternalProjectSitePortal,
   type ExternalProjectSitePortalSection,
 } from "./ExternalProjectSitePortal";
+import { WorkspaceSectionStack } from "../ui";
 import { ProjectSiteActionBar } from "./ProjectSiteActionBar";
 import type { ProjectSiteKitchenEquipmentCreateFormState } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
@@ -158,7 +159,7 @@ export function ExternalProjectSiteWorkspaceView({
             </label>
           </div>
 
-          <div className="project-site-list-layout">
+          <WorkspaceSectionStack>
             <ProjectSiteUsagePanel
               usageRequests={filteredUsageRequests}
               status={usageStatus}
@@ -182,7 +183,7 @@ export function ExternalProjectSiteWorkspaceView({
               onClose={onCloseForm}
               onSubmit={onCreateUsageRequest}
             />
-          </div>
+          </WorkspaceSectionStack>
         </>
       ) : null}
     </>

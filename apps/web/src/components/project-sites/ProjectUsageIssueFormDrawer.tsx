@@ -1,7 +1,7 @@
 import { PackageMinus, Save } from "lucide-react";
 import type { FormEvent } from "react";
 import type { ProjectUsageRequestDto } from "@company-erp/shared";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer, InlineActions } from "../ui";
 
 export type ProjectUsageIssueFormState = {
   requestId: string;
@@ -42,26 +42,26 @@ export function ProjectUsageIssueFormDrawer({
   return (
     <FormDrawer title="出库登记" open={open} onClose={onClose}>
       {canIssueUsage ? (
-        <form className="dashboard-panel workspace-form project-issue-form" onSubmit={onSubmit} aria-label="出库登记表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <PackageMinus aria-hidden="true" size={16} />
-              出库登记
-            </h3>
-            <div className="inline-actions">
-              <button type="submit" disabled={submitState === "saving" || usageRequests.length === 0 || pendingIssueConfirm}>
-                <Save aria-hidden="true" size={15} />
-                执行出库
-              </button>
-              {pendingIssueConfirm ? (
-                <div className="inline-confirm-actions" aria-label="确认执行出库">
-                  <span>确认执行本次出库？</span>
-                  <button type="submit" disabled={submitState === "saving"}>确认出库</button>
-                  <button type="button" onClick={onCancelConfirm}>取消</button>
-                </div>
-              ) : null}
-            </div>
-          </div>
+        <form className="workspace-form project-issue-form" onSubmit={onSubmit} aria-label="出库登记表单" noValidate>
+          <DrawerFormHeader
+            title="出库登记"
+            icon={<PackageMinus aria-hidden="true" size={16} />}
+            action={(
+              <InlineActions>
+                <button type="submit" disabled={submitState === "saving" || usageRequests.length === 0 || pendingIssueConfirm}>
+                  <Save aria-hidden="true" size={15} />
+                  执行出库
+                </button>
+                {pendingIssueConfirm ? (
+                  <div className="inline-confirm-actions" aria-label="确认执行出库">
+                    <span>确认执行本次出库？</span>
+                    <button type="submit" disabled={submitState === "saving"}>确认出库</button>
+                    <button type="button" onClick={onCancelConfirm}>取消</button>
+                  </div>
+                ) : null}
+              </InlineActions>
+            )}
+          />
           <label>
             <span>领用申请</span>
             <select value={form.requestId} onChange={(event) => onChange({ ...form, requestId: event.target.value })}>

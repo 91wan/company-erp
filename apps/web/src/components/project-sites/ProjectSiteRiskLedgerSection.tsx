@@ -12,6 +12,7 @@ import {
 } from "./ProjectSiteCreateFormDrawer";
 import { ProjectSiteRiskTable } from "./ProjectSiteRiskTable";
 import type { ProjectSiteFormDrawer } from "./ProjectSitesHeadquartersView";
+import { WorkspaceSectionStack } from "../ui";
 
 type LoadStatus = "loading" | "ready" | "error";
 type SubmitState = "idle" | "saving" | "error";
@@ -58,7 +59,7 @@ export function ProjectSiteRiskLedgerSection({
   onCreateSite,
 }: ProjectSiteRiskLedgerSectionProps) {
   return (
-    <div className="project-site-list-layout">
+    <WorkspaceSectionStack>
       <ProjectSiteRiskTable
         sites={filteredSites}
         status={siteStatus}
@@ -82,6 +83,6 @@ export function ProjectSiteRiskLedgerSection({
         onClose={onCloseForm}
         onSubmit={onCreateSite}
       />
-    </div>
+    </WorkspaceSectionStack>
   );
 }

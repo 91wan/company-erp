@@ -1,7 +1,7 @@
 import { PackageCheck, RefreshCw } from "lucide-react";
 import type { PurchaseRecordDto, PurchaseRecordStatusCode } from "@company-erp/shared";
 import { PURCHASE_RECORD_STATUSES } from "@company-erp/shared";
-import { SectionCard } from "../ui";
+import { SectionCard, WorkspaceSectionStack } from "../ui";
 import {
   PurchaseFilterToolbar,
   PurchaseRecordsTable,
@@ -27,7 +27,7 @@ export function PurchaseRecordsTab({
   onSelectRecord: (record: PurchaseRecordDto) => void;
 }) {
   return (
-    <div className="project-site-list-layout">
+    <WorkspaceSectionStack>
       <SectionCard title="采购执行" action={<PackageCheck aria-hidden="true" size={17} />}>
         <PurchaseFilterToolbar
           query={recordQuery}
@@ -44,6 +44,6 @@ export function PurchaseRecordsTab({
           <PurchaseRecordsTable records={filteredRecords} onSelectRecord={onSelectRecord} />
         ) : null}
       </SectionCard>
-    </div>
+    </WorkspaceSectionStack>
   );
 }

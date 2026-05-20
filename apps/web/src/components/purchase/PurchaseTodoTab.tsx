@@ -1,6 +1,6 @@
 import { Check, X } from "lucide-react";
 import type { PurchaseRequestDto } from "@company-erp/shared";
-import { SectionCard } from "../ui";
+import { InlineActions, SectionCard, WorkspaceTableContainer } from "../ui";
 import { formatDateTime, PurchaseStateMessage } from "./PurchaseWorkspaceParts";
 import type { PurchasePendingReviewAction, PurchaseSubmitState } from "./purchaseWorkspaceTypes";
 
@@ -34,7 +34,7 @@ export function PurchaseTodoTab({
             <span>审批备注</span>
             <input value={reviewRemark} onChange={(event) => onReviewRemarkChange(event.target.value)} />
           </label>
-          <div className="table-wrap">
+          <WorkspaceTableContainer>
             <table>
               <thead>
                 <tr>
@@ -54,7 +54,7 @@ export function PurchaseTodoTab({
                     <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
                     <td>
                       {canManage ? (
-                        <div className="inline-actions">
+                        <InlineActions>
                           <button
                             type="button"
                             disabled={reviewState === "saving"}
@@ -89,7 +89,7 @@ export function PurchaseTodoTab({
                               <button type="button" onClick={() => onPendingReviewActionChange(null)}>取消</button>
                             </div>
                           ) : null}
-                        </div>
+                        </InlineActions>
                       ) : (
                         "只读"
                       )}
@@ -98,7 +98,7 @@ export function PurchaseTodoTab({
                 ))}
               </tbody>
             </table>
-          </div>
+          </WorkspaceTableContainer>
         </>
       ) : null}
       {reviewState === "error" ? <p className="form-error">{reviewError || "审批操作失败"}</p> : null}

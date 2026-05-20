@@ -115,6 +115,33 @@
   flex-wrap: wrap;
 }
 
+.ui-action-bar,
+.ui-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ui-action-bar {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ui-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #175cd3;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
 .ui-summary-card {
   display: grid;
   gap: 7px;
@@ -241,6 +268,22 @@
 }
 
 .ui-section-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.ui-drawer-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.ui-drawer-form-header h3 {
   display: flex;
   align-items: center;
   gap: 8px;

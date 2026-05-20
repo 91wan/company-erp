@@ -1,7 +1,7 @@
 import { ClipboardList, RefreshCw } from "lucide-react";
 import type { PurchaseRequestDto, PurchaseRequestStatusCode } from "@company-erp/shared";
 import { PURCHASE_REQUEST_STATUSES } from "@company-erp/shared";
-import { SectionCard } from "../ui";
+import { SectionCard, WorkspaceSectionStack } from "../ui";
 import {
   PurchaseFilterToolbar,
   PurchaseRequestsTable,
@@ -33,7 +33,7 @@ export function PurchaseRequestsTab({
   onSubmitRequest: (request: PurchaseRequestDto) => void;
 }) {
   return (
-    <div className="project-site-list-layout">
+    <WorkspaceSectionStack>
       <SectionCard title="采购需求" action={<ClipboardList aria-hidden="true" size={17} />}>
         <PurchaseFilterToolbar
           query={requestQuery}
@@ -56,6 +56,6 @@ export function PurchaseRequestsTab({
           />
         ) : null}
       </SectionCard>
-    </div>
+    </WorkspaceSectionStack>
   );
 }

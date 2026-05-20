@@ -86,6 +86,62 @@ export function Toolbar({
   );
 }
 
+export function ActionBar({ children, label }: { children: ReactNode; label?: string }) {
+  return (
+    <div className="ui-action-bar" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+export function InlineActions({ children, label }: { children: ReactNode; label?: string }) {
+  return (
+    <div className="ui-inline-actions" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+export function MetricSummaryGrid({ children, label }: { children: ReactNode; label?: string }) {
+  return (
+    <div className="summary-grid compact-summary" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+export function SummaryPill({ children }: { children: ReactNode }) {
+  return <span className="ui-summary-pill">{children}</span>;
+}
+
+export function WorkspaceTableContainer({ children }: { children: ReactNode }) {
+  return <div className="ui-table-wrap">{children}</div>;
+}
+
+export function WorkspaceSectionStack({ children }: { children: ReactNode }) {
+  return <div className="workspace-section-stack">{children}</div>;
+}
+
+export function DrawerFormHeader({
+  title,
+  icon,
+  action,
+}: {
+  title: ReactNode;
+  icon?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="ui-drawer-form-header">
+      <h3>
+        {icon}
+        {title}
+      </h3>
+      {action}
+    </div>
+  );
+}
+
 export function DataTable({
   headers,
   rows,
@@ -103,7 +159,7 @@ export function DataTable({
   if (rows.length === 0) return <div className="ui-table-state">{emptyState ?? "暂无数据"}</div>;
 
   return (
-    <div className="ui-table-wrap table-wrap">
+    <div className="ui-table-wrap">
       <table className="ui-data-table">
         <thead>
           <tr>
