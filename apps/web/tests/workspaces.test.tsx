@@ -211,19 +211,33 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(screen.getByRole("heading", { name: "人员权限" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "公司员工" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("普通用户账号")).not.toBeInTheDocument();
+    expect(screen.queryByText("权限矩阵")).not.toBeInTheDocument();
+    expect(await screen.findByText("EMP0001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
     expect(screen.getByText("部门管理")).toBeInTheDocument();
-    expect(screen.getAllByText("公司员工").length).toBeGreaterThan(0);
+    expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     expect(screen.getByText("普通用户账号")).toBeInTheDocument();
+    expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     expect(screen.getAllByText("项目点账号").length).toBeGreaterThan(0);
     expect(screen.getByText("项目点账号代表当前现场负责人/项目经理，不代表分包主体，也不等同于项目点现场人员。")).toBeInTheDocument();
-    expect(screen.getByText("项目点分配")).toBeInTheDocument();
-    expect(screen.getByText("权限矩阵")).toBeInTheDocument();
-    expect(await screen.findAllByText("人事行政部")).not.toHaveLength(0);
-    expect(screen.getByText("EMP0001")).toBeInTheDocument();
-    expect(screen.getAllByText("zhangsan").length).toBeGreaterThan(0);
     expect(await screen.findByText("王项目")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
+    expect(screen.getAllByText("项目点分配").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SITE-WX-001 科技园一期项目点").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("人事").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("负责人").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "权限说明" }));
+    expect(screen.getByText("权限矩阵")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     fireEvent.click(screen.getByRole("button", { name: "停用" }));
     expect(screen.getByText("确认停用？")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认停用" })).toBeInTheDocument();
@@ -1819,10 +1833,18 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
     expect(await screen.findByText("暂无员工资料")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
+    expect(await screen.findByText("暂无部门资料")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     expect(await screen.findByText("暂无账号资料")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     expect(await screen.findByText("暂无项目点账号")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     expect(await screen.findByText("暂无项目点分配")).toBeInTheDocument();
 
     rerender(
@@ -1836,10 +1858,19 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
     expect(await screen.findByText("员工资料加载失败")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
+    expect(await screen.findByText("部门资料加载失败")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     expect(await screen.findByText("账号资料加载失败")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     expect(await screen.findByText("项目点账号加载失败")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     expect(await screen.findByText("项目点分配加载失败")).toBeInTheDocument();
   });
 
@@ -1873,24 +1904,29 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("EMP0001");
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
     fireEvent.change(screen.getByLabelText("部门编码"), { target: { value: "DEP-WH" } });
     fireEvent.change(screen.getByLabelText("部门名称"), { target: { value: "仓储部" } });
     fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
     fireEvent.change(screen.getByLabelText("员工编号"), { target: { value: "EMP0002" } });
     fireEvent.change(screen.getByLabelText("员工姓名"), { target: { value: "李四" } });
     fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     fireEvent.change(screen.getByLabelText("当前联系人"), { target: { value: "赵项目" } });
     fireEvent.change(screen.getByLabelText("手机号"), { target: { value: "13811112222" } });
     fireEvent.change(screen.getByLabelText("项目点登录账号"), { target: { value: "site-new" } });
     fireEvent.change(screen.getByLabelText("项目点初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存项目点账号" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
     const projectSiteAssignmentSelect = screen
       .getAllByLabelText("项目点")
@@ -1899,10 +1935,15 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
     expect(await screen.findAllByText("仓储部")).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
     expect(await screen.findByText("EMP0002")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     expect(await screen.findByText("lisi")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "项目点账号" }));
     expect(await screen.findByText("赵项目")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     expect(await screen.findAllByText("SITE-WX-001 科技园一期项目点")).not.toHaveLength(0);
   });
 
@@ -1923,17 +1964,22 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("EMP0001");
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
     fireEvent.change(screen.getByLabelText("部门编码"), { target: { value: "DEP-WH" } });
     fireEvent.change(screen.getByLabelText("部门名称"), { target: { value: "仓储部" } });
     fireEvent.click(screen.getByRole("button", { name: "保存部门" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
     fireEvent.change(screen.getByLabelText("员工编号"), { target: { value: "EMP0002" } });
     fireEvent.change(screen.getByLabelText("员工姓名"), { target: { value: "李四" } });
     fireEvent.click(screen.getByRole("button", { name: "保存员工" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     fireEvent.change(screen.getByLabelText("登录账号"), { target: { value: "lisi" } });
     fireEvent.change(screen.getByLabelText("初始密码"), { target: { value: "ChangeMe123!" } });
     fireEvent.click(screen.getByRole("button", { name: "保存账号" }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     fireEvent.change(screen.getByLabelText("员工"), { target: { value: employee.id } });
     const projectSiteAssignmentSelect = screen
       .getAllByLabelText("项目点")
@@ -1942,9 +1988,13 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(projectSiteAssignmentSelect!, { target: { value: projectSite.id } });
     fireEvent.click(screen.getByRole("button", { name: "保存分配" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "部门" }));
     expect(await screen.findByText("部门编码已存在")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "公司员工" }));
     expect(await screen.findByText("员工编号已存在")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "用户账号" }));
     expect(await screen.findByText("登录账号已存在")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "项目点分配" }));
     expect(await screen.findByText("该员工已分配到该项目点")).toBeInTheDocument();
   });
 });
