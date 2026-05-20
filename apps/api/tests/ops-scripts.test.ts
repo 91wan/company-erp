@@ -349,6 +349,93 @@ describe("operator runbook command smoke", () => {
   });
 });
 
+describe("NAS trial deploy notification readiness gate", () => {
+  it("prints help without reading .env or NAS paths", () => {
+    const result = spawnSync("node", ["scripts/nas-trial-readiness-gate.mjs", "--help"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-readiness-should-not-read.env"),
+        NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
+        NAS_DATA_ROOT: "/volume1/should-not-be-read",
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage: npm run nas:trial-readiness");
+    expect(result.stdout).toContain("READY_FOR_NAS_INTRAnet_TRIAL");
+    expect(result.stdout).toContain("BLOCKED");
+    expect(`${result.stdout}\n${result.stderr}`).not.toContain("/volume1/should-not-be-read");
+  });
+
+  it("reports ready when repository, PR, smoke, and doc/static gates pass", async () => {
+    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/nas-trial-readiness-gate.mjs")).href)) as {
+      evaluateReadiness: (input: { run: (label: string, command: string, args: string[]) => { status: number; stdout: string; stderr: string } }) => {
+        status: string;
+        blockers: string[];
+      };
+    };
+
+    const result = evaluateReadiness({
+      run: (label) => {
+        if (label === "git status") return { status: 0, stdout: "## main...origin/main\n", stderr: "" };
+        if (label === "open PRs") return { status: 0, stdout: "[]\n", stderr: "" };
+        if (label === "preflight help") return { status: 0, stdout: "Usage: npm run preflight:nas\n", stderr: "" };
+        if (label === "pilot local dry-run") return { status: 0, stdout: "Pilot local verification dry-run\n", stderr: "" };
+        if (label === "pilot evidence help") return { status: 0, stdout: "Usage: npm run pilot:verify-evidence\n", stderr: "" };
+        if (label === "audit export help") return { status: 0, stdout: "Usage: npm run audit:verify-export\n", stderr: "" };
+        if (label === "legacy report help") return { status: 0, stdout: "Usage: npm run attachments:legacy-report\n", stderr: "" };
+        if (label === "doc static gate") return { status: 0, stdout: "nas-trial-handoff-final-gate-doc\n", stderr: "" };
+        return { status: 0, stdout: `${label} ok\n`, stderr: "" };
+      },
+    });
+
+    expect(result.status).toBe("READY_FOR_NAS_INTRAnet_TRIAL");
+    expect(result.blockers).toEqual([]);
+  });
+
+  it("reports blockers without leaking NAS paths or secrets", async () => {
+    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/nas-trial-readiness-gate.mjs")).href)) as {
+      evaluateReadiness: (input: { run: (label: string, command: string, args: string[]) => { status: number; stdout: string; stderr: string } }) => {
+        status: string;
+        blockers: string[];
+      };
+    };
+
+    const result = evaluateReadiness({
+      run: (label) => {
+        if (label === "git status") return { status: 0, stdout: "## main...origin/main\n M package.json\n", stderr: "" };
+        if (label === "open PRs") return { status: 0, stdout: "[{\"number\":225}]\n", stderr: "" };
+        if (label === "pilot local dry-run") return { status: 1, stdout: "", stderr: "BLOCKED: /volume1/should-not-be-read secret" };
+        return { status: 0, stdout: `${label} ok\n`, stderr: "" };
+      },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("git status"),
+        expect.stringContaining("open PRs"),
+        expect.stringContaining("pilot local dry-run"),
+      ]),
+    );
+    expect(result.blockers.join("\n")).not.toContain("/volume1/should-not-be-read");
+    expect(result.blockers.join("\n")).not.toContain("secret");
+  });
+
+  it("documents the exact notification conditions for NAS intranet trial deployment", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const runbook = readFile(join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md"));
+
+    expect(packageJson.scripts).toHaveProperty("nas:trial-readiness");
+    expect(runbook).toContain("可以部署 NAS 内网试点");
+    expect(runbook).toContain("禁止公网暴露 API/PostgreSQL");
+    expect(runbook).toContain("不是正式合规档案系统全面上线");
+    expect(runbook).toContain("npm run nas:trial-readiness");
+  });
+});
+
 describe("local NAS pilot verification pack", () => {
   it("prints help without reading deployment env or checking Docker", () => {
     const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--help"], {
