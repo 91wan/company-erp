@@ -6,6 +6,7 @@ type ProjectSiteToolbarProps = {
   usageFilter: "all" | ProjectUsageStatusCode;
   onQueryChange: (query: string) => void;
   onUsageFilterChange: (status: "all" | ProjectUsageStatusCode) => void;
+  showUsageFilter?: boolean;
 };
 
 export function ProjectSiteToolbar({
@@ -13,6 +14,7 @@ export function ProjectSiteToolbar({
   usageFilter,
   onQueryChange,
   onUsageFilterChange,
+  showUsageFilter = true,
 }: ProjectSiteToolbarProps) {
   return (
     <div className="project-site-toolbar">
@@ -24,21 +26,23 @@ export function ProjectSiteToolbar({
           placeholder="搜索项目点、客户、物料、申请单"
         />
       </label>
-      <label className="table-filter">
-        <Filter aria-hidden="true" size={16} />
-        <select
-          aria-label="领用状态筛选"
-          value={usageFilter}
-          onChange={(event) => onUsageFilterChange(event.target.value as "all" | ProjectUsageStatusCode)}
-        >
-          <option value="all">全部领用状态</option>
-          {PROJECT_USAGE_STATUSES.map((status) => (
-            <option key={status.code} value={status.code}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showUsageFilter ? (
+        <label className="table-filter">
+          <Filter aria-hidden="true" size={16} />
+          <select
+            aria-label="领用状态筛选"
+            value={usageFilter}
+            onChange={(event) => onUsageFilterChange(event.target.value as "all" | ProjectUsageStatusCode)}
+          >
+            <option value="all">全部领用状态</option>
+            {PROJECT_USAGE_STATUSES.map((status) => (
+              <option key={status.code} value={status.code}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
     </div>
   );
 }

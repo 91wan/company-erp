@@ -22,4 +22,19 @@ describe("ProjectSiteToolbar", () => {
     fireEvent.change(screen.getByLabelText("领用状态筛选"), { target: { value: "issued" } });
     expect(onUsageFilterChange).toHaveBeenCalledWith("issued");
   });
+
+  it("can hide usage-status filtering outside usage-led tabs", () => {
+    render(
+      <ProjectSiteToolbar
+        query=""
+        usageFilter="all"
+        onQueryChange={vi.fn()}
+        onUsageFilterChange={vi.fn()}
+        showUsageFilter={false}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("搜索项目点、客户、物料、申请单")).toBeInTheDocument();
+    expect(screen.queryByLabelText("领用状态筛选")).not.toBeInTheDocument();
+  });
 });

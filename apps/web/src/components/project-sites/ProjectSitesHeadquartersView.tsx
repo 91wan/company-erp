@@ -249,6 +249,7 @@ export function ProjectSitesHeadquartersView({
               usageFilter={usageFilter}
               onQueryChange={onQueryChange}
               onUsageFilterChange={onUsageFilterChange}
+              showUsageFilter={false}
             />
             <ProjectSiteRiskLedgerSection
               filteredSites={filteredSites}

@@ -731,7 +731,7 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("项目点风险台账")).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader")).toHaveLength(8);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(7);
     expect(screen.getByText("个人承包人王某")).toBeInTheDocument();
     expect(await screen.findByText(/健康证缺失/)).toBeInTheDocument();
     expect(screen.getAllByText("红色风险").some((element) => element.classList.contains("danger"))).toBe(true);

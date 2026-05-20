@@ -110,7 +110,8 @@ describe("ProjectSitesHeadquartersView", () => {
 
     expect(screen.getByRole("heading", { name: "项目点" })).toBeInTheDocument();
     expect(screen.getByText("项目点风险台账")).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader")).toHaveLength(8);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(7);
+    expect(screen.queryByLabelText("领用状态筛选")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "领用申请" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "投入合同" })).not.toBeInTheDocument();
 
@@ -119,6 +120,7 @@ describe("ProjectSitesHeadquartersView", () => {
 
     fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     expect(screen.getByRole("heading", { name: "领用申请" })).toBeInTheDocument();
+    expect(screen.getByLabelText("领用状态筛选")).toBeInTheDocument();
     expect(screen.queryByText("项目点风险台账")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("tab", { name: "投入合同" })[0]!);
