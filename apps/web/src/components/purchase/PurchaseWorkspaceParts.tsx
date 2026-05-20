@@ -78,14 +78,9 @@ export function PurchaseRequestsTable({
             <th>编号</th>
             <th>申请人</th>
             <th>部门/项目点</th>
-            <th>物料</th>
-            <th>数量</th>
-            <th>来源</th>
+            <th>物料/数量</th>
             <th>状态</th>
-            <th>提交时间</th>
-            <th>审批人/备注</th>
             <th>期望到货</th>
-            <th>更新时间</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -97,18 +92,18 @@ export function PurchaseRequestsTable({
                 <td>{request.requestNo}</td>
                 <td>{request.requesterName}</td>
                 <td>{request.projectSiteName || request.departmentName}</td>
-                <td>{firstLine?.materialName ?? "-"}</td>
-                <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
-                <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
+                <td>
+                  <span className="table-cell-stack">
+                    <strong>{firstLine?.materialName ?? "-"}</strong>
+                    <small>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</small>
+                  </span>
+                </td>
                 <td>
                   <StatusBadge tone={purchaseRequestTone(request.status)}>
                     {requestStatusLabel.get(request.status)}
                   </StatusBadge>
                 </td>
-                <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
-                <td>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "-"}</td>
                 <td>{request.expectedArrivalDate || "-"}</td>
-                <td>{formatDateTime(request.updatedAt)}</td>
                 <td>
                   {canManage && request.status === "draft" ? (
                     <button type="button" disabled={reviewState === "saving"} onClick={(event) => { event.stopPropagation(); onSubmitRequest(request); }}>
@@ -137,9 +132,7 @@ export function PurchaseRecordsTable({ records, onSelectRecord }: { records: Pur
             <th>采购人</th>
             <th>来源</th>
             <th>供应商/平台/店铺</th>
-            <th>合同</th>
-            <th>物料</th>
-            <th>采购数量</th>
+            <th>物料/数量</th>
             <th>采购日期</th>
             <th>状态</th>
           </tr>
@@ -154,9 +147,12 @@ export function PurchaseRecordsTable({ records, onSelectRecord }: { records: Pur
                 <td>{record.purchaserName}</td>
                 <td>{sourceTypeLabel.get(record.sourceType)}</td>
                 <td>{sourceText}</td>
-                <td>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "-"}</td>
-                <td>{firstLine?.materialName ?? "-"}</td>
-                <td>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</td>
+                <td>
+                  <span className="table-cell-stack">
+                    <strong>{firstLine?.materialName ?? "-"}</strong>
+                    <small>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</small>
+                  </span>
+                </td>
                 <td>{record.purchaseDate}</td>
                 <td>
                   <StatusBadge tone={record.status === "cancelled" ? "warning" : "success"}>
@@ -184,8 +180,14 @@ export function PurchaseRequestDetail({ request }: { request: PurchaseRequestDto
       <dd>{request.projectSiteName || request.departmentName || "-"}</dd>
       <dt>物料</dt>
       <dd>{firstLine ? `${firstLine.materialName} ${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>来源</dt>
+      <dd>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</dd>
       <dt>状态</dt>
       <dd>{requestStatusLabel.get(request.status)}</dd>
+      <dt>提交时间</dt>
+      <dd>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</dd>
+      <dt>期望到货</dt>
+      <dd>{request.expectedArrivalDate || "-"}</dd>
       <dt>审批信息</dt>
       <dd>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "暂无"}</dd>
       <dt>更新时间</dt>
@@ -210,6 +212,8 @@ export function PurchaseRecordDetail({ record }: { record: PurchaseRecordDto }) 
       <dd>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "未关联"}</dd>
       <dt>物料</dt>
       <dd>{firstLine ? `${firstLine.materialName} ${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>采购日期</dt>
+      <dd>{record.purchaseDate}</dd>
       <dt>状态</dt>
       <dd>{recordStatusLabel.get(record.status)}</dd>
     </dl>
