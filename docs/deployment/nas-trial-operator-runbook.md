@@ -73,6 +73,7 @@
 
 - 附件 scope 必须覆盖 list、detail、download-url、content、总部上传和外部项目点业务对象受控上传。
 - 业务页面只使用统一附件引用；legacy `attachmentPath`、`sourceAttachmentPath`、`filePath` 只能作为迁移参考。
+- raw path 下载入口禁止；附件下载只能走统一附件接口和已鉴权的 content/download-url 流程。
 - 审计导出必须是 admin-only，并保留 `action`、`entityType`、`actorUsername`、date range 筛选条件。
 - 审计 CSV 归档前必须通过 `audit:verify-export`，不能只记录 SHA256。
 
