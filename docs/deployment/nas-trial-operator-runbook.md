@@ -74,6 +74,18 @@ npm run attachments:legacy-report -- --help
 npm run audit:verify-export -- --help
 ```
 
+## 可部署通知 gate
+
+在通知业务方或运维窗口“可以部署 NAS 内网试点”前，先运行只读 readiness gate：
+
+```bash
+npm run nas:trial-readiness
+```
+
+只有输出 `READY_FOR_NAS_INTRAnet_TRIAL` 时，才可以发出通知：可以部署 NAS 内网试点；不要公网暴露 API/PostgreSQL。这个通知只表示进入 NAS 内网试点部署窗口，不是正式合规档案系统全面上线。
+
+如果输出 `BLOCKED`，先处理列出的阻塞项，不要发部署通知。常见阻塞包括：`main...origin/main` 不干净、仍有 open PR、脚本 smoke 失败、文档/static gate 失败、本地标准链或 GitHub CI 未通过。
+
 ## 角色验收
 
 - `admin`: 可访问 Dashboard、项目点风险台账、系统设置、全局附件管理、审计日志和审计导出。
