@@ -35,7 +35,7 @@ test("external post-orchestration QA keeps portal sections distinct and amount s
   await createMockCompanyErpApi(page, { user: externalProjectSiteUser });
 
   await page.goto("/");
-  const nav = page.getByLabel("ERP modules");
+  const nav = page.getByLabel("ERP 模块");
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
 
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();

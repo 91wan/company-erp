@@ -22,7 +22,7 @@ export function Sidebar({
   onSelectSettings,
 }: SidebarProps) {
   return (
-    <aside className="erp-sidebar" aria-label="ERP modules">
+    <aside className="erp-sidebar" aria-label="ERP 模块">
       <div className="sidebar-brand">
         <span className="app-icon">财</span>
         <h1>{companyName}</h1>

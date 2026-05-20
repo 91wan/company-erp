@@ -53,6 +53,7 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
 
     try {
       const input = normalizeInventoryMovementInput(request.body);
+      await validateInventoryMovementBusinessRules(input, options);
       const inventoryMovement = await options.inventoryRepository.createMovement(input);
       await writeAuditLog(request, options, {
         action: "inventory_movement.create",
@@ -190,4 +191,29 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
     }
   });
 
+}
+
+async function validateInventoryMovementBusinessRules(
+  input: ReturnType<typeof normalizeInventoryMovementInput>,
+  options: BuildAppOptions,
+): Promise<void> {
+  const issues: string[] = [];
+  if (options.materialRepository) {
+    const material = await options.materialRepository.getById(input.materialId);
+    if (material) {
+      if (input.unit !== material.baseUnit) issues.push("unit must match material baseUnit");
+    }
+  }
+
+  if (options.employeeRepository) {
+    const employees = await options.employeeRepository.list({ employmentStatus: "active" });
+    const matchedEmployee = employees.find(
+      (employee) => employee.name === input.handledBy || employee.employeeNo === input.handledBy,
+    );
+    if (!matchedEmployee) {
+      issues.push("handledBy must reference an active headquarters employee");
+    }
+  }
+
+  if (issues.length > 0) throw new InventoryMovementValidationError(issues);
 }

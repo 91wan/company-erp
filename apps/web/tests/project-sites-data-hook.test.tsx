@@ -64,7 +64,7 @@ describe("useProjectSitesData", () => {
     expect(result.current.usageRequests).toEqual([projectUsageRequest]);
     expect(result.current.parties).toEqual([party]);
     expect(result.current.materials).toEqual([
-      expect.objectContaining({ id: material.id, materialName: material.materialName, unit: material.projectSiteSaleUnit }),
+      expect.objectContaining({ id: material.id, materialName: material.materialName, unit: material.baseUnit }),
     ]);
     expect(result.current.warehouses).toEqual([
       expect.objectContaining({ id: warehouse.id, warehouseCode: warehouse.warehouseCode }),

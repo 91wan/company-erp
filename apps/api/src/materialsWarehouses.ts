@@ -110,7 +110,6 @@ export function normalizeMaterialInput(
   if (typeof payload.materialName === "string") normalized.materialName = payload.materialName.trim();
   if (typeof payload.materialCategory === "string") normalized.materialCategory = payload.materialCategory.trim();
   if (typeof payload.baseUnit === "string") normalized.baseUnit = payload.baseUnit.trim();
-
   for (const field of [
     "specification",
     "defaultWarehouseId",
@@ -172,7 +171,10 @@ export function normalizeMaterialInput(
   if (issues.length > 0) throw new MaterialValidationError(issues);
 
   if (mode === "create") {
-    return { ...normalized, status: normalized.status ?? "enabled" } as CreateMaterialInput;
+    return {
+      ...normalized,
+      status: normalized.status ?? "enabled",
+    } as CreateMaterialInput;
   }
   return normalized;
 }

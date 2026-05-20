@@ -4,6 +4,8 @@ import type {
   CreateInventoryMovementInput,
   InventoryBalanceDto,
   InventoryMovementDto,
+  MaterialDto,
+  EmployeeDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
 import type { AuditLogRepository } from "../src/auditLogs";
@@ -12,6 +14,8 @@ import {
   InventoryMovementConflictError,
   type InventoryRepository,
 } from "../src/inventory";
+import type { MaterialRepository } from "../src/materialsWarehouses";
+import type { EmployeeRepository } from "../src/peoplePermissions";
 import { hashPassword } from "../src/password";
 
 const now = "2026-05-11T12:00:00.000Z";
@@ -92,6 +96,101 @@ function makeBalance(overrides: Partial<InventoryBalanceDto> = {}): InventoryBal
   };
 }
 
+function makeMaterial(overrides: Partial<MaterialDto> = {}): MaterialDto {
+  return {
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    materialCode: "MAT0001",
+    materialName: "定制员工工服",
+    specification: "夏装 L 码",
+    materialCategory: "定制物料",
+    baseUnit: "套",
+    defaultWarehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    defaultWarehouseName: "无锡总部仓库",
+    defaultSupplierPartyId: null,
+    defaultSupplierPartyName: null,
+    safeStock: 20,
+    isProjectSiteSaleEnabled: false,
+    purchaseReferencePrice: null,
+    projectSiteSalePrice: null,
+    projectSiteSaleUnit: null,
+    projectSiteSaleRemark: null,
+    isConsumable: false,
+    status: "enabled",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function makeEmployee(overrides: Partial<EmployeeDto> = {}): EmployeeDto {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    employeeNo: "EMP0001",
+    name: "张三",
+    departmentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    departmentName: "总部仓储部",
+    phone: "13900000000",
+    email: null,
+    position: "仓管",
+    hireDate: "2026-01-01",
+    employmentStatus: "active",
+    remark: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function createFakeEmployeeRepository(seed: EmployeeDto[] = [makeEmployee()]): EmployeeRepository {
+  const employees = [...seed];
+  return {
+    async list(filters) {
+      return employees.filter((employee) => {
+        const matchesStatus = filters.employmentStatus ? employee.employmentStatus === filters.employmentStatus : true;
+        return matchesStatus;
+      });
+    },
+    async getById(id) {
+      return employees.find((employee) => employee.id === id) ?? null;
+    },
+    async create(input) {
+      const employee = makeEmployee({ ...input });
+      employees.push(employee);
+      return employee;
+    },
+    async update(id, input) {
+      const index = employees.findIndex((employee) => employee.id === id);
+      if (index === -1) return null;
+      employees[index] = { ...employees[index], ...input, updatedAt: now };
+      return employees[index];
+    },
+  };
+}
+
+function createFakeMaterialRepository(seed: MaterialDto[] = [makeMaterial()]): MaterialRepository {
+  const materials = [...seed];
+  return {
+    async list() {
+      return materials;
+    },
+    async getById(id) {
+      return materials.find((material) => material.id === id) ?? null;
+    },
+    async create(input) {
+      const material = makeMaterial({ ...input });
+      materials.push(material);
+      return material;
+    },
+    async update(id, input) {
+      const index = materials.findIndex((material) => material.id === id);
+      if (index === -1) return null;
+      materials[index] = { ...materials[index], ...input, updatedAt: now };
+      return materials[index];
+    },
+  };
+}
+
 function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): InventoryRepository {
   const movements = [...seed];
 
@@ -122,12 +221,15 @@ function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): Inven
       return movements.find((movement) => movement.id === id) ?? null;
     },
     async createMovement(input: CreateInventoryMovementInput) {
-      if (movements.some((movement) => movement.movementNo === input.movementNo)) {
+      const movementNo = input.movementNo ?? `AUTO-${movements.length + 1}`;
+      if (movements.some((movement) => movement.movementNo === movementNo)) {
         throw new InventoryMovementConflictError("movementNo");
       }
       const movement = makeMovement({
         id: "22222222-2222-4222-8222-222222222222",
         ...input,
+        movementNo,
+        quantity: input.movementType === "outbound" || input.movementType === "adjustment_out" ? -input.quantity : input.quantity,
         sourceType: input.sourceType ?? null,
         unitPrice: input.unitPrice ?? null,
         purchaseRecordNo: input.purchaseRecordNo ?? null,
@@ -314,13 +416,17 @@ describe("inventory movements API", () => {
 
   it("creates a positive inbound movement", async () => {
     const auditLogRepository = createFakeAuditLogRepository();
-    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository(), auditLogRepository });
+    const app = await buildApp({
+      inventoryRepository: createFakeInventoryRepository(),
+      materialRepository: createFakeMaterialRepository(),
+      employeeRepository: createFakeEmployeeRepository(),
+      auditLogRepository,
+    });
 
     const response = await app.inject({
       method: "POST",
       url: "/api/inventory-movements",
       payload: {
-        movementNo: "RK20260511002",
         movementDate: "2026-05-11",
         movementType: "inbound",
         sourceType: "purchase",
@@ -328,6 +434,7 @@ describe("inventory movements API", () => {
         materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         quantity: 8,
         unit: "套",
+        handledBy: "张三",
         purchaseRecordLineId: "44444444-4444-4444-8444-444444444444",
       },
     });
@@ -337,7 +444,7 @@ describe("inventory movements API", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
       inventoryMovement: {
-        movementNo: "RK20260511002",
+        movementNo: expect.stringMatching(/^AUTO-/),
         movementType: "inbound",
         quantity: 8,
         purchaseRecordLineId: "44444444-4444-4444-8444-444444444444",
@@ -350,6 +457,115 @@ describe("inventory movements API", () => {
     });
   });
 
+  it("creates a manual headquarters outbound movement without requiring a movement number", async () => {
+    const app = await buildApp({
+      inventoryRepository: createFakeInventoryRepository(),
+      materialRepository: createFakeMaterialRepository(),
+      employeeRepository: createFakeEmployeeRepository(),
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/inventory-movements",
+      payload: {
+        movementDate: "2026-05-11",
+        movementType: "outbound",
+        sourceType: "other",
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        quantity: 2,
+        unit: "套",
+        handledBy: "张三",
+        remark: "外部人员参观科技园项目点领用",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      inventoryMovement: {
+        movementNo: expect.stringMatching(/^AUTO-/),
+        movementType: "outbound",
+        sourceType: "other",
+        quantity: -2,
+        remark: "外部人员参观科技园项目点领用",
+      },
+    });
+  });
+
+  it("rejects wrong units and decimal inventory quantities", async () => {
+    const app = await buildApp({
+      inventoryRepository: createFakeInventoryRepository(),
+      materialRepository: createFakeMaterialRepository([makeMaterial({ baseUnit: "件" })]),
+      employeeRepository: createFakeEmployeeRepository(),
+    });
+
+    const decimalQuantity = await app.inject({
+      method: "POST",
+      url: "/api/inventory-movements",
+      payload: {
+        movementNo: "RK20260511011",
+        movementDate: "2026-05-11",
+        movementType: "inbound",
+        sourceType: "purchase",
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        quantity: 0.004,
+        unit: "件",
+        handledBy: "张三",
+      },
+    });
+    const wrongUnit = await app.inject({
+      method: "POST",
+      url: "/api/inventory-movements",
+      payload: {
+        movementNo: "RK20260511012",
+        movementDate: "2026-05-11",
+        movementType: "inbound",
+        sourceType: "purchase",
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        quantity: 1,
+        unit: "箱",
+        handledBy: "张三",
+      },
+    });
+    await app.close();
+
+    expect(decimalQuantity.statusCode).toBe(400);
+    expect(decimalQuantity.json().issues).toContain("quantity must be an integer");
+    expect(wrongUnit.statusCode).toBe(400);
+    expect(wrongUnit.json().issues).toContain("unit must match material baseUnit");
+  });
+
+  it("rejects inventory movement handlers that are not active headquarters employees", async () => {
+    const app = await buildApp({
+      inventoryRepository: createFakeInventoryRepository(),
+      materialRepository: createFakeMaterialRepository(),
+      employeeRepository: createFakeEmployeeRepository([makeEmployee({ employmentStatus: "active" })]),
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/inventory-movements",
+      payload: {
+        movementNo: "RK20260511013",
+        movementDate: "2026-05-11",
+        movementType: "inbound",
+        sourceType: "purchase",
+        warehouseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        quantity: 1,
+        unit: "套",
+        handledBy: "临时人员",
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues).toContain("handledBy must reference an active headquarters employee");
+  });
+
   it("rejects invalid movement create payloads and duplicate movement numbers", async () => {
     const app = await buildApp({ inventoryRepository: createFakeInventoryRepository([makeMovement()]) });
 
@@ -359,7 +575,7 @@ describe("inventory movements API", () => {
       payload: {
         movementNo: "RK20260511003",
         movementDate: "2026-05-11",
-        movementType: "outbound",
+        movementType: "unsupported",
         warehouseId: "",
         materialId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         quantity: 0,
@@ -385,7 +601,7 @@ describe("inventory movements API", () => {
     expect(invalid.statusCode).toBe(400);
     expect(invalid.json().issues).toEqual(
       expect.arrayContaining([
-        "movementType is not open for creation in this phase",
+        "movementType is unsupported",
         "warehouseId is required",
         "quantity must be a positive number",
       ]),

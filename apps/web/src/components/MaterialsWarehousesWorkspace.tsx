@@ -307,6 +307,7 @@ export function MaterialsWarehousesWorkspace({
               onChange={(event) => setMaterialForm((current) => ({ ...current, baseUnit: event.target.value }))}
             />
           </label>
+          <p className="form-hint">当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。</p>
           <label>
             <span>安全库存</span>
             <input
@@ -361,15 +362,7 @@ export function MaterialsWarehousesWorkspace({
               }
             />
           </label>
-          <label>
-            <span>收费单位</span>
-            <input
-              value={materialForm.projectSiteSaleUnit ?? ""}
-              onChange={(event) =>
-                setMaterialForm((current) => ({ ...current, projectSiteSaleUnit: event.target.value || null }))
-              }
-            />
-          </label>
+          <p className="form-hint">金额单位固定为人民币元；物料领用和库存数量单位使用上方基本单位。</p>
           <label>
             <span>收费备注</span>
             <input
@@ -396,7 +389,7 @@ export function MaterialsWarehousesWorkspace({
         <div>
           <span className="section-kicker">基础资料</span>
           <h2>仓库基础</h2>
-          <p>MVP 只管理无锡总部真实库存，不管理项目点现场库存。</p>
+          <p>当前阶段只管理无锡总部真实库存，不管理项目点现场库存。</p>
         </div>
         <span className="parties-total">
           <Warehouse aria-hidden="true" size={18} />
@@ -530,13 +523,16 @@ function MaterialsTable({ materials }: { materials: MaterialDto[] }) {
                 <small>{material.specification || "未设置规格"}</small>
               </td>
               <td>{material.materialCategory}</td>
-              <td>{material.baseUnit}</td>
+              <td>
+                {material.baseUnit}
+                <small>数量口径：整数</small>
+              </td>
               <td>{material.defaultWarehouseName || "-"}</td>
               <td>{material.defaultSupplierPartyName || "-"}</td>
               <td>{material.safeStock ?? "-"}</td>
               <td>
                 {material.isProjectSiteSaleEnabled && material.projectSiteSalePrice !== null && material.projectSiteSalePrice !== undefined
-                  ? `${material.projectSiteSalePrice} / ${material.projectSiteSaleUnit || material.baseUnit}`
+                  ? `${material.projectSiteSalePrice} 元`
                   : "不收费"}
                 {material.isProjectSiteSaleEnabled && material.projectSiteSaleRemark ? <small>{material.projectSiteSaleRemark}</small> : null}
               </td>

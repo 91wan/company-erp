@@ -41,12 +41,12 @@ export function ApiStatus({ loadHealth = defaultLoadHealth }: ApiStatusProps) {
   }, [loadHealth]);
 
   if (state === "loading") {
-    return <div className="api-status neutral">Checking API</div>;
+    return <div className="api-status neutral">正在检查接口</div>;
   }
 
   if (state === "online") {
-    return <div className="api-status success">API online</div>;
+    return <div className="api-status success">接口在线</div>;
   }
 
-  return <div className="api-status danger">API offline</div>;
+  return <div className="api-status danger">接口离线</div>;
 }

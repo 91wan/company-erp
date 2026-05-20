@@ -113,6 +113,27 @@ const demoWarehouse = {
   updatedAt: "2026-05-11T09:00:00.000Z",
 };
 
+const demoEmployee = {
+  id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+  employeeNo: "EMP0001",
+  name: "DEMO 仓管",
+  gender: null,
+  phone: "13900000000",
+  email: null,
+  departmentId: null,
+  departmentName: "总部仓储部",
+  position: "仓管",
+  employmentStatus: "active",
+  hireDate: "2026-01-01",
+  leaveDate: null,
+  remark: null,
+  userAccountId: null,
+  username: null,
+  accountStatus: null,
+  createdAt: "2026-05-11T09:00:00.000Z",
+  updatedAt: "2026-05-11T09:00:00.000Z",
+};
+
 const demoMaterial = {
   id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   materialCode: "DEMO-MAT-001",
@@ -442,6 +463,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     parties: [{ ...demoParty }],
     materials: [{ ...demoMaterial }],
     warehouses: [{ ...demoWarehouse }],
+    employees: [{ ...demoEmployee }],
     purchaseRequests: [{ ...demoPurchaseRequest }],
     purchaseRecords: [{ ...demoPurchaseRecord }],
     inventoryMovements: [{ ...demoInventoryMovement }],
@@ -692,7 +714,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
           materialCode: material.materialCode,
           materialName: material.materialName,
           specification: material.specification,
-          unit: material.projectSiteSaleUnit || material.baseUnit,
+          unit: material.baseUnit,
         })),
       });
     }
@@ -813,7 +835,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       const quantity = Number(input.quantity ?? 0);
       const inventoryMovement = {
         id: nextId("inventory-movement"),
-        movementNo: input.movementNo,
+        movementNo: input.movementNo ?? `AUTO-${state.inventoryMovements.length + 1}`,
         movementDate: input.movementDate,
         movementType: input.movementType,
         sourceType: input.sourceType ?? null,
@@ -824,7 +846,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
         materialCode: material.materialCode,
         materialName: material.materialName,
         specification: material.specification,
-        quantity,
+        quantity: input.movementType === "outbound" || input.movementType === "adjustment_out" ? -quantity : quantity,
         unit: input.unit,
         unitPrice: input.unitPrice ?? null,
         purchaseRecordNo: input.purchaseRecordNo ?? null,
@@ -837,7 +859,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       };
       state.inventoryMovements = [inventoryMovement, ...state.inventoryMovements];
       const balance = state.inventoryBalances[0];
-      balance.currentQuantity = Number(balance.currentQuantity) + quantity;
+      balance.currentQuantity = Number(balance.currentQuantity) + Number(inventoryMovement.quantity);
       balance.lastMovementAt = String(input.movementDate ?? "2026-05-13");
       return fulfill(route, { inventoryMovement });
     }
@@ -999,7 +1021,7 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname === "/api/materials") return { materials: state.materials };
   if (pathname === "/api/warehouses") return { warehouses: state.warehouses };
   if (pathname.startsWith("/api/departments")) return { departments: [] };
-  if (pathname.startsWith("/api/employees")) return { employees: [] };
+  if (pathname.startsWith("/api/employees")) return { employees: state.employees };
   if (pathname.startsWith("/api/user-accounts")) return { userAccounts: [] };
   if (pathname.startsWith("/api/external-project-site-accounts")) return { externalProjectSiteAccounts: [] };
   if (pathname.startsWith("/api/project-site-assignments")) return { projectSiteAssignments: [] };

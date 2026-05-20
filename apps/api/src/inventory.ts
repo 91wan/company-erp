@@ -49,7 +49,13 @@ export class InventoryMovementValidationError extends Error {
 
 const movementTypes = new Set(INVENTORY_MOVEMENT_TYPES.map((movementType) => movementType.code));
 const sourceTypes = new Set(INVENTORY_SOURCE_TYPES.map((sourceType) => sourceType.code));
-const creatableMovementTypes = new Set<InventoryMovementTypeCode>(["opening", "inbound", "adjustment_in"]);
+const creatableMovementTypes = new Set<InventoryMovementTypeCode>([
+  "opening",
+  "inbound",
+  "outbound",
+  "adjustment_in",
+  "adjustment_out",
+]);
 
 function normalizeNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -68,6 +74,10 @@ function normalizeRequiredString(value: unknown, field: string, issues: string[]
 function normalizePositiveNumber(value: unknown, field: string, issues: string[]): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     issues.push(`${field} must be a positive number`);
+    return undefined;
+  }
+  if (!Number.isInteger(value)) {
+    issues.push(`${field} must be an integer`);
     return undefined;
   }
   return value;
@@ -183,8 +193,9 @@ export function normalizeInventoryMovementInput(input: unknown): CreateInventory
 
   const unitPrice = normalizeNonNegativeNumber(payload.unitPrice, "unitPrice", issues);
 
+  const normalizedMovementNo = normalizeNullableString(payload.movementNo);
   const normalized: CreateInventoryMovementInput = {
-    movementNo: normalizeRequiredString(payload.movementNo, "movementNo", issues) ?? "",
+    ...(normalizedMovementNo ? { movementNo: normalizedMovementNo } : {}),
     movementDate: normalizeOptionalDate(payload.movementDate, "movementDate", issues) ?? "",
     movementType: movementType ?? "inbound",
     ...(sourceType !== undefined ? { sourceType } : {}),

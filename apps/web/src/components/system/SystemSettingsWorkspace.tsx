@@ -210,7 +210,7 @@ export function SystemSettingsWorkspace({
         eyebrow="基础与系统"
         title="系统设置"
         subtitle="分区查看公司信息、部署版本、附件管理、审计日志和安全状态；公司名称会同步到登录页和侧边栏。"
-        actions={<UiStatusBadge tone={canManage ? "success" : "disabled"}>{canManage ? "Admin 可修改" : "只读查看"}</UiStatusBadge>}
+        actions={<UiStatusBadge tone={canManage ? "success" : "disabled"}>{canManage ? "管理员可修改" : "只读查看"}</UiStatusBadge>}
       />
 
       <form className="dashboard-panel party-form settings-form" onSubmit={handleSubmit}>
@@ -276,7 +276,7 @@ export function SystemSettingsWorkspace({
       {canReadAuditLogs ? (
         <SectionCard title="审计日志" badge={<UiStatusBadge tone="info">只读</UiStatusBadge>}>
           <div className="section-inline-header">
-            <p className="form-hint">只读查看最近的高风险业务操作记录。导出 CSV 下载后记录 SHA256、筛选条件、导出人和 deploy revision。</p>
+            <p className="form-hint">只读查看最近的高风险业务操作记录。导出 CSV 下载后记录 SHA256、筛选条件、导出人和部署版本。</p>
             <button
               type="button"
               className="secondary-action"
@@ -292,7 +292,7 @@ export function SystemSettingsWorkspace({
               <input
                 value={auditFilters.entityType}
                 onChange={(event) => setAuditFilters((filters) => ({ ...filters, entityType: event.target.value }))}
-                placeholder="certificate"
+                placeholder="例如：证照记录"
               />
             </label>
             <label>
@@ -300,7 +300,7 @@ export function SystemSettingsWorkspace({
               <input
                 value={auditFilters.action}
                 onChange={(event) => setAuditFilters((filters) => ({ ...filters, action: event.target.value }))}
-                placeholder="certificate.create"
+                placeholder="例如：创建证照"
               />
             </label>
             <label>
@@ -308,7 +308,7 @@ export function SystemSettingsWorkspace({
               <input
                 value={auditFilters.actorUsername}
                 onChange={(event) => setAuditFilters((filters) => ({ ...filters, actorUsername: event.target.value }))}
-                placeholder="admin"
+                placeholder="例如：管理员"
               />
             </label>
             <label>
@@ -372,7 +372,7 @@ export function SystemSettingsWorkspace({
 
       {canReadAttachments ? (
         <SectionCard title="附件管理" badge={<UiStatusBadge tone={canManageAttachments ? "success" : "disabled"}>{canManageAttachments ? "可登记" : "只读"}</UiStatusBadge>}>
-          <p className="form-hint">登记后端认可的相对 storage key；不要填写 NAS 绝对路径、URL 或本地文件路径。</p>
+          <p className="form-hint">登记后端认可的相对存储键；不要填写 NAS 绝对路径、网址或本地文件路径。</p>
 
           {canManageAttachments ? (
             <form className="party-form settings-form" onSubmit={handleAttachmentSubmit}>
@@ -396,7 +396,7 @@ export function SystemSettingsWorkspace({
                   />
                 </label>
                 <label>
-                  <span>Storage Key</span>
+                  <span>存储键</span>
                   <input
                     value={attachmentForm.storageKey}
                     onChange={(event) => setAttachmentForm((form) => ({ ...form, storageKey: event.target.value }))}
@@ -458,7 +458,7 @@ export function SystemSettingsWorkspace({
                   <tr>
                     <th>附件编号</th>
                     <th>名称</th>
-                    <th>Storage Key</th>
+                    <th>存储键</th>
                     <th>归属</th>
                     <th>状态</th>
                     <th>操作</th>

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { GenerateReplenishmentSuggestionsResult, ImportJobDto, InventoryBalanceDto } from "@company-erp/shared";
+import type { CreateMaterialInput, GenerateReplenishmentSuggestionsResult, ImportJobDto, InventoryBalanceDto } from "@company-erp/shared";
 import {
   BusinessProjectsWorkspace,
   CertificatesWorkspace,
@@ -101,11 +101,11 @@ describe("Company ERP workspace components", () => {
     expect(screen.getByRole("heading", { name: "物料与仓库" })).toBeInTheDocument();
     expect(screen.getByText("仓库基础")).toBeInTheDocument();
     expect(await screen.findByText("定制员工工服")).toBeInTheDocument();
-    expect(screen.getByText("98 / 套")).toBeInTheDocument();
+    expect(screen.getByText("98 元")).toBeInTheDocument();
     expect(screen.getByText("项目点领用核算价")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("无锡总部仓库").length).toBeGreaterThan(0);
-    expect(screen.getByText("MVP 只管理无锡总部真实库存，不管理项目点现场库存。")).toBeInTheDocument();
+    expect(screen.getByText("当前阶段只管理无锡总部真实库存，不管理项目点现场库存。")).toBeInTheDocument();
   });
 
   it("renders empty and error states for material and warehouse loading", async () => {
@@ -133,7 +133,7 @@ describe("Company ERP workspace components", () => {
   it("creates material and warehouse records from the forms", async () => {
     const createdMaterial = { ...material, materialCode: "MAT0002", materialName: "定制纸杯" };
     const createdWarehouse = { ...warehouse, warehouseCode: "WH-TEMP-01", warehouseName: "临时周转仓" };
-    const createMaterial = vi.fn(() => Promise.resolve(createdMaterial));
+    const createMaterial = vi.fn((input: CreateMaterialInput) => Promise.resolve({ ...createdMaterial, ...input }));
 
     render(
       <MaterialsWarehousesWorkspace
@@ -148,10 +148,11 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("物料编码"), { target: { value: "MAT0002" } });
     fireEvent.change(screen.getByLabelText("物料名称"), { target: { value: "定制纸杯" } });
     fireEvent.change(screen.getByLabelText("基本单位"), { target: { value: "箱" } });
+    expect(screen.queryByLabelText("收费单位")).not.toBeInTheDocument();
+    expect(screen.getByText("当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("项目点领用收费"));
     fireEvent.change(screen.getByLabelText("采购参考价"), { target: { value: "12.5" } });
     fireEvent.change(screen.getByLabelText("项目点收费价"), { target: { value: "15" } });
-    fireEvent.change(screen.getByLabelText("收费单位"), { target: { value: "箱" } });
     fireEvent.change(screen.getByLabelText("收费备注"), { target: { value: "项目点耗材核算" } });
     fireEvent.click(screen.getByLabelText("耗材"));
     fireEvent.click(screen.getByRole("button", { name: "保存物料" }));
@@ -167,11 +168,11 @@ describe("Company ERP workspace components", () => {
         isProjectSiteSaleEnabled: true,
         purchaseReferencePrice: 12.5,
         projectSiteSalePrice: 15,
-        projectSiteSaleUnit: "箱",
         projectSiteSaleRemark: "项目点耗材核算",
         isConsumable: true,
       }),
     );
+    expect(createMaterial.mock.calls[0]?.[0]).not.toHaveProperty("projectSiteSaleUnit");
   });
 
   it("shows material and warehouse creation failures", async () => {
@@ -315,6 +316,7 @@ describe("Company ERP workspace components", () => {
         loadInventoryBalances={() => Promise.resolve([inventoryBalance])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
       />,
     );
 
@@ -324,8 +326,8 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("当前库存查询").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
-    expect(screen.getByText("公司内部出库暂未开放；项目点领用出库请到项目点模块办理。")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("流水类型")).queryByRole("option", { name: "出库" })).not.toBeInTheDocument();
+    expect(screen.getByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("流水类型")).getByRole("option", { name: "出库" })).toBeInTheDocument();
     expect(await screen.findByText("RK20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
     expect(screen.getAllByText("MAT0001").length).toBeGreaterThan(0);
@@ -346,6 +348,7 @@ describe("Company ERP workspace components", () => {
         loadInventoryBalances={() => Promise.resolve([])}
         loadMaterials={() => Promise.resolve([])}
         loadWarehouses={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
       />,
     );
 
@@ -358,12 +361,13 @@ describe("Company ERP workspace components", () => {
         loadInventoryBalances={() => Promise.reject(new Error("offline"))}
         loadMaterials={() => Promise.reject(new Error("offline"))}
         loadWarehouses={() => Promise.reject(new Error("offline"))}
+        loadEmployees={() => Promise.reject(new Error("offline"))}
       />,
     );
 
     expect(await screen.findByText("库存流水接口暂不可用")).toBeInTheDocument();
     expect(await screen.findByText("当前库存接口暂不可用")).toBeInTheDocument();
-    expect(await screen.findByText("物料或仓库接口暂不可用，暂不能登记入库。")).toBeInTheDocument();
+    expect(await screen.findByText("物料、仓库或员工接口暂不可用，暂不能登记出入库。")).toBeInTheDocument();
   });
 
   it("creates an inbound inventory movement and refreshes balances", async () => {
@@ -377,6 +381,7 @@ describe("Company ERP workspace components", () => {
         loadInventoryBalances={() => Promise.resolve(balances)}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
         createInventoryMovement={() => {
           balances = [refreshedBalance];
           return Promise.resolve(createdMovement);
@@ -385,16 +390,102 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无库存流水");
-    fireEvent.change(screen.getByLabelText("入库单号"), { target: { value: "RK20260511002" } });
+    await screen.findByRole("option", { name: `${employee.employeeNo} ${employee.name}` });
+    expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
     fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });
+    expect(screen.getByLabelText("单位")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("单位")).toHaveValue(material.baseUnit);
     fireEvent.change(screen.getByLabelText("入库数量"), { target: { value: "8" } });
-    fireEvent.change(screen.getByLabelText("经办人"), { target: { value: "王仓管" } });
+    fireEvent.change(screen.getByLabelText("经办人"), { target: { value: employee.name } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await screen.findByText("RK20260511002")).toBeInTheDocument();
     expect(await screen.findByText("20 套")).toBeInTheDocument();
+  });
+
+  it("blocks decimal inbound quantities because material quantities are integer-only", async () => {
+    const createInventoryMovement = vi.fn(() => Promise.resolve(inventoryMovement));
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
+        createInventoryMovement={createInventoryMovement}
+      />,
+    );
+
+    await screen.findByText("暂无库存流水");
+    await screen.findByRole("option", { name: `${employee.employeeNo} ${employee.name}` });
+    expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
+    fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });
+    fireEvent.change(screen.getByLabelText("入库数量"), { target: { value: "0.004" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("数量必须为整数。")).toBeInTheDocument();
+    expect(createInventoryMovement).not.toHaveBeenCalled();
+  });
+
+  it("requires selecting a headquarters employee as the inventory handler", async () => {
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
+        createInventoryMovement={() => Promise.resolve(inventoryMovement)}
+      />,
+    );
+
+    await screen.findByText("暂无库存流水");
+    expect(screen.getByLabelText("经办人").tagName).toBe("SELECT");
+    expect(screen.getByRole("option", { name: `${employee.employeeNo} ${employee.name}` })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "经办人" })).not.toBeInTheDocument();
+  });
+
+  it("creates a manual headquarters outbound movement with project visit purpose in remark", async () => {
+    const createInventoryMovement = vi.fn(() =>
+      Promise.resolve({ ...inventoryMovement, movementNo: "CK20260511002", movementType: "outbound" as const, quantity: -2 }),
+    );
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
+        createInventoryMovement={createInventoryMovement}
+      />,
+    );
+
+    await screen.findByText("暂无库存流水");
+    fireEvent.change(screen.getByLabelText("流水类型"), { target: { value: "outbound" } });
+    fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
+    fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
+    fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });
+    fireEvent.change(screen.getByLabelText("出库数量"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("经办人"), { target: { value: employee.name } });
+    fireEvent.change(screen.getByLabelText("备注"), { target: { value: "外部人员参观科技园项目点领用" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() =>
+      expect(createInventoryMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          movementType: "outbound",
+          sourceType: "other",
+          quantity: 2,
+          remark: "外部人员参观科技园项目点领用",
+        }),
+      ),
+    );
   });
 
   it("shows inventory creation failures", async () => {
@@ -404,12 +495,13 @@ describe("Company ERP workspace components", () => {
         loadInventoryBalances={() => Promise.resolve([])}
         loadMaterials={() => Promise.resolve([material])}
         loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
         createInventoryMovement={() => Promise.reject(new Error("duplicate movement"))}
       />,
     );
 
     await screen.findByText("暂无库存流水");
-    fireEvent.change(screen.getByLabelText("入库单号"), { target: { value: "RK20260511002" } });
+    expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
     fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });

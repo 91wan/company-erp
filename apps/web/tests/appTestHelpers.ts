@@ -264,7 +264,7 @@ export function mockShellFetch(
         return Promise.resolve(jsonResponse({
           error: "ATTACHMENT_VALIDATION_FAILED",
           issues: [
-            "Storage Key 只能使用 contracts/<uuid>.pdf 这类相对路径",
+            "存储键只能使用 contracts/<uuid>.pdf 这类相对路径",
             `password=${"Secret"}${"123"} 不应泄露`,
             `identityNo=${"320101199"}${"001011234"} 不应泄露`,
           ],
@@ -310,7 +310,7 @@ export function mockShellFetch(
             materialCode: material.materialCode,
             materialName: material.materialName,
             specification: material.specification,
-            unit: material.projectSiteSaleUnit,
+            unit: material.baseUnit,
           },
         ],
       }));

@@ -1086,7 +1086,7 @@ export type InventoryBalanceDto = {
 };
 
 export type CreateInventoryMovementInput = {
-  movementNo: string;
+  movementNo?: string;
   movementDate: string;
   movementType: InventoryMovementTypeCode;
   sourceType?: InventorySourceTypeCode | null;
