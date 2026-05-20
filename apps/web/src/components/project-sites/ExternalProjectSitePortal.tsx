@@ -142,7 +142,7 @@ export function ExternalProjectSitePortal({
         )}
       >
       <section className="external-portal-section" aria-label="当前门户分区">
-        <div className="panel-header people-panel-title">
+        <div className="ui-section-header">
           <h3>{activeCopy.title}</h3>
           {primarySummary ? (
             <StatusBadge tone={primarySummary.blockingIssueCount > 0 ? "danger" : primarySummary.warningIssueCount > 0 ? "warning" : "success"}>

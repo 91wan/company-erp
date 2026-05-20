@@ -268,7 +268,7 @@ test("critical workspaces keep vertical and horizontal scrolling in desktop and 
     expect(["auto", "visible"]).toContain(scrollMetrics.overflowY);
 
     const tableMetrics = await page
-      .locator(".table-wrap")
+      .locator(".ui-table-wrap, .table-wrap")
       .first()
       .evaluate((element) => ({
         clientWidth: element.clientWidth,

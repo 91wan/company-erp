@@ -8,7 +8,7 @@ import {
   type ProjectSiteKitchenEquipmentDto,
   type ProjectSiteKitchenEquipmentStatusCode,
 } from "@company-erp/shared";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer } from "../ui";
 
 export type ProjectSiteKitchenEquipmentChangeFormState = {
   projectSiteId: string;
@@ -46,17 +46,17 @@ export function ProjectSiteKitchenEquipmentChangeFormDrawer({
 }) {
   return (
     <FormDrawer title="上报设备变更" open={open} onClose={onClose}>
-      <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="厨房设备变更上报表单" noValidate>
-        <div className="panel-header people-panel-title">
-          <h3>
-            <ClipboardList aria-hidden="true" size={16} />
-            上报设备变更
-          </h3>
-          <button type="submit" disabled={submitState === "saving"}>
-            <Save aria-hidden="true" size={15} />
-            提交上报
-          </button>
-        </div>
+      <form className="workspace-form" onSubmit={onSubmit} aria-label="厨房设备变更上报表单" noValidate>
+        <DrawerFormHeader
+          title="上报设备变更"
+          icon={<ClipboardList aria-hidden="true" size={16} />}
+          action={(
+            <button type="submit" disabled={submitState === "saving"}>
+              <Save aria-hidden="true" size={15} />
+              提交上报
+            </button>
+          )}
+        />
         {!usageOnly ? (
           <label>
             <span>项目点</span>

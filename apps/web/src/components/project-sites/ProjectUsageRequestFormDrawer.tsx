@@ -1,7 +1,7 @@
 import { ClipboardList, Save } from "lucide-react";
 import type { FormEvent } from "react";
 import type { ProjectSiteDto, ProjectUsageOptionMaterialDto } from "@company-erp/shared";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer } from "../ui";
 
 export type ProjectUsageRequestFormState = {
   requestNo: string;
@@ -56,20 +56,20 @@ export function ProjectUsageRequestFormDrawer({
   return (
     <FormDrawer title="新增领用申请" open={open} onClose={onClose}>
       {canCreateUsage ? (
-        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="新增领用申请表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <ClipboardList aria-hidden="true" size={16} />
-              新增领用申请
-            </h3>
-            <button
-              type="submit"
-              disabled={submitState === "saving" || masterStatus !== "ready" || (!usageOnly && sites.length === 0)}
-            >
-              <Save aria-hidden="true" size={15} />
-              保存领用申请
-            </button>
-          </div>
+        <form className="workspace-form" onSubmit={onSubmit} aria-label="新增领用申请表单" noValidate>
+          <DrawerFormHeader
+            title="新增领用申请"
+            icon={<ClipboardList aria-hidden="true" size={16} />}
+            action={(
+              <button
+                type="submit"
+                disabled={submitState === "saving" || masterStatus !== "ready" || (!usageOnly && sites.length === 0)}
+              >
+                <Save aria-hidden="true" size={15} />
+                保存领用申请
+              </button>
+            )}
+          />
           <label>
             <span>领用申请单号</span>
             <input value={form.requestNo} onChange={(event) => onChange({ ...form, requestNo: event.target.value })} />

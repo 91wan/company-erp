@@ -15,6 +15,7 @@ import {
 } from "./ProjectUsageRequestFormDrawer";
 import type { ProjectSiteFormDrawer } from "./ProjectSitesHeadquartersView";
 import type { UsageWarehouseOption } from "./useProjectSitesData";
+import { WorkspaceSectionStack } from "../ui";
 
 type LoadStatus = "loading" | "ready" | "error";
 type SubmitState = "idle" | "saving" | "error";
@@ -76,7 +77,7 @@ export function ProjectSiteUsageSection({
 }: ProjectSiteUsageSectionProps) {
   return (
     <>
-      <div className="project-site-list-layout">
+      <WorkspaceSectionStack>
         <ProjectSiteUsagePanel
           usageRequests={filteredUsageRequests}
           status={usageStatus}
@@ -100,7 +101,7 @@ export function ProjectSiteUsageSection({
           onClose={onCloseForm}
           onSubmit={onCreateUsageRequest}
         />
-      </div>
+      </WorkspaceSectionStack>
 
       <ProjectUsageIssueFormDrawer
         open={openFormDrawer === "issue"}

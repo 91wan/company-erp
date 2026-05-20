@@ -9,7 +9,7 @@ import {
   type ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
 import { certificateStatusToBadge } from "../statusMappers";
-import { DataTable, EmptyState, StatusBadge, Toolbar } from "../ui";
+import { DataTable, DrawerFormHeader, EmptyState, StatusBadge, Toolbar } from "../ui";
 
 const typeLabel = new Map(CERTIFICATE_TYPES.map((item) => [item.code, item.label]));
 const ownerLabel = new Map(CERTIFICATE_OWNER_TYPES.map((item) => [item.code, item.label]));
@@ -126,14 +126,7 @@ export function CertificateDetailFields({
 }
 
 export function CertificatePanelHeader({ title, icon }: { title: string; icon: ReactNode }) {
-  return (
-    <div className="workspace-panel-header">
-      <h3>
-        {icon}
-        {title}
-      </h3>
-    </div>
-  );
+  return <DrawerFormHeader title={title} icon={icon} />;
 }
 
 export function CertificateStateLine({

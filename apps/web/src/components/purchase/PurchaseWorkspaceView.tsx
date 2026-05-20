@@ -1,5 +1,5 @@
 import { ShoppingCart } from "lucide-react";
-import { SegmentedTabs, SummaryCard, WorkspaceScaffold } from "../ui";
+import { MetricSummaryGrid, SegmentedTabs, SummaryCard, SummaryPill, WorkspaceScaffold } from "../ui";
 import type { PurchaseWorkspaceController } from "./usePurchaseWorkspaceController";
 import { purchaseTabs } from "./purchaseWorkspaceTypes";
 import { PurchaseArrivalsTab } from "./PurchaseArrivalsTab";
@@ -18,13 +18,13 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
       title="采购管理"
       subtitle="默认处理采购待办；需求、执行和到货记录分区查看。"
       actions={(
-        <span className="parties-total">
+        <SummaryPill>
           <ShoppingCart aria-hidden="true" size={18} />
           {model.purchaseRequests.length + model.purchaseRecords.length} 条采购数据
-        </span>
+        </SummaryPill>
       )}
       summary={(
-        <div className="summary-grid compact-summary" aria-label="采购摘要指标">
+        <MetricSummaryGrid label="采购摘要指标">
           <SummaryCard label="采购需求" value={model.purchaseRequests.length} detail="需求台账" tone="info" />
           <SummaryCard
             label="待审批"
@@ -39,7 +39,7 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
             tone="neutral"
           />
           <SummaryCard label="采购记录" value={model.purchaseRecords.length} detail="采购执行" tone="info" />
-        </div>
+        </MetricSummaryGrid>
       )}
       tabs={(
         <>

@@ -1,6 +1,6 @@
 import { Save } from "lucide-react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer } from "../ui";
 import type { RequestFormState } from "./purchaseWorkspaceTypes";
 
 export function PurchaseRequestFormDrawer({
@@ -27,14 +27,16 @@ export function PurchaseRequestFormDrawer({
   return (
     <FormDrawer title="新增采购需求" open={open} dirty={dirty && submitState !== "saving"} onClose={onClose}>
       {canManage ? (
-        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} noValidate>
-          <div className="panel-header">
-            <h3>新增采购需求</h3>
-            <button type="submit" disabled={submitState === "saving"}>
-              <Save aria-hidden="true" size={15} />
-              保存采购需求
-            </button>
-          </div>
+        <form className="workspace-form" onSubmit={onSubmit} noValidate>
+          <DrawerFormHeader
+            title="新增采购需求"
+            action={(
+              <button type="submit" disabled={submitState === "saving"}>
+                <Save aria-hidden="true" size={15} />
+                保存采购需求
+              </button>
+            )}
+          />
           <label>
             <span>采购需求编号</span>
             <input required value={form.requestNo} onChange={(event) => onFormChange((current) => ({ ...current, requestNo: event.target.value }))} />

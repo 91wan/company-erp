@@ -16,7 +16,7 @@ import {
   type ProjectUsageStatusCode,
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
-import { EmptyState, SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold } from "../ui";
+import { EmptyState, MetricSummaryGrid, SegmentedTabs, StatusBadge, SummaryCard, SummaryPill, WorkspaceScaffold } from "../ui";
 import type { ProjectSiteCreateFormState } from "./ProjectSiteCreateFormDrawer";
 import { ProjectSiteDetailDrawer } from "./ProjectSiteDetailDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
@@ -233,18 +233,18 @@ export function ProjectSitesHeadquartersView({
         title="项目点"
         subtitle="按风险台账、物料领用、厨房设备和投入合同分区处理项目点事务。"
         actions={(
-          <span className="parties-total">
+          <SummaryPill>
             <MapPin aria-hidden="true" size={18} />
             {sites.length} 个项目点
-          </span>
+          </SummaryPill>
         )}
         summary={(
-          <div className="summary-grid compact-summary" aria-label="项目点摘要指标">
+          <MetricSummaryGrid label="项目点摘要指标">
             <SummaryCard label="项目点" value={sites.length} detail={`${activeSiteCount} 个启用`} tone="info" />
             <SummaryCard label="红色风险" value={complianceBlockingIssueCount} detail="阻断项" tone={complianceBlockingIssueCount > 0 ? "danger" : "success"} />
             <SummaryCard label="黄色预警" value={complianceWarningIssueCount} detail="临期或待处理" tone={complianceWarningIssueCount > 0 ? "warning" : "success"} />
             <SummaryCard label="待处理领用" value={pendingUsageCount} detail={`申请 ${totalRequestedQuantity} / 已出 ${totalIssuedQuantity}`} tone={pendingUsageCount > 0 ? "warning" : "success"} />
-          </div>
+          </MetricSummaryGrid>
         )}
         tabs={(
           <>

@@ -225,15 +225,18 @@
   font-size: 13px;
 }
 
-.inline-actions {
+.inline-actions,
+.ui-inline-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
 .inline-actions button,
+.ui-inline-actions button,
 .inline-action,
-.table-wrap td > button {
+.table-wrap td > button,
+.ui-table-wrap td > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -249,8 +252,10 @@
 }
 
 .inline-actions button:disabled,
+.ui-inline-actions button:disabled,
 .inline-action:disabled,
-.table-wrap td > button:disabled {
+.table-wrap td > button:disabled,
+.ui-table-wrap td > button:disabled {
   opacity: 0.55;
 }
 

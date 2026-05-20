@@ -2,7 +2,7 @@ import { Save } from "lucide-react";
 import type { ContractDto, PurchaseSourceTypeCode } from "@company-erp/shared";
 import { PURCHASE_SOURCE_TYPES } from "@company-erp/shared";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer } from "../ui";
 import type { RecordFormState } from "./purchaseWorkspaceTypes";
 
 export function PurchaseRecordFormDrawer({
@@ -31,14 +31,16 @@ export function PurchaseRecordFormDrawer({
   return (
     <FormDrawer title="新增采购记录" open={open} dirty={dirty && submitState !== "saving"} onClose={onClose}>
       {canManage ? (
-        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} noValidate>
-          <div className="panel-header">
-            <h3>新增采购记录</h3>
-            <button type="submit" disabled={submitState === "saving"}>
-              <Save aria-hidden="true" size={15} />
-              保存采购记录
-            </button>
-          </div>
+        <form className="workspace-form" onSubmit={onSubmit} noValidate>
+          <DrawerFormHeader
+            title="新增采购记录"
+            action={(
+              <button type="submit" disabled={submitState === "saving"}>
+                <Save aria-hidden="true" size={15} />
+                保存采购记录
+              </button>
+            )}
+          />
           <label>
             <span>采购单号</span>
             <input required value={form.purchaseNo} onChange={(event) => onFormChange((current) => ({ ...current, purchaseNo: event.target.value }))} />

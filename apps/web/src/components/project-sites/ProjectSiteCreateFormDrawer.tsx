@@ -6,7 +6,7 @@ import {
   type CreateProjectSiteInput,
   type PartyDto,
 } from "@company-erp/shared";
-import { FormDrawer } from "../ui";
+import { DrawerFormHeader, FormDrawer } from "../ui";
 
 export type ProjectSiteCreateFormState = {
   siteCode: string;
@@ -57,17 +57,17 @@ export function ProjectSiteCreateFormDrawer({
   return (
     <FormDrawer title="新增项目点" open={open} onClose={onClose}>
       {canEditSites ? (
-        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="新增项目点表单" noValidate>
-          <div className="panel-header people-panel-title">
-            <h3>
-              <MapPin aria-hidden="true" size={16} />
-              新增项目点
-            </h3>
-            <button type="submit" disabled={submitState === "saving"}>
-              <Save aria-hidden="true" size={15} />
-              保存项目点
-            </button>
-          </div>
+        <form className="workspace-form" onSubmit={onSubmit} aria-label="新增项目点表单" noValidate>
+          <DrawerFormHeader
+            title="新增项目点"
+            icon={<MapPin aria-hidden="true" size={16} />}
+            action={(
+              <button type="submit" disabled={submitState === "saving"}>
+                <Save aria-hidden="true" size={15} />
+                保存项目点
+              </button>
+            )}
+          />
           <label>
             <span>项目点编码</span>
             <input value={form.siteCode} onChange={(event) => onChange({ ...form, siteCode: event.target.value })} />

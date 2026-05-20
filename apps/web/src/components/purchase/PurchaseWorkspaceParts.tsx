@@ -11,7 +11,7 @@ import {
   PURCHASE_REQUEST_STATUSES,
   PURCHASE_SOURCE_TYPES,
 } from "@company-erp/shared";
-import { StatusBadge, Toolbar as UiToolbar } from "../ui";
+import { StatusBadge, Toolbar as UiToolbar, WorkspaceTableContainer } from "../ui";
 
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
@@ -71,7 +71,7 @@ export function PurchaseRequestsTable({
   onSelectRequest: (request: PurchaseRequestDto) => void;
 }) {
   return (
-    <div className="table-wrap">
+    <WorkspaceTableContainer>
       <table>
         <thead>
           <tr>
@@ -118,13 +118,13 @@ export function PurchaseRequestsTable({
           })}
         </tbody>
       </table>
-    </div>
+    </WorkspaceTableContainer>
   );
 }
 
 export function PurchaseRecordsTable({ records, onSelectRecord }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void }) {
   return (
-    <div className="table-wrap">
+    <WorkspaceTableContainer>
       <table>
         <thead>
           <tr>
@@ -164,7 +164,7 @@ export function PurchaseRecordsTable({ records, onSelectRecord }: { records: Pur
           })}
         </tbody>
       </table>
-    </div>
+    </WorkspaceTableContainer>
   );
 }
 
