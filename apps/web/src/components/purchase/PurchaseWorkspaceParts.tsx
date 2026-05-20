@@ -1,0 +1,246 @@
+import { Filter, Search } from "lucide-react";
+import type { ReactNode } from "react";
+import type {
+  PurchaseRecordDto,
+  PurchaseRecordStatusCode,
+  PurchaseRequestDto,
+  PurchaseRequestStatusCode,
+} from "@company-erp/shared";
+import {
+  PURCHASE_RECORD_STATUSES,
+  PURCHASE_REQUEST_STATUSES,
+  PURCHASE_SOURCE_TYPES,
+} from "@company-erp/shared";
+import { StatusBadge, Toolbar as UiToolbar } from "../ui";
+
+const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
+const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
+const sourceTypeLabel = new Map(PURCHASE_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
+
+export function PurchaseFilterToolbar({
+  query,
+  onQueryChange,
+  filter,
+  onFilterChange,
+  options,
+  searchLabel,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  filter: string;
+  onFilterChange: (value: string) => void;
+  options: readonly { code: string; label: string }[];
+  searchLabel: string;
+}) {
+  return (
+    <UiToolbar
+      search={(
+        <label className="table-search">
+          <Search aria-hidden="true" size={16} />
+          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={searchLabel} />
+        </label>
+      )}
+      filters={(
+        <label className="table-filter">
+          <Filter aria-hidden="true" size={16} />
+          <select aria-label={searchLabel} value={filter} onChange={(event) => onFilterChange(event.target.value)}>
+            <option value="all">全部状态</option>
+            {options.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    />
+  );
+}
+
+export function PurchaseRequestsTable({
+  requests,
+  canManage,
+  reviewState,
+  onSubmitRequest,
+  onSelectRequest,
+}: {
+  requests: PurchaseRequestDto[];
+  canManage: boolean;
+  reviewState: "idle" | "saving" | "error";
+  onSubmitRequest: (request: PurchaseRequestDto) => void;
+  onSelectRequest: (request: PurchaseRequestDto) => void;
+}) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>编号</th>
+            <th>申请人</th>
+            <th>部门/项目点</th>
+            <th>物料</th>
+            <th>数量</th>
+            <th>来源</th>
+            <th>状态</th>
+            <th>提交时间</th>
+            <th>审批人/备注</th>
+            <th>期望到货</th>
+            <th>更新时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {requests.map((request) => {
+            const firstLine = request.lines[0];
+            return (
+              <tr key={request.id} tabIndex={0} onClick={() => onSelectRequest(request)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRequest(request); }}>
+                <td>{request.requestNo}</td>
+                <td>{request.requesterName}</td>
+                <td>{request.projectSiteName || request.departmentName}</td>
+                <td>{firstLine?.materialName ?? "-"}</td>
+                <td>{firstLine ? `${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</td>
+                <td>{request.purpose === "库存补货建议" ? "库存补货建议" : "手工录入"}</td>
+                <td>
+                  <StatusBadge tone={purchaseRequestTone(request.status)}>
+                    {requestStatusLabel.get(request.status)}
+                  </StatusBadge>
+                </td>
+                <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
+                <td>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "-"}</td>
+                <td>{request.expectedArrivalDate || "-"}</td>
+                <td>{formatDateTime(request.updatedAt)}</td>
+                <td>
+                  {canManage && request.status === "draft" ? (
+                    <button type="button" disabled={reviewState === "saving"} onClick={(event) => { event.stopPropagation(); onSubmitRequest(request); }}>
+                      提交 {request.requestNo}
+                    </button>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PurchaseRecordsTable({ records, onSelectRecord }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>采购单号</th>
+            <th>采购人</th>
+            <th>来源</th>
+            <th>供应商/平台/店铺</th>
+            <th>合同</th>
+            <th>物料</th>
+            <th>采购数量</th>
+            <th>采购日期</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((record) => {
+            const firstLine = record.lines[0];
+            const sourceText = record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || record.purchaseDescription || "未建供应商";
+            return (
+              <tr key={record.id} tabIndex={0} onClick={() => onSelectRecord(record)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRecord(record); }}>
+                <td>{record.purchaseNo}</td>
+                <td>{record.purchaserName}</td>
+                <td>{sourceTypeLabel.get(record.sourceType)}</td>
+                <td>{sourceText}</td>
+                <td>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "-"}</td>
+                <td>{firstLine?.materialName ?? "-"}</td>
+                <td>{firstLine ? `${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</td>
+                <td>{record.purchaseDate}</td>
+                <td>
+                  <StatusBadge tone={record.status === "cancelled" ? "warning" : "success"}>
+                    {recordStatusLabel.get(record.status)}
+                  </StatusBadge>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PurchaseRequestDetail({ request }: { request: PurchaseRequestDto }) {
+  const firstLine = request.lines[0];
+  return (
+    <dl className="detail-grid">
+      <dt>需求编号</dt>
+      <dd>{request.requestNo}</dd>
+      <dt>申请人</dt>
+      <dd>{request.requesterName}</dd>
+      <dt>部门/项目点</dt>
+      <dd>{request.projectSiteName || request.departmentName || "-"}</dd>
+      <dt>物料</dt>
+      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.requestedQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>状态</dt>
+      <dd>{requestStatusLabel.get(request.status)}</dd>
+      <dt>审批信息</dt>
+      <dd>{request.reviewedByName || request.reviewRemark ? `${request.reviewedByName ?? "-"} ${request.reviewRemark ?? ""}` : "暂无"}</dd>
+      <dt>更新时间</dt>
+      <dd>{formatDateTime(request.updatedAt)}</dd>
+    </dl>
+  );
+}
+
+export function PurchaseRecordDetail({ record }: { record: PurchaseRecordDto }) {
+  const firstLine = record.lines[0];
+  return (
+    <dl className="detail-grid">
+      <dt>采购单号</dt>
+      <dd>{record.purchaseNo}</dd>
+      <dt>采购人</dt>
+      <dd>{record.purchaserName}</dd>
+      <dt>来源</dt>
+      <dd>{sourceTypeLabel.get(record.sourceType)}</dd>
+      <dt>供应商/平台</dt>
+      <dd>{record.supplierPartyName || record.supplierNameText || record.purchasePlatform || record.shopName || "-"}</dd>
+      <dt>合同</dt>
+      <dd>{record.contractNo ? `${record.contractNo} ${record.contractName ?? ""}` : "未关联"}</dd>
+      <dt>物料</dt>
+      <dd>{firstLine ? `${firstLine.materialName} ${firstLine.purchaseQuantity} ${firstLine.unit}` : "-"}</dd>
+      <dt>状态</dt>
+      <dd>{recordStatusLabel.get(record.status)}</dd>
+    </dl>
+  );
+}
+
+export function PurchaseStateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
+  return (
+    <div className="workspace-state">
+      {icon}
+      <span>{text}</span>
+    </div>
+  );
+}
+
+export function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function purchaseRequestTone(status: PurchaseRequestStatusCode): "info" | "success" | "warning" | "danger" | "rejected" {
+  if (status === "rejected") return "rejected";
+  if (status === "cancelled") return "warning";
+  if (status === "completed") return "success";
+  if (status === "pending_approval") return "warning";
+  if (status === "draft") return "info";
+  return "success";
+}
+
+export type { PurchaseRecordStatusCode, PurchaseRequestStatusCode };
