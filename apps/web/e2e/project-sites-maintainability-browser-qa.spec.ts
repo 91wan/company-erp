@@ -35,6 +35,7 @@ test("admin project-site maintainability QA keeps detail attachments scoped and 
     .toBe(true);
   await page.getByRole("button", { name: "关闭" }).click();
 
+  await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "出库登记" }).click();
   await page.getByLabel("出库单号").fill("DEMO-QA-MAINT-OUT");
   await page.getByLabel("领用时间").fill("2026-05-18");
@@ -67,6 +68,7 @@ test("viewer and scoped project-site maintainability QA keep restricted project-
   await createMockCompanyErpApi(scopedPage, { user: projectSiteUser });
   await scopedPage.goto("/");
   await scopedPage.getByRole("button", { name: "项目点", exact: true }).click();
+  await scopedPage.getByRole("tab", { name: "物料领用" }).click();
   await expect(scopedPage.getByRole("button", { name: "新增领用申请" })).toBeVisible();
   await expect(scopedPage.getByRole("button", { name: "出库登记" })).toHaveCount(0);
   await expect(scopedPage.getByText("采购价")).toHaveCount(0);
@@ -82,7 +84,7 @@ test("external project-site maintainability QA stays portal-only across complian
 
   await page.goto("/");
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
-  await expect(page.getByText("合规任务队列")).toBeVisible();
+  await expect(page.getByLabel("项目点任务卡")).toBeVisible();
 
   const nav = page.getByLabel("ERP 模块");
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();

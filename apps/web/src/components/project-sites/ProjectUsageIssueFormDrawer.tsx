@@ -42,7 +42,7 @@ export function ProjectUsageIssueFormDrawer({
   return (
     <FormDrawer title="出库登记" open={open} onClose={onClose}>
       {canIssueUsage ? (
-        <form className="dashboard-panel party-form project-issue-form" onSubmit={onSubmit} aria-label="出库登记表单" noValidate>
+        <form className="dashboard-panel workspace-form project-issue-form" onSubmit={onSubmit} aria-label="出库登记表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <PackageMinus aria-hidden="true" size={16} />

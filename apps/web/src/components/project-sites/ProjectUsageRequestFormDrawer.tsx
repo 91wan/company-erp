@@ -56,7 +56,7 @@ export function ProjectUsageRequestFormDrawer({
   return (
     <FormDrawer title="新增领用申请" open={open} onClose={onClose}>
       {canCreateUsage ? (
-        <form className="dashboard-panel party-form" onSubmit={onSubmit} aria-label="新增领用申请表单" noValidate>
+        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="新增领用申请表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <ClipboardList aria-hidden="true" size={16} />

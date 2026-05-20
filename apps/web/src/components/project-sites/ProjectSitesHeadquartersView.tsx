@@ -1,4 +1,5 @@
 import { MapPin } from "lucide-react";
+import { useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
   PROJECT_USAGE_STATUSES,
@@ -15,14 +16,13 @@ import {
   type ProjectUsageStatusCode,
 } from "@company-erp/shared";
 import type { AttachmentFilters } from "../../apiClient";
-import { PageHeader } from "../ui";
+import { EmptyState, SegmentedTabs, StatusBadge, SummaryCard, WorkspaceScaffold } from "../ui";
 import type { ProjectSiteCreateFormState } from "./ProjectSiteCreateFormDrawer";
 import { ProjectSiteDetailDrawer } from "./ProjectSiteDetailDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
 import type { ProjectSiteKitchenEquipmentCreateFormState } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
 import { ProjectSiteEquipmentSection } from "./ProjectSiteEquipmentSection";
 import { ProjectSiteInvestmentSection } from "./ProjectSiteInvestmentSection";
-import { ProjectSiteOperationsOverview } from "./ProjectSiteOperationsOverview";
 import { ProjectSiteRiskLedgerSection } from "./ProjectSiteRiskLedgerSection";
 import { ProjectSiteToolbar } from "./ProjectSiteToolbar";
 import { ProjectSiteUsageSection } from "./ProjectSiteUsageSection";
@@ -119,6 +119,15 @@ export type ProjectSitesHeadquartersViewProps = {
 };
 
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
+type HeadquartersTab = "risk" | "usage" | "equipment" | "investment" | "review";
+
+const headquartersTabs: { key: HeadquartersTab; label: string }[] = [
+  { key: "risk", label: "风险台账" },
+  { key: "usage", label: "物料领用" },
+  { key: "equipment", label: "厨房设备" },
+  { key: "investment", label: "投入合同" },
+  { key: "review", label: "资料审核" },
+];
 
 export function ProjectSitesHeadquartersView({
   sites,
@@ -137,7 +146,6 @@ export function ProjectSitesHeadquartersView({
   investmentSummary,
   investmentSummaryStatus,
   selectedInvestmentSiteId,
-  kitchenEquipment,
   filteredKitchenEquipment,
   filteredKitchenEquipmentChangeRequests,
   kitchenEquipmentStatus,
@@ -196,120 +204,154 @@ export function ProjectSitesHeadquartersView({
   loadAttachments,
   getAttachmentDownloadUrl,
 }: ProjectSitesHeadquartersViewProps) {
+  const [activeTab, setActiveTab] = useState<HeadquartersTab>("risk");
+  const tabActions = (
+    <div className="workspace-primary-actions" aria-label="当前分区操作">
+      {activeTab === "risk" && canEditSites ? <button type="button" onClick={() => onOpenForm("site")}>新增项目点</button> : null}
+      {activeTab === "usage" && canCreateUsage ? <button type="button" onClick={() => onOpenForm("usage")}>新增领用申请</button> : null}
+      {activeTab === "usage" && canIssueUsage ? <button type="button" className="secondary-action" onClick={() => onOpenForm("issue")}>出库登记</button> : null}
+      {activeTab === "equipment" && canEditSites ? <button type="button" onClick={() => onOpenForm("equipment")}>新增厨房设备</button> : null}
+      {activeTab === "equipment" ? <button type="button" className="secondary-action" onClick={() => onOpenForm("equipmentChange")}>上报设备变更</button> : null}
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
+      <WorkspaceScaffold
         eyebrow="项目点"
         title="项目点"
-        subtitle="维护项目点基础台账、合规资料、领用申请、厨房设备和总部出库动作。"
+        subtitle="按风险台账、物料领用、厨房设备和投入合同分区处理项目点事务。"
         actions={(
           <span className="parties-total">
             <MapPin aria-hidden="true" size={18} />
             {sites.length} 个项目点
           </span>
         )}
-      />
+        summary={(
+          <div className="summary-grid compact-summary" aria-label="项目点摘要指标">
+            <SummaryCard label="项目点" value={sites.length} detail={`${activeSiteCount} 个启用`} tone="info" />
+            <SummaryCard label="红色风险" value={complianceBlockingIssueCount} detail="阻断项" tone={complianceBlockingIssueCount > 0 ? "danger" : "success"} />
+            <SummaryCard label="黄色预警" value={complianceWarningIssueCount} detail="临期或待处理" tone={complianceWarningIssueCount > 0 ? "warning" : "success"} />
+            <SummaryCard label="待处理领用" value={pendingUsageCount} detail={`申请 ${totalRequestedQuantity} / 已出 ${totalIssuedQuantity}`} tone={pendingUsageCount > 0 ? "warning" : "success"} />
+          </div>
+        )}
+        tabs={(
+          <>
+            <SegmentedTabs items={headquartersTabs} activeKey={activeTab} onChange={setActiveTab} ariaLabel="项目点分区" />
+            {tabActions}
+          </>
+        )}
+      >
+        {activeTab === "risk" ? (
+          <>
+            <ProjectSiteToolbar
+              query={query}
+              usageFilter={usageFilter}
+              onQueryChange={onQueryChange}
+              onUsageFilterChange={onUsageFilterChange}
+            />
+            <ProjectSiteRiskLedgerSection
+              filteredSites={filteredSites}
+              siteStatus={siteStatus}
+              complianceSummaries={complianceSummaries}
+              openFormDrawer={openFormDrawer}
+              canEditSites={canEditSites}
+              siteForm={siteForm}
+              clientParties={clientParties}
+              operatorParties={operatorParties}
+              subcontractorParties={subcontractorParties}
+              businessProjects={businessProjects}
+              masterStatus={masterStatus}
+              siteSubmitState={siteSubmitState}
+              siteSubmitError={siteSubmitError}
+              onSelectSite={onSelectSite}
+              onSiteFormChange={onSiteFormChange}
+              onCloseForm={onCloseForm}
+              onCreateSite={onCreateSite}
+            />
+          </>
+        ) : null}
 
-      <ProjectSiteOperationsOverview
-        canEditSites={canEditSites}
-        canCreateUsage={canCreateUsage}
-        canIssueUsage={canIssueUsage}
-        masterStatus={masterStatus}
-        siteCount={sites.length}
-        activeSiteCount={activeSiteCount}
-        pendingUsageCount={pendingUsageCount}
-        totalRequestedQuantity={totalRequestedQuantity}
-        totalIssuedQuantity={totalIssuedQuantity}
-        kitchenEquipmentCount={kitchenEquipment.length}
-        pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
-        complianceBlockingIssueCount={complianceBlockingIssueCount}
-        complianceWarningIssueCount={complianceWarningIssueCount}
-        onOpenForm={onOpenForm}
-      />
+        {activeTab === "usage" ? (
+          <>
+            <ProjectSiteToolbar
+              query={query}
+              usageFilter={usageFilter}
+              onQueryChange={onQueryChange}
+              onUsageFilterChange={onUsageFilterChange}
+            />
+            <ProjectSiteUsageSection
+              usageRequests={usageRequests}
+              filteredUsageRequests={filteredUsageRequests}
+              usageStatus={usageStatus}
+              usageStatusLabel={usageStatusLabel}
+              openFormDrawer={openFormDrawer}
+              canCreateUsage={canCreateUsage}
+              canIssueUsage={canIssueUsage}
+              usageForm={usageForm}
+              issueForm={issueForm}
+              sites={sites}
+              warehouses={warehouses}
+              materials={materials}
+              masterStatus={masterStatus}
+              pendingIssueConfirm={pendingIssueConfirm}
+              usageSubmitState={usageSubmitState}
+              issueSubmitState={issueSubmitState}
+              usageSubmitError={usageSubmitError}
+              issueSubmitError={issueSubmitError}
+              onUsageFormChange={onUsageFormChange}
+              onIssueFormChange={onIssueFormChange}
+              onMaterialChange={onMaterialChange}
+              onCancelIssueConfirm={onCancelIssueConfirm}
+              onCloseForm={onCloseForm}
+              onCreateUsageRequest={onCreateUsageRequest}
+              onIssueUsageRequest={onIssueUsageRequest}
+            />
+          </>
+        ) : null}
 
-      <ProjectSiteEquipmentSection
-        filteredKitchenEquipment={filteredKitchenEquipment}
-        filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
-        kitchenEquipmentStatus={kitchenEquipmentStatus}
-        openFormDrawer={openFormDrawer}
-        canEditSites={canEditSites}
-        kitchenEquipmentForm={kitchenEquipmentForm}
-        kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
-        sites={sites}
-        kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
-        kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
-        kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
-        kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
-        onKitchenEquipmentFormChange={onKitchenEquipmentFormChange}
-        onKitchenEquipmentChangeFormChange={onKitchenEquipmentChangeFormChange}
-        onCloseForm={onCloseForm}
-        onCreateKitchenEquipment={onCreateKitchenEquipment}
-        onCreateKitchenEquipmentChangeRequest={onCreateKitchenEquipmentChangeRequest}
-        onReviewKitchenEquipmentChangeRequest={onReviewKitchenEquipmentChangeRequest}
-      />
+        {activeTab === "equipment" ? (
+          <ProjectSiteEquipmentSection
+            filteredKitchenEquipment={filteredKitchenEquipment}
+            filteredKitchenEquipmentChangeRequests={filteredKitchenEquipmentChangeRequests}
+            kitchenEquipmentStatus={kitchenEquipmentStatus}
+            openFormDrawer={openFormDrawer}
+            canEditSites={canEditSites}
+            kitchenEquipmentForm={kitchenEquipmentForm}
+            kitchenEquipmentChangeForm={kitchenEquipmentChangeForm}
+            sites={sites}
+            kitchenEquipmentSubmitState={kitchenEquipmentSubmitState}
+            kitchenEquipmentChangeSubmitState={kitchenEquipmentChangeSubmitState}
+            kitchenEquipmentSubmitError={kitchenEquipmentSubmitError}
+            kitchenEquipmentChangeSubmitError={kitchenEquipmentChangeSubmitError}
+            onKitchenEquipmentFormChange={onKitchenEquipmentFormChange}
+            onKitchenEquipmentChangeFormChange={onKitchenEquipmentChangeFormChange}
+            onCloseForm={onCloseForm}
+            onCreateKitchenEquipment={onCreateKitchenEquipment}
+            onCreateKitchenEquipmentChangeRequest={onCreateKitchenEquipmentChangeRequest}
+            onReviewKitchenEquipmentChangeRequest={onReviewKitchenEquipmentChangeRequest}
+          />
+        ) : null}
 
-      <ProjectSiteToolbar
-        query={query}
-        usageFilter={usageFilter}
-        onQueryChange={onQueryChange}
-        onUsageFilterChange={onUsageFilterChange}
-      />
+        {activeTab === "investment" ? (
+          <ProjectSiteInvestmentSection
+            sites={sites}
+            selectedSiteId={selectedInvestmentSiteId}
+            investmentSummary={investmentSummary}
+            investmentSummaryStatus={investmentSummaryStatus}
+            onSelectedSiteChange={onSelectedInvestmentSiteChange}
+          />
+        ) : null}
 
-      <ProjectSiteRiskLedgerSection
-        filteredSites={filteredSites}
-        siteStatus={siteStatus}
-        complianceSummaries={complianceSummaries}
-        openFormDrawer={openFormDrawer}
-        canEditSites={canEditSites}
-        siteForm={siteForm}
-        clientParties={clientParties}
-        operatorParties={operatorParties}
-        subcontractorParties={subcontractorParties}
-        businessProjects={businessProjects}
-        masterStatus={masterStatus}
-        siteSubmitState={siteSubmitState}
-        siteSubmitError={siteSubmitError}
-        onSelectSite={onSelectSite}
-        onSiteFormChange={onSiteFormChange}
-        onCloseForm={onCloseForm}
-        onCreateSite={onCreateSite}
-      />
-
-      <ProjectSiteInvestmentSection
-        sites={sites}
-        selectedSiteId={selectedInvestmentSiteId}
-        investmentSummary={investmentSummary}
-        investmentSummaryStatus={investmentSummaryStatus}
-        onSelectedSiteChange={onSelectedInvestmentSiteChange}
-      />
-
-      <ProjectSiteUsageSection
-        usageRequests={usageRequests}
-        filteredUsageRequests={filteredUsageRequests}
-        usageStatus={usageStatus}
-        usageStatusLabel={usageStatusLabel}
-        openFormDrawer={openFormDrawer}
-        canCreateUsage={canCreateUsage}
-        canIssueUsage={canIssueUsage}
-        usageForm={usageForm}
-        issueForm={issueForm}
-        sites={sites}
-        warehouses={warehouses}
-        materials={materials}
-        masterStatus={masterStatus}
-        pendingIssueConfirm={pendingIssueConfirm}
-        usageSubmitState={usageSubmitState}
-        issueSubmitState={issueSubmitState}
-        usageSubmitError={usageSubmitError}
-        issueSubmitError={issueSubmitError}
-        onUsageFormChange={onUsageFormChange}
-        onIssueFormChange={onIssueFormChange}
-        onMaterialChange={onMaterialChange}
-        onCancelIssueConfirm={onCancelIssueConfirm}
-        onCloseForm={onCloseForm}
-        onCreateUsageRequest={onCreateUsageRequest}
-        onIssueUsageRequest={onIssueUsageRequest}
-      />
+        {activeTab === "review" ? (
+          <ProjectSiteReviewQueue
+            sites={filteredSites}
+            complianceSummaries={complianceSummaries}
+            pendingKitchenEquipmentChangeCount={pendingKitchenEquipmentChangeCount}
+            onSelectSite={onSelectSite}
+          />
+        ) : null}
+      </WorkspaceScaffold>
 
       <ProjectSiteDetailDrawer
         site={selectedDetailSite}
@@ -322,5 +364,62 @@ export function ProjectSitesHeadquartersView({
         onClose={onCloseDetail}
       />
     </>
+  );
+}
+
+function ProjectSiteReviewQueue({
+  sites,
+  complianceSummaries,
+  pendingKitchenEquipmentChangeCount,
+  onSelectSite,
+}: {
+  sites: ProjectSiteDto[];
+  complianceSummaries: Record<string, ProjectSiteComplianceSummaryDto>;
+  pendingKitchenEquipmentChangeCount: number;
+  onSelectSite: (site: ProjectSiteDto) => void;
+}) {
+  const riskySites = sites.filter((site) => {
+    const summary = complianceSummaries[site.id];
+    return summary && (summary.blockingIssueCount > 0 || summary.warningIssueCount > 0);
+  });
+
+  if (riskySites.length === 0 && pendingKitchenEquipmentChangeCount === 0) {
+    return (
+      <EmptyState
+        title="暂无待处理资料"
+        description="已有真实接口支持的合规风险会汇总到这里；更细资料审核入口后续随接口开放。"
+      />
+    );
+  }
+
+  return (
+    <section className="project-site-review-queue" aria-label="项目点资料审核队列">
+      {riskySites.map((site) => {
+        const summary = complianceSummaries[site.id];
+        return (
+          <article key={site.id} className="ui-section-card compact-review-item">
+            <div>
+              <strong>{site.siteCode} {site.siteName}</strong>
+              <p>红色风险 {summary.blockingIssueCount} 项，黄色预警 {summary.warningIssueCount} 项。</p>
+            </div>
+            <StatusBadge tone={summary.blockingIssueCount > 0 ? "danger" : "warning"}>
+              {summary.blockingIssueCount > 0 ? "阻断" : "预警"}
+            </StatusBadge>
+            <button type="button" className="secondary-action" onClick={() => onSelectSite(site)}>
+              查看详情
+            </button>
+          </article>
+        );
+      })}
+      {pendingKitchenEquipmentChangeCount > 0 ? (
+        <article className="ui-section-card compact-review-item">
+          <div>
+            <strong>厨房设备变更待审核</strong>
+            <p>{pendingKitchenEquipmentChangeCount} 条设备变更等待总部处理，请在“厨房设备”分区审核。</p>
+          </div>
+          <StatusBadge tone="warning">待审核</StatusBadge>
+        </article>
+      ) : null}
+    </section>
   );
 }

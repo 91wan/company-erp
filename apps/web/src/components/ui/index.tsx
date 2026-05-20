@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+export { WorkspaceScaffold } from "./WorkspaceScaffold";
+export { SegmentedTabs, type TabItem } from "./SegmentedTabs";
+
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "rejected" | "disabled" | "notApplicable";
 
 export function PageHeader({

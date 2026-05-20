@@ -48,7 +48,7 @@ export function ProjectSiteKitchenEquipmentCreateFormDrawer({
   return (
     <FormDrawer title="新增厨房设备" open={open} onClose={onClose}>
       {!usageOnly && canEditSites ? (
-        <form className="dashboard-panel party-form" onSubmit={onSubmit} aria-label="新增厨房设备表单" noValidate>
+        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="新增厨房设备表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <Wrench aria-hidden="true" size={16} />

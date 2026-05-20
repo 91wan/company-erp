@@ -22,7 +22,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
-import { DetailDrawer, FormDrawer, PageHeader, SectionCard, StatusBadge, SummaryCard, Toolbar as UiToolbar } from "./ui";
+import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold } from "./ui";
 import { contractExpiryToBadge } from "./statusMappers";
 
 type ContractsWorkspaceProps = {
@@ -57,6 +57,15 @@ type ContractFormState = {
 };
 
 type ContractFormDrawer = "contract" | null;
+type ContractTab = "risk" | "ledger" | "expiry" | "attachments" | "archive";
+
+const contractTabs: { key: ContractTab; label: string }[] = [
+  { key: "risk", label: "合同风险" },
+  { key: "ledger", label: "合同台账" },
+  { key: "expiry", label: "到期提醒" },
+  { key: "attachments", label: "附件" },
+  { key: "archive", label: "归档" },
+];
 
 const directionLabel = new Map(CONTRACT_DIRECTIONS.map((direction) => [direction.code, direction.label]));
 const contractFormLabel = new Map(CONTRACT_FORMS.map((form) => [form.code, form.label]));
@@ -113,6 +122,7 @@ export function ContractsWorkspace({
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
+  const [activeTab, setActiveTab] = useState<ContractTab>("risk");
   const [selectedContractId, setSelectedContractId] = useState("");
   const [contractForm, setContractForm] = useState<ContractFormState>({
     contractNo: "",
@@ -211,6 +221,12 @@ export function ContractsWorkspace({
     () => contracts.find((contract) => contract.id === selectedContractId) ?? null,
     [contracts, selectedContractId],
   );
+  const visibleContracts = filteredContracts.filter((contract) => {
+    if (activeTab === "risk") return contract.expiryState === "expired" || contract.expiryState === "expiring_soon";
+    if (activeTab === "expiry") return contract.expiryState === "expired" || contract.expiryState === "expiring_soon";
+    if (activeTab === "archive") return contract.status === "completed" || contract.status === "cancelled";
+    return true;
+  });
 
   async function handleContractSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -267,35 +283,41 @@ export function ContractsWorkspace({
   const hasCounterparties = parties.length > 0;
 
   return (
-    <section className="contracts-workspace" aria-label="合同管理">
-      <PageHeader
+    <WorkspaceScaffold
         eyebrow="合同风险台账"
         title="合同台账"
-        subtitle="维护合同基础信息、项目点和业务项目关联、附件引用与到期风险。"
+        subtitle="默认查看合同风险；台账、到期提醒、附件和归档分区查看。"
         actions={(
           <span className="parties-total">
             <FileText aria-hidden="true" size={18} />
             {contracts.length} 份合同
           </span>
         )}
-      />
-
-      <div className="summary-grid" aria-label="合同摘要指标">
-        <SummaryCard label="合同总数" value={contracts.length} detail="合同风险台账" tone="info" />
-        <SummaryCard label="执行中" value={contracts.filter((contract) => contract.status === "active").length} detail="当前有效合同" tone="success" />
-        <SummaryCard label="30 天内到期" value={contracts.filter((contract) => contract.expiryState === "expiring_soon").length} detail="需要续签或复核" tone="warning" />
-        <SummaryCard label="已到期" value={contracts.filter((contract) => contract.expiryState === "expired").length} detail="阻断风险" tone={contracts.some((contract) => contract.expiryState === "expired") ? "danger" : "success"} />
-        <SummaryCard label="已终止" value={contracts.filter((contract) => contract.status === "terminated").length} detail="历史归档" tone="disabled" />
-      </div>
-
-      {canManage ? (
-        <div className="project-site-action-bar" aria-label="合同快捷操作">
-          <button type="button" onClick={() => setOpenFormDrawer("contract")}>新增合同</button>
-        </div>
+        summary={(
+          <div className="summary-grid compact-summary" aria-label="合同摘要指标">
+            <SummaryCard label="合同总数" value={contracts.length} detail="合同风险台账" tone="info" />
+            <SummaryCard label="执行中" value={contracts.filter((contract) => contract.status === "active").length} detail="当前有效合同" tone="success" />
+            <SummaryCard label="30 天内到期" value={contracts.filter((contract) => contract.expiryState === "expiring_soon").length} detail="需要续签或复核" tone="warning" />
+            <SummaryCard label="已到期" value={contracts.filter((contract) => contract.expiryState === "expired").length} detail="阻断风险" tone={contracts.some((contract) => contract.expiryState === "expired") ? "danger" : "success"} />
+          </div>
+        )}
+        tabs={(
+          <>
+            <SegmentedTabs items={contractTabs} activeKey={activeTab} onChange={setActiveTab} ariaLabel="合同分区" />
+            {canManage && activeTab === "ledger" ? (
+              <div className="workspace-primary-actions">
+                <button type="button" onClick={() => setOpenFormDrawer("contract")}>新增合同</button>
+              </div>
+            ) : null}
+          </>
+        )}
+      >
+      {activeTab === "attachments" ? (
+        <EmptyState title="合同附件请从合同详情查看" description="选择合同台账中的记录后，在详情抽屉中查看或登记统一附件。" />
       ) : null}
-
+      {activeTab === "risk" || activeTab === "ledger" || activeTab === "expiry" || activeTab === "archive" ? (
       <div className="project-site-list-layout">
-        <SectionCard title="合同风险台账" action={<FileText aria-hidden="true" size={17} />}>
+        <SectionCard title={activeTab === "ledger" ? "合同台账" : activeTab === "archive" ? "合同归档" : "合同风险台账"} action={<FileText aria-hidden="true" size={17} />}>
           <ContractToolbar
             query={query}
             onQueryChange={setQuery}
@@ -306,12 +328,12 @@ export function ContractsWorkspace({
           />
           {contractStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载合同台账..." /> : null}
           {contractStatus === "error" ? <StateMessage text="合同台账加载失败" /> : null}
-          {contractStatus === "ready" && filteredContracts.length === 0 ? <StateMessage text="暂无合同资料" /> : null}
-          {contractStatus === "ready" && filteredContracts.length > 0 ? <ContractsTable contracts={filteredContracts} onSelectContract={(contract) => setSelectedContractId(contract.id)} /> : null}
+          {contractStatus === "ready" && visibleContracts.length === 0 ? <StateMessage text="暂无合同资料" /> : null}
+          {contractStatus === "ready" && visibleContracts.length > 0 ? <ContractsTable contracts={visibleContracts} onSelectContract={(contract) => setSelectedContractId(contract.id)} /> : null}
         </SectionCard>
 
         <FormDrawer title="新增合同" open={openFormDrawer === "contract"} onClose={() => setOpenFormDrawer(null)}>
-          {canManage ? <form className="dashboard-panel party-form" onSubmit={handleContractSubmit} noValidate>
+          {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleContractSubmit} noValidate>
           <div className="panel-header">
             <h3>新增合同</h3>
             <button type="submit" disabled={contractSubmitState === "saving" || !hasCounterparties}>
@@ -443,6 +465,7 @@ export function ContractsWorkspace({
           </form> : null}
         </FormDrawer>
       </div>
+      ) : null}
 
       <DetailDrawer title="合同详情" open={Boolean(selectedContract)} onClose={() => setSelectedContractId("")}>
         {selectedContract ? (
@@ -460,7 +483,7 @@ export function ContractsWorkspace({
           </>
         ) : null}
       </DetailDrawer>
-    </section>
+    </WorkspaceScaffold>
   );
 }
 
@@ -595,7 +618,7 @@ function ContractDetail({ contract }: { contract: ContractDto }) {
 
 function StateMessage({ icon, text }: { icon?: ReactNode; text: string }) {
   return (
-    <div className="party-state">
+    <div className="workspace-state">
       {icon}
       <span>{text}</span>
     </div>

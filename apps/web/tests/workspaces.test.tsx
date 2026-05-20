@@ -242,11 +242,13 @@ describe("Company ERP workspace components", () => {
 
     expect(screen.getByRole("heading", { name: "采购管理" })).toBeInTheDocument();
     expect(screen.getAllByText("采购需求").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("采购记录").length).toBeGreaterThan(0);
+    expect(screen.queryByText("新增采购记录")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     expect(screen.getByText("新增采购需求")).toBeInTheDocument();
-    expect(screen.getByText("新增采购记录")).toBeInTheDocument();
     expect(await screen.findByText("PR20260511001")).toBeInTheDocument();
     expect(screen.getByText("库存补货建议")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
+    expect(screen.getByText("新增采购记录")).toBeInTheDocument();
     expect(screen.getByText("PO20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("HT20260511001 无锡项目点服务合同").length).toBeGreaterThan(0);
     expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
@@ -321,23 +323,26 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(screen.getByRole("heading", { name: "库存管理" })).toBeInTheDocument();
-    expect(screen.getAllByText("入库登记").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("库存流水").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("当前库存查询").length).toBeGreaterThan(0);
+    expect(screen.getByRole("tab", { name: "库存风险" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "当前库存" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "入库流水" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
-    expect(screen.getByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("流水类型")).getByRole("option", { name: "出库" })).toBeInTheDocument();
+    expect(screen.queryByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
+    expect(screen.getByText("新增入库流水")).toBeInTheDocument();
     expect(await screen.findByText("RK20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("WH-WX-HQ").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("MAT0001").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/MAT0001/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("低库存").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText("RK20260511001"));
     expect(await screen.findByRole("heading", { name: "库存流水详情" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
 
-    fireEvent.click(screen.getAllByText("2026-05-11")[1]);
+    fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
+    fireEvent.click(screen.getAllByText("2026-05-11")[0]!);
     expect(await screen.findByRole("heading", { name: "库存余额详情" })).toBeInTheDocument();
   });
 
@@ -352,7 +357,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    expect(await screen.findByText("暂无低库存风险")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     expect(await screen.findByText("暂无库存流水")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
     expect(await screen.findByText("暂无当前库存")).toBeInTheDocument();
 
     rerender(
@@ -365,8 +373,12 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     expect(await screen.findByText("库存流水接口暂不可用")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
     expect(await screen.findByText("当前库存接口暂不可用")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增入库流水" }));
     expect(await screen.findByText("物料、仓库或员工接口暂不可用，暂不能登记出入库。")).toBeInTheDocument();
   });
 
@@ -389,7 +401,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     await screen.findByText("暂无库存流水");
+    fireEvent.click(screen.getByRole("button", { name: "新增入库流水" }));
     await screen.findByRole("option", { name: `${employee.employeeNo} ${employee.name}` });
     expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
@@ -402,6 +417,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await screen.findByText("RK20260511002")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
     expect(await screen.findByText("20 套")).toBeInTheDocument();
   });
 
@@ -419,7 +435,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     await screen.findByText("暂无库存流水");
+    fireEvent.click(screen.getByRole("button", { name: "新增入库流水" }));
     await screen.findByRole("option", { name: `${employee.employeeNo} ${employee.name}` });
     expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
@@ -444,7 +463,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     await screen.findByText("暂无库存流水");
+    fireEvent.click(screen.getByRole("button", { name: "新增入库流水" }));
     expect(screen.getByLabelText("经办人").tagName).toBe("SELECT");
     expect(screen.getByRole("option", { name: `${employee.employeeNo} ${employee.name}` })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "经办人" })).not.toBeInTheDocument();
@@ -466,8 +488,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "出库流水" }));
     await screen.findByText("暂无库存流水");
-    fireEvent.change(screen.getByLabelText("流水类型"), { target: { value: "outbound" } });
+    fireEvent.click(screen.getByRole("button", { name: "新增出库流水" }));
     fireEvent.change(screen.getByLabelText("出库日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
     fireEvent.change(screen.getByLabelText("物料"), { target: { value: material.id } });
@@ -500,7 +524,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "入库流水" }));
     await screen.findByText("暂无库存流水");
+    fireEvent.click(screen.getByRole("button", { name: "新增入库流水" }));
     expect(screen.queryByLabelText("入库单号")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("入库日期"), { target: { value: "2026-05-11" } });
     fireEvent.change(screen.getByLabelText("仓库"), { target: { value: warehouse.id } });
@@ -525,11 +552,11 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(screen.getByRole("heading", { name: "项目点" })).toBeInTheDocument();
-    expect(screen.getAllByText("项目点台账").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("领用申请").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("出库登记").length).toBeGreaterThan(0);
+    expect(screen.getByText("项目点风险台账")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "领用申请" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "出库登记" })).not.toBeInTheDocument();
     expect(screen.getByText("新增项目点")).toBeInTheDocument();
-    expect(screen.getByText("新增领用申请")).toBeInTheDocument();
+    expect(screen.queryByText("新增领用申请")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("项目点编码")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增项目点" }));
     expect(screen.getByLabelText("项目点编码")).toBeInTheDocument();
@@ -539,14 +566,16 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByText("SITE-WX-001"));
     expect(await screen.findByRole("heading", { name: "SITE-WX-001 科技园一期项目点" })).toBeInTheDocument();
     for (const tab of ["合规摘要", "物料领用", "厨房设备"]) {
-      expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
+      expect(screen.getAllByRole("tab", { name: tab }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("tab", { name: "健康证" })).not.toBeInTheDocument();
     expect(screen.queryByText("待后端明细接口支持")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    expect(screen.getByText("投入合同")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "投入合同" })[0]!);
+    expect(screen.getByRole("heading", { name: "投入合同" })).toBeInTheDocument();
     expect(await screen.findByText("装修/改造")).toBeInTheDocument();
     expect(screen.getByText("¥260,000.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     expect(screen.getByText("USE20260511001")).toBeInTheDocument();
     expect(screen.getAllByText("MAT0001 定制员工工服").length).toBeGreaterThan(0);
   });
@@ -570,6 +599,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("SITE-WX-001");
+    fireEvent.click(screen.getAllByRole("tab", { name: "厨房设备" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "新增厨房设备" }));
     expect(screen.queryByText("附件引用（历史兼容）")).not.toBeInTheDocument();
     expect(screen.queryByText("不要填写 NAS 绝对路径")).not.toBeInTheDocument();
@@ -577,7 +607,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("数量"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: "保存设备" }));
 
-    expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
+    await waitFor(() => expect(createKitchenEquipment).toHaveBeenCalled());
     expect(createKitchenEquipment).toHaveBeenCalledWith(expect.not.objectContaining({ attachmentPath: expect.anything() }));
 
     fireEvent.click(screen.getByRole("button", { name: "上报设备变更" }));
@@ -613,7 +643,8 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByRole("heading", { name: "项目点" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "月度经营报表 后续开放" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "现场库存 后续开放" })).not.toBeInTheDocument();
-    expect(screen.getByText("月度经营报表、现场库存尚未开放；当前只展示可办理的项目点台账、领用、厨房设备和总部出库入口。")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "资料审核" })[0]!);
+    expect(screen.getByLabelText("项目点资料审核队列")).toBeInTheDocument();
   });
 
   it("shows unified business attachment references in project-site details", async () => {
@@ -700,18 +731,10 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("项目点风险台账")).toBeInTheDocument();
-    expect(screen.getByText("项目点现场人员")).toBeInTheDocument();
-    expect(screen.getAllByText("雇主责任险").length).toBeGreaterThan(0);
-    expect(screen.getByText("健康证")).toBeInTheDocument();
-    expect(screen.getByText("食品经营许可证")).toBeInTheDocument();
-    expect(screen.getAllByText("工资表").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(8);
     expect(screen.getByText("个人承包人王某")).toBeInTheDocument();
-    expect(await screen.findByText("12 人")).toBeInTheDocument();
-    expect(screen.getByText("缺失 1 / 临期 2 / 过期 1")).toBeInTheDocument();
-    expect(screen.getByText("未覆盖 1 / 临期 1 / 过期 0")).toBeInTheDocument();
-    expect(screen.getAllByText("临期").length).toBeGreaterThan(0);
-    expect(screen.getByText("不需要")).toBeInTheDocument();
-    expect(screen.getByText("红色风险")).toHaveClass("danger");
+    expect(await screen.findByText(/健康证缺失/)).toBeInTheDocument();
+    expect(screen.getAllByText("红色风险").some((element) => element.classList.contains("danger"))).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "查看详情" }));
     expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
@@ -751,9 +774,8 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("科技园一期项目点")).toBeInTheDocument();
-    expect(screen.getAllByText("我的项目点").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
-    expect(await screen.findByText("红色风险")).toBeInTheDocument();
+    expect(screen.getByText(/我的项目点 1/)).toBeInTheDocument();
+    expect((await screen.findAllByText("红色风险")).length).toBeGreaterThan(0);
     expect(screen.getByText(/暂无可见领用申请/)).toBeInTheDocument();
   });
 
@@ -778,18 +800,14 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(await screen.findByText("合规任务队列")).toBeInTheDocument();
-    expect((await screen.findAllByText("补充健康证")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("更新食品经营许可证").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("补充被保人员").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("工资表待总部审核").length).toBeGreaterThan(0);
+    expect(await screen.findByText("资料待处理")).toBeInTheDocument();
+    expect(screen.getByText("健康证/食品经营许可证")).toBeInTheDocument();
+    expect(screen.getByText("雇主责任险/工资表")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "处理补充健康证" }));
+    fireEvent.click(screen.getByText("健康证/食品经营许可证").closest("button")!);
     expect(onPortalSectionChange).toHaveBeenCalledWith("rosterHealth");
-    fireEvent.click(screen.getByRole("button", { name: "处理补充被保人员" }));
+    fireEvent.click(screen.getByText("雇主责任险/工资表").closest("button")!);
     expect(onPortalSectionChange).toHaveBeenCalledWith("insurance");
-    fireEvent.click(screen.getByRole("button", { name: "处理工资表待总部审核" }));
-    expect(onPortalSectionChange).toHaveBeenCalledWith("payroll");
   });
 
   it("switches external project-site portal sections to real task guidance", async () => {
@@ -819,33 +837,27 @@ describe("Company ERP workspace components", () => {
 
     render(<PortalHarness />);
 
-    expect(await screen.findByText("当前项目经理：王项目")).toBeInTheDocument();
-    expect(screen.getByText("联系电话：13900000000")).toBeInTheDocument();
-    expect((await screen.findAllByText("补充健康证")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("项目经理：王项目 / 13900000000")).toBeInTheDocument();
+    expect(screen.getByText("资料待处理")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^雇主责任险提交$/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /^雇主责任险$/ }));
     expect((await screen.findAllByRole("heading", { name: "雇主责任险提交" })).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/下方展示当前已有接口可读取的明细/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/附件由总部登记或后续上传接口支持/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^工资表提交$/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /^工资表$/ }));
     expect((await screen.findAllByRole("heading", { name: "工资表提交" })).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/下方展示当前已有接口可读取的明细/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/附件由总部登记或后续上传接口支持/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(/Storage Key/i)).not.toBeInTheDocument();
   });
 
-  it("renders project-site kitchen equipment and lets site users report changes", async () => {
-    const createChangeRequest = vi.fn().mockResolvedValue({
-      ...projectSiteKitchenEquipmentChangeRequest,
-      id: "96969696-9696-4969-8969-969696969696",
-      description: "门封条损坏",
-    });
-
+  it("keeps the external project-site portal focused on task sections instead of kitchen-equipment tables", async () => {
     render(
       <ProjectSitesWorkspace
         usageOnly
+        loadProjectSites={() => Promise.resolve([projectSite])}
         loadUsageRequests={() => Promise.resolve([projectUsageRequest])}
         loadUsageOptions={() =>
           Promise.resolve({
@@ -855,36 +867,13 @@ describe("Company ERP workspace components", () => {
         }
         loadKitchenEquipment={() => Promise.resolve([projectSiteKitchenEquipment])}
         loadKitchenEquipmentChangeRequests={() => Promise.resolve([projectSiteKitchenEquipmentChangeRequest])}
-        createKitchenEquipmentChangeRequest={createChangeRequest}
       />,
     );
 
-    expect((await screen.findAllByText("厨房设备")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("六门冰柜").length).toBeGreaterThan(0);
-    expect(screen.getByText("冷藏设备")).toBeInTheDocument();
-    expect(screen.getByText("2 台")).toBeInTheDocument();
-    expect(screen.getByText("WX-ZC-ICE-001")).toBeInTheDocument();
-    expect(screen.getByText("压缩机异响，需要维修")).toBeInTheDocument();
-
-    expect(screen.queryByLabelText("关联设备")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "上报设备变更" }));
-    fireEvent.change(screen.getByLabelText("关联设备"), { target: { value: projectSiteKitchenEquipment.id } });
-    fireEvent.change(screen.getByLabelText("设备名称"), { target: { value: "六门冰柜" } });
-    fireEvent.change(screen.getByLabelText("变更状态"), { target: { value: "damaged" } });
-    fireEvent.change(screen.getByLabelText("说明"), { target: { value: "门封条损坏" } });
-    fireEvent.click(screen.getByRole("button", { name: "提交上报" }));
-
-    expect(createChangeRequest).toHaveBeenCalled();
-    expect(await screen.findByText("门封条损坏")).toBeInTheDocument();
-    expect(createChangeRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        projectSiteId: "",
-        equipmentId: projectSiteKitchenEquipment.id,
-        equipmentName: "六门冰柜",
-        proposedStatus: "damaged",
-        description: "门封条损坏",
-      }),
-    );
+    expect(await screen.findByText("科技园一期项目点")).toBeInTheDocument();
+    expect(screen.getByText("资料待处理")).toBeInTheDocument();
+    expect(screen.queryByText("WX-ZC-ICE-001")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上报设备变更" })).not.toBeInTheDocument();
   });
 
   it("requires confirmation before reviewing kitchen equipment change requests", async () => {
@@ -909,6 +898,8 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    expect(await screen.findByText("SITE-WX-001")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "厨房设备" })[0]!);
     expect(await screen.findByText("压缩机异响，需要维修")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
     expect(reviewKitchenEquipmentChangeRequest).not.toHaveBeenCalled();
@@ -935,6 +926,7 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("暂无项目点风险台账")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     expect(await screen.findByText("暂无领用申请")).toBeInTheDocument();
 
     rerender(
@@ -949,8 +941,11 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getAllByRole("tab", { name: "风险台账" })[0]!);
     expect(await screen.findByText("项目点风险台账加载失败")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     expect(await screen.findByText("领用申请加载失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     expect(await screen.findByText("项目点、物料、仓库或业务项目接口暂不可用，暂不能登记领用。")).toBeInTheDocument();
   });
 
@@ -989,6 +984,7 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("SITE-WX-002")).toBeInTheDocument();
     expect(createProjectSite).toHaveBeenCalledWith(expect.objectContaining({ businessProjectId: businessProject.id }));
     expect(screen.getAllByText("滨江项目点").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "新增领用申请" }));
     fireEvent.change(screen.getByLabelText("领用申请单号"), { target: { value: "USE20260511002" } });
     fireEvent.change(screen.getByLabelText("申请日期"), { target: { value: "2026-05-11" } });
@@ -1030,6 +1026,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     await screen.findByText("USE20260511001");
     expect(screen.queryByLabelText("出库单号")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "出库登记" }));
@@ -1066,6 +1063,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getAllByRole("tab", { name: "物料领用" })[0]!);
     await screen.findByText("USE20260511001");
     fireEvent.click(screen.getByRole("button", { name: "出库登记" }));
     fireEvent.change(screen.getByLabelText("出库单号"), { target: { value: "OUT20260511002" } });
@@ -1087,7 +1085,8 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
-    expect(screen.getAllByRole("heading", { name: "合同台账" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "合同风险台账" }).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
     expect(screen.getByText("新增合同")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "登记附件路径" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "附件路径" })).not.toBeInTheDocument();
@@ -1191,6 +1190,8 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByText("暂无合同资料")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
+    expect(await screen.findByText("暂无合同资料")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
     expect(await screen.findByText("缺少往来方资料，暂不能新增合同。")).toBeInTheDocument();
 
@@ -1203,6 +1204,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
     expect(await screen.findByText("合同台账加载失败")).toBeInTheDocument();
     expect(await screen.findByText("往来方、业务项目或项目点接口暂不可用，暂不能新增合同。")).toBeInTheDocument();
   });
@@ -1230,6 +1232,8 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无合同资料");
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
     await screen.findByText("暂无合同资料");
     expect(screen.queryByRole("button", { name: "保存合同" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
@@ -1274,6 +1278,7 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "合同台账" }));
     await screen.findByText("HT20260511001");
     fireEvent.click(screen.getByRole("button", { name: "新增合同" }));
     fireEvent.change(screen.getByLabelText("合同编号"), { target: { value: "HT20260511002" } });
@@ -1429,6 +1434,7 @@ describe("Company ERP workspace components", () => {
     await screen.findByText("暂无证照资料");
     expect(screen.queryByText("附件引用（历史兼容）")).not.toBeInTheDocument();
     expect(screen.queryByText("来源文件引用（历史兼容）")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
     fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0003" } });
     fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "供应商营业执照" } });
     fireEvent.change(screen.getByLabelText("证照类型"), { target: { value: "business_license" } });
@@ -1441,7 +1447,8 @@ describe("Company ERP workspace components", () => {
     await waitFor(() => expect(createCertificate).toHaveBeenCalled());
     expect(Object.prototype.hasOwnProperty.call(createCertificate.mock.calls[0][0], "attachmentPath")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(createCertificate.mock.calls[0][0], "sourceFilePath")).toBe(false);
-    expect(await screen.findByText("CERT0003")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "保存证照" })).not.toBeInTheDocument());
+    expect(createCertificate).toHaveBeenCalledWith(expect.objectContaining({ certificateCode: "CERT0003" }));
 
     rerender(
       <CertificatesWorkspace
@@ -1454,6 +1461,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无证照资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
     fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0004" } });
     fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "错误证照" } });
     fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
@@ -1486,6 +1494,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无证照资料");
+    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
     fireEvent.change(screen.getByLabelText("证照编码"), { target: { value: "CERT0005" } });
     fireEvent.change(screen.getByLabelText("证照名称"), { target: { value: "李现场健康证" } });
     fireEvent.change(screen.getByLabelText("证照类型"), { target: { value: "person_health_cert" } });
@@ -1581,7 +1590,10 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    expect(await screen.findByText("暂无待审批采购需求")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     expect(await screen.findByText("暂无采购需求")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     expect(await screen.findByText("暂无采购记录")).toBeInTheDocument();
 
     rerender(
@@ -1592,7 +1604,9 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     expect(await screen.findByText("采购需求加载失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     expect(await screen.findByText("采购记录加载失败")).toBeInTheDocument();
   });
 
@@ -1610,6 +1624,8 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无待审批采购需求");
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     await screen.findByText("暂无采购需求");
     expect(screen.queryByRole("button", { name: "保存采购需求" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "新增采购需求" }));
@@ -1621,6 +1637,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("需求单位"), { target: { value: "箱" } });
     fireEvent.click(screen.getByRole("button", { name: "保存采购需求" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     fireEvent.click(screen.getByRole("button", { name: "新增采购记录" }));
     fireEvent.change(screen.getByLabelText("采购单号"), { target: { value: "PO20260511002" } });
     fireEvent.change(screen.getByLabelText("采购人"), { target: { value: "赵六" } });
@@ -1633,11 +1650,15 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("采购单位"), { target: { value: "箱" } });
     fireEvent.click(screen.getByRole("button", { name: "保存采购记录" }));
 
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     expect(await screen.findByText("PR20260511002")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     expect(await screen.findByText("PO20260511002")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     fireEvent.click(screen.getByRole("cell", { name: "PR20260511002" }));
     expect(screen.getByRole("heading", { name: "采购需求详情" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     fireEvent.click(screen.getByRole("cell", { name: "PO20260511002" }));
     expect(screen.getByRole("heading", { name: "采购记录详情" })).toBeInTheDocument();
   });
@@ -1689,10 +1710,12 @@ describe("Company ERP workspace components", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     fireEvent.click(screen.getByRole("button", { name: "提交 PR-DRAFT" }));
     expect(await screen.findByText("PR-DRAFT")).toBeInTheDocument();
     expect(submitPurchaseRequest).toHaveBeenCalledWith("request-draft");
 
+    fireEvent.click(screen.getByRole("tab", { name: "待办" }));
     fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "同意采购" } });
     fireEvent.click(screen.getByRole("button", { name: "审批通过 PR-PENDING" }));
     expect(approvePurchaseRequest).not.toHaveBeenCalled();
@@ -1701,16 +1724,18 @@ describe("Company ERP workspace components", () => {
     expect(screen.queryByText("确认审批通过 PR-PENDING？")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "审批通过 PR-PENDING" }));
     fireEvent.click(screen.getByRole("button", { name: "确认审批通过" }));
-    expect(await screen.findByText((content) => content.includes("同意采购"))).toBeInTheDocument();
-    expect(approvePurchaseRequest).toHaveBeenCalledWith("request-pending", { reviewedByName: "", reviewRemark: "同意采购" });
+    await waitFor(() =>
+      expect(approvePurchaseRequest).toHaveBeenCalledWith("request-pending", { reviewedByName: "", reviewRemark: "同意采购" }),
+    );
 
     fireEvent.change(screen.getByLabelText("审批备注"), { target: { value: "资料不完整" } });
     fireEvent.click(screen.getByRole("button", { name: "驳回 PR-REJECT" }));
     expect(rejectPurchaseRequest).not.toHaveBeenCalled();
     expect(screen.getByText("确认驳回 PR-REJECT？")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认驳回" }));
-    expect(await screen.findByText("已驳回")).toBeInTheDocument();
-    expect(rejectPurchaseRequest).toHaveBeenCalledWith("request-pending-reject", { reviewedByName: "", reviewRemark: "资料不完整" });
+    await waitFor(() =>
+      expect(rejectPurchaseRequest).toHaveBeenCalledWith("request-pending-reject", { reviewedByName: "", reviewRemark: "资料不完整" }),
+    );
   });
 
   it("hides purchase approval actions from read-only users and shows review failures", async () => {
@@ -1754,6 +1779,8 @@ describe("Company ERP workspace components", () => {
       />,
     );
 
+    await screen.findByText("暂无待审批采购需求");
+    fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     await screen.findByText("暂无采购需求");
     fireEvent.click(screen.getByRole("button", { name: "新增采购需求" }));
     fireEvent.change(screen.getByLabelText("采购需求编号"), { target: { value: "PR20260511002" } });
@@ -1765,6 +1792,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存采购需求" }));
     expect(await screen.findByText("采购需求编号已存在")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     fireEvent.click(screen.getByRole("button", { name: "新增采购记录" }));
     fireEvent.change(screen.getByLabelText("采购单号"), { target: { value: "PO20260511002" } });
     fireEvent.change(screen.getByLabelText("采购人"), { target: { value: "赵六" } });

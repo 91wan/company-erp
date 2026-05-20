@@ -1,7 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import {
   PROJECT_SITE_SERVICE_MODES,
-  PROJECT_SITE_STATUSES,
   type BusinessProjectDto,
   type PartyDto,
   type ProjectSiteComplianceSummaryDto,
@@ -37,26 +36,7 @@ type ProjectSiteRiskLedgerSectionProps = {
   onCreateSite: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-const siteStatusLabel = new Map(PROJECT_SITE_STATUSES.map((status) => [status.code, status.label]));
 const serviceModeLabel = new Map(PROJECT_SITE_SERVICE_MODES.map((mode) => [mode.code, mode.label]));
-const complianceComputedStatusLabel = new Map([
-  ["valid", "有效"],
-  ["expiring_soon", "即将到期"],
-  ["expired", "已过期"],
-  ["review_due_soon", "即将复核"],
-  ["review_due", "待复核"],
-  ["archived", "归档"],
-  ["disabled", "已停用"],
-  ["missing", "缺失"],
-  ["not_applicable", "不适用"],
-]);
-const complianceReviewStatusLabel = new Map([
-  ["pending", "待审核"],
-  ["approved", "已通过"],
-  ["rejected", "已驳回"],
-  ["missing", "缺失"],
-  ["not_required", "不需要"],
-]);
 
 export function ProjectSiteRiskLedgerSection({
   filteredSites,
@@ -83,10 +63,7 @@ export function ProjectSiteRiskLedgerSection({
         sites={filteredSites}
         status={siteStatus}
         serviceModeLabel={serviceModeLabel}
-        siteStatusLabel={siteStatusLabel}
         complianceSummaries={complianceSummaries}
-        complianceComputedStatusLabel={complianceComputedStatusLabel}
-        complianceReviewStatusLabel={complianceReviewStatusLabel}
         onSelectSite={onSelectSite}
       />
 

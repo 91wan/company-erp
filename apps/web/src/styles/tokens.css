@@ -1,0 +1,12 @@
+:root {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --shadow-card: var(--shadow-md);
+  --color-danger: var(--red);
+  --color-warning: var(--orange);
+  --color-success: var(--green);
+  --color-info: var(--blue);
+  --color-neutral: var(--muted);
+}

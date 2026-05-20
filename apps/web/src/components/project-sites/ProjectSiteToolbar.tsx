@@ -15,8 +15,8 @@ export function ProjectSiteToolbar({
   onUsageFilterChange,
 }: ProjectSiteToolbarProps) {
   return (
-    <div className="party-toolbar">
-      <label className="party-search">
+    <div className="project-site-toolbar">
+      <label className="table-search">
         <Search aria-hidden="true" size={16} />
         <input
           value={query}
@@ -24,7 +24,7 @@ export function ProjectSiteToolbar({
           placeholder="搜索项目点、客户、物料、申请单"
         />
       </label>
-      <label className="party-filter">
+      <label className="table-filter">
         <Filter aria-hidden="true" size={16} />
         <select
           aria-label="领用状态筛选"

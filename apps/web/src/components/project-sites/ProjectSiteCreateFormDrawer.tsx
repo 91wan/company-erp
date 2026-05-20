@@ -57,7 +57,7 @@ export function ProjectSiteCreateFormDrawer({
   return (
     <FormDrawer title="新增项目点" open={open} onClose={onClose}>
       {canEditSites ? (
-        <form className="dashboard-panel party-form" onSubmit={onSubmit} aria-label="新增项目点表单" noValidate>
+        <form className="dashboard-panel workspace-form" onSubmit={onSubmit} aria-label="新增项目点表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <MapPin aria-hidden="true" size={16} />

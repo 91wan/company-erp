@@ -1,0 +1,106 @@
+.project-site-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.project-site-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.project-site-module-note,
+.project-site-module-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.project-site-module-note p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.external-portal-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+}
+
+.external-portal-hero h3 {
+  margin: 4px 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.external-portal-hero p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.external-portal-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.external-portal-task-cards,
+.external-portal-task-strip,
+.project-site-review-queue {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.external-portal-task-cards {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.external-portal-task-cards button,
+.external-portal-task-strip article,
+.project-site-review-queue article {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-align: left;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+}
+
+.external-portal-task-cards button:hover {
+  border-color: rgb(37 99 235 / 28%);
+  background: var(--blue-soft);
+}
+
+.external-portal-task-cards strong,
+.external-portal-task-strip strong,
+.project-site-review-queue strong {
+  font-size: 15px;
+}
+
+.external-portal-task-cards span:last-child,
+.external-portal-task-strip span:last-child,
+.project-site-review-queue span:last-child {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1024px) {
+  .external-portal-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
