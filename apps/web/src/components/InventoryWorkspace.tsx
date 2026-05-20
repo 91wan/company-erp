@@ -595,7 +595,7 @@ export function InventoryWorkspace({
       </SectionCard> : null}
 
       {activeTab === "replenishment" ? (
-        <EmptyState title="补货建议后续开放" description="当前低库存风险会在库存风险分区展示；补货建议稳定接口开放后在此处理。" />
+        <EmptyState title="暂无补货建议" description="当前低库存风险会在库存风险分区展示；补货建议稳定接口开放后在此处理。" />
       ) : null}
 
       <DetailDrawer
