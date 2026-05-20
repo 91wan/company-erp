@@ -54,6 +54,7 @@ export function useProjectSitesWorkspaceController(
     canIssue,
     usageOnly,
     portalSection,
+    initialTab,
     onPortalSectionChange,
     externalProjectSiteContactName,
     externalProjectSiteContactPhone,
@@ -374,6 +375,9 @@ export function useProjectSitesWorkspaceController(
     attachments: {
       loadAttachments: loadUnifiedAttachments,
       getAttachmentDownloadUrl,
+    },
+    navigation: {
+      initialTab,
     },
   });
 

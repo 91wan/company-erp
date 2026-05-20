@@ -73,6 +73,7 @@ export type ProjectSitesWorkspaceOptions = {
   canIssue?: boolean;
   usageOnly: boolean;
   portalSection: ExternalProjectSitePortalSection;
+  initialTab?: string;
   onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
   externalProjectSiteContactName?: string | null;
   externalProjectSiteContactPhone?: string | null;

@@ -32,8 +32,8 @@ describe("dashboardShellNavigation", () => {
     expect(workspaceForExternalPortalSection("usage")).toBe("项目点");
     expect(workspaceForExternalPortalSection("insurance")).toBe("项目点");
     expect(workspaceForExternalPortalSection("payroll")).toBe("项目点");
-    expect(workspaceForExternalPortalSection("rosterHealth")).toBe("项目点");
-    expect(workspaceForExternalPortalSection("foodLicense")).toBe("项目点");
+    expect(workspaceForExternalPortalSection("rosterHealth")).toBe("证照资质");
+    expect(workspaceForExternalPortalSection("foodLicense")).toBe("证照资质");
   });
 
   it("resolves sidebar item selection without losing external portal sections", () => {
@@ -42,7 +42,7 @@ describe("dashboardShellNavigation", () => {
 
     expect(foodLicense).toBeDefined();
     expect(resolveNavigationSelection(foodLicense!)).toEqual({
-      workspace: "项目点",
+      workspace: "证照资质",
       portalSection: "foodLicense",
     });
   });

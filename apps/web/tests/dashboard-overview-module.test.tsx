@@ -22,7 +22,13 @@ describe("DashboardOverview module", () => {
     expect(await screen.findByText("PR-SUMMARY-001")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("MAT-SUMMARY-LOW")[0]);
-    expect(onNavigate).toHaveBeenCalledWith("库存");
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "库存", tab: "risk", entityId: "summary-low" });
+
+    fireEvent.click(screen.getByText("USE-SUMMARY-001"));
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "项目点", tab: "usage", entityId: "summary-usage" });
+
+    fireEvent.click(screen.getByText("CERT-SUMMARY-001"));
+    expect(onNavigate).toHaveBeenCalledWith({ workspace: "证照资质", tab: "risk", entityId: "summary-cert" });
 
     const urls = fetchSpy.mock.calls.map(([input]) => String(input));
     expect(urls.some((url) => url.endsWith("/api/dashboard/summary"))).toBe(true);

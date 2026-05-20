@@ -12,7 +12,6 @@ import { PurchaseWorkspace } from "./PurchaseWorkspace";
 import { InventoryWorkspace } from "./InventoryWorkspace";
 import { ReplenishmentSuggestionsWorkspace } from "./ReplenishmentSuggestionsWorkspace";
 import { ProjectSitesWorkspace } from "./ProjectSitesWorkspace";
-import type { ExternalProjectSitePortalSection } from "./project-sites/ExternalProjectSitePortal";
 import { ContractsWorkspace } from "./ContractsWorkspace";
 import { BusinessProjectsWorkspace } from "./BusinessProjectsWorkspace";
 import { ExcelImportWorkspace } from "./ExcelImportWorkspace";
@@ -26,8 +25,10 @@ import {
   isExternalProjectSiteUser,
   isProjectSiteScopedUser,
   isReadOnlyUser,
+  normalizeNavigationIntent,
   resolveNavigationSelection,
   workspaceForExternalPortalSection,
+  type NavigationIntent,
   type WorkspaceKey,
 } from "./shell/dashboardShellNavigation";
 
@@ -43,13 +44,20 @@ type DashboardShellProps = {
 
 export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLogout }: DashboardShellProps) {
   const isExternalProjectSite = isExternalProjectSiteUser(currentUser);
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>(
-    isExternalProjectSite ? "项目点" : "总览",
-  );
-  const [activePortalSection, setActivePortalSection] = useState<ExternalProjectSitePortalSection>("overview");
+  const [activeNavigationIntent, setActiveNavigationIntent] = useState<NavigationIntent>({
+    workspace: isExternalProjectSite ? "项目点" : "总览",
+    portalSection: isExternalProjectSite ? "overview" : undefined,
+  });
+  const activeWorkspace = activeNavigationIntent.workspace;
+  const activePortalSection = activeNavigationIntent.portalSection ?? "overview";
   const isProjectSiteScoped = isProjectSiteScopedUser(currentUser);
   const visibleNavigationGroups = buildVisibleNavigationGroups(currentUser);
   const isReadOnly = isReadOnlyUser(currentUser);
+  const navigate = (intent: WorkspaceKey | NavigationIntent) => {
+    setActiveNavigationIntent(normalizeNavigationIntent(intent));
+  };
+  const activeWorkspaceTab = (workspace: WorkspaceKey) =>
+    activeNavigationIntent.workspace === workspace ? activeNavigationIntent.tab : undefined;
 
   return (
     <main className={isReadOnly ? "erp-shell read-only-shell" : "erp-shell"}>
@@ -61,16 +69,15 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
         activePortalSection={activePortalSection}
         onSelectItem={(item) => {
           const selection = resolveNavigationSelection(item);
-          if (isExternalProjectSite && selection.portalSection) setActivePortalSection(selection.portalSection);
-          setActiveWorkspace(selection.workspace);
+          navigate(selection);
         }}
-        onSelectSettings={isExternalProjectSite ? undefined : () => setActiveWorkspace("系统设置")}
+        onSelectSettings={isExternalProjectSite ? undefined : () => navigate({ workspace: "系统设置" })}
       />
       <section className="erp-main" aria-label={`${activeWorkspace} workspace`}>
         <TopBar currentUser={currentUser} onLogout={onLogout} />
         <div className="dashboard-scroll">
           {activeWorkspace === "总览" ? (
-            <DashboardOverview currentUser={currentUser} onNavigate={setActiveWorkspace} />
+            <DashboardOverview currentUser={currentUser} onNavigate={navigate} />
           ) : null}
           {activeWorkspace === "基础资料" ? (
             <>
@@ -78,17 +85,28 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
             </>
           ) : null}
-          {activeWorkspace === "采购" ? <PurchaseWorkspace canManage={canManage(currentUser.roles, "procurement")} /> : null}
+          {activeWorkspace === "采购" ? (
+            <PurchaseWorkspace
+              canManage={canManage(currentUser.roles, "procurement")}
+              initialTab={activeWorkspaceTab("采购")}
+            />
+          ) : null}
           {activeWorkspace === "库存" ? (
             <>
               <InventoryWorkspace
                 canManage={canManage(currentUser.roles, "inventory")}
                 showBalances={!isProjectSiteScoped && canRead(currentUser.roles, "inventoryQuantity")}
+                initialTab={activeWorkspaceTab("库存")}
               />
               <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
             </>
           ) : null}
-          {activeWorkspace === "合同" ? <ContractsWorkspace canManage={canManage(currentUser.roles, "contracts")} /> : null}
+          {activeWorkspace === "合同" ? (
+            <ContractsWorkspace
+              canManage={canManage(currentUser.roles, "contracts")}
+              initialTab={activeWorkspaceTab("合同")}
+            />
+          ) : null}
           {activeWorkspace === "业务项目" ? (
             <BusinessProjectsWorkspace canManage={canManage(currentUser.roles, "businessProjects")} />
           ) : null}
@@ -98,6 +116,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               allowedOwnerTypes={isProjectSiteScoped ? SCOPED_CERTIFICATE_OWNER_TYPES : undefined}
               allowedPersonOwnerSources={isProjectSiteScoped ? SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES : undefined}
               portalSection={isExternalProjectSite ? activePortalSection : undefined}
+              initialTab={activeWorkspaceTab("证照资质")}
             />
           ) : null}
           {activeWorkspace === "项目点" ? (
@@ -107,12 +126,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               canIssue={canManage(currentUser.roles, "inventory")}
               usageOnly={isExternalProjectSite}
               portalSection={activePortalSection}
+              initialTab={activeWorkspaceTab("项目点")}
               externalProjectSiteContactName={currentUser.externalProjectSiteContactName}
               externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
-              onPortalSectionChange={(section) => {
-                setActivePortalSection(section);
-                setActiveWorkspace(workspaceForExternalPortalSection(section));
-              }}
+              onPortalSectionChange={(section) => navigate({ workspace: workspaceForExternalPortalSection(section), portalSection: section })}
             />
           ) : null}
           {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}

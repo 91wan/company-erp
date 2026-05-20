@@ -103,7 +103,7 @@ test("project_site final readonly gate keeps scoped usage without global invento
   await expectHealthyShell(page, issues);
 });
 
-test("external_project_site final readonly gate stays portal-only across compliance sections", async ({
+test("external_project_site final readonly gate routes scoped compliance sections without restricted surfaces", async ({
   page,
 }) => {
   const issues = trackBrowserIssues(page);
@@ -123,19 +123,13 @@ test("external_project_site final readonly gate stays portal-only across complia
   await nav
     .getByRole("button", { name: "现场人员/健康证", exact: true })
     .click();
-  await expect(
-    page
-      .getByLabel("当前门户分区")
-      .getByRole("heading", { name: "现场人员/健康证提交" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "健康证", selected: true })).toBeVisible();
   await nav
     .getByRole("button", { name: "食品经营许可证", exact: true })
     .click();
-  await expect(
-    page
-      .getByLabel("当前门户分区")
-      .getByRole("heading", { name: "食品经营许可证提交" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "食品经营许可证", selected: true })).toBeVisible();
   await nav.getByRole("button", { name: "雇主责任险", exact: true }).click();
   await expect(
     page

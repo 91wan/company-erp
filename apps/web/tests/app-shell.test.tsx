@@ -1120,6 +1120,19 @@ describe("Company ERP app shell", () => {
     ).toBe(false);
   });
 
+  it("routes dashboard summary rows into the requested workspace tab", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByText("USE-SUMMARY-001"));
+
+    expect(
+      await screen.findByRole("tab", { name: "物料领用", selected: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增领用申请" })).toBeInTheDocument();
+  });
+
   it("shows external project managers only scoped project-site compliance workspaces", async () => {
     const fetchMock = mockShellFetch(externalProjectSiteUser);
 
@@ -1170,15 +1183,11 @@ describe("Company ERP app shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^现场人员\/健康证$/ }));
     expect(
-      (await screen.findAllByRole("heading", { name: "现场人员/健康证提交" }))
-        .length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getByText(/下方展示当前已有接口可读取的明细/),
+      await screen.findByRole("heading", { name: "证照资质" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "证照资质" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("tab", { name: "健康证", selected: true }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "保存证照" }),
     ).not.toBeInTheDocument();

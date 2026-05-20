@@ -31,14 +31,14 @@ import { DashboardMetricStrip } from "./DashboardMetricStrip";
 import { DashboardPanelHeader } from "./DashboardPanelHeader";
 import { DashboardQuickEntries } from "./DashboardQuickEntries";
 import { DashboardRecentActivities } from "./DashboardRecentActivities";
-import type { WorkspaceKey } from "../shell/dashboardShellNavigation";
+import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 import {
   type DashboardLiveData,
   type LoadState,
   useDashboardLiveData,
 } from "./dashboardLiveData";
 
-type NavigateToWorkspace = (workspace: WorkspaceKey) => void;
+type NavigateToWorkspace = (intent: NavigationIntent) => void;
 
 export function DashboardOverview({
   currentUser,
@@ -294,9 +294,19 @@ type QueueItem = {
   owner: string;
   status: string;
   updatedAt: string;
-  target: WorkspaceKey;
+  target: NavigationIntent;
   tone?: StatusTone;
 };
+
+function navigationIntentFromSummaryItem(item: DashboardSummaryItemDto): NavigationIntent {
+  const fallback = dashboardTarget(item.targetWorkspace);
+  return {
+    ...fallback,
+    workspace: fallback.workspace,
+    tab: item.targetTab ?? fallback.tab,
+    entityId: item.entityId,
+  };
+}
 
 function dashboardSummary(data: DashboardLiveData): DashboardSummaryDto | null {
   return data.dashboardSummary.status === "success"
@@ -314,7 +324,7 @@ function summaryItemToQueueItem(
     owner: item.subtitle ?? "-",
     status: item.statusLabel ?? "-",
     updatedAt: formatDateTime(item.updatedAt),
-    target: dashboardTarget(item.targetWorkspace),
+    target: navigationIntentFromSummaryItem(item),
     tone:
       item.tone === "neutral" || item.tone === "disabled" ? "info" : item.tone,
   };
@@ -341,7 +351,7 @@ function TodoQueuePanel({
           owner: request.requesterName ?? "-",
           status: "待审批",
           updatedAt: formatDateTime(request.submittedAt ?? request.updatedAt),
-          target: "采购",
+          target: { workspace: "采购", tab: "todo" },
           tone: "info",
         }));
   const pendingUsage: QueueItem[] = summary
@@ -357,7 +367,7 @@ function TodoQueuePanel({
           owner: request.projectSiteName,
           status: "待处理",
           updatedAt: formatDateTime(request.updatedAt),
-          target: "项目点",
+          target: { workspace: "项目点", tab: "usage" },
           tone: "warning",
         }));
   const certificateReviews: QueueItem[] = summary
@@ -383,7 +393,7 @@ function TodoQueuePanel({
           updatedAt: formatDateTime(
             certificate.nextReviewDate ?? certificate.updatedAt,
           ),
-          target: "证照资质",
+          target: { workspace: "证照资质", tab: "risk" },
           tone: certificateStatusToBadge(certificate.computedStatus).tone,
         }));
   const rows = [
@@ -397,7 +407,7 @@ function TodoQueuePanel({
       title="待办队列"
       badge={<UiStatusBadge tone="info">{rows.length} 项</UiStatusBadge>}
       action={
-        <button type="button" onClick={() => onNavigate("采购")}>
+        <button type="button" onClick={() => onNavigate({ workspace: "采购", tab: "todo" })}>
           查看采购
         </button>
       }
@@ -468,7 +478,7 @@ function RiskQueuePanel({
           updatedAt: formatDateTime(
             certificate.expiryDate ?? certificate.updatedAt,
           ),
-          target: "证照资质",
+          target: { workspace: "证照资质", tab: "risk" },
           tone: certificateStatusToBadge(certificate.computedStatus).tone,
         }));
   const contractRisks: QueueItem[] = summary
@@ -489,7 +499,7 @@ function RiskQueuePanel({
             contract.counterpartyPartyName ?? contract.counterpartyNameSnapshot,
           status: contractExpiryLabel(contract.expiryState),
           updatedAt: formatDateTime(contract.endDate ?? contract.updatedAt),
-          target: "合同",
+          target: { workspace: "合同", tab: "risk" },
           tone: contractExpiryToBadge(contract.expiryState).tone,
         }));
   const lowStocks: QueueItem[] = summary
@@ -505,7 +515,7 @@ function RiskQueuePanel({
           owner: balance.warehouseName,
           status: "预警",
           updatedAt: formatDateTime(balance.lastMovementAt),
-          target: "库存",
+          target: { workspace: "库存", tab: "risk" },
           tone: "warning",
         }));
   const projectSiteComplianceRisks: QueueItem[] = summary
@@ -527,7 +537,7 @@ function RiskQueuePanel({
               ? `阻断 ${summary.blockingIssueCount}`
               : `预警 ${summary.warningIssueCount}`,
           updatedAt: formatDateTime(summary.generatedAt),
-          target: "项目点",
+          target: { workspace: "项目点", tab: "risk" },
           tone: summary.blockingIssueCount > 0 ? "danger" : "warning",
         }));
   const rows = [
@@ -550,7 +560,7 @@ function RiskQueuePanel({
         </UiStatusBadge>
       }
       action={
-        <button type="button" onClick={() => onNavigate("证照资质")}>
+        <button type="button" onClick={() => onNavigate({ workspace: "证照资质", tab: "risk" })}>
           查看风险
         </button>
       }
@@ -619,7 +629,7 @@ function RecentActivityPanel({
       status: movement.materialName,
       sortAt: movement.movementDate,
       updatedAt: formatDateTime(movement.movementDate),
-      target: "库存" as WorkspaceKey,
+    target: { workspace: "库存", tab: "inbound" },
     }));
   const purchase = data.purchaseRecords.data.map((record) => ({
     title: `采购 ${record.purchaseNo}`,
@@ -628,7 +638,7 @@ function RecentActivityPanel({
     status: purchaseRecordStatusLabel(record.status),
     sortAt: record.updatedAt,
     updatedAt: formatDateTime(record.updatedAt),
-    target: "采购" as WorkspaceKey,
+    target: { workspace: "采购", tab: "records" },
   }));
   const usage = data.projectUsageRequests.data.map((request) => ({
     title: `领用 ${request.requestNo}`,
@@ -637,7 +647,7 @@ function RecentActivityPanel({
     status: projectUsageStatusLabel(request.status),
     sortAt: request.updatedAt,
     updatedAt: formatDateTime(request.updatedAt),
-    target: "项目点" as WorkspaceKey,
+    target: { workspace: "项目点", tab: "usage" },
   }));
   const certificate = data.certificates.data.map((record) => ({
     title: `证照 ${record.certificateName}`,
@@ -646,7 +656,7 @@ function RecentActivityPanel({
     status: certificateStatusLabel(record.computedStatus),
     sortAt: record.updatedAt,
     updatedAt: formatDateTime(record.updatedAt),
-    target: "证照资质" as WorkspaceKey,
+    target: { workspace: "证照资质", tab: "risk" },
   }));
   const rows = [...purchase, ...inbound, ...usage, ...certificate]
     .sort(
@@ -673,7 +683,7 @@ function LowStockPanel({
       <section className="dashboard-panel table-panel">
         <DashboardPanelHeader
           title="低库存物料"
-          onNavigate={() => onNavigate("库存")}
+          onNavigate={() => onNavigate({ workspace: "库存", tab: "risk" })}
         />
         {dashboardSummary.unavailableSections.includes("inventory") ? (
           <PanelStateMessage text="低库存数据暂不可用" />
@@ -684,7 +694,7 @@ function LowStockPanel({
         ) : null}
         <ResponsiveTable
           headers={["物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
-          onRowClick={() => onNavigate("库存")}
+          onRowClick={() => onNavigate({ workspace: "库存", tab: "risk" })}
           rows={rows.map((row) => [
             row.title,
             row.subtitle ?? "-",
@@ -709,7 +719,7 @@ function LowStockPanel({
     <section className="dashboard-panel table-panel">
       <DashboardPanelHeader
         title="低库存物料"
-        onNavigate={() => onNavigate("库存")}
+        onNavigate={() => onNavigate({ workspace: "库存", tab: "risk" })}
       />
       {inventoryBalances.status === "error" ? (
         <PanelStateMessage text="低库存数据暂不可用" />
@@ -719,7 +729,7 @@ function LowStockPanel({
       ) : null}
       <ResponsiveTable
         headers={["物料编码", "物料名称", "当前库存", "安全库存", "状态"]}
-        onRowClick={() => onNavigate("库存")}
+        onRowClick={() => onNavigate({ workspace: "库存", tab: "risk" })}
         rows={rows.map((row) => [
           row.materialCode,
           row.materialName,
@@ -774,7 +784,7 @@ function SystemStatusPanel({
     <section className="dashboard-panel system-panel">
       <DashboardPanelHeader
         title="系统状态"
-        onNavigate={() => onNavigate("系统设置")}
+        onNavigate={() => onNavigate({ workspace: "系统设置" })}
       />
       <div className="system-list">
         {items.map((item) => (
@@ -782,7 +792,7 @@ function SystemStatusPanel({
             key={item.label}
             type="button"
             className="system-item clickable-row"
-            onClick={() => onNavigate("系统设置")}
+            onClick={() => onNavigate({ workspace: "系统设置" })}
           >
             <span
               className={

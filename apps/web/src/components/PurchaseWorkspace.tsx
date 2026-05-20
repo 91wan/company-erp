@@ -35,6 +35,7 @@ type PurchaseWorkspaceProps = {
   approvePurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
   rejectPurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
   canManage?: boolean;
+  initialTab?: string;
 };
 
 type PurchaseRequestReviewPayload = {
@@ -75,6 +76,10 @@ const purchaseTabs: { key: PurchaseTab; label: string }[] = [
   { key: "records", label: "采购执行" },
   { key: "arrivals", label: "到货记录" },
 ];
+
+function isPurchaseTab(value: string | undefined): value is PurchaseTab {
+  return purchaseTabs.some((tab) => tab.key === value);
+}
 
 const emptyRequestForm: RequestFormState = {
   requestNo: "",
@@ -163,6 +168,7 @@ export function PurchaseWorkspace({
   approvePurchaseRequest = defaultApprovePurchaseRequest,
   rejectPurchaseRequest = defaultRejectPurchaseRequest,
   canManage = true,
+  initialTab,
 }: PurchaseWorkspaceProps) {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDto[]>([]);
   const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordDto[]>([]);
@@ -185,7 +191,7 @@ export function PurchaseWorkspace({
     requestId: string;
   } | null>(null);
   const [openFormDrawer, setOpenFormDrawer] = useState<PurchaseFormDrawer>(null);
-  const [activeTab, setActiveTab] = useState<PurchaseTab>("todo");
+  const [activeTab, setActiveTab] = useState<PurchaseTab>(isPurchaseTab(initialTab) ? initialTab : "todo");
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
   const [requestForm, setRequestForm] = useState<RequestFormState>({
@@ -194,6 +200,10 @@ export function PurchaseWorkspace({
   const [recordForm, setRecordForm] = useState<RecordFormState>({
     ...emptyRecordForm,
   });
+
+  useEffect(() => {
+    if (isPurchaseTab(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     let mounted = true;

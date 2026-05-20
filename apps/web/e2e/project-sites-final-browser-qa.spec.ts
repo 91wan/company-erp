@@ -91,7 +91,7 @@ test("project_site final ProjectSites QA keeps scoped usage available and sensit
   await expectHealthyShell(page, issues);
 });
 
-test("external project-site final QA remains portal-only across all project-site sections", async ({ page }) => {
+test("external project-site final QA routes scoped project-site and certificate sections", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: externalProjectSiteUser });
 
@@ -103,9 +103,11 @@ test("external project-site final QA remains portal-only across all project-site
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "物料领用申请" })).toBeVisible();
   await nav.getByRole("button", { name: "现场人员/健康证", exact: true }).click();
-  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "现场人员/健康证提交" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "健康证", selected: true })).toBeVisible();
   await nav.getByRole("button", { name: "食品经营许可证", exact: true }).click();
-  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "食品经营许可证提交" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "证照资质" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "食品经营许可证", selected: true })).toBeVisible();
   await nav.getByRole("button", { name: "雇主责任险", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "雇主责任险提交" })).toBeVisible();
   await nav.getByRole("button", { name: "工资表", exact: true }).click();

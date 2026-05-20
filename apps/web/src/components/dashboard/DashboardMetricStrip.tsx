@@ -1,9 +1,10 @@
 import type { MetricCard } from "../../dashboardData";
-import { dashboardTarget, type DashboardWorkspaceKey } from "./DashboardHeader";
+import type { NavigationIntent } from "../shell/dashboardShellNavigation";
+import { dashboardTarget } from "./DashboardHeader";
 
 type DashboardMetricStripProps = {
   metrics: MetricCard[];
-  onNavigate: (workspace: DashboardWorkspaceKey) => void;
+  onNavigate: (intent: NavigationIntent) => void;
 };
 
 export function DashboardMetricStrip({ metrics, onNavigate }: DashboardMetricStripProps) {
