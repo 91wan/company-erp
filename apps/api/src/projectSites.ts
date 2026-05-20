@@ -153,6 +153,7 @@ export type ProjectSiteComplianceRepository = {
   createCoveredPerson(input: CreateProjectSiteInsuranceCoveredPersonInput): Promise<ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto>;
   listPayrollSubmissions(filters: ProjectSitePayrollSubmissionListFilters): Promise<ProjectSitePayrollSubmissionDto[]>;
   createPayrollSubmission(input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto>;
+  getComplianceSummaries(projectSiteIds?: readonly string[]): Promise<ProjectSiteComplianceSummaryDto[]>;
   getComplianceSummary(projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null>;
 };
 

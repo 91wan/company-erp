@@ -483,6 +483,12 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
       payrollSubmissions.unshift(submission);
       return submission;
     },
+    async getComplianceSummaries(projectSiteIds?: readonly string[]) {
+      const summaries = [
+        makeComplianceSummary({ projectSiteId: "11111111-1111-4111-8111-111111111111" }),
+      ];
+      return projectSiteIds ? summaries.filter((summary) => projectSiteIds.includes(summary.projectSiteId)) : summaries;
+    },
     async getComplianceSummary(projectSiteId) {
       return projectSiteId === "11111111-1111-4111-8111-111111111111" ? makeComplianceSummary({ projectSiteId }) : null;
     },

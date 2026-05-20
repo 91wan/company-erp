@@ -7,7 +7,6 @@ import type {
   InventoryBalanceDto,
   InventoryMovementDto,
   ProjectSiteComplianceSummaryDto,
-  ProjectSiteDto,
   ProjectUsageRequestDto,
   PurchaseRecordDto,
   PurchaseRequestDto,
@@ -297,17 +296,9 @@ export function registerDashboardRoutes(app: FastifyInstance, options: BuildAppO
           return options.inventoryRepository.listBalances({ lowStockOnly: true });
         }, [] as InventoryBalanceDto[]);
 
-    const projectSites = await safeSection(accumulator, "projectSites", async () => {
-      if (!options.projectSiteRepository) throw new Error("missing project site repository");
-      return options.projectSiteRepository.list(scopedFilters);
-    }, [] as ProjectSiteDto[]);
-
     const complianceSummaries = await safeSection(accumulator, "projectSiteCompliance", async () => {
       if (!options.projectSiteComplianceRepository) throw new Error("missing project site compliance repository");
-      const summaries = await Promise.all(
-        projectSites.map((site) => options.projectSiteComplianceRepository!.getComplianceSummary(site.id)),
-      );
-      return summaries.filter((summary): summary is ProjectSiteComplianceSummaryDto => Boolean(summary));
+      return options.projectSiteComplianceRepository.getComplianceSummaries(scope ?? undefined);
     }, [] as ProjectSiteComplianceSummaryDto[]);
 
     const projectUsageRequests = await safeSection(accumulator, "projectUsageRequests", async () => {

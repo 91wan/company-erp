@@ -370,6 +370,9 @@ function createFakeComplianceRepository(): ProjectSiteComplianceRepository {
     async createPayrollSubmission(_input: CreateProjectSitePayrollSubmissionInput): Promise<ProjectSitePayrollSubmissionDto> {
       throw new Error("not used");
     },
+    async getComplianceSummaries(_projectSiteIds?: readonly string[]): Promise<ProjectSiteComplianceSummaryDto[]> {
+      return [];
+    },
     async getComplianceSummary(_projectSiteId: string): Promise<ProjectSiteComplianceSummaryDto | null> {
       return null;
     },

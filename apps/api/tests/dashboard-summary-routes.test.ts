@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AuthenticatedUserDto,
   CertificateRecordDto,
@@ -410,13 +410,25 @@ function repositories(overrides: Partial<{
       async createCoveredPerson() { throw new Error("not implemented"); },
       async listPayrollSubmissions() { return []; },
       async createPayrollSubmission() { throw new Error("not implemented"); },
-      async getComplianceSummary(projectSiteId) {
+      getComplianceSummaries: vi.fn(async (projectSiteIds?: readonly string[]) => {
+        const visibleSites = projectSiteIds
+          ? projectSites.filter((site) => projectSiteIds.includes(site.id))
+          : projectSites;
+        return visibleSites.map((site) =>
+          makeComplianceSummary({
+            projectSiteId: site.id,
+            projectSiteName: site.id === assignedProjectSiteId ? "无锡项目点" : "苏州项目点",
+            blockingIssueCount: site.id === assignedProjectSiteId ? 4 : 1,
+          }),
+        );
+      }),
+      getComplianceSummary: vi.fn(async (projectSiteId) => {
         return makeComplianceSummary({
           projectSiteId,
           projectSiteName: projectSiteId === assignedProjectSiteId ? "无锡项目点" : "苏州项目点",
           blockingIssueCount: projectSiteId === assignedProjectSiteId ? 4 : 1,
         });
-      },
+      }),
     } satisfies ProjectSiteComplianceRepository,
     projectUsageRequestRepository: {
       async list(filters) {
@@ -462,10 +474,11 @@ function repositories(overrides: Partial<{
 describe("dashboard summary API", () => {
   it("returns a global dashboard summary for admin users", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
+    const repoSet = repositories();
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "dashboard-summary-test-secret" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
-      ...repositories(),
+      ...repoSet,
     });
 
     const cookie = await loginCookie(app, "admin");
@@ -488,10 +501,18 @@ describe("dashboard summary API", () => {
       ]),
     );
     expect(body.dashboardSummary.unavailableSections).toEqual([]);
+    const complianceRepository = repoSet.projectSiteComplianceRepository as ProjectSiteComplianceRepository & {
+      getComplianceSummaries: ReturnType<typeof vi.fn>;
+      getComplianceSummary: ReturnType<typeof vi.fn>;
+    };
+    expect(complianceRepository.getComplianceSummaries).toHaveBeenCalledTimes(1);
+    expect(complianceRepository.getComplianceSummaries).toHaveBeenCalledWith(undefined);
+    expect(complianceRepository.getComplianceSummary).not.toHaveBeenCalled();
   });
 
   it("limits external project site summaries to the assigned project site and redacts sensitive amounts", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
+    const repoSet = repositories();
     const externalUser: Partial<AuthenticatedUserDto> = {
       roles: ["external_project_site"],
       assignedProjectSiteIds: [assignedProjectSiteId],
@@ -511,7 +532,7 @@ describe("dashboard summary API", () => {
           ...externalUser,
         }),
       ]),
-      ...repositories(),
+      ...repoSet,
     });
 
     const cookie = await loginCookie(app, "site-manager");
@@ -534,6 +555,54 @@ describe("dashboard summary API", () => {
     expect(JSON.stringify(body)).not.toContain("chargeAmount");
     expect(JSON.stringify(body)).not.toContain("chargePriceSource");
     expect(JSON.stringify(body)).not.toContain("敏感计费备注");
+    const complianceRepository = repoSet.projectSiteComplianceRepository as ProjectSiteComplianceRepository & {
+      getComplianceSummaries: ReturnType<typeof vi.fn>;
+      getComplianceSummary: ReturnType<typeof vi.fn>;
+    };
+    expect(complianceRepository.getComplianceSummaries).toHaveBeenCalledTimes(1);
+    expect(complianceRepository.getComplianceSummaries).toHaveBeenCalledWith([assignedProjectSiteId]);
+    expect(complianceRepository.getComplianceSummary).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty summary without calling compliance summaries when project-site scope is empty", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const repoSet = repositories();
+    const scopedUser: Partial<AuthenticatedUserDto> = {
+      roles: ["project_site"],
+      assignedProjectSiteIds: [],
+    };
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "dashboard-summary-empty-scope-test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          username: "empty-scope",
+          passwordHash,
+          ...scopedUser,
+        }),
+      ]),
+      ...repoSet,
+    });
+
+    const cookie = await loginCookie(app, "empty-scope");
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/dashboard/summary",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().dashboardSummary).toMatchObject({
+      todoCount: 0,
+      projectSiteComplianceRisks: [],
+      unavailableSections: [],
+    });
+    const complianceRepository = repoSet.projectSiteComplianceRepository as ProjectSiteComplianceRepository & {
+      getComplianceSummaries: ReturnType<typeof vi.fn>;
+      getComplianceSummary: ReturnType<typeof vi.fn>;
+    };
+    expect(complianceRepository.getComplianceSummaries).not.toHaveBeenCalled();
+    expect(complianceRepository.getComplianceSummary).not.toHaveBeenCalled();
   });
 
   it("degrades unavailable dashboard sections without failing the whole response", async () => {
@@ -542,6 +611,18 @@ describe("dashboard summary API", () => {
       auth: { enabled: true, sessionSecret: "dashboard-summary-degrade-test-secret" },
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
       ...repositories({
+        projectSiteComplianceRepository: {
+          async listRosterPeople() { return []; },
+          async createRosterPerson() { throw new Error("not implemented"); },
+          async listInsurancePolicies() { return []; },
+          async createInsurancePolicy() { throw new Error("not implemented"); },
+          async listCoveredPeople() { return []; },
+          async createCoveredPerson() { throw new Error("not implemented"); },
+          async listPayrollSubmissions() { return []; },
+          async createPayrollSubmission() { throw new Error("not implemented"); },
+          getComplianceSummaries: vi.fn(async () => { throw new Error("project-site compliance unavailable"); }),
+          getComplianceSummary: vi.fn(async () => null),
+        } as unknown as ProjectSiteComplianceRepository,
         inventoryRepository: undefined,
         certificateRepository: {
           async list() { throw new Error("certificate storage unavailable"); },
@@ -566,6 +647,8 @@ describe("dashboard summary API", () => {
       lowStockItems: [],
       certificateRisks: [],
       unavailableSections: expect.arrayContaining(["inventory", "certificates"]),
+      projectSiteComplianceRisks: [],
     });
+    expect(response.json().dashboardSummary.unavailableSections).toContain("projectSiteCompliance");
   });
 });
