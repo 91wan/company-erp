@@ -276,7 +276,7 @@ export function SystemSettingsWorkspace({
       {canReadAuditLogs ? (
         <SectionCard title="审计日志" badge={<UiStatusBadge tone="info">只读</UiStatusBadge>}>
           <div className="section-inline-header">
-            <p className="form-hint">只读查看最近的高风险业务操作记录。</p>
+            <p className="form-hint">只读查看最近的高风险业务操作记录。导出 CSV 下载后记录 SHA256、筛选条件、导出人和 deploy revision。</p>
             <button
               type="button"
               className="secondary-action"
