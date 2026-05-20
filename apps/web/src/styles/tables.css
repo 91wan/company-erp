@@ -1,1 +1,97 @@
-/* Table styles are being migrated out of legacy.css incrementally. */
+/* Shared table styles. */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eef1f5;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: #667085;
+  background: #fbfcfe;
+  font-size: 10px;
+  font-weight: 680;
+}
+
+td {
+  color: #253142;
+  font-size: 11px;
+  font-weight: 540;
+}
+
+td:first-child,
+th:first-child {
+  padding-left: 14px;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.status-badge.red {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.status-badge.green {
+  color: #15803d;
+  background: var(--green-soft);
+}
+
+.status-badge.orange,
+.status-badge.amber {
+  color: #b45309;
+  background: var(--orange-soft);
+}
+
+.status-badge.blue {
+  color: #0f5bdb;
+  background: var(--blue-soft);
+}
+
+.status-badge.gray {
+  color: #475467;
+  background: #eef2f7;
+}
+
+.table-action {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.table-action.danger {
+  border-color: rgba(220, 38, 38, 0.24);
+  color: #b42318;
+  background: #fff5f4;
+}

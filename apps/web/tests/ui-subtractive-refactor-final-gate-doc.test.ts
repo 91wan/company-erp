@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -48,5 +49,41 @@ describe("UI subtractive refactor final gate", () => {
       expect(content, file).not.toMatch(/员工名单|项目员工|项目点员工|食品证|承包商账号|供应商账号/);
       expect(content, file).not.toMatch(/Storage Key|登记附件路径|raw path 下载入口/);
     }
+  });
+
+  it("keeps CSS layered instead of routing new UI through the legacy stylesheet", () => {
+    const mainEntry = read("apps/web/src/main.tsx");
+    const indexCss = read("apps/web/src/styles/index.css");
+    const legacyCss = read("apps/web/src/styles/legacy.css");
+    const requiredLayers = [
+      "tokens",
+      "base",
+      "shell",
+      "ui",
+      "dashboard",
+      "workspace",
+      "forms",
+      "tables",
+      "project-sites",
+      "purchase",
+      "certificates",
+      "inventory",
+      "contracts",
+      "legacy",
+    ];
+
+    expect(mainEntry).toContain("./styles/index.css");
+    expect(mainEntry).not.toContain("./styles.css");
+    for (const layer of requiredLayers) {
+      expect(existsSync(join(repoRoot, `apps/web/src/styles/${layer}.css`)), layer).toBe(true);
+      expect(indexCss, layer).toContain(`@import "./${layer}.css"`);
+    }
+
+    expect(legacyCss).toContain("TODO(ui-css)");
+    expect(legacyCss).not.toMatch(/:root\s*\{[^}]*--surface/s);
+    expect(legacyCss).not.toMatch(/\.erp-shell\s*\{/);
+    expect(legacyCss).not.toMatch(/\.ui-summary-card\s*\{/);
+    expect(legacyCss).not.toMatch(/\.dashboard-grid\s*\{/);
+    expect(legacyCss).not.toMatch(/\.project-site-action-bar\s*\{/);
   });
 });

@@ -1,4 +1,231 @@
+/* Shared form and action styles. */
+
 .workspace-form {
   display: grid;
   gap: 15px;
+}
+
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.primary-action:disabled {
+  opacity: 0.6;
+}
+
+.party-search input,
+.party-filter select,
+.party-form input,
+.party-form select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: 13px;
+}
+
+.party-form {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.party-form .panel-header {
+  margin-bottom: 0;
+}
+
+.party-form .panel-header button,
+.table-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.party-form .panel-header button:disabled {
+  opacity: 0.55;
+}
+
+.party-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.party-form label > span,
+.party-form legend {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.party-form label > input,
+.party-form label > select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.party-form .form-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.party-form .form-check-row > input {
+  width: 16px;
+  min-height: 16px;
+  padding: 0;
+}
+
+.party-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.party-form legend {
+  padding: 0 4px;
+}
+
+.party-type-check {
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  color: #344054;
+  font-size: 12px;
+}
+
+.party-type-check input {
+  width: 14px;
+  height: 14px;
+}
+
+.form-helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.inline-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-confirm-actions span {
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.form-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.full-width-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.full-width-field input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inline-actions button,
+.inline-action,
+.table-wrap td > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.inline-actions button:disabled,
+.inline-action:disabled,
+.table-wrap td > button:disabled {
+  opacity: 0.55;
+}
+
+.form-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.form-success {
+  margin: 0;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.read-only-shell .party-form,
+.read-only-shell .table-action,
+.read-only-shell .primary-action,
+.read-only-shell .project-issue-form {
+  display: none;
 }
