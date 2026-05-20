@@ -56,4 +56,30 @@ describe("purchase workspace presentation parts", () => {
     fireEvent.click(screen.getByText(purchaseRecord.purchaseNo));
     expect(onSelectRecord).toHaveBeenCalledWith(purchaseRecord);
   });
+
+  it("keeps purchase request tables readable in the main workspace", () => {
+    render(
+      <PurchaseRequestsTable
+        requests={[purchaseRequest]}
+        canManage
+        reviewState="idle"
+        onSubmitRequest={vi.fn()}
+        onSelectRequest={vi.fn()}
+      />,
+    );
+
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toHaveLength(7);
+    expect(headers).not.toContain("审批人/备注");
+    expect(headers).not.toContain("更新时间");
+  });
+
+  it("keeps purchase record tables readable in the main workspace", () => {
+    render(<PurchaseRecordsTable records={[purchaseRecord]} onSelectRecord={vi.fn()} />);
+
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toHaveLength(7);
+    expect(headers).not.toContain("合同");
+    expect(headers).not.toContain("采购数量");
+  });
 });

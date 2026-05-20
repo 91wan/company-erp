@@ -375,15 +375,22 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("tab", { name: "采购需求" }));
     expect(screen.getByText("新增采购需求")).toBeInTheDocument();
     expect(await screen.findByText("PR20260511001")).toBeInTheDocument();
+    expect(screen.queryByText("库存补货建议")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("PR20260511001"));
     expect(screen.getByText("库存补货建议")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
     expect(screen.getByText("新增采购记录")).toBeInTheDocument();
     expect(screen.getByText("PO20260511001")).toBeInTheDocument();
     expect(
+      screen.queryByText("HT20260511001 无锡项目点服务合同"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("PO20260511001"));
+    expect(
       screen.getAllByText("HT20260511001 无锡项目点服务合同").length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("定制员工工服").length).toBeGreaterThan(0);
-    expect(screen.getByText("京东企业购")).toBeInTheDocument();
+    expect(screen.getAllByText("京东企业购").length).toBeGreaterThan(0);
   });
 
   it("generates replenishment suggestions and converts one to a purchase request", async () => {
