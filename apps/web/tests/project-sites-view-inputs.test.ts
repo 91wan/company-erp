@@ -28,7 +28,7 @@ describe("projectSitesViewInputs", () => {
     id: material.id,
     materialCode: material.materialCode,
     materialName: material.materialName,
-    unit: material.projectSiteSaleUnit ?? material.baseUnit,
+    unit: material.baseUnit,
   };
 
   it("builds external portal input without exposing headquarters-only issue capability", () => {

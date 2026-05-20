@@ -28,7 +28,7 @@ describe("projectSitesViewModels", () => {
     id: material.id,
     materialCode: material.materialCode,
     materialName: material.materialName,
-    unit: material.projectSiteSaleUnit ?? material.baseUnit,
+    unit: material.baseUnit,
   };
 
   it("builds headquarters view props from grouped workspace data, model, state, and handlers", () => {

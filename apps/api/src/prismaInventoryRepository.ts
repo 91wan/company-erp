@@ -200,15 +200,35 @@ function toPurchaseRecordLineRollup(value: unknown): PurchaseRecordLineRollupRec
   };
 }
 
+function generatedMovementNo(input: CreateInventoryMovementInput): string {
+  const prefix =
+    input.movementType === "opening"
+      ? "QC"
+      : input.movementType === "inbound"
+        ? "RK"
+        : input.movementType === "outbound"
+          ? "CK"
+          : input.movementType === "adjustment_in"
+            ? "PY"
+            : "PK";
+  const timestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${prefix}${timestamp}${suffix}`;
+}
+
 function createMovementData(input: CreateInventoryMovementInput): Prisma.InventoryMovementCreateInput {
+  const signedQuantity =
+    input.movementType === "outbound" || input.movementType === "adjustment_out"
+      ? -Math.abs(input.quantity)
+      : input.quantity;
   return {
-    movementNo: input.movementNo,
+    movementNo: input.movementNo || generatedMovementNo(input),
     movementDate: new Date(`${input.movementDate}T00:00:00.000Z`),
     movementType: input.movementType,
     sourceType: input.sourceType,
     warehouse: { connect: { id: input.warehouseId } },
     material: { connect: { id: input.materialId } },
-    quantity: input.quantity,
+    quantity: signedQuantity,
     unit: input.unit,
     unitPrice: input.unitPrice,
     purchaseRecordNo: input.purchaseRecordNo,

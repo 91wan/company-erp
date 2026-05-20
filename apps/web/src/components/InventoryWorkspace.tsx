@@ -4,6 +4,7 @@ import {
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
   type CreateInventoryMovementInput,
+  type EmployeeDto,
   type InventoryBalanceDto,
   type InventoryMovementDto,
   type InventoryMovementTypeCode,
@@ -20,14 +21,14 @@ type InventoryWorkspaceProps = {
   createInventoryMovement?: (input: CreateInventoryMovementInput) => Promise<InventoryMovementDto>;
   loadMaterials?: () => Promise<MaterialDto[]>;
   loadWarehouses?: () => Promise<WarehouseDto[]>;
+  loadEmployees?: () => Promise<EmployeeDto[]>;
   canManage?: boolean;
   showBalances?: boolean;
 };
 
 type MovementFormState = {
-  movementNo: string;
   movementDate: string;
-  movementType: Extract<InventoryMovementTypeCode, "opening" | "inbound" | "adjustment_in">;
+  movementType: Extract<InventoryMovementTypeCode, "opening" | "inbound" | "outbound" | "adjustment_in" | "adjustment_out">;
   sourceType: CreateInventoryMovementInput["sourceType"];
   warehouseId: string;
   materialId: string;
@@ -43,7 +44,7 @@ type MovementFormState = {
 const movementTypeLabel = new Map(INVENTORY_MOVEMENT_TYPES.map((movementType) => [movementType.code, movementType.label]));
 const sourceTypeLabel = new Map(INVENTORY_SOURCE_TYPES.map((sourceType) => [sourceType.code, sourceType.label]));
 const creatableMovementTypes = INVENTORY_MOVEMENT_TYPES.filter((movementType) =>
-  ["opening", "inbound", "adjustment_in"].includes(movementType.code),
+  ["opening", "inbound", "outbound", "adjustment_in", "adjustment_out"].includes(movementType.code),
 );
 
 async function defaultLoadInventoryMovements(): Promise<InventoryMovementDto[]> {
@@ -70,6 +71,11 @@ async function defaultLoadWarehouses(): Promise<WarehouseDto[]> {
   return payload.warehouses;
 }
 
+async function defaultLoadEmployees(): Promise<EmployeeDto[]> {
+  const payload = await requestJson<{ employees: EmployeeDto[] }>(`${apiBaseUrl}/api/employees?employmentStatus=active`);
+  return payload.employees;
+}
+
 async function defaultCreateInventoryMovement(input: CreateInventoryMovementInput): Promise<InventoryMovementDto> {
   const payload = await requestJson<{ inventoryMovement: InventoryMovementDto }>(
     `${apiBaseUrl}/api/inventory-movements`,
@@ -87,6 +93,7 @@ export function InventoryWorkspace({
   createInventoryMovement = defaultCreateInventoryMovement,
   loadMaterials = defaultLoadMaterials,
   loadWarehouses = defaultLoadWarehouses,
+  loadEmployees = defaultLoadEmployees,
   canManage = true,
   showBalances = true,
 }: InventoryWorkspaceProps) {
@@ -94,6 +101,7 @@ export function InventoryWorkspace({
   const [balances, setBalances] = useState<InventoryBalanceDto[]>([]);
   const [materials, setMaterials] = useState<MaterialDto[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
+  const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [movementStatus, setMovementStatus] = useState<"loading" | "ready" | "error">("loading");
   const [balanceStatus, setBalanceStatus] = useState<"loading" | "ready" | "error">("loading");
   const [masterStatus, setMasterStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -104,7 +112,6 @@ export function InventoryWorkspace({
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<MovementFormState>({
-    movementNo: "",
     movementDate: "",
     movementType: "inbound",
     sourceType: "purchase",
@@ -165,17 +172,19 @@ export function InventoryWorkspace({
   useEffect(() => {
     let mounted = true;
     setMasterStatus("loading");
-    Promise.all([loadMaterials(), loadWarehouses()])
-      .then(([nextMaterials, nextWarehouses]) => {
+    Promise.all([loadMaterials(), loadWarehouses(), loadEmployees()])
+      .then(([nextMaterials, nextWarehouses, nextEmployees]) => {
         if (!mounted) return;
         setMaterials(nextMaterials);
         setWarehouses(nextWarehouses);
+        setEmployees(nextEmployees.filter((employee) => employee.employmentStatus === "active"));
         setMasterStatus("ready");
         setForm((current) => ({
           ...current,
           materialId: current.materialId || nextMaterials[0]?.id || "",
           warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
           unit: current.unit || nextMaterials[0]?.baseUnit || "",
+          handledBy: current.handledBy || nextEmployees.find((employee) => employee.employmentStatus === "active")?.name || "",
         }));
       })
       .catch(() => {
@@ -185,7 +194,7 @@ export function InventoryWorkspace({
     return () => {
       mounted = false;
     };
-  }, [loadMaterials, loadWarehouses]);
+  }, [loadEmployees, loadMaterials, loadWarehouses]);
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -215,6 +224,8 @@ export function InventoryWorkspace({
   const selectedMovement = movements.find((movement) => movement.id === selectedMovementId) ?? null;
   const selectedBalance =
     balances.find((balance) => `${balance.warehouseId}:${balance.materialId}` === selectedBalanceKey) ?? null;
+  const isOutboundMovement = form.movementType === "outbound" || form.movementType === "adjustment_out";
+  const quantityLabel = isOutboundMovement ? "出库数量" : "入库数量";
 
   function updateSelectedMaterial(materialId: string) {
     const material = materials.find((candidate) => candidate.id === materialId);
@@ -231,8 +242,12 @@ export function InventoryWorkspace({
     setSubmitError("");
 
     try {
+      if (form.quantity && !Number.isInteger(Number(form.quantity))) {
+        setSubmitError("数量必须为整数。");
+        setSubmitState("error");
+        return;
+      }
       const created = await createInventoryMovement({
-        movementNo: form.movementNo,
         movementDate: form.movementDate,
         movementType: form.movementType,
         sourceType: form.sourceType || null,
@@ -251,7 +266,6 @@ export function InventoryWorkspace({
         setBalances(await loadInventoryBalances());
       }
       setForm((current) => ({
-        movementNo: "",
         movementDate: "",
         movementType: "inbound",
         sourceType: "purchase",
@@ -262,7 +276,7 @@ export function InventoryWorkspace({
         unitPrice: "",
         purchaseRecordNo: "",
         purchaseRecordLineId: "",
-        handledBy: "",
+        handledBy: current.handledBy,
         remark: "",
       }));
       setSubmitState("idle");
@@ -296,7 +310,7 @@ export function InventoryWorkspace({
         <button type="button">库存流水</button>
         {showBalances ? <button type="button">当前库存查询</button> : null}
       </div>
-      <p className="form-hint">公司内部出库暂未开放；项目点领用出库请到项目点模块办理。</p>
+      <p className="form-hint">项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。</p>
 
       <div className="summary-grid" aria-label="库存指标摘要">
         <SummaryCard label="库存流水" value={movements.length} detail="最近出入库记录" tone="info" />
@@ -360,25 +374,21 @@ export function InventoryWorkspace({
           )}
         </SectionCard>
 
-        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="入库登记表单">
+        {canManage ? <form className="dashboard-panel party-form" onSubmit={handleSubmit} aria-label="库存出入库登记表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <PackageCheck aria-hidden="true" size={16} />
-              入库登记
+              库存出入库登记
             </h3>
-            <button type="submit" disabled={submitState === "saving" || masterStatus !== "ready"}>
+            <button type="submit" disabled={submitState === "saving" || masterStatus !== "ready" || employees.length === 0}>
               <Save aria-hidden="true" size={15} />
               {submitState === "saving" ? "保存中" : "保存"}
             </button>
           </div>
           <label>
-            <span>入库单号</span>
-            <input value={form.movementNo} onChange={(event) => setForm({ ...form, movementNo: event.target.value })} />
-          </label>
-          <label>
-            <span>入库日期</span>
+            <span>{isOutboundMovement ? "出库日期" : "入库日期"}</span>
             <input
-              type="date"
+              placeholder="年-月-日，例如 2026-05-20"
               value={form.movementDate}
               onChange={(event) => setForm({ ...form, movementDate: event.target.value })}
             />
@@ -408,25 +418,29 @@ export function InventoryWorkspace({
           <fieldset>
             <legend>数量和来源</legend>
             <label>
-              <span>入库数量</span>
+              <span>{quantityLabel}</span>
               <input
                 type="number"
                 min="0"
-                step="0.001"
+                step="1"
                 value={form.quantity}
                 onChange={(event) => setForm({ ...form, quantity: event.target.value })}
               />
             </label>
             <label>
               <span>单位</span>
-              <input value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} />
+              <input value={form.unit} readOnly aria-readonly="true" />
             </label>
             <label>
               <span>流水类型</span>
               <select
                 value={form.movementType}
                 onChange={(event) =>
-                  setForm({ ...form, movementType: event.target.value as MovementFormState["movementType"] })
+                  setForm({
+                    ...form,
+                    movementType: event.target.value as MovementFormState["movementType"],
+                    sourceType: event.target.value === "outbound" || event.target.value === "adjustment_out" ? "other" : form.sourceType,
+                  })
                 }
               >
                 {creatableMovementTypes.map((movementType) => (
@@ -472,13 +486,25 @@ export function InventoryWorkspace({
           </label>
           <label>
             <span>经办人</span>
-            <input value={form.handledBy} onChange={(event) => setForm({ ...form, handledBy: event.target.value })} />
+            <select value={form.handledBy} onChange={(event) => setForm({ ...form, handledBy: event.target.value })}>
+              <option value="">选择总部员工</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.name}>
+                  {employee.employeeNo} {employee.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>备注</span>
-            <input value={form.remark} onChange={(event) => setForm({ ...form, remark: event.target.value })} />
+            <input
+              value={form.remark}
+              placeholder={isOutboundMovement ? "例如：去参观某项目点" : ""}
+              onChange={(event) => setForm({ ...form, remark: event.target.value })}
+            />
           </label>
-          {masterStatus === "error" ? <p className="form-error">物料或仓库接口暂不可用，暂不能登记入库。</p> : null}
+          {masterStatus === "error" ? <p className="form-error">物料、仓库或员工接口暂不可用，暂不能登记出入库。</p> : null}
+          {masterStatus === "ready" && employees.length === 0 ? <p className="form-error">缺少在职总部员工，暂不能登记出入库。</p> : null}
           {submitState === "error" ? <p className="form-error">{submitError || "入库登记失败，请检查必填项或单号是否重复。"}</p> : null}
         </form> : null}
       </div>

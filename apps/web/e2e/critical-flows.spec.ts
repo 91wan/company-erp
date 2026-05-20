@@ -74,12 +74,11 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await expect(page.getByText("DEMO-E2E-PO")).toBeVisible();
 
   await page.getByRole("button", { name: "库存", exact: true }).click();
-  await page.getByLabel("入库单号").fill("DEMO-E2E-IN");
   await page.getByLabel("入库日期").fill("2026-05-13");
   await page.getByLabel("入库数量").fill("5");
-  await page.getByLabel("经办人").fill("DEMO 仓管");
+  await page.getByLabel("经办人").selectOption("DEMO 仓管");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("DEMO-E2E-IN")).toBeVisible();
+  await expect(page.getByText("AUTO-2")).toBeVisible();
   await expect(page.getByText("25 套")).toBeVisible();
 
   expect(mockApi.capturedRequests.map((request) => `${request.method} ${request.path}`)).toEqual(

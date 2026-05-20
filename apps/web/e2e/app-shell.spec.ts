@@ -36,7 +36,7 @@ test("admin can navigate from dashboard cards and sidebar to real workspaces", a
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
-  await expect(page.getByText("API online")).toBeVisible();
+  await expect(page.getByText("接口在线")).toBeVisible();
   await expect(page.getByText("DEMO-PO-001")).toBeVisible();
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
   await expect(page.getByText("DEMO-CERT-001")).toBeVisible();
@@ -305,7 +305,7 @@ test("external project-site accounts render only scoped project-site compliance 
   await page.goto("/");
 
   await expect(page.getByText("site-manager").first()).toBeVisible();
-  const externalSidebar = page.getByLabel("ERP modules");
+  const externalSidebar = page.getByLabel("ERP 模块");
   const portalTabs = page.getByLabel("项目点门户分区");
   await expect(externalSidebar.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();
   await expect(portalTabs.getByRole("button", { name: "我的项目点", exact: true })).toBeVisible();

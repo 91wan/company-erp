@@ -65,15 +65,64 @@ export async function requestJson<TPayload>(url: string, init?: RequestInit): Pr
 }
 
 function sanitizeIssueText(issue: string): string {
-  return issue
+  const redacted = issue
     .replace(/\b(password|passwordHash|secret|cookie|identityNo|identityNoEncrypted)\s*[:=]\s*[^,，;；\s]+/gi, "$1=[已隐藏]")
     .replace(/\b\d{17}[\dXx]\b/g, "身份证号已隐藏")
     .replace(/\b\d{15}\b/g, "身份证号已隐藏");
+  return translateIssueText(redacted);
+}
+
+const fieldLabels: Record<string, string> = {
+  movementNo: "流水单号",
+  movementDate: "入库日期",
+  movementType: "流水类型",
+  sourceType: "来源类型",
+  warehouseId: "仓库",
+  materialId: "物料",
+  quantity: "数量",
+  unit: "单位",
+  handledBy: "经办人",
+  materialCode: "物料编码",
+  materialName: "物料名称",
+  materialCategory: "物料类别",
+  baseUnit: "基本单位",
+  purchaseReferencePrice: "采购参考价",
+  projectSiteSalePrice: "项目点领用价",
+};
+
+function translateIssueText(issue: string): string {
+  const direct: Record<string, string> = {
+    "Payload must be an object": "提交内容格式不正确",
+    "quantity must be an integer": "数量必须为整数",
+    "unit must match material baseUnit": "单位必须与物料基本单位一致",
+    "handledBy must reference an active headquarters employee": "经办人必须选择在职总部员工",
+    "movementType is not open for creation in this phase": "当前流水类型暂不支持手工登记",
+    "movementType is unsupported": "流水类型不支持",
+    "sourceType is unsupported": "来源类型不支持",
+    "lowStockOnly must be true or false": "低库存筛选必须为是或否",
+    "projectSiteSalePrice must be greater than or equal to purchaseReferencePrice": "项目点领用价不能低于采购参考价",
+  };
+  if (direct[issue]) return direct[issue];
+  const required = issue.match(/^([A-Za-z0-9_.]+) is required$/);
+  if (required) return `${fieldLabels[required[1]] ?? required[1]}必填`;
+  const positive = issue.match(/^([A-Za-z0-9_.]+) must be a positive number$/);
+  if (positive) return `${fieldLabels[positive[1]] ?? positive[1]}必须为正数`;
+  const nonNegative = issue.match(/^([A-Za-z0-9_.]+) must be a non-negative number$/);
+  if (nonNegative) return `${fieldLabels[nonNegative[1]] ?? nonNegative[1]}不能为负数`;
+  const nonNegativeInteger = issue.match(/^([A-Za-z0-9_.]+) must be a non-negative integer$/);
+  if (nonNegativeInteger) return `${fieldLabels[nonNegativeInteger[1]] ?? nonNegativeInteger[1]}必须为非负整数`;
+  const date = issue.match(/^([A-Za-z0-9_.]+) must be YYYY-MM-DD$/);
+  if (date) return `${fieldLabels[date[1]] ?? date[1]}必须为年-月-日格式（YYYY-MM-DD）`;
+  const unsupported = issue.match(/^([A-Za-z0-9_.]+) is unsupported$/);
+  if (unsupported) return `${fieldLabels[unsupported[1]] ?? unsupported[1]}不支持`;
+  const bool = issue.match(/^([A-Za-z0-9_.]+) must be boolean$/);
+  if (bool) return `${fieldLabels[bool[1]] ?? bool[1]}必须为是或否`;
+  return issue;
 }
 
 export function formatApiError(error: unknown, fallback: string): string {
   if (error instanceof ApiRequestError && error.issues.length > 0) {
-    return error.issues.join("；");
+    return error.issues.map(sanitizeIssueText).join("；");
   }
   return fallback;
 }

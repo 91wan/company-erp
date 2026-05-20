@@ -49,7 +49,7 @@ export function useProjectSitesLoadDefaults({
       ...current,
       warehouseId: current.warehouseId || nextWarehouses[0]?.id || "",
       materialId: current.materialId || nextMaterials[0]?.id || "",
-      unit: current.unit || nextMaterials[0]?.projectSiteSaleUnit || nextMaterials[0]?.baseUnit || "",
+      unit: current.unit || nextMaterials[0]?.baseUnit || "",
     }));
   }, [setUsageForm]);
 

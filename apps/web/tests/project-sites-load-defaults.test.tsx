@@ -56,7 +56,7 @@ describe("useProjectSitesLoadDefaults", () => {
     act(() => result.current.onMasterDataLoaded({ parties: [party], materials: [material], warehouses: [warehouse], businessProjects: [businessProject] }));
     expect(result.current.usageForm.warehouseId).toBe(warehouse.id);
     expect(result.current.usageForm.materialId).toBe(material.id);
-    expect(result.current.usageForm.unit).toBe(material.projectSiteSaleUnit);
+    expect(result.current.usageForm.unit).toBe(material.baseUnit);
 
     act(() => result.current.onKitchenEquipmentLoaded([projectSiteKitchenEquipment]));
     expect(result.current.kitchenEquipmentChangeForm.equipmentId).toBe(projectSiteKitchenEquipment.id);

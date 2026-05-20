@@ -258,7 +258,7 @@ describe("Company ERP app shell", () => {
 
     fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-002" } });
     fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "DEMO 证照附件" } });
-    fireEvent.change(screen.getByLabelText("Storage Key"), { target: { value: "certificates/demo-certificate.jpg" } });
+    fireEvent.change(screen.getByLabelText("存储键"), { target: { value: "certificates/demo-certificate.jpg" } });
     fireEvent.change(screen.getByLabelText("归属模块"), { target: { value: "certificates" } });
     fireEvent.change(screen.getByLabelText("归属对象"), { target: { value: "certificate" } });
     fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
@@ -293,10 +293,10 @@ describe("Company ERP app shell", () => {
 
     fireEvent.change(screen.getByLabelText("附件编号"), { target: { value: "ATT-DEMO-003" } });
     fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "错误附件" } });
-    fireEvent.change(screen.getByLabelText("Storage Key"), { target: { value: "../bad.pdf" } });
+    fireEvent.change(screen.getByLabelText("存储键"), { target: { value: "../bad.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
 
-    expect(await screen.findByText(/Storage Key 只能使用 contracts\/<uuid>\.pdf 这类相对路径/)).toBeInTheDocument();
+    expect(await screen.findByText(/存储键只能使用 contracts\/<uuid>\.pdf 这类相对路径/)).toBeInTheDocument();
     expect(screen.getByText(/password=\[已隐藏\]/)).toBeInTheDocument();
     expect(screen.getByText(/identityNo=\[已隐藏\]/)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(`${"Secret"}${"123"}`))).not.toBeInTheDocument();
@@ -736,7 +736,7 @@ describe("Company ERP app shell", () => {
 
     expect(screen.queryByRole("button", { name: "公司内部出库 后续开放" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "项目点领用出库 请到项目点模块办理" })).not.toBeInTheDocument();
-    expect(screen.getByText("公司内部出库暂未开放；项目点领用出库请到项目点模块办理。")).toBeInTheDocument();
+    expect(screen.getByText("项目点正式领用可走项目点申请流，也可由总部手工出库；手工出库请在备注中写明项目点、领用人和用途。")).toBeInTheDocument();
     expect(screen.getByText("当前库存 = 库存流水数量按仓库 + 物料汇总")).toBeInTheDocument();
   });
 
@@ -854,7 +854,7 @@ describe("Company ERP app shell", () => {
     render(<ApiStatus loadHealth={() => Promise.resolve({ status: "ok", service: "company-erp-api" })} />);
 
     await waitFor(() => {
-      expect(screen.getByText("API online")).toBeInTheDocument();
+      expect(screen.getByText("接口在线")).toBeInTheDocument();
     });
   });
 
@@ -862,7 +862,7 @@ describe("Company ERP app shell", () => {
     render(<ApiStatus loadHealth={() => Promise.reject(new Error("offline"))} />);
 
     await waitFor(() => {
-      expect(screen.getByText("API offline")).toBeInTheDocument();
+      expect(screen.getByText("接口离线")).toBeInTheDocument();
     });
   });
 

@@ -95,7 +95,7 @@ test("external project-site final QA remains portal-only across all project-site
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
   await expect(page.getByText("合规任务队列")).toBeVisible();
 
-  const nav = page.getByLabel("ERP modules");
+  const nav = page.getByLabel("ERP 模块");
   await nav.getByRole("button", { name: "物料领用", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "物料领用申请" })).toBeVisible();
   await nav.getByRole("button", { name: "现场人员/健康证", exact: true }).click();

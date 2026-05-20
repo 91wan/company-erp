@@ -28,7 +28,7 @@ const materialOption = {
   materialCode: material.materialCode,
   materialName: material.materialName,
   specification: material.specification,
-  unit: material.projectSiteSaleUnit ?? material.baseUnit,
+  unit: material.baseUnit,
 };
 
 describe("ProjectUsageRequestFormDrawer", () => {

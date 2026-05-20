@@ -95,7 +95,7 @@ test("external project-site QA gate stays in the portal and keeps restricted sur
   await expect(page.getByText("DEMO 项目点").first()).toBeVisible();
   await expect(page.getByText("合规任务队列")).toBeVisible();
 
-  const externalSidebar = page.getByLabel("ERP modules");
+  const externalSidebar = page.getByLabel("ERP 模块");
   await externalSidebar.getByRole("button", { name: "物料领用", exact: true }).click();
   await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "物料领用申请" })).toBeVisible();
   await expect(page.getByRole("button", { name: "新增领用申请" })).toBeVisible();
