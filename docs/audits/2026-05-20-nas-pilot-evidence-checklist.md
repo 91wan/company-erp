@@ -12,7 +12,7 @@ The current system can enter a controlled NAS intranet trial after the evidence 
 
 Keep these files or command outputs in the non-Git trial evidence folder for the deployment date:
 
-- `npm run pilot:verify-local` output, including the local verification summary and any explicit `BLOCKED` or `SKIPPED` dependency messages.
+- `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` output, including the local verification summary and any explicit `BLOCKED` or `SKIPPED` dependency messages. The evidence directory must stay outside the repository.
 - `npm run preflight:nas` output from the final deployment environment file, with real secrets redacted before sharing outside the deployment operator group.
 - `backup restore drill` result, including the dry-run or local restore evidence and the exact tool versions used.
 - `npm run attachments:legacy-report -- --json` or `npm run attachments:legacy-report -- --csv` output, retained as the legacy attachment gap snapshot.

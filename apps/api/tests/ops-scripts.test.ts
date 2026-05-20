@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,6 +9,18 @@ import { resetAccountPassword } from "../src/accountOps.js";
 import { CONFIRM_DEMO_CLEANUP, DEMO_CLEANUP_TARGETS, cleanupDemoData } from "../src/demoCleanup.js";
 
 const repoRoot = new URL("../../..", import.meta.url).pathname;
+
+function readdirSafe(path: string): string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
+  }
+}
+
+function readFile(path: string): string {
+  return readFileSync(path, "utf8");
+}
 
 describe("account ops", () => {
   it("rejects missing and placeholder reset credentials", async () => {
@@ -280,14 +292,17 @@ describe("local NAS pilot verification pack", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Usage: npm run pilot:verify-local");
     expect(result.stdout).toContain("--dry-run");
+    expect(result.stdout).toContain("--evidence-dir");
     expect(result.stderr).toBe("");
   });
 
   it("supports dry-run without reading real env, NAS paths, or Docker", () => {
+    const evidenceDir = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-dry-run-"));
     const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--dry-run"], {
       cwd: repoRoot,
       env: {
         ...process.env,
+        PILOT_EVIDENCE_DIR: evidenceDir,
         PREFLIGHT_ENV_FILE: join(tmpdir(), "company-erp-should-not-read.env"),
         NAS_DATA_ROOT: "/volume1/should-not-be-read",
         NAS_ATTACHMENTS_ROOT: "/volume1/should-not-be-read",
@@ -305,6 +320,18 @@ describe("local NAS pilot verification pack", () => {
     expect(result.stdout).toContain("Would check Dashboard N+1 regression");
     expect(result.stdout).toContain("No real .env, NAS data, or production container will be read");
     expect(result.stderr).toBe("");
+    expect(readdirSafe(evidenceDir)).toEqual([]);
+    rmSync(evidenceDir, { recursive: true, force: true });
+  });
+
+  it("rejects evidence directories inside the tracked repository", () => {
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", join(repoRoot, "docs", "audits")], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Evidence directory must be outside the repository");
   });
 
   it("runs local pilot checks with temporary env and docker compose stub", () => {
@@ -336,6 +363,36 @@ describe("local NAS pilot verification pack", () => {
     expect(result.stdout).toContain("Dashboard N+1 regression check passed");
     expect(result.stdout).toContain("Pilot local verification passed");
     expect(result.stdout).not.toContain("/volume1/should-not-be-read");
+  });
+
+  it("writes local evidence files when an external evidence directory is provided", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-verify-evidence-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(readFile(join(evidenceDir, "summary.txt"))).toContain("Pilot local verification passed");
+    expect(readFile(join(evidenceDir, "legacy-report-dry-run.txt"))).toContain("Attachment legacy migration readiness dry-run");
+    expect(readFile(join(evidenceDir, "environment-checks.txt"))).toContain("NAS preflight passed");
+    expect(`${readFile(join(evidenceDir, "summary.txt"))}\n${readFile(join(evidenceDir, "environment-checks.txt"))}`).not.toContain(
+      "POSTGRES_PASSWORD=",
+    );
+    rmSync(tempRoot, { recursive: true, force: true });
   });
 });
 
