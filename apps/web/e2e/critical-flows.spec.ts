@@ -7,7 +7,9 @@ import {
   viewerUser,
 } from "./mockApi";
 
-test("admin can create master data records and sees failed save feedback", async ({ page }) => {
+test("admin can create master data records and sees failed save feedback", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   const mockApi = await createMockCompanyErpApi(page, {
     user: adminUser,
@@ -26,7 +28,9 @@ test("admin can create master data records and sees failed save feedback", async
   await page.getByLabel("物料名称").fill("DEMO E2E 失败物料");
   await page.getByLabel("基本单位").fill("套");
   await page.getByRole("button", { name: "保存物料" }).click();
-  await expect(page.getByText("保存失败，请检查编码是否重复或稍后重试。")).toBeVisible();
+  await expect(
+    page.getByText("保存失败，请检查编码是否重复或稍后重试。"),
+  ).toBeVisible();
 
   await page.getByLabel("物料编码").fill("DEMO-E2E-MAT");
   await page.getByLabel("物料名称").fill("DEMO E2E 物料");
@@ -40,13 +44,23 @@ test("admin can create master data records and sees failed save feedback", async
   await page.getByRole("button", { name: "保存仓库" }).click();
   await expect(page.getByText("DEMO-E2E-WH")).toBeVisible();
 
-  expect(mockApi.capturedRequests.map((request) => `${request.method} ${request.path}`)).toEqual(
-    expect.arrayContaining(["POST /api/parties", "POST /api/materials", "POST /api/warehouses"]),
+  expect(
+    mockApi.capturedRequests.map(
+      (request) => `${request.method} ${request.path}`,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      "POST /api/parties",
+      "POST /api/materials",
+      "POST /api/warehouses",
+    ]),
   );
   await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
 });
 
-test("purchase and inventory forms submit through API mocks and refresh visible tables", async ({ page }) => {
+test("purchase and inventory forms submit through API mocks and refresh visible tables", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
 
@@ -62,7 +76,9 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.getByLabel("需求数量").fill("3");
   await page.getByLabel("需求单位").fill("套");
   await page.getByRole("button", { name: "保存采购需求" }).click();
-  await expect(page.getByRole("cell", { name: "DEMO-E2E-PR", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "DEMO-E2E-PR", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("tab", { name: "采购执行" }).click();
   await page.getByRole("button", { name: "新增采购记录" }).click();
@@ -87,7 +103,11 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await page.getByRole("tab", { name: "当前库存" }).click();
   await expect(page.getByText("25 套")).toBeVisible();
 
-  expect(mockApi.capturedRequests.map((request) => `${request.method} ${request.path}`)).toEqual(
+  expect(
+    mockApi.capturedRequests.map(
+      (request) => `${request.method} ${request.path}`,
+    ),
+  ).toEqual(
     expect.arrayContaining([
       "POST /api/purchase-requests",
       "POST /api/purchase-records",
@@ -98,9 +118,13 @@ test("purchase and inventory forms submit through API mocks and refresh visible 
   await expectHealthyShell(page, issues);
 });
 
-test("project-site scoped users can request usage while issue actions stay warehouse-only", async ({ page }) => {
+test("project-site scoped users can request usage while issue actions stay warehouse-only", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
-  const mockApi = await createMockCompanyErpApi(page, { user: projectSiteUser });
+  const mockApi = await createMockCompanyErpApi(page, {
+    user: projectSiteUser,
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "项目点", exact: true }).click();
@@ -116,13 +140,17 @@ test("project-site scoped users can request usage while issue actions stay wareh
   await page.getByRole("button", { name: "保存领用申请" }).click();
   await expect(page.getByText("DEMO-E2E-USAGE")).toBeVisible();
 
-  expect(mockApi.capturedRequests.map((request) => `${request.method} ${request.path}`)).toContain(
-    "POST /api/project-usage-requests",
-  );
+  expect(
+    mockApi.capturedRequests.map(
+      (request) => `${request.method} ${request.path}`,
+    ),
+  ).toContain("POST /api/project-usage-requests");
   await expectHealthyShell(page, issues);
 });
 
-test("warehouse-capable admin can issue usage and sees charge snapshot refresh", async ({ page }) => {
+test("warehouse-capable admin can issue usage and sees charge snapshot refresh", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: adminUser });
 
@@ -142,11 +170,15 @@ test("warehouse-capable admin can issue usage and sees charge snapshot refresh",
 
   await expect(page.getByText("DEMO 领用人")).toBeVisible();
   await expect(page.getByText("¥196.00")).toBeVisible();
-  await expect(page.locator("span.ui-status-badge.success").filter({ hasText: "已出库" })).toBeVisible();
+  await expect(
+    page.locator("span.ui-status-badge.success").filter({ hasText: "已出库" }),
+  ).toBeVisible();
   await expectHealthyShell(page, issues);
 });
 
-test("contract failure and Excel import permissions are visible in the browser", async ({ page }) => {
+test("contract failure and Excel import permissions are visible in the browser", async ({
+  page,
+}) => {
   const adminIssues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, {
     user: adminUser,
@@ -162,38 +194,56 @@ test("contract failure and Excel import permissions are visible in the browser",
   await page.getByLabel("开始日期").fill("2026-05-13");
   await page.getByLabel("结束日期").fill("2027-05-12");
   await page.getByRole("button", { name: "保存合同" }).click();
-  await expect(page.getByText("合同保存失败，请检查编号、日期或金额。")).toBeVisible();
+  await expect(
+    page.getByText("合同保存失败，请检查编号、日期或金额。"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "关闭" }).click();
   await expect(page.getByRole("button", { name: "保存合同" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Excel 导入" }).click();
   await page.getByLabel("Excel 文件").setInputFiles({
     name: "demo-import.xlsx",
-    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     buffer: Buffer.from("demo"),
   });
   await page.getByRole("button", { name: "导入预检" }).click();
-  await expect(page.getByText("demo-import.xlsx")).toBeVisible();
+  await expect(page.getByText("通过")).toBeVisible();
   await page.getByRole("button", { name: "确认导入" }).click();
+  await page.getByRole("tab", { name: "导入批次" }).click();
   await expect(page.getByText("已确认导入")).toBeVisible();
-  await expectHealthyShell(page, adminIssues, { allowFailedNetworkResources: true });
+  await expectHealthyShell(page, adminIssues, {
+    allowFailedNetworkResources: true,
+  });
 
   const viewerPage = await page.context().newPage();
   const viewerIssues = trackBrowserIssues(viewerPage);
   await createMockCompanyErpApi(viewerPage, { user: viewerUser });
   await viewerPage.goto("/");
   await viewerPage.getByRole("button", { name: "Excel 导入" }).click();
-  await expect(viewerPage.getByRole("button", { name: "导入预检" })).toHaveCount(0);
-  await expect(viewerPage.getByRole("button", { name: "确认导入" })).toHaveCount(0);
+  await expect(
+    viewerPage.getByRole("button", { name: "导入预检" }),
+  ).toHaveCount(0);
+  await expect(
+    viewerPage.getByRole("button", { name: "确认导入" }),
+  ).toHaveCount(0);
   await expectHealthyShell(viewerPage, viewerIssues);
 });
 
-test("critical workspaces keep vertical and horizontal scrolling in desktop and mobile", async ({ page }) => {
+test("critical workspaces keep vertical and horizontal scrolling in desktop and mobile", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: adminUser });
 
   await page.goto("/");
-  for (const workspace of ["基础资料", "采购", "库存", "项目点", "合同"] as const) {
+  for (const workspace of [
+    "基础资料",
+    "采购",
+    "库存",
+    "项目点",
+    "合同",
+  ] as const) {
     await page.getByRole("button", { name: workspace, exact: true }).click();
     if (workspace === "采购") {
       await page.getByRole("tab", { name: "采购需求" }).click();
@@ -202,20 +252,29 @@ test("critical workspaces keep vertical and horizontal scrolling in desktop and 
     } else if (workspace === "合同") {
       await page.getByRole("tab", { name: "合同台账" }).click();
     }
-    const scrollMetrics = await page.locator(".dashboard-scroll").evaluate((element) => ({
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-      overflowY: window.getComputedStyle(element).overflowY,
-    }));
-    expect(scrollMetrics.scrollHeight).toBeGreaterThanOrEqual(scrollMetrics.clientHeight);
+    const scrollMetrics = await page
+      .locator(".dashboard-scroll")
+      .evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: window.getComputedStyle(element).overflowY,
+      }));
+    expect(scrollMetrics.scrollHeight).toBeGreaterThanOrEqual(
+      scrollMetrics.clientHeight,
+    );
     expect(["auto", "visible"]).toContain(scrollMetrics.overflowY);
 
-    const tableMetrics = await page.locator(".table-wrap").first().evaluate((element) => ({
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
-      overflowX: window.getComputedStyle(element).overflowX,
-    }));
-    expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(tableMetrics.clientWidth);
+    const tableMetrics = await page
+      .locator(".table-wrap")
+      .first()
+      .evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflowX: window.getComputedStyle(element).overflowX,
+      }));
+    expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(
+      tableMetrics.clientWidth,
+    );
     expect(tableMetrics.overflowX).toBe("auto");
   }
   await expectHealthyShell(page, issues);

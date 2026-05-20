@@ -8,7 +8,9 @@ import {
   viewerUser,
 } from "./mockApi";
 
-test("admin readonly QA gate covers dashboard, attachments, audit logs, and confirmation flows", async ({ page }) => {
+test("admin readonly QA gate covers dashboard, attachments, audit logs, and confirmation flows", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: adminUser });
 
@@ -18,8 +20,10 @@ test("admin readonly QA gate covers dashboard, attachments, audit logs, and conf
 
   await page.getByRole("button", { name: "系统设置", exact: true }).click();
   await expect(page.getByRole("heading", { name: "系统设置" })).toBeVisible();
+  await page.getByRole("tab", { name: "审计日志" }).click();
   await expect(page.getByRole("heading", { name: "审计日志" })).toBeVisible();
   await expect(page.getByText("certificate.create")).toBeVisible();
+  await page.getByRole("tab", { name: "附件管理" }).click();
   await expect(page.getByRole("heading", { name: "附件管理" })).toBeVisible();
   await expect(page.getByText("DEMO 合同附件")).toBeVisible();
 
@@ -41,7 +45,9 @@ test("admin readonly QA gate covers dashboard, attachments, audit logs, and conf
   await expectHealthyShell(page, issues);
 });
 
-test("viewer readonly QA gate hides mutation, audit, attachment, and issue actions", async ({ page }) => {
+test("viewer readonly QA gate hides mutation, audit, attachment, and issue actions", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: viewerUser });
 
@@ -50,7 +56,9 @@ test("viewer readonly QA gate hides mutation, audit, attachment, and issue actio
   await expect(page.getByText("只读").first()).toBeVisible();
 
   await page.getByRole("button", { name: "采购", exact: true }).click();
-  await expect(page.getByRole("button", { name: "新增采购需求" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "新增采购需求" })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("button", { name: "审批通过" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
@@ -64,7 +72,9 @@ test("viewer readonly QA gate hides mutation, audit, attachment, and issue actio
   await expectHealthyShell(page, issues);
 });
 
-test("project-site scoped QA gate keeps usage visible and global inventory hidden", async ({ page }) => {
+test("project-site scoped QA gate keeps usage visible and global inventory hidden", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: projectSiteUser });
 
@@ -73,22 +83,30 @@ test("project-site scoped QA gate keeps usage visible and global inventory hidde
   await expect(page.getByText("1 个项目点")).toBeVisible();
 
   await page.getByRole("button", { name: "项目点", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "项目点", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "项目点", exact: true }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "物料领用" }).click();
   await page.getByRole("button", { name: "新增领用申请" }).click();
-  await expect(page.getByRole("button", { name: "保存领用申请" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "保存领用申请" }),
+  ).toBeVisible();
   await expect(page.getByLabel("出库单号")).toHaveCount(0);
   await expect(page.getByLabel("出库数量")).toHaveCount(0);
   await page.getByRole("button", { name: "关闭" }).click();
 
   await page.getByRole("button", { name: "库存", exact: true }).click();
-  await expect(page.getByRole("button", { name: "当前库存查询" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "当前库存查询" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText("库存金额")).toHaveCount(0);
   await expect(page.getByText("采购价")).toHaveCount(0);
   await expectHealthyShell(page, issues);
 });
 
-test("external project-site QA gate stays in the portal and keeps restricted surfaces hidden", async ({ page }) => {
+test("external project-site QA gate stays in the portal and keeps restricted surfaces hidden", async ({
+  page,
+}) => {
   const issues = trackBrowserIssues(page);
   await createMockCompanyErpApi(page, { user: externalProjectSiteUser });
 
@@ -98,17 +116,37 @@ test("external project-site QA gate stays in the portal and keeps restricted sur
   await expect(page.getByLabel("项目点任务卡")).toBeVisible();
 
   const externalSidebar = page.getByLabel("ERP 模块");
-  await externalSidebar.getByRole("button", { name: "物料领用", exact: true }).click();
-  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "物料领用申请" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "新增领用申请" })).toBeVisible();
+  await externalSidebar
+    .getByRole("button", { name: "物料领用", exact: true })
+    .click();
+  await expect(
+    page
+      .getByLabel("当前门户分区")
+      .getByRole("heading", { name: "物料领用申请" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "新增领用申请" }),
+  ).toBeVisible();
 
-  await externalSidebar.getByRole("button", { name: "雇主责任险", exact: true }).click();
-  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "雇主责任险" })).toBeVisible();
+  await externalSidebar
+    .getByRole("button", { name: "雇主责任险", exact: true })
+    .click();
+  await expect(
+    page
+      .getByLabel("当前门户分区")
+      .getByRole("heading", { name: "雇主责任险" }),
+  ).toBeVisible();
 
-  await externalSidebar.getByRole("button", { name: "工资表", exact: true }).click();
-  await expect(page.getByLabel("当前门户分区").getByRole("heading", { name: "工资表" })).toBeVisible();
+  await externalSidebar
+    .getByRole("button", { name: "工资表", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("当前门户分区").getByRole("heading", { name: "工资表" }),
+  ).toBeVisible();
 
-  await expect(page.getByRole("button", { name: "系统设置", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "系统设置", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByText("审计日志")).toHaveCount(0);
   await expect(page.getByText("附件管理")).toHaveCount(0);
   await expect(page.getByText("项目点台账")).toHaveCount(0);

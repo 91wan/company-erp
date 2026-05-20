@@ -4,11 +4,13 @@ import { DashboardHeader } from "../src/components/dashboard/DashboardHeader";
 import { adminUser } from "./appTestHelpers";
 
 describe("DashboardHeader", () => {
-  it("uses the current user in the operations console copy", () => {
+  it("keeps the dashboard workflow focused without a competing page header", () => {
     render(<DashboardHeader currentUser={adminUser} onNavigate={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(screen.getByText(/admin，这里汇总待办、风险、审核和最近动态/)).toBeInTheDocument();
+    expect(screen.getByText("业务流程")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "工作台" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/欢迎回来，Admin/)).not.toBeInTheDocument();
   });
 
