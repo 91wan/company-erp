@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -389,6 +390,27 @@ describe("local NAS pilot verification pack", () => {
     expect(readFile(join(evidenceDir, "summary.txt"))).toContain("Pilot local verification passed");
     expect(readFile(join(evidenceDir, "legacy-report-dry-run.txt"))).toContain("Attachment legacy migration readiness dry-run");
     expect(readFile(join(evidenceDir, "environment-checks.txt"))).toContain("NAS preflight passed");
+    const manifest = JSON.parse(readFile(join(evidenceDir, "manifest.json"))) as {
+      generatedAt: string;
+      gitCommit: string;
+      command: string;
+      files: Array<{ name: string; bytes: number; sha256: string }>;
+    };
+    const manifestHash = createHash("sha256").update(readFile(join(evidenceDir, "manifest.json"))).digest("hex");
+    expect(readFile(join(evidenceDir, "manifest.sha256"))).toBe(`${manifestHash}  manifest.json\n`);
+    expect(manifest.generatedAt).toEqual(expect.any(String));
+    expect(manifest.gitCommit).toMatch(/^[0-9a-f]{40}$/);
+    expect(manifest.command).toContain("--evidence-dir");
+    expect(manifest.files.map((file) => file.name).sort()).toEqual([
+      "environment-checks.txt",
+      "legacy-report-dry-run.txt",
+      "summary.txt",
+    ]);
+    for (const file of manifest.files) {
+      const content = readFile(join(evidenceDir, file.name));
+      expect(file.bytes).toBe(Buffer.byteLength(content));
+      expect(file.sha256).toBe(createHash("sha256").update(content).digest("hex"));
+    }
     expect(`${readFile(join(evidenceDir, "summary.txt"))}\n${readFile(join(evidenceDir, "environment-checks.txt"))}`).not.toContain(
       "POSTGRES_PASSWORD=",
     );
