@@ -489,6 +489,38 @@ exit 9
     expect(readFile(join(evidenceDir, "manifest.json"))).toContain("legacy-report.json");
     rmSync(tempRoot, { recursive: true, force: true });
   });
+
+  it("creates an evidence package that the manifest verifier accepts end to end", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-e2e-"));
+    const evidenceDir = join(tempRoot, "evidence");
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+
+    const localResult = spawnSync("npm", ["run", "pilot:verify-local", "--", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
+      encoding: "utf8",
+    });
+    expect(localResult.status).toBe(0);
+
+    const manifestResult = spawnSync("npm", ["run", "pilot:verify-evidence", "--", "--evidence-dir", evidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    expect(manifestResult.status).toBe(0);
+    expect(manifestResult.stdout).toContain("Pilot evidence manifest verified");
+    expect(manifestResult.stdout).toContain("4 files");
+
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
 });
 
 describe("pilot evidence manifest verifier", () => {
@@ -586,6 +618,30 @@ describe("audit export evidence verifier", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Audit export verified");
     expect(result.stdout).toContain("1 records");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("verifies a synthetic retained audit CSV through the npm verifier command", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-audit-export-command-"));
+    const csvPath = join(tempRoot, "audit-export.csv");
+    const csv = [
+      "createdAt,actorUsername,action,entityType",
+      "2026-05-20T00:00:00.000Z,admin,attachment.download_url,attachment",
+      "2026-05-20T00:01:00.000Z,admin,attachment.content_read,attachment",
+      "",
+    ].join("\n");
+    writeFileSync(csvPath, csv);
+    const hash = createHash("sha256").update(csv).digest("hex");
+
+    const result = spawnSync(
+      "npm",
+      ["run", "audit:verify-export", "--", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Audit export verified");
+    expect(result.stdout).toContain("2 records");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
