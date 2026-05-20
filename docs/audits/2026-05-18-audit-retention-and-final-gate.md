@@ -22,7 +22,7 @@ Scope: NAS intranet trial readiness after the project-site compliance detail, co
 - 归档职责归属系统管理员和业务负责人共同确认：系统管理员负责备份文件、恢复演练和访问控制，业务负责人负责确认留存周期是否满足当前试点合规要求。
 - 审计 JSON 必须持续脱敏，不记录 `password`、`passwordHash`、`token`、`cookie`、完整身份证、`identityNoEncrypted`、raw server path 或真实 NAS 路径。
 - 审计日志支持 admin-only 查询和 CSV 导出；不提供前端删除或自动归档功能。导出入口为 `/api/audit-logs/export.csv`，必须继续支持 `action`、`entityType`、`actorUsername` 和 date range filters。
-- 试点期建议每周导出一次 CSV，并在每次导出文件名或旁路记录中写明 deploy revision、导出人、导出时间和筛选条件；保存位置应与 PostgreSQL dump、attachments archive、NAS `.env` 备份一起纳入受控备份边界。
+- 试点期建议每周导出一次 CSV，并在每次导出文件名或旁路记录中写明 deploy revision、导出人、导出时间和筛选条件；导出后记录 SHA256，便于后续确认文件未被替换或改写。保存位置应与 PostgreSQL dump、attachments archive、NAS `.env` 备份一起纳入受控备份边界。
 - 附件相关审计必须覆盖 `attachment.upload`、`attachment.business_upload`、`attachment.download_url`、`attachment.content_read` 和 `attachment.update`。新增上传、下载或附件变更路径时，必须进入 audit coverage gate，或在 allowlist 中说明为什么不属于业务审计事件。
 - 正式合规档案系统上线前必须补充归档、保全、定期导出演练、恢复抽查和业务方留存周期确认策略。
 

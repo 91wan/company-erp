@@ -43,7 +43,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-function createFakeAuditLogRepository(): AuditLogRepository {
+function createFakeAuditLogRepository(extraLogs: AuditLogDto[] = []): AuditLogRepository {
   const logs: AuditLogDto[] = [
     {
       id: "22222222-2222-4222-8222-222222222222",
@@ -71,6 +71,7 @@ function createFakeAuditLogRepository(): AuditLogRepository {
       userAgent: "vitest",
       createdAt: now,
     },
+    ...extraLogs,
   ];
 
   return {
@@ -230,6 +231,51 @@ describe("audit logs API", () => {
     expect(exported.body).not.toContain("ops");
     expect(exported.body).not.toContain("DemoPasswordForAudit123!");
     expect(viewer.statusCode).toBe(403);
+  });
+
+  it("escapes CSV injection, comma, quote, and newline fields while keeping exported audit data redacted", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      auditLogRepository: createFakeAuditLogRepository([
+        {
+          id: "99999999-9999-4999-8999-999999999999",
+          actorUserId: "11111111-1111-4111-8111-111111111111",
+          actorUsername: "=cmd,operator",
+          action: "attachment.content_read",
+          entityType: "attachment",
+          entityId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          beforeJson: null,
+          afterJson: {
+            fileName: "receipt,\n\"signed\".pdf",
+            identityNo: "TEST-IDENTITY-NO-SHOULD-REDACT",
+            cookie: "TEST-COOKIE-SHOULD-REDACT",
+            note: "+formula",
+          },
+          ip: "127.0.0.1",
+          userAgent: "browser,\nagent",
+          createdAt: now,
+        },
+      ]),
+    });
+
+    const adminCookie = await loginCookie(app, "admin");
+    const exported = await app.inject({
+      method: "GET",
+      url: "/api/audit-logs/export.csv?action=attachment.content_read",
+      cookies: { company_erp_session: adminCookie },
+    });
+    await app.close();
+
+    expect(exported.statusCode).toBe(200);
+    expect(exported.body).toContain("\"'=cmd,operator\"");
+    expect(exported.body).toContain("\"browser,\nagent\"");
+    expect(exported.body).toContain("receipt,\\n");
+    expect(exported.body).toContain("\\\"\"signed\\\"\".pdf");
+    expect(exported.body).toContain("[redacted]");
+    expect(exported.body).not.toContain("TEST-IDENTITY-NO-SHOULD-REDACT");
+    expect(exported.body).not.toContain("TEST-COOKIE-SHOULD-REDACT");
   });
 
   it("writes redacted audit logs for sensitive account mutations and fails closed when audit write fails", async () => {
