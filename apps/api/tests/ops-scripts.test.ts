@@ -410,7 +410,10 @@ describe("local NAS pilot verification pack", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(readFile(join(evidenceDir, "summary.txt"))).toContain("Pilot local verification passed");
+    const summary = readFile(join(evidenceDir, "summary.txt"));
+    expect(summary).toContain("Pilot local verification passed");
+    expect(summary).toContain("npm run pilot:verify-evidence");
+    expect(summary).toContain("npm run audit:verify-export");
     expect(readFile(join(evidenceDir, "legacy-report-dry-run.txt"))).toContain("Attachment legacy migration readiness dry-run");
     expect(readFile(join(evidenceDir, "environment-checks.txt"))).toContain("NAS preflight passed");
     expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("SKIPPED");
