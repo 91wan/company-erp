@@ -961,21 +961,192 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
       }
     },
     async getComplianceSummaries(projectSiteIds?: readonly string[]) {
-      const ids = projectSiteIds
-        ? [...new Set(projectSiteIds)]
-        : (
-            await client.projectSite.findMany({
-              select: { id: true },
-              orderBy: [{ siteCode: "asc" }, { siteName: "asc" }],
-            })
-          ).map((site) => site.id);
+      const now = new Date();
 
-      if (ids.length === 0) return [];
+      // Fetch all sites in a single query — ordered when no IDs are given.
+      const sites = projectSiteIds
+        ? await client.projectSite.findMany({
+            where: { id: { in: [...new Set(projectSiteIds)] } },
+          })
+        : await client.projectSite.findMany({
+            orderBy: [{ siteCode: "asc" }, { siteName: "asc" }],
+          });
 
-      // TODO(compliance-summary): replace this per-site composition with aggregate queries
-      // when the compliance checklist grows beyond the current pilot data volume.
-      const summaries = await Promise.all(ids.map((projectSiteId) => this.getComplianceSummary(projectSiteId)));
-      return summaries.filter((summary): summary is ProjectSiteComplianceSummaryDto => Boolean(summary));
+      if (sites.length === 0) return [];
+
+      const ids = sites.map((s) => s.id);
+      const payrollRequiredIds = sites.filter((s) => s.payrollAgencyRequired).map((s) => s.id);
+
+      // Batch-load all supporting data — 3 queries regardless of how many sites.
+      const allRosterPeople = await client.projectSiteRosterPerson.findMany({
+        where: { projectSiteId: { in: ids }, status: "active" },
+        select: { id: true, projectSiteId: true },
+      });
+
+      const allRosterIds = allRosterPeople.map((p) => p.id);
+
+      const [allHealthCerts, allPolicies, allFoodLicenses, allPayrollSubmissions] = await Promise.all([
+        allRosterIds.length === 0
+          ? Promise.resolve([])
+          : client.certificateRecord.findMany({
+              where: {
+                certificateType: "person_health_cert",
+                ownerRosterPersonId: { in: allRosterIds },
+              },
+              select: {
+                isDisabled: true,
+                validityType: true,
+                expiryDate: true,
+                nextReviewDate: true,
+                reminderDays: true,
+                ownerRosterPersonId: true,
+              },
+            }),
+        client.projectSiteEmployerLiabilityInsurancePolicy.findMany({
+          where: { projectSiteId: { in: ids } },
+          include: { coveredPeople: true },
+        }),
+        client.certificateRecord.findMany({
+          where: {
+            certificateType: "food_operation_license",
+            ownerType: "project_site",
+            ownerProjectSiteId: { in: ids },
+          },
+          select: {
+            isDisabled: true,
+            validityType: true,
+            expiryDate: true,
+            nextReviewDate: true,
+            reminderDays: true,
+            ownerProjectSiteId: true,
+          },
+        }),
+        payrollRequiredIds.length === 0
+          ? Promise.resolve([])
+          : client.projectSitePayrollSubmission.findMany({
+              where: { projectSiteId: { in: payrollRequiredIds }, payrollMonth: currentPayrollMonth(now) },
+              orderBy: { updatedAt: "desc" },
+              select: { projectSiteId: true, reviewStatus: true },
+            }),
+      ]);
+
+      // Pre-index into Maps for O(1) per-site lookup.
+      const rosterIdsBySite = new Map<string, string[]>();
+      for (const person of allRosterPeople) {
+        const list = rosterIdsBySite.get(person.projectSiteId) ?? [];
+        list.push(person.id);
+        rosterIdsBySite.set(person.projectSiteId, list);
+      }
+
+      // Only non-disabled health certs are tracked (mirrors getComplianceSummary logic).
+      const healthCertsByRosterId = new Map<string, CertificateStatusRecord[]>();
+      for (const cert of allHealthCerts) {
+        if (!cert.ownerRosterPersonId || cert.isDisabled) continue;
+        const list = healthCertsByRosterId.get(cert.ownerRosterPersonId) ?? [];
+        list.push(cert);
+        healthCertsByRosterId.set(cert.ownerRosterPersonId, list);
+      }
+
+      const policiesBySiteId = new Map<string, (typeof allPolicies)[number][]>();
+      for (const policy of allPolicies) {
+        const list = policiesBySiteId.get(policy.projectSiteId) ?? [];
+        list.push(policy);
+        policiesBySiteId.set(policy.projectSiteId, list);
+      }
+
+      const foodLicensesBySiteId = new Map<string, CertificateStatusRecord[]>();
+      for (const cert of allFoodLicenses) {
+        if (!cert.ownerProjectSiteId) continue;
+        const list = foodLicensesBySiteId.get(cert.ownerProjectSiteId) ?? [];
+        list.push(cert);
+        foodLicensesBySiteId.set(cert.ownerProjectSiteId, list);
+      }
+
+      // Keep only the latest payroll submission per site (results are DESC by updatedAt).
+      const latestPayrollBySiteId = new Map<string, (typeof allPayrollSubmissions)[number]["reviewStatus"]>();
+      for (const submission of allPayrollSubmissions) {
+        if (!latestPayrollBySiteId.has(submission.projectSiteId)) {
+          latestPayrollBySiteId.set(submission.projectSiteId, submission.reviewStatus);
+        }
+      }
+
+      // Compute per-site summaries in memory — no further DB calls.
+      return sites.map((site): ProjectSiteComplianceSummaryDto => {
+        const activeRosterIds = rosterIdsBySite.get(site.id) ?? [];
+        const policies = policiesBySiteId.get(site.id) ?? [];
+        const foodLicenses = foodLicensesBySiteId.get(site.id) ?? [];
+
+        let missingHealthCertificateCount = 0;
+        let expiringHealthCertificateCount = 0;
+        let expiredHealthCertificateCount = 0;
+        for (const rosterPersonId of activeRosterIds) {
+          const certs = healthCertsByRosterId.get(rosterPersonId) ?? [];
+          if (certs.length === 0) {
+            missingHealthCertificateCount += 1;
+            continue;
+          }
+          const statuses = certs.map((cert) => getCertificateComputedStatus(certificateDtoForStatus(cert), now));
+          if (statuses.includes("expired")) expiredHealthCertificateCount += 1;
+          if (statuses.includes("expiring_soon")) expiringHealthCertificateCount += 1;
+        }
+
+        const coveredRosterIds = new Set<string>();
+        let insuranceExpiringSoonCount = 0;
+        let insuranceExpiredCount = 0;
+        for (const policy of policies) {
+          const daysToStart = daysFromToday(policy.startDate, now);
+          const daysToEnd = daysFromToday(policy.endDate, now);
+          if (daysToEnd !== null && daysToEnd < 0) {
+            insuranceExpiredCount += 1;
+            continue;
+          }
+          if (daysToEnd !== null && daysToEnd <= 30) insuranceExpiringSoonCount += 1;
+          const isCurrentlyValid =
+            policy.reviewStatus !== "rejected" &&
+            (daysToStart === null || daysToStart <= 0) &&
+            (daysToEnd === null || daysToEnd >= 0);
+          if (!isCurrentlyValid) continue;
+          for (const coveredPerson of policy.coveredPeople ?? []) {
+            if (coveredPerson.rosterPersonId) coveredRosterIds.add(coveredPerson.rosterPersonId);
+          }
+        }
+
+        const insuranceUncoveredActiveRosterCount = activeRosterIds.filter((id) => !coveredRosterIds.has(id)).length;
+        const foodOperationLicenseStatus = summarizeFoodLicense(foodLicenses, now);
+        const payrollCurrentMonthStatus = site.payrollAgencyRequired
+          ? (latestPayrollBySiteId.get(site.id) ?? "missing")
+          : "not_required";
+
+        const blockingIssueCount =
+          missingHealthCertificateCount +
+          expiredHealthCertificateCount +
+          insuranceUncoveredActiveRosterCount +
+          insuranceExpiredCount +
+          (foodOperationLicenseStatus === "missing" || foodOperationLicenseStatus === "expired" ? 1 : 0) +
+          (payrollCurrentMonthStatus === "missing" ? 1 : 0);
+        const warningIssueCount =
+          expiringHealthCertificateCount +
+          insuranceExpiringSoonCount +
+          (foodOperationLicenseStatus === "expiring_soon" ? 1 : 0);
+
+        return {
+          projectSiteId: site.id,
+          projectSiteName: site.siteName,
+          payrollAgencyRequired: site.payrollAgencyRequired,
+          activeRosterCount: activeRosterIds.length,
+          missingHealthCertificateCount,
+          expiringHealthCertificateCount,
+          expiredHealthCertificateCount,
+          insuranceUncoveredActiveRosterCount,
+          insuranceExpiringSoonCount,
+          insuranceExpiredCount,
+          foodOperationLicenseStatus,
+          payrollCurrentMonthStatus,
+          blockingIssueCount,
+          warningIssueCount,
+          generatedAt: now.toISOString(),
+        } satisfies ProjectSiteComplianceSummaryDto;
+      });
     },
     async getComplianceSummary(projectSiteId: string) {
       const now = new Date();
