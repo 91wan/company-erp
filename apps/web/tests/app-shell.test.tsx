@@ -1133,6 +1133,39 @@ describe("Company ERP app shell", () => {
     expect(screen.getByRole("button", { name: "新增领用申请" })).toBeInTheDocument();
   });
 
+  it("routes dashboard certificate review rows into the certificate review tab", async () => {
+    mockShellFetch(adminUser, undefined, undefined, {
+      dashboardSummary: {
+        ...defaultDashboardSummary,
+        certificateRisks: [
+          {
+            id: "certificate:pending-review",
+            entityType: "certificate",
+            entityId: "pending-review",
+            title: "CERT-PENDING-REVIEW",
+            subtitle: "待总部审核资料",
+            statusLabel: "待审核",
+            tone: "info",
+            targetWorkspace: "证照资质",
+            targetTab: "review",
+            updatedAt: "2026-05-13T10:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByText("CERT-PENDING-REVIEW"));
+
+    expect(
+      await screen.findByRole("heading", { name: "证照资质" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "待审核", selected: true }),
+    ).toBeInTheDocument();
+  });
+
   it("shows external project managers only scoped project-site compliance workspaces", async () => {
     const fetchMock = mockShellFetch(externalProjectSiteUser);
 
