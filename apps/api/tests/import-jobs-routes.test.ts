@@ -528,6 +528,67 @@ describe("import job error-report.xlsx", () => {
     await app.close();
     expect(response.statusCode).toBe(404);
   });
+
+  // P0-4: per-template field columns appear in error report
+  it("error report includes per-template field columns alongside fixed columns", async () => {
+    const job = makeJob({
+      templateType: "parties",
+      errorRows: 1,
+      rows: [
+        {
+          id: "row-err-pt",
+          rowNumber: 2,
+          rawData: { 供应商编码: "BAD", 供应商名称: "" },
+          normalizedData: null,
+          issues: [{ level: "error", field: "供应商名称", message: "供应商名称必填" }],
+          status: "error",
+          targetRecordType: null,
+          targetRecordId: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行");
+    const headerRow = (sheet!.getRow(1).values as unknown[]).slice(1) as string[];
+
+    // Fixed columns always present
+    expect(headerRow).toContain("行号");
+    expect(headerRow).toContain("状态");
+    expect(headerRow).toContain("问题");
+    expect(headerRow).toContain("建议处理");
+    // Per-template column from parties template
+    expect(headerRow).toContain("供应商名称");
+    // Raw JSON column at end
+    expect(headerRow).toContain("原始数据 JSON");
+
+    // Field value should appear in the data row at the correct column position
+    const fieldIndex = headerRow.indexOf("供应商编码");
+    const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1) as unknown[];
+    expect(dataRow[fieldIndex]).toBe("BAD");
+  });
+
+  it("error report with no error rows returns empty sheet with correct headers", async () => {
+    const job = makeJob({ errorRows: 0 });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行");
+    const headerRow = (sheet!.getRow(1).values as unknown[]).slice(1) as string[];
+    expect(headerRow).toContain("行号");
+    // Row 2 should indicate no error rows
+    const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1) as string[];
+    expect(dataRow.join("")).toContain("无错误行");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -601,5 +662,42 @@ describe("import permission enforcement", () => {
     const response = await app.inject({ method: "GET", url: "/api/import-templates" });
     await app.close();
     expect(response.statusCode).toBe(401);
+  });
+
+  // P1-1: error-report.xlsx uses masterData.read → viewer can access, external_project_site cannot
+  it("viewer can download error-report.xlsx (masterData.read), external_project_site cannot", async () => {
+    const job = makeJob();
+    const password = "ChangeMe123!";
+    const accounts: AuthAccountRecord[] = [
+      makeAuthAccount({ username: "viewer_user", passwordHash: await hashPassword(password), roles: ["viewer"] }),
+      makeAuthAccount({
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        username: "ext_user",
+        passwordHash: await hashPassword(password),
+        roles: ["external_project_site"],
+      }),
+    ];
+    const app = await buildApp({
+      importJobRepository: createFakeRepository([job]),
+      authRepository: createFakeAuthRepository(accounts),
+      auth: { enabled: true, sessionSecret: TEST_SESSION_SECRET },
+    });
+    const viewerCookie = await loginCookie(app, "viewer_user", password);
+    const extCookie = await loginCookie(app, "ext_user", password);
+
+    const viewerReport = await app.inject({
+      method: "GET",
+      url: `/api/import-jobs/${job.id}/error-report.xlsx`,
+      headers: { cookie: `company_erp_session=${viewerCookie}` },
+    });
+    const extReport = await app.inject({
+      method: "GET",
+      url: `/api/import-jobs/${job.id}/error-report.xlsx`,
+      headers: { cookie: `company_erp_session=${extCookie}` },
+    });
+    await app.close();
+
+    expect(viewerReport.statusCode).toBe(200);
+    expect(extReport.statusCode).toBe(403);
   });
 });

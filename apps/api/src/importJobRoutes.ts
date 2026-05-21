@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import type { FastifyInstance } from "fastify";
 import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ImportJobValidationError, normalizeImportJobFilters, normalizeImportTemplateType } from "./importJobs.js";
-import { buildAllTemplatesZip, buildImportTemplateWorkbook, listImportTemplateDownloads } from "./importTemplates.js";
+import { buildAllTemplatesZip, buildImportTemplateWorkbook, IMPORT_TEMPLATE_DEFINITIONS, listImportTemplateDownloads } from "./importTemplates.js";
 
 const SENSITIVE_FIELDS = new Set(["storageKey", "passwordHash", "identityNo", "token", "cookie", "secret"]);
 function sanitizeRawData(rawData: Record<string, unknown>): Record<string, unknown> {
@@ -84,36 +84,38 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
 
     const rows = importJob.rows ?? [];
     const reportRows = rows.filter((row) => row.status === "error" || row.status === "warning");
+    const templateDef = IMPORT_TEMPLATE_DEFINITIONS[importJob.templateType as keyof typeof IMPORT_TEMPLATE_DEFINITIONS];
+    const templateHeaders: string[] = templateDef ? [...templateDef.headers] : [];
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Company ERP";
 
+    // Sheet 1: 问题行 — fixed columns + per-template field columns
     const sheet = workbook.addWorksheet("问题行");
-    sheet.addRow(["行号", "状态", "问题", "原始数据", "建议处理"]);
+    const fixedHeaders = ["行号", "状态", "问题", "建议处理"];
+    sheet.addRow([...fixedHeaders, ...templateHeaders, "原始数据 JSON"]);
     sheet.getRow(1).font = { bold: true };
-    for (const row of reportRows) {
-      const statusLabel = row.status === "error" ? "错误" : "警告";
-      const issues = row.issues.map((i) => i.message).join("；");
-      const raw = row.rawData ? JSON.stringify(sanitizeRawData(row.rawData)) : "";
-      const advice = row.status === "error" ? "修正后重新上传预检" : "确认导入时会写入（有警告）";
-      sheet.addRow([row.rowNumber, statusLabel, issues, raw, advice]);
+
+    if (reportRows.length === 0) {
+      sheet.addRow(["", "无错误行", "", "", ...templateHeaders.map(() => ""), ""]);
+    } else {
+      for (const row of reportRows) {
+        const statusLabel = row.status === "error" ? "错误" : "警告";
+        const issues = (row.issues as unknown as { message: string }[]).map((i) => i.message).join("；");
+        const advice = row.status === "error" ? "修正后重新上传预检" : "确认导入时会写入（有警告）";
+        const rawSanitized = row.rawData ? sanitizeRawData(row.rawData as Record<string, unknown>) : {};
+        const fieldValues = templateHeaders.map((h) => {
+          const v = rawSanitized[h];
+          return v !== undefined && v !== null ? String(v) : "";
+        });
+        sheet.addRow([row.rowNumber, statusLabel, issues, advice, ...fieldValues, JSON.stringify(rawSanitized)]);
+      }
     }
     sheet.columns = [
-      { width: 8 }, { width: 10 }, { width: 50 }, { width: 60 }, { width: 20 },
+      { width: 8 }, { width: 10 }, { width: 50 }, { width: 20 },
+      ...templateHeaders.map(() => ({ width: 18 })),
+      { width: 40 },
     ];
-    if (reportRows.length === 0) {
-      sheet.addRow(["", "无错误行", "", "", ""]);
-    }
-
-    const summarySheet = workbook.addWorksheet("导入说明");
-    summarySheet.addRow(["模板类型", importJob.templateType]);
-    summarySheet.addRow(["原文件名", importJob.originalFileName]);
-    summarySheet.addRow(["总行数", importJob.totalRows]);
-    summarySheet.addRow(["错误行数", importJob.errorRows]);
-    summarySheet.addRow(["警告行数", importJob.warningRows]);
-    summarySheet.addRow(["跳过行数", importJob.skippedRows]);
-    summarySheet.addRow(["说明", "修正错误行后重新上传预检，警告行确认导入时会写入"]);
-    summarySheet.columns = [{ width: 20 }, { width: 50 }];
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     return reply
@@ -200,11 +202,15 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
         afterJson: {
           id: importJob.id,
           templateType: importJob.templateType,
+          originalFileName: importJob.originalFileName,
           status: importJob.status,
           totalRows: importJob.totalRows,
           validRows: importJob.validRows,
+          warningRows: importJob.warningRows,
           errorRows: importJob.errorRows,
           skippedRows: importJob.skippedRows,
+          importedRows: importJob.importedRows,
+          createdTargetsCount: createdTargets.length,
           createdTargets,
         },
       });

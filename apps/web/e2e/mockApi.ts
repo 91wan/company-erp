@@ -1020,7 +1020,29 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
     return fulfill(route, responseForCollection(path, state));
   });
 
-  return { capturedRequests };
+  /**
+   * Register a one-time response override for a specific method+path.
+   * The override takes effect on the very next matching request, then auto-removes.
+   */
+  async function overrideOnce(method: string, path: string, responseBody: unknown) {
+    await page.route(
+      (url) => url.pathname === path,
+      async (route) => {
+        if (route.request().method().toUpperCase() === method.toUpperCase()) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(responseBody),
+          });
+        } else {
+          await route.fallback();
+        }
+      },
+      { times: 1 },
+    );
+  }
+
+  return { capturedRequests, overrideOnce };
 }
 
 function responseForCollection(pathname: string, state: ReturnType<typeof makeStateShape>): unknown {

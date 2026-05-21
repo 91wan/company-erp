@@ -69,6 +69,7 @@ export function useExcelImportController({
   const [actionStatus, setActionStatus] = useState<"idle" | "saving" | "error" | "success">("idle");
   const [actionError, setActionError] = useState("");
   const [activeTab, setActiveTab] = useState<ExcelImportTab>(() => (canManage ? "preview" : "jobs"));
+  const [confirmingJobId, setConfirmingJobId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -109,12 +110,23 @@ export function useExcelImportController({
     }
   }
 
+  function handleRequestConfirm() {
+    if (activeJob) setConfirmingJobId(activeJob.id);
+  }
+
+  function handleCancelConfirm() {
+    setConfirmingJobId(null);
+  }
+
   async function handleConfirm() {
-    if (!selectedJob) return;
+    if (!selectedJob && !activeJob) return;
+    const jobToConfirm = selectedJob ?? activeJob;
+    if (!jobToConfirm) return;
+    setConfirmingJobId(null);
     setActionError("");
     setActionStatus("saving");
     try {
-      const confirmed = await confirmImportJob(selectedJob.id);
+      const confirmed = await confirmImportJob(jobToConfirm.id);
       setSelectedJob(confirmed);
       setJobs((current) => current.map((item) => (item.id === confirmed.id ? confirmed : item)));
       setActionStatus("success");
@@ -149,11 +161,14 @@ export function useExcelImportController({
     actionStatus,
     actionError,
     activeTab,
+    confirmingJobId,
     canManage,
     setTemplateType,
     setFile,
     setActiveTab,
     handlePreview,
+    handleRequestConfirm,
+    handleCancelConfirm,
     handleConfirm,
     handleSelectJob,
   };

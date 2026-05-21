@@ -212,3 +212,56 @@ describe("health certificate import preview", () => {
     expect(messages.some(m => m.includes("手机号"))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P0-6: Phone validation even when there is only one same-name roster person
+// ---------------------------------------------------------------------------
+
+describe("health certificate phone consistency (P0-6)", () => {
+  it("errors when unique roster match has a different phone than the one in Excel", async () => {
+    // ROSTER_ZHANG has phone "13800000001"; Excel supplies "13999999999"
+    const repo = createPrismaImportJobRepository(baseClient());
+    const buffer = await workbookBuffer(HEALTH_CERT_HEADERS,
+      [["项目点健康证", "SITE-001", "", "张示例", "13999999999", "2027-06-01", "", ""]]);
+    const job = await repo.preview({ templateType: "health_certificates", originalFileName: "h.xlsx", fileBuffer: buffer });
+    expect(job.rows[0]?.status).toBe("error");
+    const messages = job.rows[0]?.issues.map(i => i.message) ?? [];
+    expect(messages.some(m => m.includes("手机号"))).toBe(true);
+  });
+
+  it("succeeds when unique roster match phone equals the one in Excel", async () => {
+    // ROSTER_ZHANG has phone "13800000001"; Excel supplies same phone
+    const repo = createPrismaImportJobRepository(baseClient());
+    const buffer = await workbookBuffer(HEALTH_CERT_HEADERS,
+      [["项目点健康证", "SITE-001", "", "张示例", "13800000001", "2027-06-01", "", ""]]);
+    const job = await repo.preview({ templateType: "health_certificates", originalFileName: "h.xlsx", fileBuffer: buffer });
+    expect(job.rows[0]?.status).not.toBe("error");
+  });
+
+  it("succeeds when unique roster match exists and Excel phone is empty", async () => {
+    // No phone in Excel → unique name match is accepted without phone check
+    const repo = createPrismaImportJobRepository(baseClient());
+    const buffer = await workbookBuffer(HEALTH_CERT_HEADERS,
+      [["项目点健康证", "SITE-001", "", "张示例", "", "2027-06-01", "", ""]]);
+    const job = await repo.preview({ templateType: "health_certificates", originalFileName: "h.xlsx", fileBuffer: buffer });
+    expect(job.rows[0]?.status).not.toBe("error");
+  });
+
+  it("errors when roster person has no phone but Excel supplies one", async () => {
+    // Make ROSTER_ZHANG have no phone
+    const noPhoneRoster = { ...ROSTER_ZHANG, phone: null as unknown as string };
+    const client = baseClient({
+      projectSiteRosterPerson: {
+        async findMany() { return [noPhoneRoster]; },
+        async create() { return { id: "r1" }; },
+      },
+    });
+    const repo = createPrismaImportJobRepository(client);
+    const buffer = await workbookBuffer(HEALTH_CERT_HEADERS,
+      [["项目点健康证", "SITE-001", "", "张示例", "13800000001", "2027-06-01", "", ""]]);
+    const job = await repo.preview({ templateType: "health_certificates", originalFileName: "h.xlsx", fileBuffer: buffer });
+    expect(job.rows[0]?.status).toBe("error");
+    const messages = job.rows[0]?.issues.map(i => i.message) ?? [];
+    expect(messages.some(m => m.includes("手机号"))).toBe(true);
+  });
+});

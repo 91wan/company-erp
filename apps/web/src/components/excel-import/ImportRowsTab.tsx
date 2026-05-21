@@ -1,32 +1,70 @@
 /**
- * P0-3: Per-template preview columns.
- * P0-4: Confirm dialog with summary before writing.
- * P1-1: Show targetRecordType/targetRecordId for imported rows.
+ * P0-1: Two-step confirm with full summary (ConfirmAction).
+ * P0-2: Per-template preview columns (via importPreviewColumns).
+ * P0-5: Confirmed rows show targetRecordType / targetRecordId.
  */
 import { CheckCircle2, Download, FileSpreadsheet, XCircle } from "lucide-react";
-import { DataTable, SectionCard } from "../ui";
+import { ConfirmAction, DataTable, SectionCard } from "../ui";
 import { errorReportUrl } from "./importDownloadLinks";
 import { getPreviewColumns } from "./importPreviewColumns";
-import { ImportStatusBadge, importStatusLabel } from "./ImportJobsTab";
+import { ImportStatusBadge } from "./ImportJobsTab";
 import type { ExcelImportController } from "./useExcelImportController";
 
+// Map targetRecordType to a human-readable module hint.
+function targetHint(type: string | null | undefined, id: string | null | undefined): string {
+  if (!type || !id) return "";
+  const hints: Record<string, string> = {
+    certificate: "证照资质",
+    contract: "合同台账",
+    projectSiteRosterPerson: "项目点现场人员",
+    projectSite: "项目点",
+    material: "物料台账",
+    party: "往来方台账",
+    inventoryMovement: "库存流水",
+    employee: "员工档案",
+  };
+  const area = hints[type] ?? type;
+  return `已导入：${area} / ${id}`;
+}
+
+function resultCell(
+  status: string,
+  targetRecordType: string | null | undefined,
+  targetRecordId: string | null | undefined,
+): string {
+  if (status === "imported") return targetHint(targetRecordType, targetRecordId) || "已导入";
+  if (status === "skipped") return "已跳过：重复记录";
+  if (status === "error") return "未导入：存在错误";
+  return "";
+}
+
 export function ImportRowsTab({ model }: { model: ExcelImportController }) {
-  const { activeJob, rows, summary, canManage } = model;
-  const columns = activeJob ? getPreviewColumns(activeJob.templateType) : [];
-  const canConfirm = canManage && activeJob?.status === "previewed" && activeJob.errorRows === 0;
+  const { activeJob, rows, summary, confirmingJobId, canManage } = model;
+  const isConfirmed = activeJob?.status === "confirmed";
+  const baseColumns = activeJob ? getPreviewColumns(activeJob.templateType) : [];
+  // For confirmed jobs, append a "导入结果" column.
+  const columns = isConfirmed
+    ? [...baseColumns, { header: "导入结果", getValue: (_r: (typeof rows)[0]) => "" }]
+    : baseColumns;
+  const isConfirming = confirmingJobId === activeJob?.id;
+  const canConfirm = canManage && activeJob?.status === "previewed" && (activeJob.errorRows ?? 0) === 0;
+
+  const confirmationSummary = (
+    <span>
+      确认导入 <strong>{model.templateLabel}</strong>（{activeJob?.originalFileName ?? ""}），
+      共 <strong>{summary.valid + summary.warning}</strong> 行将写入
+      {summary.warning > 0 ? <span>，其中 <strong>{summary.warning}</strong> 行有警告</span> : null}
+      {summary.skipped > 0 ? <span>，<strong>{summary.skipped}</strong> 行已跳过</span> : null}
+      。确认后不覆盖既有记录，skipped 行不会写入。
+    </span>
+  );
 
   return (
     <SectionCard
       title="行级预览"
       action={
         <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-          {canConfirm ? (
-            <span style={{ fontSize: "0.85em", color: "var(--color-text-secondary)" }}>
-              共 <strong>{summary.valid + summary.warning}</strong> 行写入
-              {summary.warning > 0 ? <>，{summary.warning} 行有警告</> : null}
-            </span>
-          ) : null}
-          {activeJob && (activeJob.errorRows > 0 || activeJob.warningRows > 0) ? (
+          {activeJob && ((activeJob.errorRows ?? 0) > 0 || (activeJob.warningRows ?? 0) > 0) ? (
             <a
               className="secondary-action"
               href={errorReportUrl(activeJob.id)}
@@ -34,23 +72,25 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
               aria-label="下载错误行"
             >
               <Download aria-hidden="true" size={16} />
-              {activeJob.errorRows > 0 ? "下载错误行" : "下载预检报告"}
+              {(activeJob.errorRows ?? 0) > 0 ? "下载错误行" : "下载预检报告"}
             </a>
           ) : null}
           {canConfirm ? (
-            <button
-              className="secondary-action"
-              disabled={model.actionStatus === "saving"}
-              onClick={() => void model.handleConfirm()}
-            >
-              <CheckCircle2 aria-hidden="true" size={16} />
-              确认导入
-            </button>
+            <ConfirmAction
+              actionLabel={<><CheckCircle2 aria-hidden="true" size={16} />确认导入</>}
+              confirmationText={confirmationSummary}
+              confirmLabel="确定导入"
+              confirming={isConfirming}
+              pending={model.actionStatus === "saving"}
+              onRequestConfirm={model.handleRequestConfirm}
+              onCancel={model.handleCancelConfirm}
+              onConfirm={model.handleConfirm}
+            />
           ) : null}
         </div>
       }
     >
-      {activeJob?.errorRows ? (
+      {(activeJob?.errorRows ?? 0) > 0 ? (
         <div className="workspace-state">
           <XCircle size={18} aria-hidden="true" />
           <span>存在错误行，不能确认导入</span>
@@ -66,9 +106,8 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
         <DataTable
           headers={columns.map((c) => c.header)}
           rows={rows.map((row) => [
-            ...columns.map((col) => {
+            ...baseColumns.map((col) => {
               const v = col.getValue(row);
-              // For the "问题" column, render status badge + issues
               if (col.header === "问题") {
                 return (
                   <span key="issue" style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
@@ -79,18 +118,9 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
               }
               return v ?? "-";
             }),
+            ...(isConfirmed ? [resultCell(row.status, row.targetRecordType, row.targetRecordId)] : []),
           ])}
         />
-      ) : null}
-      {activeJob?.status === "confirmed" && rows.some((r) => r.targetRecordId) ? (
-        <div className="import-result-hint">
-          <strong>导入完成</strong> — 已导入行可在对应模块搜索 {importStatusLabel("imported")} 记录ID查询。
-          {rows.filter((r) => r.targetRecordType && r.targetRecordId).slice(0, 3).map((r) => (
-            <span key={r.id} style={{ marginLeft: 8, color: "var(--color-text-secondary)", fontSize: "0.85em" }}>
-              {r.targetRecordType}：{r.targetRecordId}
-            </span>
-          ))}
-        </div>
       ) : null}
     </SectionCard>
   );
