@@ -111,7 +111,7 @@ describe("UI subtractive refactor final gate", () => {
       "apps/web/src/components/MaterialsWarehousesWorkspace.tsx",
       "apps/web/src/components/BusinessProjectsWorkspace.tsx",
       "apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx",
-      "apps/web/src/components/ExcelImportWorkspace.tsx",
+      "apps/web/src/components/excel-import/ExcelImportWorkspaceView.tsx",
       "apps/web/src/components/system/SystemSettingsWorkspace.tsx",
       "apps/web/src/components/dashboard/DashboardOverview.tsx",
     ];
