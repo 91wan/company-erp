@@ -130,7 +130,8 @@ Required columns: 项目点编码, 姓名, 人员类型, 状态
 
 Required columns: 健康证归属类型, 姓名, 到期日期
 
-- 健康证归属类型 determines matching: project-site health certificates use 项目点编码 + 姓名 to match a roster person; company health certificates use 员工编码 + 姓名 to match an employee.
+- 健康证归属类型 determines matching: `项目点健康证` uses 项目点编码 + 姓名 to match an active roster person; `公司健康证` uses 员工编码 + 姓名 to match an employee.
+- If multiple active roster people share the same name on a site, fill 手机号 (optional) to disambiguate. The phone must match the roster record exactly.
 - Image file name is optional. Images are added later via the attachment module.
 - No OCR. Expiry date is entered manually.
 - Certificate number, ID card digits, and issuing authority are not required.

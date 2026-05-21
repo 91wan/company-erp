@@ -45,6 +45,7 @@ type RosterPersonLookup = {
   id: string;
   projectSiteId: string;
   personName: string;
+  phone?: string | null;
   identityNoLast4?: string | null;
   status: ProjectSiteRosterStatusCode;
 };
@@ -871,6 +872,7 @@ function normalizeHealthCertificate(row: RawRow, context: PreviewContext): Norma
   const employeeNo = text(row.rawData, "员工编码");
   const employee = employeeNo ? context.employeesByNo.get(employeeNo) : null;
   const personName = text(row.rawData, "姓名");
+  const personPhone = nullableText(row.rawData, "手机号");
   const expiryDate = dateText(row.rawData, "到期日期");
   const imageFileName = nullableText(row.rawData, "图片文件名");
 
@@ -891,12 +893,25 @@ function normalizeHealthCertificate(row: RawRow, context: PreviewContext): Norma
           (person) => person.status === "active" && person.projectSiteId === projectSite.id && person.personName === personName,
         )
       : [];
-  const rosterPerson = rosterMatches.length === 1 ? rosterMatches[0] : null;
+  // When multiple roster people share the same name on a site, narrow by phone if provided.
+  const phoneNarrowedMatches =
+    rosterMatches.length > 1 && personPhone
+      ? rosterMatches.filter((person) => person.phone && person.phone === personPhone)
+      : rosterMatches;
+  const rosterPerson = phoneNarrowedMatches.length === 1 ? phoneNarrowedMatches[0] : null;
   if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length === 0) {
     issues.push(issue("error", "姓名", "未匹配到项目点现场人员"));
   }
-  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length > 1) {
-    issues.push(issue("error", "姓名", "同一项目点存在同名在场人员，请先在项目点现场人员台账中区分备注或补充手机号后再导入。"));
+  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length > 1 && phoneNarrowedMatches.length !== 1) {
+    issues.push(
+      issue(
+        "error",
+        "手机号",
+        phoneNarrowedMatches.length === 0
+          ? "手机号未能匹配到同名在场人员，请检查手机号或先在项目点现场人员台账中补充手机号。"
+          : "同一项目点存在同名在场人员，请填写手机号以区分，或先在项目点现场人员台账中区分备注。",
+      ),
+    );
   }
 
   const certificateCode =

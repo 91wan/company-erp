@@ -425,7 +425,7 @@ describe("import jobs API", () => {
     expect(material.sample[5]).toBe("");
     expect(material.notes).toContain("默认供应商编码不是必填");
     expect(inventory.sample).toContain("无锡总部仓库");
-    expect(health.headers).toEqual(["健康证归属类型", "项目点编码", "员工编码", "姓名", "到期日期", "图片文件名", "备注"]);
+    expect(health.headers).toEqual(["健康证归属类型", "项目点编码", "员工编码", "姓名", "手机号", "到期日期", "图片文件名", "备注"]);
     expect(health.headers).not.toEqual(expect.arrayContaining(["身份证后四位", "健康证编号", "发证机构", "签发日期"]));
     expect(health.notes).toContain("不需要填写健康证编号");
     expect(health.notes).toContain("不做 OCR");
