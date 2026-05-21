@@ -510,6 +510,59 @@ describe("dashboard summary API", () => {
     expect(complianceRepository.getComplianceSummary).not.toHaveBeenCalled();
   });
 
+  it("routes pending certificate review summary items to the certificate review tab", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "dashboard-summary-certificate-target-test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash })]),
+      ...repositories({
+        certificateRepository: {
+          async list() {
+            return [
+              makeCertificate({
+                id: "56565656-5656-4656-8656-565656565656",
+                certificateCode: "CERT-PENDING-FOOD",
+                certificateName: "待审核食品经营许可证",
+                certificateType: "food_operation_license",
+                ownerType: "project_site",
+                ownerRosterPersonId: null,
+                ownerRosterPersonName: null,
+                ownerRosterPersonProjectSiteId: null,
+                ownerProjectSiteId: assignedProjectSiteId,
+                ownerProjectSiteName: "无锡项目点",
+                computedStatus: "valid",
+                confirmedAt: null,
+              }),
+            ];
+          },
+          async getById() { return null; },
+          async create() { throw new Error("not implemented"); },
+          async update() { return null; },
+        },
+      }),
+    });
+
+    const cookie = await loginCookie(app, "admin");
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/dashboard/summary",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().dashboardSummary.certificateRisks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityId: "56565656-5656-4656-8656-565656565656",
+          statusLabel: "待审核",
+          targetWorkspace: "证照资质",
+          targetTab: "review",
+        }),
+      ]),
+    );
+  });
+
   it("limits external project site summaries to the assigned project site and redacts sensitive amounts", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const repoSet = repositories();

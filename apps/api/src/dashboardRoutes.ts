@@ -150,10 +150,17 @@ function certificateRisksFrom(certificates: readonly CertificateRecordDto[]): Da
         statusLabel: isExpired ? "已过期" : isExpiring ? "即将到期" : "待审核",
         tone: isExpired ? "danger" : isExpiring ? "warning" : "info",
         targetWorkspace: "证照资质",
-        targetTab: certificate.certificateType === "food_operation_license" ? "food" : certificate.certificateType === "person_health_cert" ? "health" : "risk",
+        targetTab: certificateTargetTab(certificate),
         updatedAt: certificate.updatedAt,
       });
     });
+}
+
+function certificateTargetTab(certificate: CertificateRecordDto): string {
+  if (!certificate.confirmedAt) return "review";
+  if (certificate.certificateType === "food_operation_license") return "food";
+  if (certificate.certificateType === "person_health_cert") return "health";
+  return "risk";
 }
 
 function contractRisksFrom(contracts: readonly ContractDto[]): DashboardSummaryItemDto[] {

@@ -601,6 +601,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
               statusLabel: "待审批",
               tone: "info",
               targetWorkspace: "采购",
+              targetTab: "todo",
               updatedAt: request.updatedAt,
             })),
           projectUsageTodos: state.projectUsageRequests
@@ -614,6 +615,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
               statusLabel: "待处理",
               tone: "info",
               targetWorkspace: "项目点",
+              targetTab: "usage",
               updatedAt: request.updatedAt,
             })),
           certificateRisks: state.certificates.map((certificate) => ({
@@ -625,6 +627,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
             statusLabel: certificate.computedStatus === "expired" ? "已过期" : "即将到期",
             tone: certificate.computedStatus === "expired" ? "danger" : "warning",
             targetWorkspace: "证照资质",
+            targetTab: certificate.certificateType === "food_operation_license" ? "food" : certificate.certificateType === "person_health_cert" ? "health" : "risk",
             updatedAt: certificate.updatedAt,
           })),
           contractRisks: state.contracts
@@ -638,6 +641,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
               statusLabel: contract.expiryState === "expired" ? "已到期" : "即将到期",
               tone: contract.expiryState === "expired" ? "danger" : "warning",
               targetWorkspace: "合同",
+              targetTab: "risk",
               updatedAt: contract.updatedAt,
             })),
           projectSiteComplianceRisks: state.projectSites.map((site) => ({
@@ -649,6 +653,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
             statusLabel: "红色风险",
             tone: "danger",
             targetWorkspace: "项目点",
+            targetTab: "risk",
             updatedAt: site.updatedAt,
           })),
           lowStockItems: isScopedUser ? [] : state.inventoryBalances
@@ -662,6 +667,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
               statusLabel: "低库存",
               tone: "warning",
               targetWorkspace: "库存",
+              targetTab: "risk",
               updatedAt: balance.lastMovementAt,
             })),
           recentActivities: state.purchaseRecords.map((record) => ({
@@ -673,6 +679,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
             statusLabel: "最近采购",
             tone: "neutral",
             targetWorkspace: "采购",
+            targetTab: "records",
             updatedAt: record.updatedAt,
           })),
           unavailableSections: [],
