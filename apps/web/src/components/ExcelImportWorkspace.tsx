@@ -102,6 +102,24 @@ function statusLabel(status: string) {
   return status;
 }
 
+function importRowTargetLabel(row: ImportJobDto["rows"][number]): string {
+  if (row.normalizedData && row.rawData && "健康证归属类型" in row.rawData) {
+    const data = row.normalizedData;
+    const ownerType = stringField(data, "healthCertificateOwnerTypeLabel") || stringField(row.rawData, "健康证归属类型");
+    const ownerCode = stringField(data, "projectSiteCode") || stringField(data, "employeeNo") || stringField(row.rawData, "项目点编码") || stringField(row.rawData, "员工编码");
+    const personName = stringField(data, "personName") || stringField(row.rawData, "姓名");
+    const expiryDate = stringField(data, "expiryDate") || stringField(row.rawData, "到期日期");
+    const imageFileName = stringField(data, "imageFileName") || stringField(row.rawData, "图片文件名");
+    return [ownerType, ownerCode, personName, expiryDate, imageFileName].filter(Boolean).join(" / ") || row.targetRecordType || "-";
+  }
+  return row.targetRecordType ?? "-";
+}
+
+function stringField(data: Record<string, unknown> | null, field: string): string {
+  const value = data?.[field];
+  return typeof value === "string" ? value : value === null || value === undefined ? "" : String(value);
+}
+
 export function ExcelImportWorkspace({
   loadImportJobs = defaultLoadImportJobs,
   loadImportJobDetail = defaultLoadImportJobDetail,
@@ -382,7 +400,7 @@ export function ExcelImportWorkspace({
                 rows={rows.map((row) => [
                   row.rowNumber,
                   <ImportStatusBadge key={row.id} status={row.status} />,
-                  row.targetRecordType ?? "-",
+                  importRowTargetLabel(row),
                   row.issues.length
                     ? row.issues.map((item) => item.message).join("；")
                     : "通过",

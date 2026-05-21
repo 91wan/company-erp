@@ -2321,6 +2321,93 @@ describe("Company ERP workspace components", () => {
     expect(await screen.findByText("suppliers.xlsx")).toBeInTheDocument();
   });
 
+  it("shows health certificate import row preview with the new business fields", async () => {
+    const healthJob: ImportJobDto = {
+      ...importJob,
+      id: "health-import-job",
+      templateType: "health_certificates",
+      originalFileName: "health.xlsx",
+      rows: [
+        {
+          ...importJob.rows[0],
+          id: "health-row-1",
+          rawData: {
+            健康证归属类型: "项目点健康证",
+            项目点编码: "SITE0001",
+            员工编码: "",
+            姓名: "王示例",
+            到期日期: "2027-05-01",
+            图片文件名: "",
+          },
+          normalizedData: {
+            healthCertificateOwnerTypeLabel: "项目点健康证",
+            projectSiteCode: "SITE0001",
+            employeeNo: null,
+            personName: "王示例",
+            expiryDate: "2027-05-01",
+            imageFileName: null,
+          },
+          issues: [],
+          status: "valid",
+          targetRecordType: null,
+          targetRecordId: null,
+        },
+        {
+          ...importJob.rows[0],
+          id: "health-row-2",
+          rowNumber: 3,
+          rawData: {
+            健康证归属类型: "公司健康证",
+            项目点编码: "",
+            员工编码: "EMP0001",
+            姓名: "李公司",
+            到期日期: "2027-05-02",
+            图片文件名: "licompany.png",
+          },
+          normalizedData: {
+            healthCertificateOwnerTypeLabel: "公司健康证",
+            projectSiteCode: null,
+            employeeNo: "EMP0001",
+            personName: "李公司",
+            expiryDate: "2027-05-02",
+            imageFileName: "licompany.png",
+          },
+          issues: [],
+          status: "valid",
+          targetRecordType: null,
+          targetRecordId: null,
+        },
+      ],
+    };
+    render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([])}
+        previewImportJob={() => Promise.resolve(healthJob)}
+      />,
+    );
+
+    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("模板类型"), {
+      target: { value: "health_certificates" },
+    });
+    fireEvent.change(screen.getByLabelText("Excel 文件"), {
+      target: {
+        files: [
+          new File(["xlsx"], "health.xlsx", {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "导入预检" }));
+
+    expect(await screen.findByText("项目点健康证 / SITE0001 / 王示例 / 2027-05-01")).toBeInTheDocument();
+    expect(screen.getByText("公司健康证 / EMP0001 / 李公司 / 2027-05-02 / licompany.png")).toBeInTheDocument();
+    expect(screen.queryByText("身份证后四位")).not.toBeInTheDocument();
+    expect(screen.queryByText("健康证编号")).not.toBeInTheDocument();
+    expect(screen.queryByText("发证机构")).not.toBeInTheDocument();
+  });
+
   it("shows Excel import loading, error, empty, and read-only states", async () => {
     const { rerender } = render(
       <ExcelImportWorkspace

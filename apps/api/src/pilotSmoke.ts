@@ -290,7 +290,7 @@ async function ensureWarehouse(client: PilotApiClient) {
     match: (warehouse) => warehouse.warehouseCode === DEMO_CODES.warehouseCode,
     payload: {
       warehouseCode: DEMO_CODES.warehouseCode,
-      warehouseName: "总部仓库",
+      warehouseName: "无锡总部仓库",
       warehouseType: "headquarters",
       remark: "DEMO smoke fallback warehouse",
     },

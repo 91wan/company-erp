@@ -12,7 +12,7 @@ export const TRIAL_OPERATOR_PARTY = {
 
 export const TRIAL_HEADQUARTERS_WAREHOUSE = {
   warehouseCode: "WH-WX-HQ",
-  warehouseName: "总部仓库",
+  warehouseName: "无锡总部仓库",
   warehouseType: "headquarters",
   status: "enabled",
   remark: "MVP 默认总部库存仓库，用于采购入库、库存余额和项目点领用出库。",
