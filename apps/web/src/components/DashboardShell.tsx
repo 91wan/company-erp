@@ -106,39 +106,49 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           {activeWorkspace === "总览" ? (
             <DashboardOverview currentUser={currentUser} onNavigate={navigate} />
           ) : null}
-          <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
-            {activeWorkspace === "基础资料" ? (
-              <>
-                <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-                <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-              </>
-            ) : null}
-            {activeWorkspace === "采购" ? (
+          {/* Each workspace gets its own Suspense boundary so that navigating away
+              immediately unmounts the previous workspace (and any open drawers/backdrops).
+              A shared boundary would keep the previous subtree mounted-but-hidden during
+              the concurrent transition, leaving drawer backdrops in the DOM. */}
+          {activeWorkspace === "基础资料" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
+              <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+              <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "采购" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <PurchaseWorkspace
                 canManage={canManage(currentUser.roles, "procurement")}
                 initialTab={activeWorkspaceTab("采购")}
               />
-            ) : null}
-            {activeWorkspace === "库存" ? (
-              <>
-                <InventoryWorkspace
-                  canManage={canManage(currentUser.roles, "inventory")}
-                  showBalances={!isProjectSiteScoped && canRead(currentUser.roles, "inventoryQuantity")}
-                  initialTab={activeWorkspaceTab("库存")}
-                />
-                <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
-              </>
-            ) : null}
-            {activeWorkspace === "合同" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "库存" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
+              <InventoryWorkspace
+                canManage={canManage(currentUser.roles, "inventory")}
+                showBalances={!isProjectSiteScoped && canRead(currentUser.roles, "inventoryQuantity")}
+                initialTab={activeWorkspaceTab("库存")}
+              />
+              <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "合同" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <ContractsWorkspace
                 canManage={canManage(currentUser.roles, "contracts")}
                 initialTab={activeWorkspaceTab("合同")}
               />
-            ) : null}
-            {activeWorkspace === "业务项目" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "业务项目" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <BusinessProjectsWorkspace canManage={canManage(currentUser.roles, "businessProjects")} />
-            ) : null}
-            {activeWorkspace === "证照资质" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "证照资质" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <CertificatesWorkspace
                 canManage={canManage(currentUser.roles, "certificates")}
                 allowedOwnerTypes={isProjectSiteScoped ? SCOPED_CERTIFICATE_OWNER_TYPES : undefined}
@@ -146,8 +156,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 portalSection={isExternalProjectSite ? activePortalSection : undefined}
                 initialTab={activeWorkspaceTab("证照资质")}
               />
-            ) : null}
-            {activeWorkspace === "项目点" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "项目点" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <ProjectSitesWorkspace
                 canManageSites={canManage(currentUser.roles, "projectSites")}
                 canManageUsage={canManage(currentUser.roles, "projectUsageRequest")}
@@ -159,12 +171,20 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
                 onPortalSectionChange={(section) => navigate({ workspace: workspaceForExternalPortalSection(section), portalSection: section })}
               />
-            ) : null}
-            {activeWorkspace === "人员权限" ? <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} /> : null}
-            {activeWorkspace === "Excel 导入" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "人员权限" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
+              <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} />
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "Excel 导入" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
-            ) : null}
-            {activeWorkspace === "系统设置" ? (
+            </Suspense>
+          ) : null}
+          {activeWorkspace === "系统设置" ? (
+            <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <SystemSettingsWorkspace
                 companyName={appConfig.companyName}
                 canManage={canManage(currentUser.roles, "systemSettings")}
@@ -173,8 +193,8 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 canManageAttachments={canManage(currentUser.roles, "attachments")}
                 onCompanyNameChange={onAppConfigChange}
               />
-            ) : null}
-          </Suspense>
+            </Suspense>
+          ) : null}
         </div>
       </section>
     </main>
