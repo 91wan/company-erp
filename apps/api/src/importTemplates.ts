@@ -1,3 +1,4 @@
+import { deflateRawSync } from "node:zlib";
 import ExcelJS from "exceljs";
 import {
   IMPORT_TEMPLATE_TYPES,
@@ -5,6 +6,77 @@ import {
   type ImportTemplateTypeCode,
 } from "@company-erp/shared";
 import { ImportJobValidationError } from "./importJobs.js";
+
+// ---------------------------------------------------------------------------
+// Minimal ZIP builder — no external dependency.
+// Uses DEFLATE (RFC 1951) via Node's built-in zlib.deflateRawSync.
+// ---------------------------------------------------------------------------
+
+const CRC_TABLE: number[] = (() => {
+  const table: number[] = [];
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[i] = c;
+  }
+  return table;
+})();
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) crc = (CRC_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8)) >>> 0;
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function buildZip(files: { name: string; data: Buffer }[]): Buffer {
+  const now = new Date();
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = Buffer.from(file.name, "utf8");
+    const compressed = deflateRawSync(file.data, { level: 6 });
+    const crc = crc32(file.data);
+
+    // Local file header (30 + name)
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6); local.writeUInt16LE(8, 8);
+    local.writeUInt16LE(dosTime, 10); local.writeUInt16LE(dosDate, 12);
+    local.writeUInt32LE(crc, 14); local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(file.data.length, 22); local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28); name.copy(local, 30);
+    localParts.push(local, compressed);
+
+    // Central directory entry (46 + name)
+    const central = Buffer.alloc(46 + name.length);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6); central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(8, 10); central.writeUInt16LE(dosTime, 12);
+    central.writeUInt16LE(dosDate, 14); central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(compressed.length, 20); central.writeUInt32LE(file.data.length, 24);
+    central.writeUInt16LE(name.length, 28); central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32); central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36); central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(offset, 42); name.copy(central, 46);
+    centralParts.push(central);
+
+    offset += local.length + compressed.length;
+  }
+
+  const cd = Buffer.concat(centralParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(files.length, 8); eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, cd, eocd]);
+}
 
 type TemplateDefinition = {
   headers: readonly string[];
@@ -78,6 +150,17 @@ export function listImportTemplateDownloads(): ImportTemplateDownloadDto[] {
     label: template.label,
     downloadUrl: `/api/import-templates/${template.code}.xlsx`,
   }));
+}
+
+/** Build a zip containing all import template xlsx files. */
+export async function buildAllTemplatesZip(): Promise<Buffer> {
+  const files = await Promise.all(
+    IMPORT_TEMPLATE_TYPES.map(async (template) => ({
+      name: `${template.code}.xlsx`,
+      data: await buildImportTemplateWorkbook(template.code),
+    })),
+  );
+  return buildZip(files);
 }
 
 export async function buildImportTemplateWorkbook(templateType: ImportTemplateTypeCode): Promise<Buffer> {

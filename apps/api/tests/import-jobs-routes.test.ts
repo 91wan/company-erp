@@ -445,3 +445,161 @@ describe("import jobs API", () => {
     expect(templateTypes).toHaveLength(8);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P0-1: all.zip endpoint
+// ---------------------------------------------------------------------------
+
+describe("import template all.zip", () => {
+  it("GET /api/import-templates/all.zip returns 200 with zip content-type", async () => {
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
+    const response = await app.inject({ method: "GET", url: "/api/import-templates/all.zip" });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/zip");
+    expect(response.headers["content-disposition"]).toContain("company_erp_import_templates.zip");
+    expect(response.rawPayload.length).toBeGreaterThan(1000);
+  });
+
+  it("zip contains health_certificates.xlsx, contracts.xlsx, and materials.xlsx", async () => {
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
+    const response = await app.inject({ method: "GET", url: "/api/import-templates/all.zip" });
+    await app.close();
+
+    // The ZIP central directory contains filenames as UTF-8 text
+    const payload = response.rawPayload.toString("binary");
+    expect(payload).toContain("health_certificates.xlsx");
+    expect(payload).toContain("contracts.xlsx");
+    expect(payload).toContain("materials.xlsx");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0-2: error-report.xlsx endpoint
+// ---------------------------------------------------------------------------
+
+describe("import job error-report.xlsx", () => {
+  it("returns xlsx error report for a previewed job with error rows", async () => {
+    const job = makeJob({
+      errorRows: 1,
+      rows: [
+        {
+          id: "row-err",
+          rowNumber: 2,
+          rawData: { 供应商编码: "BAD", 供应商名称: "" },
+          normalizedData: null,
+          issues: [{ level: "error", field: "供应商名称", message: "供应商名称必填" }],
+          status: "error",
+          targetRecordType: null,
+          targetRecordId: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("spreadsheetml");
+    expect(response.headers["content-disposition"]).toContain("error_report.xlsx");
+    expect(response.rawPayload.length).toBeGreaterThan(500);
+
+    // Parse the xlsx and verify row content
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行");
+    expect(sheet).toBeDefined();
+    const headerRow = (sheet!.getRow(1).values as unknown[]).slice(1);
+    expect(headerRow).toContain("行号");
+    expect(headerRow).toContain("问题");
+    // Row 2 should be the error row
+    const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1);
+    expect(dataRow[0]).toBe(2); // rowNumber
+    expect(dataRow[1]).toBe("错误");
+    expect(String(dataRow[2])).toContain("供应商名称必填");
+  });
+
+  it("returns 404 for a non-existent import job", async () => {
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
+    const response = await app.inject({ method: "GET", url: "/api/import-jobs/nonexistent/error-report.xlsx" });
+    await app.close();
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1-5: Import permission tests
+// ---------------------------------------------------------------------------
+
+const TEST_SESSION_SECRET = "test-session-secret-for-import-permission-tests-abc";
+
+describe("import permission enforcement", () => {
+  async function buildAuthedApp(roles: string[]) {
+    const password = "ChangeMe123!";
+    const accounts: AuthAccountRecord[] = [
+      makeAuthAccount({ username: "testuser", passwordHash: await hashPassword(password), roles: roles as never }),
+    ];
+    const authRepository = createFakeAuthRepository(accounts);
+    const app = await buildApp({
+      importJobRepository: createFakeRepository([makeJob()]),
+      authRepository,
+      auth: { enabled: true, sessionSecret: TEST_SESSION_SECRET },
+    });
+    const cookie = await loginCookie(app, "testuser", password);
+    return { app, cookie };
+  }
+
+  it("admin can GET import templates", async () => {
+    const { app, cookie } = await buildAuthedApp(["admin"]);
+    const response = await app.inject({ method: "GET", url: "/api/import-templates", headers: { cookie: `company_erp_session=${cookie}` } });
+    await app.close();
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("viewer (masterData read) can download templates and list jobs but cannot preview or confirm", async () => {
+    const { app, cookie } = await buildAuthedApp(["viewer"]);
+
+    const templateResponse = await app.inject({ method: "GET", url: "/api/import-templates/parties.xlsx", headers: { cookie: `company_erp_session=${cookie}` } });
+    const listResponse = await app.inject({ method: "GET", url: "/api/import-jobs", headers: { cookie: `company_erp_session=${cookie}` } });
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
+    const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
+    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}` } });
+    await app.close();
+
+    expect(templateResponse.statusCode).toBe(200);
+    expect(listResponse.statusCode).toBe(200);
+    expect(previewResponse.statusCode).toBe(403);
+    expect(confirmResponse.statusCode).toBe(403);
+  });
+
+  it("admin can preview and confirm", async () => {
+    const { app, cookie } = await buildAuthedApp(["admin"]);
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
+    const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
+    await app.close();
+    expect(previewResponse.statusCode).toBe(201);
+  });
+
+  it("external_project_site user cannot preview or confirm import jobs", async () => {
+    const { app, cookie } = await buildAuthedApp(["external_project_site"]);
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
+    const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
+    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}` } });
+    await app.close();
+    expect(previewResponse.statusCode).toBe(403);
+    expect(confirmResponse.statusCode).toBe(403);
+  });
+
+  it("unauthenticated request is rejected for import templates", async () => {
+    const { app } = await buildAuthedApp(["admin"]);
+    const response = await app.inject({ method: "GET", url: "/api/import-templates" });
+    await app.close();
+    expect(response.statusCode).toBe(401);
+  });
+});

@@ -220,7 +220,7 @@ export type ImportJobPrismaClient = {
   $transaction<T>(callback: (tx: ImportTransactionClient) => Promise<T>): Promise<T>;
 };
 
-const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
+export const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
   parties: ["供应商编码", "供应商名称", "状态"],
   materials: ["物料编码", "物料名称", "物料类别", "基本单位", "状态"],
   employees: ["员工编码", "姓名", "部门", "角色", "状态"],
