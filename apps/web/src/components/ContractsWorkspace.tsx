@@ -623,8 +623,8 @@ function ContractDetail({ contract }: { contract: ContractDto }) {
       <dd>{contractExpiryToBadge(contract.expiryState).label}</dd>
       <dt>更新时间</dt>
       <dd>{formatDateTime(contract.updatedAt)}</dd>
-      <dt>附件</dt>
-      <dd>{contract.attachmentRef ?? "暂无主附件引用"}</dd>
+      <dt>附件状态</dt>
+      <dd>{contract.attachmentRef ? "已登记" : "未上传；当前合同仅用于到期提醒，PDF 扫描件可后续补传。"}</dd>
     </dl>
   );
 }

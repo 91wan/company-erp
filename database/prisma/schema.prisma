@@ -244,6 +244,9 @@ enum ImportTemplateType {
   employees
   project_sites
   opening_inventory
+  contracts
+  project_site_roster_people
+  health_certificates
 }
 
 enum ImportJobStatus {

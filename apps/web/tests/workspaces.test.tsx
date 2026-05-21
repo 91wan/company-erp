@@ -1792,6 +1792,7 @@ describe("Company ERP workspace components", () => {
       id: "18181818-1818-4181-8181-181818181818",
       contractNo: "HT20260511002",
       contractName: "采购框架合同",
+      attachmentRef: null,
     };
     const createContract = vi.fn((input) =>
       Promise.resolve({
@@ -1881,6 +1882,9 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("框架合同").length).toBeGreaterThan(0);
     expect(screen.getAllByText("食材").length).toBeGreaterThan(0);
     expect(screen.getAllByText("设备").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("未上传；当前合同仅用于到期提醒，PDF 扫描件可后续补传。"),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "登记附件路径" }),
     ).not.toBeInTheDocument();
@@ -2281,6 +2285,40 @@ describe("Company ERP workspace components", () => {
 
     expect(await screen.findByText("已确认导入")).toBeInTheDocument();
     expect(screen.getAllByText("已导入").length).toBeGreaterThan(0);
+  });
+
+  it("offers template downloads and keeps read-only users out of preview actions", async () => {
+    const { rerender } = render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([])}
+        previewImportJob={() => Promise.resolve(importJob)}
+      />,
+    );
+
+    expect(await screen.findByText("暂无导入批次")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载当前模板" }).getAttribute("href")).toContain(
+      "/api/import-templates/parties.xlsx",
+    );
+    fireEvent.change(screen.getByLabelText("模板类型"), {
+      target: { value: "health_certificates" },
+    });
+    expect(screen.getByRole("link", { name: "下载当前模板" }).getAttribute("href")).toContain(
+      "/api/import-templates/health_certificates.xlsx",
+    );
+    expect(screen.queryByText("模板来源：")).not.toBeInTheDocument();
+
+    rerender(
+      <ExcelImportWorkspace
+        canManage={false}
+        loadImportJobs={() => Promise.resolve([importJobSummary])}
+        loadImportJobDetail={() => Promise.resolve(importJob)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "导入预检" }));
+    expect(screen.getByRole("link", { name: "下载当前模板" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
+    expect(await screen.findByText("suppliers.xlsx")).toBeInTheDocument();
   });
 
   it("shows Excel import loading, error, empty, and read-only states", async () => {

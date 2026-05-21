@@ -412,6 +412,9 @@ function routePermission(pathname: string, method: string): { area: PermissionAr
       ? { area: "masterData", requiredLevel: "read" }
       : { area: "systemSettings", requiredLevel: "manage" };
   }
+  if (pathname.startsWith("/api/import-templates")) {
+    return { area: "masterData", requiredLevel: "read" };
+  }
   return null;
 }
 

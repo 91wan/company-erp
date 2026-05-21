@@ -3,6 +3,14 @@ import ExcelJS from "exceljs";
 import { Prisma } from "@prisma/client";
 import type {
   BaseStatusCode,
+  CertificateOwnerTypeCode,
+  CertificateTypeCode,
+  CertificateValidityTypeCode,
+  ContractDirectionCode,
+  ContractFormCode,
+  ContractInvestmentCategoryCode,
+  ContractStatusCode,
+  ContractSubjectCategoryCode,
   EmployeeStatusCode,
   ImportJobDto,
   ImportJobRowDto,
@@ -12,6 +20,8 @@ import type {
   ImportTemplateTypeCode,
   MvpRoleCode,
   PartyTypeCode,
+  ProjectSiteRosterStatusCode,
+  ProjectSiteRosterWorkerTypeCode,
   ProjectSiteServiceModeCode,
   ProjectSiteStatusCode,
 } from "@company-erp/shared";
@@ -28,7 +38,17 @@ type PartyLookup = { id: string; partyCode: string; partyName: string };
 type MaterialLookup = { id: string; materialCode: string; baseUnit?: string | null };
 type WarehouseLookup = { id: string; warehouseCode: string };
 type EmployeeLookup = { id: string; employeeNo: string };
-type ProjectSiteLookup = { id: string; siteCode: string };
+type ProjectSiteLookup = { id: string; siteCode: string; siteName?: string | null };
+type ContractLookup = { id: string; contractNo: string };
+type BusinessProjectLookup = { id: string; projectCode: string };
+type RosterPersonLookup = {
+  id: string;
+  projectSiteId: string;
+  personName: string;
+  identityNoLast4?: string | null;
+  status: ProjectSiteRosterStatusCode;
+};
+type CertificateLookup = { id: string; certificateCode: string; certificateNumber?: string | null };
 
 type PreviewContext = {
   partiesByCode: Map<string, PartyLookup>;
@@ -37,6 +57,11 @@ type PreviewContext = {
   warehousesByCode: Map<string, WarehouseLookup>;
   employeesByNo: Map<string, EmployeeLookup>;
   projectSitesByCode: Map<string, ProjectSiteLookup>;
+  contractsByNo: Map<string, ContractLookup>;
+  businessProjectsByCode: Map<string, BusinessProjectLookup>;
+  rosterPeople: RosterPersonLookup[];
+  certificatesByCode: Map<string, CertificateLookup>;
+  certificatesByNumber: Map<string, CertificateLookup>;
 };
 type NormalizedRow = {
   rowNumber: number;
@@ -126,6 +151,15 @@ type ImportTransactionClient = {
   projectSite: {
     create(args: Prisma.ProjectSiteCreateArgs): Promise<{ id: string }>;
   };
+  contract: {
+    create(args: Prisma.ContractCreateArgs): Promise<{ id: string }>;
+  };
+  projectSiteRosterPerson: {
+    create(args: Prisma.ProjectSiteRosterPersonCreateArgs): Promise<{ id: string }>;
+  };
+  certificateRecord: {
+    create(args: Prisma.CertificateRecordCreateArgs): Promise<{ id: string }>;
+  };
   inventoryMovement: {
     create(args: Prisma.InventoryMovementCreateArgs): Promise<{ id: string }>;
   };
@@ -155,6 +189,18 @@ export type ImportJobPrismaClient = {
   projectSite: {
     findMany(args?: Prisma.ProjectSiteFindManyArgs): Promise<ProjectSiteLookup[]>;
   } & ImportTransactionClient["projectSite"];
+  contract: {
+    findMany(args?: Prisma.ContractFindManyArgs): Promise<ContractLookup[]>;
+  } & ImportTransactionClient["contract"];
+  businessProject: {
+    findMany(args?: Prisma.BusinessProjectFindManyArgs): Promise<BusinessProjectLookup[]>;
+  };
+  projectSiteRosterPerson: {
+    findMany(args?: Prisma.ProjectSiteRosterPersonFindManyArgs): Promise<RosterPersonLookup[]>;
+  } & ImportTransactionClient["projectSiteRosterPerson"];
+  certificateRecord: {
+    findMany(args?: Prisma.CertificateRecordFindManyArgs): Promise<CertificateLookup[]>;
+  } & ImportTransactionClient["certificateRecord"];
   inventoryMovement: ImportTransactionClient["inventoryMovement"];
   importJob: {
     findMany(args: Prisma.ImportJobFindManyArgs): Promise<ImportJobRecord[]>;
@@ -172,6 +218,9 @@ const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
   employees: ["员工编码", "姓名", "部门", "角色", "状态"],
   project_sites: ["项目点编码", "项目点名称", "甲方客户/服务单位", "服务模式", "负责人员工编码", "状态"],
   opening_inventory: ["仓库编码", "物料编码", "期初数量", "单位", "库存日期"],
+  contracts: ["合同编号", "合同名称", "对方主体名称", "合同方向", "合同形态", "标的分类", "开始日期", "状态"],
+  project_site_roster_people: ["项目点编码", "姓名", "人员类型", "状态"],
+  health_certificates: ["项目点编码", "项目点现场人员姓名", "身份证后四位", "健康证编号", "到期日期"],
 };
 
 function timestamp(value: Date | string): string {
@@ -300,6 +349,73 @@ function serviceMode(value: string): ProjectSiteServiceModeCode | null {
   return null;
 }
 
+function contractDirection(value: string): ContractDirectionCode | null {
+  if (value === "采购合同" || value === "采购") return "purchase_contract";
+  if (value === "客户服务合同" || value === "客户合同" || value === "甲方合同") return "client_service_contract";
+  if (value === "外包合同" || value === "分包合同") return "subcontract_contract";
+  if (value === "其他") return "other";
+  return null;
+}
+
+function contractForm(value: string): ContractFormCode | null {
+  if (value === "一次性合同" || value === "一次性") return "one_time";
+  if (value === "固定期限合同" || value === "固定期限") return "fixed_term";
+  if (value === "框架合同" || value === "长期" || value === "无固定期限" || value === "长期/无固定期限") return "framework";
+  if (value === "工程/建设合同" || value === "工程合同" || value === "建设合同") return "project_construction";
+  return null;
+}
+
+function contractSubjectCategory(value: string): ContractSubjectCategoryCode | null {
+  if (value === "食材" || value === "食品原料") return "food_ingredients";
+  if (value === "餐具用品" || value === "餐具") return "tableware_supplies";
+  if (value === "厨房设备" || value === "设备") return "kitchen_equipment";
+  if (value === "广告标识" || value === "广告制作" || value === "广告标识/广告制作") return "advertising_signage";
+  if (value === "装修/改造" || value === "装修" || value === "改造") return "renovation";
+  if (value === "土建/厂房/土地建设" || value === "土建" || value === "厂房" || value === "土地建设") return "civil_construction";
+  if (value === "电梯") return "elevator";
+  if (value === "团餐/食堂运营服务" || value === "食堂运营服务" || value === "服务运营") return "service_operation";
+  if (value === "分包/外包服务" || value === "外包服务" || value === "分包服务") return "labor_subcontract";
+  if (value === "其他") return "other";
+  return null;
+}
+
+function contractInvestmentCategory(value: string): ContractInvestmentCategoryCode | null {
+  if (!value) return null;
+  if (value === "装修/改造" || value === "装修" || value === "改造") return "renovation";
+  if (value === "设备") return "equipment";
+  if (value === "广告标识" || value === "广告制作") return "advertising_signage";
+  if (value === "餐具用品" || value === "餐具") return "tableware_supplies";
+  if (value === "其他") return "other";
+  return null;
+}
+
+function contractStatus(value: string): ContractStatusCode | null {
+  if (value === "草稿") return "draft";
+  if (value === "履行中" || value === "有效" || value === "启用") return "active";
+  if (value === "已完成") return "completed";
+  if (value === "已终止") return "terminated";
+  if (value === "已取消") return "cancelled";
+  return null;
+}
+
+function partyTypeFromContractDirection(value: ContractDirectionCode): "supplier" | "client" | "subcontractor" {
+  if (value === "client_service_contract") return "client";
+  if (value === "subcontract_contract") return "subcontractor";
+  return "supplier";
+}
+
+function rosterWorkerType(value: string): ProjectSiteRosterWorkerTypeCode | null {
+  if (value === "直营现场人员") return "direct_site_staff";
+  if (value === "外包现场人员") return "subcontractor_site_staff";
+  return null;
+}
+
+function rosterStatus(value: string): ProjectSiteRosterStatusCode | null {
+  if (value === "在场") return "active";
+  if (value === "已离场") return "left";
+  return null;
+}
+
 const roleByChineseLabel = new Map<string, MvpRoleCode>([
   ["admin", "admin"],
   ["系统管理员", "admin"],
@@ -384,13 +500,19 @@ async function parseWorkbook(input: ImportJobPreviewInput): Promise<RawRow[]> {
 }
 
 async function loadContext(client: ImportJobPrismaClient): Promise<PreviewContext> {
-  const [parties, materials, warehouses, employees, projectSites] = await Promise.all([
+  const [parties, materials, warehouses, employees, projectSites, contracts, businessProjects, rosterPeople, certificates] =
+    await Promise.all([
     client.party.findMany(),
     client.material.findMany(),
     client.warehouse.findMany(),
     client.employee.findMany(),
     client.projectSite.findMany(),
+    client.contract.findMany(),
+    client.businessProject.findMany(),
+    client.projectSiteRosterPerson.findMany(),
+    client.certificateRecord.findMany(),
   ]);
+  const certificatesWithNumber = certificates.filter((certificate) => certificate.certificateNumber);
   return {
     partiesByCode: new Map(parties.map((party) => [party.partyCode, party])),
     partiesByName: new Map(parties.map((party) => [party.partyName, party])),
@@ -398,6 +520,11 @@ async function loadContext(client: ImportJobPrismaClient): Promise<PreviewContex
     warehousesByCode: new Map(warehouses.map((warehouse) => [warehouse.warehouseCode, warehouse])),
     employeesByNo: new Map(employees.map((employee) => [employee.employeeNo, employee])),
     projectSitesByCode: new Map(projectSites.map((site) => [site.siteCode, site])),
+    contractsByNo: new Map(contracts.map((contract) => [contract.contractNo, contract])),
+    businessProjectsByCode: new Map(businessProjects.map((project) => [project.projectCode, project])),
+    rosterPeople,
+    certificatesByCode: new Map(certificates.map((certificate) => [certificate.certificateCode, certificate])),
+    certificatesByNumber: new Map(certificatesWithNumber.map((certificate) => [certificate.certificateNumber ?? "", certificate])),
   };
 }
 
@@ -573,6 +700,218 @@ function normalizeProjectSite(row: RawRow, context: PreviewContext): NormalizedR
   };
 }
 
+function normalizeContract(row: RawRow, context: PreviewContext): NormalizedRow {
+  const issues: ImportRowIssueDto[] = [];
+  const contractNo = text(row.rawData, "合同编号");
+  const contractName = text(row.rawData, "合同名称");
+  const counterpartyCode = text(row.rawData, "对方主体编码");
+  const counterpartyName = text(row.rawData, "对方主体名称");
+  const direction = contractDirection(text(row.rawData, "合同方向"));
+  const form = contractForm(text(row.rawData, "合同形态"));
+  const subjectCategory = contractSubjectCategory(text(row.rawData, "标的分类"));
+  const startDate = dateText(row.rawData, "开始日期");
+  const endDate = dateText(row.rawData, "到期日期");
+  const signedDate = dateText(row.rawData, "签订日期");
+  const status = contractStatus(text(row.rawData, "状态"));
+  const projectSiteCode = text(row.rawData, "关联合同项目点编码");
+  const businessProjectCode = text(row.rawData, "关联业务项目编码");
+  const investmentCategory = contractInvestmentCategory(text(row.rawData, "投资分类"));
+  const attachmentStatus = text(row.rawData, "附件状态") || "未上传";
+  const amount = numberValue(row.rawData, "金额");
+  const budgetAmount = numberValue(row.rawData, "预算金额");
+  const counterparty = counterpartyCode
+    ? context.partiesByCode.get(counterpartyCode)
+    : counterpartyName
+      ? context.partiesByName.get(counterpartyName)
+      : null;
+  const projectSite = projectSiteCode ? context.projectSitesByCode.get(projectSiteCode) : null;
+  const businessProject = businessProjectCode ? context.businessProjectsByCode.get(businessProjectCode) : null;
+
+  if (!contractNo) issues.push(issue("error", "合同编号", "合同编号必填"));
+  if (!contractName) issues.push(issue("error", "合同名称", "合同名称必填"));
+  if (!counterpartyName) issues.push(issue("error", "对方主体名称", "对方主体名称必填"));
+  if (!direction) issues.push(issue("error", "合同方向", "合同方向必须为采购合同、客户服务合同、外包合同或其他"));
+  if (!form) issues.push(issue("error", "合同形态", "合同形态必须为一次性合同、固定期限合同、框架合同或工程/建设合同"));
+  if (!subjectCategory) issues.push(issue("error", "标的分类", "标的分类不在支持范围内"));
+  if (!startDate) issues.push(issue("error", "开始日期", "开始日期必须为 yyyy-mm-dd"));
+  if (text(row.rawData, "到期日期") && !endDate) issues.push(issue("error", "到期日期", "到期日期必须为 yyyy-mm-dd"));
+  if (form && form !== "framework" && !endDate) issues.push(issue("error", "到期日期", "非长期/无固定期限合同必须填写到期日期"));
+  if (text(row.rawData, "签订日期") && !signedDate) issues.push(issue("error", "签订日期", "签订日期必须为 yyyy-mm-dd"));
+  if (!status) issues.push(issue("error", "状态", "状态必须为草稿、履行中、已完成、已终止或已取消"));
+  if (!["未上传", "已线下留存", "后续补传"].includes(attachmentStatus)) {
+    issues.push(issue("error", "附件状态", "附件状态必须为未上传、已线下留存或后续补传"));
+  }
+  if (projectSiteCode && !projectSite) issues.push(issue("error", "关联合同项目点编码", "项目点编码未匹配项目点台账"));
+  if (businessProjectCode && !businessProject) issues.push(issue("error", "关联业务项目编码", "业务项目编码未匹配业务项目台账"));
+  if (text(row.rawData, "投资分类") && !investmentCategory) issues.push(issue("error", "投资分类", "投资分类不在支持范围内"));
+  if (counterpartyName && !counterparty) issues.push(issue("warning", "对方主体名称", "未匹配往来方，确认导入时自动创建对方主体"));
+
+  const existing = contractNo ? context.contractsByNo.get(contractNo) : null;
+  if (existing) issues.push(issue("warning", "合同编号", "合同编号已存在，确认导入时会跳过"));
+
+  const normalizedData = {
+    contractNo,
+    contractName,
+    counterpartyPartyId: counterparty?.id ?? null,
+    counterpartyPartyCode: counterpartyCode || null,
+    counterpartyName,
+    direction: direction ?? "purchase_contract",
+    contractForm: form ?? "fixed_term",
+    subjectCategory: subjectCategory ?? "other",
+    projectSiteId: projectSite?.id ?? null,
+    projectSiteCode: projectSiteCode || null,
+    businessProjectId: businessProject?.id ?? null,
+    businessProjectCode: businessProjectCode || null,
+    signedDate,
+    startDate,
+    endDate,
+    amount,
+    currency: text(row.rawData, "币种") || "CNY",
+    investmentCategory,
+    budgetAmount,
+    status: status ?? "active",
+    attachmentStatus,
+    remark: nullableText(row.rawData, "备注"),
+  };
+  return {
+    ...row,
+    normalizedData,
+    issues,
+    status: statusFromIssues(issues, existing ? { type: "contract", id: existing.id } : undefined),
+    targetRecordType: existing ? "contract" : null,
+    targetRecordId: existing?.id ?? null,
+  };
+}
+
+function rosterPersonKey(projectSiteId: string, personName: string, identityNoLast4: string | null): string {
+  return `${projectSiteId}::${personName}::${identityNoLast4 ?? ""}`;
+}
+
+function normalizeProjectSiteRosterPerson(row: RawRow, context: PreviewContext): NormalizedRow {
+  const issues: ImportRowIssueDto[] = [];
+  const projectSiteCode = text(row.rawData, "项目点编码");
+  const projectSite = projectSiteCode ? context.projectSitesByCode.get(projectSiteCode) : null;
+  const personName = text(row.rawData, "姓名");
+  const workerType = rosterWorkerType(text(row.rawData, "人员类型"));
+  const status = rosterStatus(text(row.rawData, "状态"));
+  const identityNoLast4 = nullableText(row.rawData, "身份证后四位");
+  const startDate = dateText(row.rawData, "入场日期");
+  const endDate = dateText(row.rawData, "离场日期");
+
+  if (!projectSiteCode) issues.push(issue("error", "项目点编码", "项目点编码必填"));
+  if (projectSiteCode && !projectSite) issues.push(issue("error", "项目点编码", "项目点编码未匹配项目点台账"));
+  if (!personName) issues.push(issue("error", "姓名", "姓名必填"));
+  if (!workerType) issues.push(issue("error", "人员类型", "人员类型必须为直营现场人员或外包现场人员"));
+  if (!status) issues.push(issue("error", "状态", "状态必须为在场或已离场"));
+  if (identityNoLast4 && !/^\d{4}$/.test(identityNoLast4)) issues.push(issue("error", "身份证后四位", "身份证后四位必须为 4 位数字"));
+  if (text(row.rawData, "入场日期") && !startDate) issues.push(issue("error", "入场日期", "入场日期必须为 yyyy-mm-dd"));
+  if (text(row.rawData, "离场日期") && !endDate) issues.push(issue("error", "离场日期", "离场日期必须为 yyyy-mm-dd"));
+  if (startDate && endDate && endDate < startDate) issues.push(issue("error", "离场日期", "离场日期不能早于入场日期"));
+
+  const existing =
+    projectSite && status === "active"
+      ? context.rosterPeople.find(
+          (person) =>
+            person.status === "active" &&
+            rosterPersonKey(person.projectSiteId, person.personName, person.identityNoLast4 ?? null) ===
+              rosterPersonKey(projectSite.id, personName, identityNoLast4),
+        )
+      : null;
+  if (existing) issues.push(issue("warning", "姓名", "同一项目点在场项目点现场人员已存在，确认导入时会跳过"));
+
+  const normalizedData = {
+    projectSiteId: projectSite?.id ?? null,
+    projectSiteCode,
+    personName,
+    phone: nullableText(row.rawData, "手机号"),
+    identityNoLast4,
+    workerType: workerType ?? "direct_site_staff",
+    jobRole: nullableText(row.rawData, "岗位"),
+    startDate,
+    endDate,
+    status: status ?? "active",
+    sourceAttachmentFileName: nullableText(row.rawData, "来源附件文件名"),
+    remark: nullableText(row.rawData, "备注"),
+  };
+  return {
+    ...row,
+    normalizedData,
+    issues,
+    status: statusFromIssues(issues, existing ? { type: "projectSiteRosterPerson", id: existing.id } : undefined),
+    targetRecordType: existing ? "projectSiteRosterPerson" : null,
+    targetRecordId: existing?.id ?? null,
+  };
+}
+
+function normalizeHealthCertificate(row: RawRow, context: PreviewContext): NormalizedRow {
+  const issues: ImportRowIssueDto[] = [];
+  const projectSiteCode = text(row.rawData, "项目点编码");
+  const projectSite = projectSiteCode ? context.projectSitesByCode.get(projectSiteCode) : null;
+  const personName = text(row.rawData, "项目点现场人员姓名");
+  const identityNoLast4 = text(row.rawData, "身份证后四位");
+  const certificateNumber = text(row.rawData, "健康证编号");
+  const expiryDate = dateText(row.rawData, "到期日期");
+  const issueDate = dateText(row.rawData, "签发日期");
+  const imageFileName = nullableText(row.rawData, "图片文件名");
+
+  if (!projectSiteCode) issues.push(issue("error", "项目点编码", "项目点编码必填"));
+  if (projectSiteCode && !projectSite) issues.push(issue("error", "项目点编码", "项目点编码未匹配项目点台账"));
+  if (!personName) issues.push(issue("error", "项目点现场人员姓名", "项目点现场人员姓名必填"));
+  if (!identityNoLast4) issues.push(issue("error", "身份证后四位", "身份证后四位必填，用于匹配项目点现场人员"));
+  if (identityNoLast4 && !/^\d{4}$/.test(identityNoLast4)) issues.push(issue("error", "身份证后四位", "身份证后四位必须为 4 位数字"));
+  if (!certificateNumber) issues.push(issue("error", "健康证编号", "健康证编号必填"));
+  if (!expiryDate) issues.push(issue("error", "到期日期", "到期日期必须为 yyyy-mm-dd"));
+  if (text(row.rawData, "签发日期") && !issueDate) issues.push(issue("error", "签发日期", "签发日期必须为 yyyy-mm-dd"));
+  if (!imageFileName) issues.push(issue("warning", "图片文件名", "未提供图片文件名，仍可导入到期提醒"));
+
+  const rosterPerson =
+    projectSite && identityNoLast4
+      ? context.rosterPeople.find(
+          (person) =>
+            person.status === "active" &&
+            rosterPersonKey(person.projectSiteId, person.personName, person.identityNoLast4 ?? null) ===
+              rosterPersonKey(projectSite.id, personName, identityNoLast4),
+        )
+      : null;
+  if (projectSite && personName && identityNoLast4 && !rosterPerson) {
+    issues.push(issue("error", "项目点现场人员姓名", "未匹配在场项目点现场人员"));
+  }
+
+  const generatedCode = `HC-${projectSiteCode}-${identityNoLast4}-${expiryDate ?? "unknown"}`;
+  const certificateCode = certificateNumber || generatedCode;
+  const existing = certificateCode
+    ? context.certificatesByCode.get(certificateCode) ?? context.certificatesByNumber.get(certificateNumber)
+    : null;
+  if (existing) issues.push(issue("warning", "健康证编号", "健康证编号已存在，确认导入时会跳过"));
+
+  const normalizedData = {
+    certificateCode,
+    certificateName: `${personName || "项目点现场人员"}健康证`,
+    certificateType: "person_health_cert" satisfies CertificateTypeCode,
+    ownerType: "person" satisfies CertificateOwnerTypeCode,
+    ownerRosterPersonId: rosterPerson?.id ?? null,
+    ownerProjectSiteId: projectSite?.id ?? null,
+    ownerNameSnapshot: personName,
+    certificateNumber,
+    issuingAuthority: nullableText(row.rawData, "发证机构"),
+    issueDate,
+    validityType: "fixed_expiry" satisfies CertificateValidityTypeCode,
+    expiryDate,
+    reminderDays: 30,
+    isComplianceCritical: true,
+    imageFileName,
+    remark: nullableText(row.rawData, "备注"),
+  };
+  return {
+    ...row,
+    normalizedData,
+    issues,
+    status: statusFromIssues(issues, existing ? { type: "certificate", id: existing.id } : undefined),
+    targetRecordType: existing ? "certificate" : null,
+    targetRecordId: existing?.id ?? null,
+  };
+}
+
 function normalizeOpeningInventory(row: RawRow, context: PreviewContext): NormalizedRow {
   const issues: ImportRowIssueDto[] = [];
   const warehouseCode = text(row.rawData, "仓库编码");
@@ -621,6 +960,9 @@ function normalizeRows(templateType: ImportTemplateTypeCode, rows: RawRow[], con
     if (templateType === "materials") return normalizeMaterial(row, context);
     if (templateType === "employees") return normalizeEmployee(row, context);
     if (templateType === "project_sites") return normalizeProjectSite(row, context);
+    if (templateType === "contracts") return normalizeContract(row, context);
+    if (templateType === "project_site_roster_people") return normalizeProjectSiteRosterPerson(row, context);
+    if (templateType === "health_certificates") return normalizeHealthCertificate(row, context);
     return normalizeOpeningInventory(row, context);
   });
 }
@@ -670,7 +1012,7 @@ function toJobDto(job: ImportJobRecord): ImportJobDto {
   };
 }
 
-async function ensureParty(tx: ImportTransactionClient, code: string, name: string, type: "client" | "subcontractor") {
+async function ensureParty(tx: ImportTransactionClient, code: string, name: string, type: "supplier" | "client" | "subcontractor") {
   const existing = await tx.party.findFirst({ where: { OR: [{ partyCode: code }, { partyName: name }] } });
   if (existing) return existing;
   return tx.party.create({
@@ -792,6 +1134,89 @@ async function importRow(
       },
     });
     return { targetRecordType: "projectSite", targetRecordId: site.id };
+  }
+
+  if (job.templateType === "contracts") {
+    const direction = stringValue(data, "direction") as ContractDirectionCode;
+    const party = await ensureParty(
+      tx,
+      stringValue(data, "counterpartyPartyCode") || `PTY-${shortHash(stringValue(data, "counterpartyName"))}`,
+      stringValue(data, "counterpartyName"),
+      partyTypeFromContractDirection(direction),
+    );
+    const remarkParts = [
+      nullableStringValue(data, "remark"),
+      stringValue(data, "attachmentStatus") ? `附件状态：${stringValue(data, "attachmentStatus")}` : null,
+    ].filter(Boolean);
+    const contract = await tx.contract.create({
+      data: {
+        contractNo: stringValue(data, "contractNo"),
+        contractName: stringValue(data, "contractName"),
+        counterpartyParty: { connect: { id: party.id } },
+        counterpartyNameSnapshot: stringValue(data, "counterpartyName"),
+        direction,
+        contractForm: stringValue(data, "contractForm") as ContractFormCode,
+        subjectCategory: stringValue(data, "subjectCategory") as ContractSubjectCategoryCode,
+        investmentCategory: nullableStringValue(data, "investmentCategory") as ContractInvestmentCategoryCode | null,
+        businessProject: stringValue(data, "businessProjectId") ? { connect: { id: stringValue(data, "businessProjectId") } } : undefined,
+        projectSite: stringValue(data, "projectSiteId") ? { connect: { id: stringValue(data, "projectSiteId") } } : undefined,
+        signedDate: dateValue(data, "signedDate"),
+        startDate: dateValue(data, "startDate") ?? new Date("1970-01-01T00:00:00.000Z"),
+        endDate: dateValue(data, "endDate"),
+        amount: numberOrNullValue(data, "amount"),
+        budgetAmount: numberOrNullValue(data, "budgetAmount"),
+        currency: stringValue(data, "currency") || "CNY",
+        attachmentRef: null,
+        status: stringValue(data, "status") as ContractStatusCode,
+        remark: remarkParts.length > 0 ? remarkParts.join("；") : null,
+      },
+    });
+    return { targetRecordType: "contract", targetRecordId: contract.id };
+  }
+
+  if (job.templateType === "project_site_roster_people") {
+    const rosterPerson = await tx.projectSiteRosterPerson.create({
+      data: {
+        projectSite: { connect: { id: stringValue(data, "projectSiteId") } },
+        personName: stringValue(data, "personName"),
+        phone: nullableStringValue(data, "phone"),
+        identityNoLast4: nullableStringValue(data, "identityNoLast4"),
+        workerType: stringValue(data, "workerType") as ProjectSiteRosterWorkerTypeCode,
+        jobRole: nullableStringValue(data, "jobRole"),
+        startDate: dateValue(data, "startDate"),
+        endDate: dateValue(data, "endDate"),
+        status: stringValue(data, "status") as ProjectSiteRosterStatusCode,
+        sourceAttachmentPath: nullableStringValue(data, "sourceAttachmentFileName"),
+        remark: nullableStringValue(data, "remark"),
+      },
+    });
+    return { targetRecordType: "projectSiteRosterPerson", targetRecordId: rosterPerson.id };
+  }
+
+  if (job.templateType === "health_certificates") {
+    const certificate = await tx.certificateRecord.create({
+      data: {
+        certificateCode: stringValue(data, "certificateCode"),
+        certificateName: stringValue(data, "certificateName"),
+        certificateType: stringValue(data, "certificateType") as CertificateTypeCode,
+        ownerType: stringValue(data, "ownerType") as CertificateOwnerTypeCode,
+        ownerRosterPerson: { connect: { id: stringValue(data, "ownerRosterPersonId") } },
+        ownerProjectSite: stringValue(data, "ownerProjectSiteId") ? { connect: { id: stringValue(data, "ownerProjectSiteId") } } : undefined,
+        ownerNameSnapshot: stringValue(data, "ownerNameSnapshot"),
+        certificateNumber: nullableStringValue(data, "certificateNumber"),
+        issuingAuthority: nullableStringValue(data, "issuingAuthority"),
+        issueDate: dateValue(data, "issueDate"),
+        validityType: stringValue(data, "validityType") as CertificateValidityTypeCode,
+        expiryDate: dateValue(data, "expiryDate"),
+        reminderDays: numberOrNullValue(data, "reminderDays") ?? 30,
+        isComplianceCritical: Boolean(data.isComplianceCritical),
+        sourceFilePath: null,
+        remark: nullableStringValue(data, "imageFileName")
+          ? [nullableStringValue(data, "remark"), `图片文件名：${stringValue(data, "imageFileName")}`].filter(Boolean).join("；")
+          : nullableStringValue(data, "remark"),
+      },
+    });
+    return { targetRecordType: "certificate", targetRecordId: certificate.id };
   }
 
   const movement = await tx.inventoryMovement.create({

@@ -1,8 +1,33 @@
 import type { FastifyInstance } from "fastify";
 import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ImportJobValidationError, normalizeImportJobFilters, normalizeImportTemplateType } from "./importJobs.js";
+import { buildImportTemplateWorkbook, listImportTemplateDownloads } from "./importTemplates.js";
 
 export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppOptions) {
+  app.get("/api/import-templates", async () => {
+    return { templates: listImportTemplateDownloads() };
+  });
+
+  app.get("/api/import-templates/all.zip", async (_request, reply) => {
+    return reply.status(501).send({ error: "IMPORT_TEMPLATE_ZIP_NOT_IMPLEMENTED" });
+  });
+
+  app.get("/api/import-templates/:templateType.xlsx", async (request, reply) => {
+    try {
+      const { templateType } = request.params as { templateType: string };
+      const workbook = await buildImportTemplateWorkbook(normalizeImportTemplateType(templateType));
+      return reply
+        .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .header("content-disposition", `attachment; filename="${templateType}.xlsx"`)
+        .send(workbook);
+    } catch (error) {
+      if (error instanceof ImportJobValidationError) {
+        return reply.status(400).send({ error: "IMPORT_VALIDATION_FAILED", issues: error.issues });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/import-jobs", async (request, reply) => {
     if (!options.importJobRepository) {
       return reply.status(503).send({ error: "IMPORT_REPOSITORY_NOT_CONFIGURED" });
