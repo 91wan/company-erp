@@ -5,12 +5,12 @@ This directory stores confirmed module plans before implementation.
 Required MVP module plans:
 
 - `people-permissions.md` - created
-- `materials-suppliers.md`
+- `materials-suppliers.md` - created
 - `contracts.md` - created
 - `purchase-requests.md` - created
 - `receiving-inventory.md` - created
 - `project-site-usage.md` - created
-- `excel-import.md`
+- `excel-import.md` - created
 
 Later-phase module plans:
 
