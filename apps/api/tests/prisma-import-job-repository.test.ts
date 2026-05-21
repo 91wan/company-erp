@@ -83,7 +83,7 @@ function createBaseClient(overrides: Partial<ImportJobPrismaClient> = {}): Impor
     },
     employee: {
       async findMany() {
-        return [{ id: "employee-manager", employeeNo: "EMP0001" }];
+        return [{ id: "employee-manager", employeeNo: "EMP0001", name: "王经理" }];
       },
       async create() {
         return { id: "employee-1" };
@@ -655,7 +655,61 @@ describe("Prisma import job repository", () => {
     });
   });
 
-  it("validates health certificate expiry imports against active project-site roster people", async () => {
+  it("keeps material default supplier optional during preview", async () => {
+    const repository = createPrismaImportJobRepository(createBaseClient());
+    const validWithoutSupplierBuffer = await workbookBuffer(
+      ["物料编码", "物料名称", "物料类别", "基本单位", "默认供应商编码", "状态"],
+      [["MAT-001", "示例物料", "食材", "件", "", "启用"]],
+    );
+    const warningUnknownSupplierBuffer = await workbookBuffer(
+      ["物料编码", "物料名称", "物料类别", "基本单位", "默认供应商编码", "状态"],
+      [["MAT-002", "示例物料二", "食材", "件", "SUP-MISSING", "启用"]],
+    );
+
+    const validJob = await repository.preview({
+      templateType: "materials",
+      originalFileName: "materials.xlsx",
+      fileBuffer: validWithoutSupplierBuffer,
+    });
+    const warningJob = await repository.preview({
+      templateType: "materials",
+      originalFileName: "materials.xlsx",
+      fileBuffer: warningUnknownSupplierBuffer,
+    });
+
+    expect(validJob.rows[0]).toMatchObject({
+      status: "valid",
+      normalizedData: expect.objectContaining({ defaultSupplierPartyId: null }),
+    });
+    expect(warningJob.rows[0]).toMatchObject({
+      status: "warning",
+      normalizedData: expect.objectContaining({ defaultSupplierPartyId: null }),
+      issues: expect.arrayContaining([
+        expect.objectContaining({ field: "默认供应商编码", message: "默认供应商未匹配，将留空" }),
+      ]),
+    });
+  });
+
+  it("requires only the new health certificate expiry reminder headers", async () => {
+    const repository = createPrismaImportJobRepository(createBaseClient());
+    const legacyBuffer = await workbookBuffer(
+      ["项目点编码", "项目点现场人员姓名", "身份证后四位", "健康证编号", "到期日期", "图片文件名"],
+      [["SITE-001", "张三", "1234", "HC-001", "2026-06-01", ""]],
+    );
+
+    await expect(
+      repository.preview({
+        templateType: "health_certificates",
+        originalFileName: "health.xlsx",
+        fileBuffer: legacyBuffer,
+      }),
+    ).rejects.toMatchObject({
+      name: "ImportJobValidationError",
+      issues: [expect.stringContaining("健康证归属类型")],
+    });
+  });
+
+  it("previews project-site health certificate expiry imports by project-site code and name", async () => {
     const repository = createPrismaImportJobRepository(
       createBaseClient({
         projectSite: {
@@ -666,11 +720,27 @@ describe("Prisma import job repository", () => {
             return { id: "site-created" };
           },
         },
+        projectSiteRosterPerson: {
+          async findMany() {
+            return [
+              {
+                id: "roster-1",
+                projectSiteId: "site-1",
+                personName: "张三",
+                identityNoLast4: null,
+                status: "active",
+              },
+            ];
+          },
+          async create() {
+            return { id: "roster-created" };
+          },
+        },
       }),
     );
     const fileBuffer = await workbookBuffer(
-      ["项目点编码", "项目点现场人员姓名", "身份证后四位", "健康证编号", "到期日期", "图片文件名"],
-      [["SITE-001", "张三", "1234", "HC-001", "2026-06-01", ""]],
+      ["健康证归属类型", "项目点编码", "员工编码", "姓名", "到期日期", "图片文件名", "备注"],
+      [["项目点健康证", "SITE-001", "", "张三", "2026-06-01", "", ""]],
     );
 
     const job = await repository.preview({
@@ -680,12 +750,132 @@ describe("Prisma import job repository", () => {
     });
 
     expect(job.rows[0]).toMatchObject({
-      status: "error",
-      issues: expect.arrayContaining([
-        expect.objectContaining({ level: "error", field: "项目点现场人员姓名", message: "未匹配在场项目点现场人员" }),
-        expect.objectContaining({ level: "warning", field: "图片文件名" }),
-      ]),
+      status: "valid",
+      issues: [],
+      normalizedData: expect.objectContaining({
+        healthCertificateOwnerTypeLabel: "项目点健康证",
+        projectSiteCode: "SITE-001",
+        personName: "张三",
+        ownerRosterPersonId: "roster-1",
+        ownerEmployeeId: null,
+        certificateType: "person_health_cert",
+        expiryDate: "2026-06-01",
+        imageFileName: null,
+      }),
     });
+    expect(String(job.rows[0].normalizedData?.certificateCode)).toMatch(/^HC-SITE-SITE-001-[A-F0-9]{8}-2026-06-01$/);
+  });
+
+  it("previews company health certificate expiry imports by employee code and name", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        employee: {
+          async findMany() {
+            return [{ id: "employee-1", employeeNo: "EMP0001", name: "李公司" }];
+          },
+          async create() {
+            return { id: "employee-created" };
+          },
+        },
+      }),
+    );
+    const fileBuffer = await workbookBuffer(
+      ["健康证归属类型", "项目点编码", "员工编码", "姓名", "到期日期", "图片文件名", "备注"],
+      [["公司健康证", "", "EMP0001", "李公司", "2026-06-01", "", ""]],
+    );
+
+    const job = await repository.preview({
+      templateType: "health_certificates",
+      originalFileName: "health.xlsx",
+      fileBuffer,
+    });
+
+    expect(job.rows[0]).toMatchObject({
+      status: "valid",
+      issues: [],
+      normalizedData: expect.objectContaining({
+        healthCertificateOwnerTypeLabel: "公司健康证",
+        employeeNo: "EMP0001",
+        personName: "李公司",
+        ownerEmployeeId: "employee-1",
+        ownerRosterPersonId: null,
+        certificateCode: "HC-EMP-EMP0001-2026-06-01",
+      }),
+    });
+  });
+
+  it("reports new health certificate matching errors without old identity or certificate-number wording", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        projectSite: {
+          async findMany() {
+            return [{ id: "site-1", siteCode: "SITE-001", siteName: "示例项目点" }];
+          },
+          async create() {
+            return { id: "site-created" };
+          },
+        },
+        projectSiteRosterPerson: {
+          async findMany() {
+            return [
+              {
+                id: "roster-1",
+                projectSiteId: "site-1",
+                personName: "张三",
+                identityNoLast4: "1111",
+                status: "active",
+              },
+              {
+                id: "roster-2",
+                projectSiteId: "site-1",
+                personName: "张三",
+                identityNoLast4: "2222",
+                status: "active",
+              },
+            ];
+          },
+          async create() {
+            return { id: "roster-created" };
+          },
+        },
+        employee: {
+          async findMany() {
+            return [{ id: "employee-1", employeeNo: "EMP0001", name: "李公司" }];
+          },
+          async create() {
+            return { id: "employee-created" };
+          },
+        },
+      }),
+    );
+    const fileBuffer = await workbookBuffer(
+      ["健康证归属类型", "项目点编码", "员工编码", "姓名", "到期日期", "图片文件名", "备注"],
+      [
+        ["项目点健康证", "SITE-MISSING", "", "张三", "2026-06-01", "", ""],
+        ["项目点健康证", "SITE-001", "", "张三", "2026-06-01", "", ""],
+        ["公司健康证", "", "EMP-MISSING", "李公司", "2026-06-01", "", ""],
+        ["公司健康证", "", "EMP0001", "李错误", "2026-06-01", "", ""],
+        ["未知类型", "", "", "张三", "2026-06-01", "", ""],
+      ],
+    );
+
+    const job = await repository.preview({
+      templateType: "health_certificates",
+      originalFileName: "health.xlsx",
+      fileBuffer,
+    });
+
+    const messages = job.rows.flatMap((row) => row.issues.map((item) => item.message));
+    expect(messages).toEqual(expect.arrayContaining([
+      "项目点编码未匹配项目点台账",
+      "同一项目点存在同名在场人员，请先在项目点现场人员台账中区分备注或补充手机号后再导入。",
+      "未匹配到公司员工",
+      "员工编码匹配的公司员工姓名不一致",
+      "健康证归属类型必须为：项目点健康证、公司健康证",
+    ]));
+    expect(messages.join("；")).not.toContain("身份证后四位必填");
+    expect(messages.join("；")).not.toContain("健康证编号必填");
+    expect(messages.join("；")).not.toContain("发证机构");
   });
 
   it("skips duplicate contracts and reports project-site roster validation issues", async () => {
@@ -864,14 +1054,15 @@ describe("Prisma import job repository", () => {
       startDate: "2026-05-01",
     });
     await confirmOne("health_certificates", "row-certificate", {
-      certificateCode: "HC-001",
+      certificateCode: "HC-SITE-SITE-001-5FB319BC-2026-06-01",
       certificateName: "张三健康证",
       certificateType: "person_health_cert",
       ownerType: "person",
       ownerRosterPersonId: "roster-1",
+      ownerEmployeeId: null,
       ownerProjectSiteId: "site-1",
       ownerNameSnapshot: "张三",
-      certificateNumber: "HC-001",
+      certificateNumber: null,
       validityType: "fixed_expiry",
       expiryDate: "2026-06-01",
       reminderDays: 30,

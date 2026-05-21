@@ -398,6 +398,39 @@ describe("import jobs API", () => {
     expect(workbookResponse.rawPayload.length).toBeGreaterThan(1000);
   });
 
+  it("generates business-friendly material, inventory, and health certificate template samples", async () => {
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
+
+    const materialResponse = await app.inject({ method: "GET", url: "/api/import-templates/materials.xlsx" });
+    const inventoryResponse = await app.inject({ method: "GET", url: "/api/import-templates/opening_inventory.xlsx" });
+    const healthResponse = await app.inject({ method: "GET", url: "/api/import-templates/health_certificates.xlsx" });
+    await app.close();
+
+    async function sheetRows(payload: Uint8Array) {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(payload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+      const sheet = workbook.getWorksheet("导入模板");
+      return {
+        headers: (sheet?.getRow(1).values as unknown[]).slice(1),
+        sample: (sheet?.getRow(2).values as unknown[]).slice(1),
+        notes: workbook.getWorksheet("说明")?.getColumn(1).values.join(" ") ?? "",
+      };
+    }
+
+    const material = await sheetRows(materialResponse.rawPayload);
+    const inventory = await sheetRows(inventoryResponse.rawPayload);
+    const health = await sheetRows(healthResponse.rawPayload);
+
+    expect(material.headers).toContain("默认供应商编码");
+    expect(material.sample[5]).toBe("");
+    expect(material.notes).toContain("默认供应商编码不是必填");
+    expect(inventory.sample).toContain("无锡总部仓库");
+    expect(health.headers).toEqual(["健康证归属类型", "项目点编码", "员工编码", "姓名", "到期日期", "图片文件名", "备注"]);
+    expect(health.headers).not.toEqual(expect.arrayContaining(["身份证后四位", "健康证编号", "发证机构", "签发日期"]));
+    expect(health.notes).toContain("不需要填写健康证编号");
+    expect(health.notes).toContain("不做 OCR");
+  });
+
   it("exposes all first-slice template codes in route-level types", () => {
     const templateTypes: ImportTemplateTypeCode[] = [
       "parties",

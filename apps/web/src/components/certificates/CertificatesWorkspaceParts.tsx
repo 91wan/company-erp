@@ -164,8 +164,9 @@ function rosterProjectSiteName(certificate: CertificateRecordDto, rosterPeople: 
 
 function healthMatchLabel(certificate: CertificateRecordDto): string {
   if (certificate.certificateType !== "person_health_cert") return "不适用";
+  if (certificate.ownerEmployeeId) return "公司健康证";
   if (!certificate.ownerRosterPersonId) return "未绑定项目点现场人员";
   if (!certificate.ownerRosterPersonName) return "待后端支持";
   if (certificate.ownerNameSnapshot && certificate.ownerRosterPersonName !== certificate.ownerNameSnapshot) return "姓名不一致";
-  return "人员已绑定，身份证后四位待后端支持";
+  return "项目点现场人员已绑定";
 }

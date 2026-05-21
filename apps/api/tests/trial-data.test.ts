@@ -25,7 +25,8 @@ describe("trial data bootstrap", () => {
     expect(prisma.warehouse.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { warehouseCode: TRIAL_HEADQUARTERS_WAREHOUSE.warehouseCode },
-        create: TRIAL_HEADQUARTERS_WAREHOUSE,
+        create: expect.objectContaining({ warehouseName: "无锡总部仓库" }),
+        update: expect.objectContaining({ warehouseName: "无锡总部仓库" }),
       }),
     );
     expect(prisma.department.upsert).toHaveBeenCalledTimes(TRIAL_DEPARTMENTS.length);

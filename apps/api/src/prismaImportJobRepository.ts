@@ -37,7 +37,7 @@ type RawRow = { rowNumber: number; rawData: Record<string, unknown> };
 type PartyLookup = { id: string; partyCode: string; partyName: string };
 type MaterialLookup = { id: string; materialCode: string; baseUnit?: string | null };
 type WarehouseLookup = { id: string; warehouseCode: string };
-type EmployeeLookup = { id: string; employeeNo: string };
+type EmployeeLookup = { id: string; employeeNo: string; name?: string | null };
 type ProjectSiteLookup = { id: string; siteCode: string; siteName?: string | null };
 type ContractLookup = { id: string; contractNo: string };
 type BusinessProjectLookup = { id: string; projectCode: string };
@@ -48,7 +48,14 @@ type RosterPersonLookup = {
   identityNoLast4?: string | null;
   status: ProjectSiteRosterStatusCode;
 };
-type CertificateLookup = { id: string; certificateCode: string; certificateNumber?: string | null };
+type CertificateLookup = {
+  id: string;
+  certificateCode: string;
+  certificateNumber?: string | null;
+  ownerEmployeeId?: string | null;
+  ownerRosterPersonId?: string | null;
+  expiryDate?: Date | string | null;
+};
 
 type PreviewContext = {
   partiesByCode: Map<string, PartyLookup>;
@@ -220,7 +227,7 @@ const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
   opening_inventory: ["仓库编码", "物料编码", "期初数量", "单位", "库存日期"],
   contracts: ["合同编号", "合同名称", "对方主体名称", "合同方向", "合同形态", "标的分类", "开始日期", "状态"],
   project_site_roster_people: ["项目点编码", "姓名", "人员类型", "状态"],
-  health_certificates: ["项目点编码", "项目点现场人员姓名", "身份证后四位", "健康证编号", "到期日期"],
+  health_certificates: ["健康证归属类型", "姓名", "到期日期"],
 };
 
 function timestamp(value: Date | string): string {
@@ -416,6 +423,12 @@ function rosterStatus(value: string): ProjectSiteRosterStatusCode | null {
   return null;
 }
 
+function healthCertificateOwnerKind(value: string): "project_site" | "employee" | null {
+  if (value === "项目点健康证") return "project_site";
+  if (value === "公司健康证") return "employee";
+  return null;
+}
+
 const roleByChineseLabel = new Map<string, MvpRoleCode>([
   ["admin", "admin"],
   ["系统管理员", "admin"],
@@ -458,6 +471,12 @@ function roleValues(value: string): { roles: MvpRoleCode[]; invalidLabels: strin
 
 function shortHash(value: string): string {
   return createHash("sha1").update(value).digest("hex").slice(0, 8).toUpperCase();
+}
+
+function isoDateString(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value.slice(0, 10);
 }
 
 function statusFromIssues(issues: ImportRowIssueDto[], duplicateTarget?: { type: string; id: string }): ImportRowStatusCode {
@@ -845,56 +864,75 @@ function normalizeProjectSiteRosterPerson(row: RawRow, context: PreviewContext):
 
 function normalizeHealthCertificate(row: RawRow, context: PreviewContext): NormalizedRow {
   const issues: ImportRowIssueDto[] = [];
+  const ownerTypeLabel = text(row.rawData, "健康证归属类型");
+  const ownerKind = healthCertificateOwnerKind(ownerTypeLabel);
   const projectSiteCode = text(row.rawData, "项目点编码");
   const projectSite = projectSiteCode ? context.projectSitesByCode.get(projectSiteCode) : null;
-  const personName = text(row.rawData, "项目点现场人员姓名");
-  const identityNoLast4 = text(row.rawData, "身份证后四位");
-  const certificateNumber = text(row.rawData, "健康证编号");
+  const employeeNo = text(row.rawData, "员工编码");
+  const employee = employeeNo ? context.employeesByNo.get(employeeNo) : null;
+  const personName = text(row.rawData, "姓名");
   const expiryDate = dateText(row.rawData, "到期日期");
-  const issueDate = dateText(row.rawData, "签发日期");
   const imageFileName = nullableText(row.rawData, "图片文件名");
 
-  if (!projectSiteCode) issues.push(issue("error", "项目点编码", "项目点编码必填"));
+  if (!ownerKind) issues.push(issue("error", "健康证归属类型", "健康证归属类型必须为：项目点健康证、公司健康证"));
+  if (!personName) issues.push(issue("error", "姓名", "姓名必填"));
+  if (ownerKind === "project_site" && !projectSiteCode) issues.push(issue("error", "项目点编码", "项目点健康证必须填写项目点编码"));
+  if (ownerKind === "employee" && !employeeNo) issues.push(issue("error", "员工编码", "公司健康证必须填写员工编码"));
   if (projectSiteCode && !projectSite) issues.push(issue("error", "项目点编码", "项目点编码未匹配项目点台账"));
-  if (!personName) issues.push(issue("error", "项目点现场人员姓名", "项目点现场人员姓名必填"));
-  if (!identityNoLast4) issues.push(issue("error", "身份证后四位", "身份证后四位必填，用于匹配项目点现场人员"));
-  if (identityNoLast4 && !/^\d{4}$/.test(identityNoLast4)) issues.push(issue("error", "身份证后四位", "身份证后四位必须为 4 位数字"));
-  if (!certificateNumber) issues.push(issue("error", "健康证编号", "健康证编号必填"));
+  if (ownerKind === "employee" && employeeNo && !employee) issues.push(issue("error", "员工编码", "未匹配到公司员工"));
+  if (ownerKind === "employee" && employee && employee.name && personName && employee.name !== personName) {
+    issues.push(issue("error", "姓名", "员工编码匹配的公司员工姓名不一致"));
+  }
   if (!expiryDate) issues.push(issue("error", "到期日期", "到期日期必须为 yyyy-mm-dd"));
-  if (text(row.rawData, "签发日期") && !issueDate) issues.push(issue("error", "签发日期", "签发日期必须为 yyyy-mm-dd"));
-  if (!imageFileName) issues.push(issue("warning", "图片文件名", "未提供图片文件名，仍可导入到期提醒"));
 
-  const rosterPerson =
-    projectSite && identityNoLast4
-      ? context.rosterPeople.find(
-          (person) =>
-            person.status === "active" &&
-            rosterPersonKey(person.projectSiteId, person.personName, person.identityNoLast4 ?? null) ===
-              rosterPersonKey(projectSite.id, personName, identityNoLast4),
+  const rosterMatches =
+    ownerKind === "project_site" && projectSite && personName
+      ? context.rosterPeople.filter(
+          (person) => person.status === "active" && person.projectSiteId === projectSite.id && person.personName === personName,
         )
-      : null;
-  if (projectSite && personName && identityNoLast4 && !rosterPerson) {
-    issues.push(issue("error", "项目点现场人员姓名", "未匹配在场项目点现场人员"));
+      : [];
+  const rosterPerson = rosterMatches.length === 1 ? rosterMatches[0] : null;
+  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length === 0) {
+    issues.push(issue("error", "姓名", "未匹配到项目点现场人员"));
+  }
+  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length > 1) {
+    issues.push(issue("error", "姓名", "同一项目点存在同名在场人员，请先在项目点现场人员台账中区分备注或补充手机号后再导入。"));
   }
 
-  const generatedCode = `HC-${projectSiteCode}-${identityNoLast4}-${expiryDate ?? "unknown"}`;
-  const certificateCode = certificateNumber || generatedCode;
-  const existing = certificateCode
-    ? context.certificatesByCode.get(certificateCode) ?? context.certificatesByNumber.get(certificateNumber)
+  const certificateCode =
+    ownerKind === "employee"
+      ? `HC-EMP-${employeeNo || "UNKNOWN"}-${expiryDate ?? "unknown"}`
+      : `HC-SITE-${projectSiteCode || "UNKNOWN"}-${shortHash(personName || "unknown")}-${expiryDate ?? "unknown"}`;
+  const existingByCode = context.certificatesByCode.get(certificateCode);
+  const existingByOwnerAndExpiry = context.certificatesByCode.size || context.certificatesByNumber.size
+    ? [...context.certificatesByCode.values()].find((certificate) => {
+        const sameExpiry = isoDateString(certificate.expiryDate) === expiryDate;
+        if (!sameExpiry) return false;
+        if (rosterPerson?.id && certificate.ownerRosterPersonId === rosterPerson.id) return true;
+        if (employee?.id && certificate.ownerEmployeeId === employee.id) return true;
+        return false;
+      })
     : null;
-  if (existing) issues.push(issue("warning", "健康证编号", "健康证编号已存在，确认导入时会跳过"));
+  const existing = existingByCode ?? existingByOwnerAndExpiry ?? null;
+  if (existingByCode) issues.push(issue("warning", "健康证", "健康证记录已存在，确认导入时会跳过"));
+  if (!existingByCode && existingByOwnerAndExpiry) issues.push(issue("warning", "到期日期", "同一归属人和到期日期的健康证已存在，确认导入时会跳过"));
 
   const normalizedData = {
     certificateCode,
     certificateName: `${personName || "项目点现场人员"}健康证`,
+    healthCertificateOwnerTypeLabel: ownerTypeLabel,
+    projectSiteCode: projectSiteCode || null,
+    employeeNo: employeeNo || null,
+    personName,
     certificateType: "person_health_cert" satisfies CertificateTypeCode,
     ownerType: "person" satisfies CertificateOwnerTypeCode,
     ownerRosterPersonId: rosterPerson?.id ?? null,
+    ownerEmployeeId: employee?.id ?? null,
     ownerProjectSiteId: projectSite?.id ?? null,
     ownerNameSnapshot: personName,
-    certificateNumber,
-    issuingAuthority: nullableText(row.rawData, "发证机构"),
-    issueDate,
+    certificateNumber: null,
+    issuingAuthority: null,
+    issueDate: null,
     validityType: "fixed_expiry" satisfies CertificateValidityTypeCode,
     expiryDate,
     reminderDays: 30,
@@ -1200,7 +1238,10 @@ async function importRow(
         certificateName: stringValue(data, "certificateName"),
         certificateType: stringValue(data, "certificateType") as CertificateTypeCode,
         ownerType: stringValue(data, "ownerType") as CertificateOwnerTypeCode,
-        ownerRosterPerson: { connect: { id: stringValue(data, "ownerRosterPersonId") } },
+        ownerEmployee: stringValue(data, "ownerEmployeeId") ? { connect: { id: stringValue(data, "ownerEmployeeId") } } : undefined,
+        ownerRosterPerson: stringValue(data, "ownerRosterPersonId")
+          ? { connect: { id: stringValue(data, "ownerRosterPersonId") } }
+          : undefined,
         ownerProjectSite: stringValue(data, "ownerProjectSiteId") ? { connect: { id: stringValue(data, "ownerProjectSiteId") } } : undefined,
         ownerNameSnapshot: stringValue(data, "ownerNameSnapshot"),
         certificateNumber: nullableStringValue(data, "certificateNumber"),
