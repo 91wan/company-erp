@@ -11,7 +11,7 @@ import type {
   ProjectSiteDto,
   ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import type { AttachmentFilters } from "../../apiClient";
+import type { AttachmentFilters, UploadAttachmentInput } from "../../apiClient";
 import type { ExternalProjectSitePortalSection } from "../project-sites/ExternalProjectSitePortal";
 
 export type CertificatesWorkspaceProps = {
@@ -22,6 +22,7 @@ export type CertificatesWorkspaceProps = {
   loadProjectSites?: () => Promise<ProjectSiteDto[]>;
   loadParties?: () => Promise<PartyDto[]>;
   loadUnifiedAttachments?: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
+  uploadCertificateImage?: (input: UploadAttachmentInput) => Promise<AttachmentRecordDto>;
   canManage?: boolean;
   allowedOwnerTypes?: readonly CertificateOwnerTypeCode[];
   allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
@@ -32,6 +33,7 @@ export type CertificatesWorkspaceProps = {
 export type CertificateFormState = {
   certificateCode: string;
   certificateName: string;
+  certificateImageFile: File | null;
   certificateType: CertificateTypeCode;
   ownerType: CertificateOwnerTypeCode;
   ownerPersonSource: "employee" | "roster";
@@ -40,6 +42,7 @@ export type CertificateFormState = {
   ownerProjectSiteId: string;
   ownerPartyId: string;
   ownerNameSnapshot: string;
+  imageDisplayName: string;
   certificateNumber: string;
   issuingAuthority: string;
   validityType: CertificateValidityTypeCode;
@@ -79,6 +82,7 @@ export function createEmptyCertificateForm(
   return {
     certificateCode: "",
     certificateName: "",
+    certificateImageFile: null,
     certificateType: ownerType === "person" ? "person_health_cert" : "food_operation_license",
     ownerType,
     ownerPersonSource,
@@ -87,9 +91,10 @@ export function createEmptyCertificateForm(
     ownerProjectSiteId: "",
     ownerPartyId: "",
     ownerNameSnapshot: "",
+    imageDisplayName: "",
     certificateNumber: "",
     issuingAuthority: "",
-    validityType: "fixed_expiry",
+    validityType: "no_expiry_visible",
     expiryDate: "",
     nextReviewDate: "",
     reminderDays: "30",

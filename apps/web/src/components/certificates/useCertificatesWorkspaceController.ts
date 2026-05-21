@@ -8,7 +8,13 @@ import type {
   ProjectSiteDto,
   ProjectSiteRosterPersonDto,
 } from "@company-erp/shared";
-import { apiBaseUrl, formatApiError, getAttachments, requestJson } from "../../apiClient";
+import {
+  apiBaseUrl,
+  formatApiError,
+  getAttachments,
+  requestJson,
+  uploadAttachment,
+} from "../../apiClient";
 import type { CertificatesWorkspaceProps, CertificateStatusFilter } from "./certificateWorkspaceTypes";
 import {
   createEmptyCertificateForm,
@@ -61,6 +67,7 @@ export function useCertificatesWorkspaceController({
   loadProjectSites = defaultLoadProjectSites,
   loadParties = defaultLoadParties,
   loadUnifiedAttachments = getAttachments,
+  uploadCertificateImage = uploadAttachment,
   canManage = true,
   allowedOwnerTypes,
   allowedPersonOwnerSources,
@@ -211,21 +218,35 @@ export function useCertificatesWorkspaceController({
     return form.ownerNameSnapshot;
   }
 
+  function draftCertificateName(ownerName: string): string {
+    if (form.certificateName.trim()) return form.certificateName.trim();
+    const typeLabel = certificateTypeLabel(form.certificateType);
+    const suffix = ownerName ? ` / ${ownerName}` : "";
+    return `${typeLabel}${suffix}（图片待复核）`;
+  }
+
+  function draftCertificateCode(): string {
+    if (form.certificateCode.trim()) return form.certificateCode.trim();
+    const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+    return `IMG-${timestamp}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitState("saving");
     setSubmitError("");
     try {
+      const ownerName = ownerNameFromForm();
       const created = await createCertificate({
-        certificateCode: form.certificateCode,
-        certificateName: form.certificateName,
+        certificateCode: draftCertificateCode(),
+        certificateName: draftCertificateName(ownerName),
         certificateType: form.certificateType,
         ownerType: form.ownerType,
         ownerEmployeeId: form.ownerType === "person" && form.ownerPersonSource === "employee" ? form.ownerEmployeeId || null : null,
         ownerRosterPersonId: form.ownerType === "person" && form.ownerPersonSource === "roster" ? form.ownerRosterPersonId || null : null,
         ownerProjectSiteId: form.ownerType === "project_site" ? form.ownerProjectSiteId || null : null,
         ownerPartyId: form.ownerType === "supplier" || form.ownerType === "company" ? form.ownerPartyId || null : null,
-        ownerNameSnapshot: ownerNameFromForm(),
+        ownerNameSnapshot: ownerName,
         certificateNumber: form.certificateNumber || null,
         issuingAuthority: form.issuingAuthority || null,
         validityType: form.validityType,
@@ -236,12 +257,25 @@ export function useCertificatesWorkspaceController({
         responsibleEmployeeId: form.responsibleEmployeeId || null,
         remark: form.remark || null,
       });
+
+      if (form.certificateImageFile) {
+        await uploadCertificateImage({
+          file: form.certificateImageFile,
+          ownerModule: "certificates",
+          ownerEntityType: "certificate",
+          ownerEntityId: created.id,
+          displayName: form.imageDisplayName || form.certificateImageFile.name,
+          remark: "证照图片上传，证件名称和到期日期待总部复核补录",
+        });
+      }
+
       setCertificates((current) => [created, ...current.filter((certificate) => certificate.id !== created.id)]);
       setForm(createEmptyCertificateForm(ownerOptions.defaultOwnerType, ownerOptions.defaultPersonOwnerSource));
+      setActiveTab("review");
       setSubmitState("saved");
       setCreateDrawerOpen(false);
     } catch (error) {
-      setSubmitError(formatApiError(error, "证照保存失败，请检查编码、归属对象或日期。"));
+      setSubmitError(formatApiError(error, "证照保存或图片上传失败，请检查归属对象、图片格式或复核日期。"));
       setSubmitState("error");
     }
   }
@@ -278,6 +312,26 @@ export function useCertificatesWorkspaceController({
     setSelectedCertificateId,
     setStatusFilter,
   };
+}
+
+const certificateTypeLabels: Record<CertificateTypeCode, string> = {
+  person_health_cert: "健康证",
+  employer_liability_insurance: "雇主责任险",
+  business_license: "营业执照",
+  food_operation_license: "食品经营许可证",
+  project_site_license: "项目点许可证",
+  supplier_qualification: "供应商资质",
+  management_system_cert: "体系认证",
+  food_safety_cert: "食品安全证书",
+  credit_rating_cert: "信用评级证书",
+  honor_cert: "荣誉证书",
+  bank_account_permit: "开户许可证",
+  contract_qualification_file: "合同相关资质文件",
+  other: "其他证照",
+};
+
+function certificateTypeLabel(type: CertificateTypeCode): string {
+  return certificateTypeLabels[type] ?? "证照";
 }
 
 export type CertificatesWorkspaceController = ReturnType<typeof useCertificatesWorkspaceController>;

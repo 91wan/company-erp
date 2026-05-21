@@ -96,7 +96,7 @@ export function CertificateRiskTable({
           </span>,
         ];
       })}
-      emptyState={<EmptyState title="暂无证照资料" description="可通过新增证照登记资料，或调整筛选条件。" />}
+      emptyState={<EmptyState title="暂无证照资料" description="可通过上传证照图片登记资料，或调整筛选条件。" />}
       onRowClick={(index) => onSelectCertificate(certificates[index])}
     />
   );

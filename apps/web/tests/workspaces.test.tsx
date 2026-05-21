@@ -2106,13 +2106,8 @@ describe("Company ERP workspace components", () => {
     expect(
       screen.queryByText("来源文件引用（历史兼容）"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
-    fireEvent.change(screen.getByLabelText("证照编码"), {
-      target: { value: "CERT0003" },
-    });
-    fireEvent.change(screen.getByLabelText("证照名称"), {
-      target: { value: "供应商营业执照" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "上传证照图片" }));
+    expect(screen.queryByLabelText("证照编码")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("证照类型"), {
       target: { value: "business_license" },
     });
@@ -2122,13 +2117,17 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("往来方"), {
       target: { value: party.id },
     });
+    fireEvent.click(screen.getByText("复核补录信息"));
+    fireEvent.change(screen.getByLabelText("证照名称（复核补录）"), {
+      target: { value: "供应商营业执照" },
+    });
     fireEvent.change(screen.getByLabelText("有效期类型"), {
       target: { value: "long_term" },
     });
-    fireEvent.change(screen.getByLabelText("下次复核日期"), {
+    fireEvent.change(screen.getByLabelText("下次复核日期（可选）"), {
       target: { value: "2026-12-01" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存待复核记录" }));
 
     await waitFor(() => expect(createCertificate).toHaveBeenCalled());
     expect(
@@ -2145,12 +2144,13 @@ describe("Company ERP workspace components", () => {
     ).toBe(false);
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "保存证照" }),
+        screen.queryByRole("button", { name: "保存待复核记录" }),
       ).not.toBeInTheDocument(),
     );
     expect(createCertificate).toHaveBeenCalledWith(
-      expect.objectContaining({ certificateCode: "CERT0003" }),
+      expect.objectContaining({ certificateName: "供应商营业执照" }),
     );
+    expect(createCertificate.mock.calls[0][0].certificateCode).toMatch(/^IMG-/);
 
     rerender(
       <CertificatesWorkspace
@@ -2163,17 +2163,15 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无证照资料");
-    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
-    fireEvent.change(screen.getByLabelText("证照编码"), {
-      target: { value: "CERT0004" },
-    });
-    fireEvent.change(screen.getByLabelText("证照名称"), {
+    fireEvent.click(screen.getByRole("button", { name: "上传证照图片" }));
+    fireEvent.click(screen.getByText("复核补录信息"));
+    fireEvent.change(screen.getByLabelText("证照名称（复核补录）"), {
       target: { value: "错误证照" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存待复核记录" }));
 
     expect(
-      await screen.findByText("证照保存失败，请检查编码、归属对象或日期。"),
+      await screen.findByText("证照保存或图片上传失败，请检查归属对象、图片格式或复核日期。"),
     ).toBeInTheDocument();
   });
 
@@ -2202,13 +2200,7 @@ describe("Company ERP workspace components", () => {
     );
 
     await screen.findByText("暂无证照资料");
-    fireEvent.click(screen.getByRole("button", { name: "新增证照" }));
-    fireEvent.change(screen.getByLabelText("证照编码"), {
-      target: { value: "CERT0005" },
-    });
-    fireEvent.change(screen.getByLabelText("证照名称"), {
-      target: { value: "李现场健康证" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "上传证照图片" }));
     fireEvent.change(screen.getByLabelText("证照类型"), {
       target: { value: "person_health_cert" },
     });
@@ -2221,10 +2213,17 @@ describe("Company ERP workspace components", () => {
     fireEvent.change(screen.getByLabelText("项目点现场人员"), {
       target: { value: rosterPerson.id },
     });
-    fireEvent.change(screen.getByLabelText("到期日期"), {
+    fireEvent.click(screen.getByText("复核补录信息"));
+    fireEvent.change(screen.getByLabelText("证照名称（复核补录）"), {
+      target: { value: "李现场健康证" },
+    });
+    fireEvent.change(screen.getByLabelText("有效期类型"), {
+      target: { value: "fixed_expiry" },
+    });
+    fireEvent.change(screen.getByLabelText("到期日期（复核补录）"), {
       target: { value: "2026-06-30" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存证照" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存待复核记录" }));
 
     expect(createCertificate).toHaveBeenCalledWith(
       expect.objectContaining({
