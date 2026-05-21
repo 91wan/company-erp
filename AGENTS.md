@@ -2,6 +2,18 @@
 
 Use Chinese by default for project communication. Keep common technical terms in English when that is clearer.
 
+## Multi-Agent Collaboration
+
+This project uses multiple AI agents in parallel. Each agent reads this file.
+
+| Agent | Role |
+|-------|------|
+| **Codex** | Primary feature development, daily implementation work |
+| **GPT-5.5 Pro** | PR code review |
+| **Claude Code** | Local direct development, security review (`/security-review`), cross-file debugging, architecture decisions, independent PR review |
+
+Claude Code runs locally on the developer's machine and can read/write files and run shell commands directly. Coordinate via Git branches and PRs — do not assume another agent has applied a change unless it is committed.
+
 ## Project Scope
 
 This repository is a lightweight internal ERP Web app for company operations.

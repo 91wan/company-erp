@@ -352,3 +352,8 @@
     min-width: 132px;
   }
 }
+
+/* Workspace lazy-load placeholder */
+.workspace-loading-placeholder {
+  min-height: 200px;
+}
