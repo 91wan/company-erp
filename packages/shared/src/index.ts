@@ -333,7 +333,10 @@ export type ImportTemplateTypeCode =
   | "materials"
   | "employees"
   | "project_sites"
-  | "opening_inventory";
+  | "opening_inventory"
+  | "contracts"
+  | "project_site_roster_people"
+  | "health_certificates";
 
 export type ImportJobStatusCode = "previewed" | "confirmed" | "failed";
 
@@ -376,6 +379,12 @@ export type ImportJobSummaryDto = {
 
 export type ImportJobDto = ImportJobSummaryDto & {
   rows: readonly ImportJobRowDto[];
+};
+
+export type ImportTemplateDownloadDto = {
+  templateType: ImportTemplateTypeCode;
+  label: string;
+  downloadUrl: string;
 };
 
 export type StatusMeta<TCode extends string = string> = {
@@ -1812,6 +1821,9 @@ export const IMPORT_TEMPLATE_TYPES = [
   { code: "employees", label: "部门与员工" },
   { code: "project_sites", label: "项目点" },
   { code: "opening_inventory", label: "期初库存" },
+  { code: "contracts", label: "合同到期提醒" },
+  { code: "project_site_roster_people", label: "项目点现场人员" },
+  { code: "health_certificates", label: "健康证到期" },
 ] as const satisfies readonly StatusMeta<ImportTemplateTypeCode>[];
 
 export const IMPORT_JOB_STATUSES = [
@@ -2107,7 +2119,7 @@ export const MVP_DICTIONARIES = {
   },
   importTemplateType: {
     label: "Excel 导入模板类型",
-    values: ["往来方/供应商", "物料", "部门与员工", "项目点", "期初库存"],
+    values: IMPORT_TEMPLATE_TYPES.map((item) => item.label),
   },
   importJobStatus: {
     label: "Excel 导入批次状态",

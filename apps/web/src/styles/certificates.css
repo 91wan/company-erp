@@ -1,1 +1,40 @@
 /* Certificates module styles. */
+
+.certificate-image-intake-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-info) 28%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-info) 8%, #ffffff);
+}
+
+.certificate-image-intake-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.certificate-image-intake-card p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.certificate-review-details {
+  display: grid;
+  gap: 10px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.certificate-review-details summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 750;
+}

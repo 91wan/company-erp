@@ -51,7 +51,7 @@ export function CertificatesWorkspaceView({ model }: { model: CertificatesWorksp
           />
           {model.canManage ? (
             <div className="workspace-primary-actions">
-              <button type="button" onClick={() => model.setCreateDrawerOpen(true)}>新增证照</button>
+              <button type="button" onClick={() => model.setCreateDrawerOpen(true)}>上传证照图片</button>
             </div>
           ) : null}
         </>

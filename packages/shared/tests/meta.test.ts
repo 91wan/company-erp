@@ -685,6 +685,9 @@ describe("MVP dictionary constants", () => {
       "employees",
       "project_sites",
       "opening_inventory",
+      "contracts",
+      "project_site_roster_people",
+      "health_certificates",
     ]);
     expect(IMPORT_JOB_STATUSES.map((status) => status.code)).toEqual(["previewed", "confirmed", "failed"]);
     expect(IMPORT_ROW_STATUSES.map((status) => status.code)).toEqual([
@@ -700,6 +703,9 @@ describe("MVP dictionary constants", () => {
       "部门与员工",
       "项目点",
       "期初库存",
+      "合同到期提醒",
+      "项目点现场人员",
+      "健康证到期",
     ]);
   });
 });

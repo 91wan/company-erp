@@ -261,7 +261,7 @@ describe("import jobs API", () => {
 
   it("rejects unsupported template types and missing files", async () => {
     const app = await buildApp({ importJobRepository: createFakeRepository() });
-    const unsupported = multipartPayload({ templateType: "contracts", file: Buffer.from("x"), fileName: "bad.xlsx" });
+    const unsupported = multipartPayload({ templateType: "unsupported_template", file: Buffer.from("x"), fileName: "bad.xlsx" });
     const missingFile = multipartPayload({ templateType: "parties" });
 
     const unsupportedResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", ...unsupported });
@@ -320,7 +320,7 @@ describe("import jobs API", () => {
   it("validates list filters for template and status", async () => {
     const app = await buildApp({ importJobRepository: createFakeRepository() });
 
-    const response = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=contracts&status=bad" });
+    const response = await app.inject({ method: "GET", url: "/api/import-jobs?templateType=unsupported_template&status=bad" });
     await app.close();
 
     expect(response.statusCode).toBe(400);
@@ -372,8 +372,43 @@ describe("import jobs API", () => {
     expect(adminConfirm.statusCode).toBe(200);
   });
 
+  it("lists Excel import templates and downloads a single generated workbook", async () => {
+    const app = await buildApp({ importJobRepository: createFakeRepository() });
+
+    const listResponse = await app.inject({ method: "GET", url: "/api/import-templates" });
+    const workbookResponse = await app.inject({ method: "GET", url: "/api/import-templates/project_sites.xlsx" });
+    await app.close();
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({
+      templates: expect.arrayContaining([
+        expect.objectContaining({ templateType: "parties", label: "往来方/供应商", downloadUrl: "/api/import-templates/parties.xlsx" }),
+        expect.objectContaining({ templateType: "materials", label: "物料", downloadUrl: "/api/import-templates/materials.xlsx" }),
+        expect.objectContaining({ templateType: "employees", label: "部门与员工", downloadUrl: "/api/import-templates/employees.xlsx" }),
+        expect.objectContaining({ templateType: "project_sites", label: "项目点", downloadUrl: "/api/import-templates/project_sites.xlsx" }),
+        expect.objectContaining({ templateType: "opening_inventory", label: "期初库存", downloadUrl: "/api/import-templates/opening_inventory.xlsx" }),
+        expect.objectContaining({ templateType: "contracts", label: "合同到期提醒", downloadUrl: "/api/import-templates/contracts.xlsx" }),
+        expect.objectContaining({ templateType: "project_site_roster_people", label: "项目点现场人员", downloadUrl: "/api/import-templates/project_site_roster_people.xlsx" }),
+        expect.objectContaining({ templateType: "health_certificates", label: "健康证到期", downloadUrl: "/api/import-templates/health_certificates.xlsx" }),
+      ]),
+    });
+    expect(workbookResponse.statusCode).toBe(200);
+    expect(workbookResponse.headers["content-type"]).toContain("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(workbookResponse.headers["content-disposition"]).toContain("project_sites.xlsx");
+    expect(workbookResponse.rawPayload.length).toBeGreaterThan(1000);
+  });
+
   it("exposes all first-slice template codes in route-level types", () => {
-    const templateTypes: ImportTemplateTypeCode[] = ["parties", "materials", "employees", "project_sites", "opening_inventory"];
-    expect(templateTypes).toHaveLength(5);
+    const templateTypes: ImportTemplateTypeCode[] = [
+      "parties",
+      "materials",
+      "employees",
+      "project_sites",
+      "opening_inventory",
+      "contracts",
+      "project_site_roster_people",
+      "health_certificates",
+    ];
+    expect(templateTypes).toHaveLength(8);
   });
 });

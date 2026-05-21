@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  Download,
   FileSpreadsheet,
   RefreshCw,
   UploadCloud,
@@ -119,6 +120,7 @@ export function ExcelImportWorkspace({
   const [actionStatus, setActionStatus] = useState<
     "idle" | "saving" | "error" | "success"
   >("idle");
+  const [actionError, setActionError] = useState("");
   const [activeTab, setActiveTab] = useState<ExcelImportTab>(() =>
     canManage ? "preview" : "jobs",
   );
@@ -158,7 +160,9 @@ export function ExcelImportWorkspace({
 
   async function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setActionError("");
     if (!file) {
+      setActionError("请选择 Excel 文件");
       setActionStatus("error");
       return;
     }
@@ -173,12 +177,14 @@ export function ExcelImportWorkspace({
       setActiveTab("rows");
       setActionStatus("success");
     } catch {
+      setActionError("Excel 导入操作失败");
       setActionStatus("error");
     }
   }
 
   async function handleConfirm() {
     if (!selectedJob) return;
+    setActionError("");
     setActionStatus("saving");
     try {
       const confirmed = await confirmImportJob(selectedJob.id);
@@ -188,20 +194,25 @@ export function ExcelImportWorkspace({
       );
       setActionStatus("success");
     } catch {
+      setActionError("Excel 导入操作失败");
       setActionStatus("error");
     }
   }
 
   async function handleSelectJob(id: string) {
     setActionStatus("idle");
+    setActionError("");
     try {
       const job = await loadImportJobDetail(id);
       setSelectedJob(job);
       setActiveTab("rows");
     } catch {
+      setActionError("Excel 导入操作失败");
       setActionStatus("error");
     }
   }
+
+  const currentTemplateUrl = `${apiBaseUrl}/api/import-templates/${templateType}.xlsx`;
 
   const summaryCards = (
     <div className="summary-grid" aria-label="导入摘要">
@@ -266,21 +277,7 @@ export function ExcelImportWorkspace({
             aria-label="导入预检表单"
           >
             <h3>导入预检</h3>
-            <label>
-              <span>模板类型</span>
-              <select
-                value={templateType}
-                onChange={(event) =>
-                  setTemplateType(event.target.value as ImportTemplateTypeCode)
-                }
-              >
-                {IMPORT_TEMPLATE_TYPES.map((template) => (
-                  <option key={template.code} value={template.code}>
-                    {template.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <TemplateDownloadControls templateType={templateType} onTemplateTypeChange={setTemplateType} currentTemplateUrl={currentTemplateUrl} />
             <label>
               <span>Excel 文件</span>
               <input
@@ -298,13 +295,13 @@ export function ExcelImportWorkspace({
               <UploadCloud aria-hidden="true" size={16} />
               {actionStatus === "saving" ? "预检中" : "导入预检"}
             </button>
-            <p className="form-helper">
-              模板来源：docs/data-import-templates/company_erp_mvp_import_templates.xlsx
-            </p>
           </form>
         ) : null}
         {activeTab === "preview" && !canManage ? (
-          <StateMessage text="当前账号只能查看导入记录，不能执行导入预检。" />
+          <SectionCard title="导入模板">
+            <TemplateDownloadControls templateType={templateType} onTemplateTypeChange={setTemplateType} currentTemplateUrl={currentTemplateUrl} />
+            <StateMessage text="当前账号可以下载模板和查看导入记录，不能执行导入预检。" />
+          </SectionCard>
         ) : null}
 
         {status === "loading" ? (
@@ -312,7 +309,7 @@ export function ExcelImportWorkspace({
         ) : null}
         {status === "error" ? <StateMessage text="导入批次加载失败" /> : null}
         {actionStatus === "error" ? (
-          <StateMessage text="Excel 导入操作失败" />
+          <StateMessage text={actionError || "Excel 导入操作失败"} />
         ) : null}
         {actionStatus === "success" ? (
           <StateMessage
@@ -396,6 +393,38 @@ export function ExcelImportWorkspace({
         ) : null}
       </section>
     </WorkspaceScaffold>
+  );
+}
+
+function TemplateDownloadControls({
+  templateType,
+  onTemplateTypeChange,
+  currentTemplateUrl,
+}: {
+  templateType: ImportTemplateTypeCode;
+  onTemplateTypeChange: (templateType: ImportTemplateTypeCode) => void;
+  currentTemplateUrl: string;
+}) {
+  return (
+    <div className="import-template-actions">
+      <label>
+        <span>模板类型</span>
+        <select
+          value={templateType}
+          onChange={(event) => onTemplateTypeChange(event.target.value as ImportTemplateTypeCode)}
+        >
+          {IMPORT_TEMPLATE_TYPES.map((template) => (
+            <option key={template.code} value={template.code}>
+              {template.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <a className="secondary-action" href={currentTemplateUrl} download>
+        <Download aria-hidden="true" size={16} />
+        下载当前模板
+      </a>
+    </div>
   );
 }
 

@@ -105,6 +105,35 @@ function createBaseClient(overrides: Partial<ImportJobPrismaClient> = {}): Impor
         return { id: "site-1" };
       },
     },
+    contract: {
+      async findMany() {
+        return [];
+      },
+      async create() {
+        return { id: "contract-1" };
+      },
+    },
+    businessProject: {
+      async findMany() {
+        return [];
+      },
+    },
+    projectSiteRosterPerson: {
+      async findMany() {
+        return [];
+      },
+      async create() {
+        return { id: "roster-1" };
+      },
+    },
+    certificateRecord: {
+      async findMany() {
+        return [];
+      },
+      async create() {
+        return { id: "certificate-1" };
+      },
+    },
     inventoryMovement: {
       async create() {
         return { id: "movement-1" };
@@ -540,5 +569,347 @@ describe("Prisma import job repository", () => {
       name: "ImportJobValidationError",
       issues: ["Import job has error rows"],
     });
+  });
+
+  it("previews contract expiry imports without requiring PDF attachments", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        party: {
+          async findMany() {
+            return [];
+          },
+          async findFirst() {
+            return null;
+          },
+          async create(args) {
+            return { id: "party-created", partyCode: args.data.partyCode, partyName: args.data.partyName };
+          },
+        },
+      }),
+    );
+    const fileBuffer = await workbookBuffer(
+      ["合同编号", "合同名称", "对方主体名称", "合同方向", "合同形态", "标的分类", "开始日期", "到期日期", "状态", "附件状态"],
+      [
+        ["HT-001", "示例采购合同", "示例供应商", "采购合同", "固定期限合同", "食材", "2026-01-01", "2026-12-31", "履行中", "未上传"],
+      ],
+    );
+
+    const job = await repository.preview({
+      templateType: "contracts",
+      originalFileName: "contracts.xlsx",
+      fileBuffer,
+    });
+
+    expect(job.rows[0]).toMatchObject({
+      status: "warning",
+      normalizedData: expect.objectContaining({
+        contractNo: "HT-001",
+        contractForm: "fixed_term",
+        direction: "purchase_contract",
+        subjectCategory: "food_ingredients",
+        status: "active",
+        attachmentStatus: "未上传",
+      }),
+      issues: expect.arrayContaining([
+        expect.objectContaining({ level: "warning", field: "对方主体名称" }),
+      ]),
+    });
+  });
+
+  it("previews project-site roster people without creating employee records", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        projectSite: {
+          async findMany() {
+            return [{ id: "site-1", siteCode: "SITE-001", siteName: "示例项目点" }];
+          },
+          async create() {
+            return { id: "site-created" };
+          },
+        },
+      }),
+    );
+    const fileBuffer = await workbookBuffer(
+      ["项目点编码", "姓名", "人员类型", "状态", "身份证后四位", "入场日期"],
+      [["SITE-001", "张三", "外包现场人员", "在场", "1234", "2026-05-01"]],
+    );
+
+    const job = await repository.preview({
+      templateType: "project_site_roster_people",
+      originalFileName: "roster.xlsx",
+      fileBuffer,
+    });
+
+    expect(job.rows[0]).toMatchObject({
+      status: "valid",
+      targetRecordType: null,
+      targetRecordId: null,
+      normalizedData: expect.objectContaining({
+        projectSiteId: "site-1",
+        projectSiteCode: "SITE-001",
+        personName: "张三",
+        identityNoLast4: "1234",
+        workerType: "subcontractor_site_staff",
+        status: "active",
+      }),
+    });
+  });
+
+  it("validates health certificate expiry imports against active project-site roster people", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        projectSite: {
+          async findMany() {
+            return [{ id: "site-1", siteCode: "SITE-001", siteName: "示例项目点" }];
+          },
+          async create() {
+            return { id: "site-created" };
+          },
+        },
+      }),
+    );
+    const fileBuffer = await workbookBuffer(
+      ["项目点编码", "项目点现场人员姓名", "身份证后四位", "健康证编号", "到期日期", "图片文件名"],
+      [["SITE-001", "张三", "1234", "HC-001", "2026-06-01", ""]],
+    );
+
+    const job = await repository.preview({
+      templateType: "health_certificates",
+      originalFileName: "health.xlsx",
+      fileBuffer,
+    });
+
+    expect(job.rows[0]).toMatchObject({
+      status: "error",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ level: "error", field: "项目点现场人员姓名", message: "未匹配在场项目点现场人员" }),
+        expect.objectContaining({ level: "warning", field: "图片文件名" }),
+      ]),
+    });
+  });
+
+  it("skips duplicate contracts and reports project-site roster validation issues", async () => {
+    const repository = createPrismaImportJobRepository(
+      createBaseClient({
+        contract: {
+          async findMany() {
+            return [{ id: "contract-existing", contractNo: "HT-001" }];
+          },
+          async create() {
+            return { id: "contract-created" };
+          },
+        },
+        projectSite: {
+          async findMany() {
+            return [{ id: "site-1", siteCode: "SITE-001", siteName: "示例项目点" }];
+          },
+          async create() {
+            return { id: "site-created" };
+          },
+        },
+      }),
+    );
+    const contractBuffer = await workbookBuffer(
+      ["合同编号", "合同名称", "对方主体名称", "合同方向", "合同形态", "标的分类", "开始日期", "到期日期", "状态"],
+      [["HT-001", "重复合同", "示例供应商", "采购合同", "固定期限合同", "食材", "2026-01-01", "2026-12-31", "履行中"]],
+    );
+    const rosterBuffer = await workbookBuffer(
+      ["项目点编码", "姓名", "人员类型", "状态", "身份证后四位", "入场日期", "离场日期"],
+      [["SITE-MISSING", "李四", "外包现场人员", "在场", "12A4", "2026-05-02", "2026-05-01"]],
+    );
+
+    const contractJob = await repository.preview({
+      templateType: "contracts",
+      originalFileName: "contracts.xlsx",
+      fileBuffer: contractBuffer,
+    });
+    const rosterJob = await repository.preview({
+      templateType: "project_site_roster_people",
+      originalFileName: "roster.xlsx",
+      fileBuffer: rosterBuffer,
+    });
+
+    expect(contractJob.rows[0]).toMatchObject({
+      status: "skipped",
+      targetRecordType: "contract",
+      targetRecordId: "contract-existing",
+    });
+    expect(rosterJob.rows[0]).toMatchObject({
+      status: "error",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ field: "项目点编码", message: "项目点编码未匹配项目点台账" }),
+        expect.objectContaining({ field: "身份证后四位", message: "身份证后四位必须为 4 位数字" }),
+        expect.objectContaining({ field: "离场日期", message: "离场日期不能早于入场日期" }),
+      ]),
+    });
+  });
+
+  it("imports contracts, project-site roster people, and health certificate expiry records", async () => {
+    const partyCreates: unknown[] = [];
+    const contractCreates: unknown[] = [];
+    const employeeCreates: unknown[] = [];
+    const rosterCreates: unknown[] = [];
+    const certificateCreates: unknown[] = [];
+    const rowUpdates: unknown[] = [];
+
+    async function confirmOne(templateType: ImportJobRecord["templateType"], rowId: string, normalizedData: Record<string, unknown>) {
+      let findUniqueCalls = 0;
+      const tx = createBaseClient({
+        party: {
+          async findMany() {
+            return [];
+          },
+          async findFirst() {
+            return null;
+          },
+          async create(args) {
+            partyCreates.push(args);
+            return { id: `party-${partyCreates.length}`, partyCode: args.data.partyCode, partyName: args.data.partyName };
+          },
+        },
+        employee: {
+          async findMany() {
+            return [];
+          },
+          async create(args) {
+            employeeCreates.push(args);
+            return { id: "employee-created" };
+          },
+        },
+        contract: {
+          async findMany() {
+            return [];
+          },
+          async create(args) {
+            contractCreates.push(args);
+            return { id: "contract-created" };
+          },
+        },
+        projectSiteRosterPerson: {
+          async findMany() {
+            return [];
+          },
+          async create(args) {
+            rosterCreates.push(args);
+            return { id: "roster-created" };
+          },
+        },
+        certificateRecord: {
+          async findMany() {
+            return [];
+          },
+          async create(args) {
+            certificateCreates.push(args);
+            return { id: "certificate-created" };
+          },
+        },
+        importJobRow: {
+          async update(args) {
+            rowUpdates.push(args);
+            return makeRow({ id: args.where.id, status: "imported" });
+          },
+        },
+        importJob: {
+          async findMany() {
+            return [];
+          },
+          async findUnique(args) {
+            if (args.where.id !== `job-${templateType}`) return null;
+            findUniqueCalls += 1;
+            return makeJob({
+              id: `job-${templateType}`,
+              templateType,
+              status: findUniqueCalls > 1 ? "confirmed" : "previewed",
+              importedRows: findUniqueCalls > 1 ? 1 : 0,
+              confirmedAt: findUniqueCalls > 1 ? now : null,
+              rows: [makeRow({ id: rowId, normalizedData })],
+            });
+          },
+          async create(args) {
+            return makeJob({ ...args.data, rows: [] });
+          },
+          async update() {
+            return makeJob({ id: `job-${templateType}`, templateType, status: "confirmed", importedRows: 1, confirmedAt: now });
+          },
+        },
+      });
+      const repository = createPrismaImportJobRepository(
+        createBaseClient({
+          async $transaction(callback) {
+            return callback(tx);
+          },
+        }),
+      );
+      return repository.confirm(`job-${templateType}`);
+    }
+
+    await confirmOne("contracts", "row-contract", {
+      contractNo: "HT-002",
+      contractName: "示例合同",
+      counterpartyName: "示例供应商",
+      direction: "purchase_contract",
+      contractForm: "fixed_term",
+      subjectCategory: "food_ingredients",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      status: "active",
+      attachmentStatus: "未上传",
+    });
+    await confirmOne("project_site_roster_people", "row-roster", {
+      projectSiteId: "site-1",
+      personName: "张三",
+      identityNoLast4: "1234",
+      workerType: "subcontractor_site_staff",
+      status: "active",
+      startDate: "2026-05-01",
+    });
+    await confirmOne("health_certificates", "row-certificate", {
+      certificateCode: "HC-001",
+      certificateName: "张三健康证",
+      certificateType: "person_health_cert",
+      ownerType: "person",
+      ownerRosterPersonId: "roster-1",
+      ownerProjectSiteId: "site-1",
+      ownerNameSnapshot: "张三",
+      certificateNumber: "HC-001",
+      validityType: "fixed_expiry",
+      expiryDate: "2026-06-01",
+      reminderDays: 30,
+      isComplianceCritical: true,
+      imageFileName: "zhangsan.png",
+    });
+
+    expect(contractCreates).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contractNo: "HT-002",
+          attachmentRef: null,
+          counterpartyParty: { connect: { id: "party-1" } },
+        }),
+      }),
+    ]);
+    expect(rosterCreates).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          projectSite: { connect: { id: "site-1" } },
+          personName: "张三",
+          workerType: "subcontractor_site_staff",
+        }),
+      }),
+    ]);
+    expect(certificateCreates).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          certificateType: "person_health_cert",
+          ownerRosterPerson: { connect: { id: "roster-1" } },
+          validityType: "fixed_expiry",
+          reminderDays: 30,
+          isComplianceCritical: true,
+          sourceFilePath: null,
+        }),
+      }),
+    ]);
+    expect(employeeCreates).toEqual([]);
+    expect(rowUpdates).toHaveLength(3);
   });
 });

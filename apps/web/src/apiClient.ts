@@ -88,6 +88,19 @@ const fieldLabels: Record<string, string> = {
   baseUnit: "基本单位",
   purchaseReferencePrice: "采购参考价",
   projectSiteSalePrice: "项目点领用价",
+  certificateCode: "证照编码",
+  certificateName: "证照名称",
+  certificateType: "证照类型",
+  ownerType: "归属对象",
+  ownerNameSnapshot: "归属名称",
+  ownerEmployeeId: "公司员工",
+  ownerRosterPersonId: "项目点现场人员",
+  ownerProjectSiteId: "项目点",
+  ownerPartyId: "往来方",
+  certificateNumber: "证面编号",
+  validityType: "有效期类型",
+  expiryDate: "到期日期",
+  nextReviewDate: "下次复核日期",
 };
 
 function translateIssueText(issue: string): string {
@@ -101,6 +114,19 @@ function translateIssueText(issue: string): string {
     "sourceType is unsupported": "来源类型不支持",
     "lowStockOnly must be true or false": "低库存筛选必须为是或否",
     "projectSiteSalePrice must be greater than or equal to purchaseReferencePrice": "项目点领用价不能低于采购参考价",
+    "expiryDate is required for fixed_expiry certificates": "固定到期证照必须填写到期日期",
+    "expiryDate is only allowed for fixed_expiry certificates": "只有固定到期证照可以填写到期日期",
+    "issueDate cannot be later than expiryDate": "发证日期不能晚于到期日期",
+    "exactly one owner link is allowed when owner link fields are provided": "归属对象只能绑定一个具体对象",
+    "person certificates must link exactly one person owner": "人员证照必须绑定一个人员归属",
+    "person certificates cannot link a project site as owner": "人员证照不能绑定项目点归属",
+    "person certificates cannot link a party owner": "人员证照不能绑定往来方归属",
+    "project_site certificates must link a project site owner": "项目点证照必须绑定项目点",
+    "project_site certificates cannot link a person as owner": "项目点证照不能绑定人员归属",
+    "project_site certificates cannot link a party owner": "项目点证照不能绑定往来方归属",
+    "supplier certificates must link a party owner": "供应商证照必须绑定往来方",
+    "company certificates must link a party owner": "公司主体证照必须绑定往来方",
+    "supplier and company certificates can only link a party owner": "供应商和公司主体证照只能绑定往来方",
   };
   if (direct[issue]) return direct[issue];
   const required = issue.match(/^([A-Za-z0-9_.]+) is required$/);
