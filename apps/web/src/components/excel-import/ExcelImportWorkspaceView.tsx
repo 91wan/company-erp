@@ -1,4 +1,5 @@
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { useMemo } from "react";
 import { SegmentedTabs, WorkspaceScaffold, type TabItem } from "../ui";
 import { ImportJobsTab } from "./ImportJobsTab";
 import { ImportPreviewTab } from "./ImportPreviewTab";
@@ -12,7 +13,20 @@ const TABS: TabItem<ExcelImportTab>[] = [
   { key: "rows", label: "行级预览" },
 ];
 
+function useImportRiskSummary(model: ExcelImportController) {
+  return useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentJobs = model.jobs.filter((j) => new Date(j.createdAt).getTime() >= cutoff);
+    const pendingConfirm = recentJobs.filter((j) => j.status === "previewed" && (j.errorRows ?? 0) === 0);
+    const errorBatches = recentJobs.filter((j) => (j.errorRows ?? 0) > 0);
+    const confirmedCount = recentJobs.filter((j) => j.status === "confirmed").length;
+    const warningTotal = recentJobs.reduce((sum, j) => sum + (j.warningRows ?? 0), 0);
+    return { pendingConfirm: pendingConfirm.length, errorBatches: errorBatches.length, confirmedCount, warningTotal };
+  }, [model.jobs]);
+}
+
 export function ExcelImportWorkspaceView({ model }: { model: ExcelImportController }) {
+  const riskSummary = useImportRiskSummary(model);
   return (
     <WorkspaceScaffold
       eyebrow="数据初始化"
@@ -29,6 +43,21 @@ export function ExcelImportWorkspaceView({ model }: { model: ExcelImportControll
       }
     >
       <div className="excel-import-workspace">
+        {model.loadStatus === "ready" && riskSummary.pendingConfirm > 0 ? (
+          <div className="import-risk-banner import-risk-banner--action" role="status">
+            <AlertTriangle size={16} aria-hidden="true" />
+            <span>
+              有 <strong>{riskSummary.pendingConfirm}</strong> 个预检批次可确认导入，请复核后确认或在批次台账中查看。
+              {riskSummary.warningTotal > 0 ? ` 含警告行 ${riskSummary.warningTotal} 条。` : ""}
+            </span>
+          </div>
+        ) : null}
+        {model.loadStatus === "ready" && riskSummary.errorBatches > 0 ? (
+          <div className="import-risk-banner import-risk-banner--warning" role="status">
+            <AlertTriangle size={16} aria-hidden="true" />
+            <span>近 7 天有 <strong>{riskSummary.errorBatches}</strong> 个批次存在错误行，需修正后重新预检。</span>
+          </div>
+        ) : null}
         {model.loadStatus === "loading" ? (
           <div className="workspace-state"><RefreshCw size={18} /><span>加载导入批次...</span></div>
         ) : null}

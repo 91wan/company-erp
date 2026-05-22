@@ -55,6 +55,7 @@ export function useProjectSitesWorkspaceController(
     usageOnly,
     portalSection,
     initialTab,
+    initialEntityId,
     onPortalSectionChange,
     externalProjectSiteContactName,
     externalProjectSiteContactPhone,
@@ -90,7 +91,7 @@ export function useProjectSitesWorkspaceController(
     pendingIssueConfirm,
     setPendingIssueConfirm,
     closeFormDrawer,
-  } = useProjectSitesWorkspaceState();
+  } = useProjectSitesWorkspaceState({ initialEntityId });
 
   const {
     onProjectSitesLoaded,

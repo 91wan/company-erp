@@ -172,6 +172,23 @@ export function useExcelImportController({
     return loadImportJobDetail(id);
   }
 
+  /** Confirm a job directly by ID (used by ImportJobDetailDrawer P0-5) */
+  async function handleConfirmJobDirectly(id: string) {
+    setConfirmingJobId(null);
+    setActionError("");
+    setActionStatus("saving");
+    try {
+      const confirmed = await confirmImportJob(id);
+      setSelectedJob(confirmed);
+      setJobs((current) => current.map((item) => (item.id === confirmed.id ? confirmed : item)));
+      setActiveTab("rows");
+      setActionStatus("success");
+    } catch {
+      setActionError("Excel 导入操作失败");
+      setActionStatus("error");
+    }
+  }
+
   return {
     jobs,
     filteredJobs,
@@ -203,5 +220,6 @@ export function useExcelImportController({
     handleConfirm,
     handleSelectJob,
     handleLoadDetail,
+    handleConfirmJobDirectly,
   };
 }

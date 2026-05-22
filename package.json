@@ -20,7 +20,8 @@
     "pilot:verify-evidence": "node scripts/verify-pilot-evidence-manifest.mjs",
     "audit:verify-export": "node scripts/verify-audit-export.mjs",
     "attachments:legacy-report": "node scripts/attachments-legacy-report.mjs",
-    "nas:trial-readiness": "node scripts/nas-trial-readiness-gate.mjs"
+    "nas:trial-readiness": "node scripts/nas-trial-readiness-gate.mjs",
+    "import:pilot-check": "node scripts/import-pilot-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

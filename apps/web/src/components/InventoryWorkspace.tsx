@@ -25,6 +25,7 @@ type InventoryWorkspaceProps = {
   canManage?: boolean;
   showBalances?: boolean;
   initialTab?: string;
+  initialEntityId?: string;
 };
 
 type MovementFormState = {
@@ -41,13 +42,14 @@ type MovementFormState = {
   handledBy: string;
   remark: string;
 };
-type InventoryTab = "risk" | "balances" | "inbound" | "outbound" | "replenishment";
+type InventoryTab = "risk" | "balances" | "inbound" | "outbound" | "movements" | "replenishment";
 
 const inventoryTabs: { key: InventoryTab; label: string }[] = [
   { key: "risk", label: "库存风险" },
   { key: "balances", label: "当前库存" },
   { key: "inbound", label: "入库流水" },
   { key: "outbound", label: "出库流水" },
+  { key: "movements", label: "库存流水" },
   { key: "replenishment", label: "补货建议" },
 ];
 
@@ -111,6 +113,7 @@ export function InventoryWorkspace({
   canManage = true,
   showBalances = true,
   initialTab,
+  initialEntityId,
 }: InventoryWorkspaceProps) {
   const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
   const [balances, setBalances] = useState<InventoryBalanceDto[]>([]);
@@ -146,6 +149,12 @@ export function InventoryWorkspace({
   useEffect(() => {
     if (isInventoryTab(initialTab)) setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (initialEntityId && activeTab === "movements") {
+      setSelectedMovementId(initialEntityId);
+    }
+  }, [initialEntityId, activeTab]);
 
   useEffect(() => {
     let mounted = true;
@@ -245,8 +254,11 @@ export function InventoryWorkspace({
   const activeTabMovements = filteredMovements.filter((movement) => {
     if (activeTab === "inbound") return movement.movementType === "inbound" || movement.movementType === "opening" || movement.movementType === "adjustment_in";
     if (activeTab === "outbound") return movement.movementType === "outbound" || movement.movementType === "adjustment_out";
-    return true;
+    return true;  // movements tab: show all
   });
+  const movementsEntityNotVisible = Boolean(
+    initialEntityId && activeTab === "movements" && movementStatus === "ready" && !movements.find((m) => m.id === initialEntityId)
+  );
   const selectedMovement = movements.find((movement) => movement.id === selectedMovementId) ?? null;
   const selectedBalance =
     balances.find((balance) => `${balance.warehouseId}:${balance.materialId}` === selectedBalanceKey) ?? null;
@@ -605,6 +617,69 @@ export function InventoryWorkspace({
           />
         )}
       </SectionCard> : null}
+
+      {activeTab === "movements" ? (
+        <SectionCard title="库存流水" action={<ClipboardList aria-hidden="true" size={16} />}>
+          {movementsEntityNotVisible ? (
+            <div className="workspace-state workspace-state--info" role="status">
+              <span>已跳转库存模块，但流水记录不可见或无权限，请搜索对应记录。</span>
+            </div>
+          ) : null}
+          <Toolbar
+            search={(
+              <label className="table-search">
+              <Search aria-hidden="true" size={16} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索单号、物料、仓库、经办人"
+              />
+              </label>
+            )}
+            filters={(
+              <label className="table-filter">
+              <Filter aria-hidden="true" size={16} />
+              <select
+                aria-label="库存流水类型筛选"
+                value={movementFilter}
+                onChange={(event) => setMovementFilter(event.target.value as "all" | InventoryMovementTypeCode)}
+              >
+                <option value="all">全部类型</option>
+                {INVENTORY_MOVEMENT_TYPES.map((movementType) => (
+                  <option key={movementType.code} value={movementType.code}>
+                    {movementType.label}
+                  </option>
+                ))}
+              </select>
+              </label>
+            )}
+          />
+          {movementStatus === "loading" ? (
+            <StateMessage icon={<RefreshCw size={16} />} text="库存流水加载中" />
+          ) : movementStatus === "error" ? (
+            <StateMessage icon={<PackageCheck size={16} />} text="库存流水接口暂不可用" />
+          ) : activeTabMovements.length === 0 ? (
+            <StateMessage icon={<PackageCheck size={16} />} text="暂无库存流水" />
+          ) : (
+            <DataTable
+              headers={["单号", "日期", "类型", "仓库", "物料", "数量", "处理摘要"]}
+              rows={activeTabMovements.map((movement) => [
+                movement.movementNo,
+                movement.movementDate,
+                movementTypeLabel.get(movement.movementType) ?? movement.movementType,
+                movement.warehouseCode,
+                `${movement.materialCode} ${movement.materialName}`,
+                `${movement.quantity} ${movement.unit}`,
+                <span key={movement.id} className="table-cell-stack">
+                  <strong>{movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "未指定来源"}</strong>
+                  <small>{movement.handledBy ?? "未记录经办人"}</small>
+                </span>,
+              ])}
+              onRowClick={(rowIndex) => setSelectedMovementId(activeTabMovements[rowIndex]?.id ?? "")}
+            />
+          )}
+        </SectionCard>
+      ) : null}
 
       {activeTab === "replenishment" ? (
         <EmptyState title="暂无补货建议" description="当前低库存风险会在库存风险分区展示；补货建议稳定接口开放后在此处理。" />

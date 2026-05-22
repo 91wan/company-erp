@@ -74,6 +74,7 @@ export type ProjectSitesWorkspaceOptions = {
   usageOnly: boolean;
   portalSection: ExternalProjectSitePortalSection;
   initialTab?: string;
+  initialEntityId?: string;
   onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
   externalProjectSiteContactName?: string | null;
   externalProjectSiteContactPhone?: string | null;

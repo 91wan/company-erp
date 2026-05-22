@@ -55,9 +55,12 @@ function buildNavigationIntent(row: ImportJobRowDto): NavigationIntent | null {
     case "material":
       return { workspace: "基础资料", tab: "materials", entityId };
     case "party":
-      return { workspace: "基础资料", entityId };  // 基础资料 uses PartiesWorkspace (no tab)
-    case "inventoryMovement":
-      return { workspace: "库存", tab: "inbound", entityId };
+      return { workspace: "基础资料", tab: "parties", entityId };
+    case "inventoryMovement": {
+      const movementType = (normalizedData as Record<string, unknown> | null)?.movementType as string | undefined;
+      const invTab = (movementType === "outbound" || movementType === "adjustment_out") ? "outbound" : "movements";
+      return { workspace: "库存", tab: invTab, entityId };
+    }
     case "employee":
       return { workspace: "人员权限", tab: "employees", entityId };
     default:
@@ -146,6 +149,7 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
         </span>
       ) : null}
       <span className="import-confirm-summary__note">确认后不覆盖既有记录。</span>
+      <span className="import-confirm-summary__note">当前系统不支持一键回滚；如导错，请到对应业务模块作废、停用或修正。</span>
     </span>
   );
 
