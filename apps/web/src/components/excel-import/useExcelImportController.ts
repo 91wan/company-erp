@@ -6,6 +6,7 @@ import {
   type ImportTemplateTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../../apiClient";
+import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 
 // ---------------------------------------------------------------------------
 // Default API implementations
@@ -46,6 +47,7 @@ export type ExcelImportWorkspaceProps = {
   previewImportJob?: (templateType: ImportTemplateTypeCode, file: File) => Promise<ImportJobDto>;
   confirmImportJob?: (id: string) => Promise<ImportJobDto>;
   canManage?: boolean;
+  onNavigate?: (intent: NavigationIntent) => void;
 };
 
 export type ExcelImportController = ReturnType<typeof useExcelImportController>;
@@ -60,6 +62,7 @@ export function useExcelImportController({
   previewImportJob = defaultPreviewImportJob,
   confirmImportJob = defaultConfirmImportJob,
   canManage = true,
+  onNavigate,
 }: ExcelImportWorkspaceProps) {
   const [jobs, setJobs] = useState<ImportJobSummaryDto[]>([]);
   const [selectedJob, setSelectedJob] = useState<ImportJobDto | null>(null);
@@ -70,6 +73,10 @@ export function useExcelImportController({
   const [actionError, setActionError] = useState("");
   const [activeTab, setActiveTab] = useState<ExcelImportTab>(() => (canManage ? "preview" : "jobs"));
   const [confirmingJobId, setConfirmingJobId] = useState<string | null>(null);
+  // Batch list filters (P0-4)
+  const [jobsTemplateFilter, setJobsTemplateFilter] = useState<ImportTemplateTypeCode | "all">("all");
+  const [jobsStatusFilter, setJobsStatusFilter] = useState<"all" | "previewed" | "confirmed">("all");
+  const [jobsSearch, setJobsSearch] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -93,6 +100,17 @@ export function useExcelImportController({
   }), [activeJob]);
 
   const templateLabel = IMPORT_TEMPLATE_TYPES.find((t) => t.code === (activeJob?.templateType ?? templateType))?.label ?? "";
+
+  const filteredJobs = useMemo(() => {
+    let result = jobs;
+    if (jobsTemplateFilter !== "all") result = result.filter((j) => j.templateType === jobsTemplateFilter);
+    if (jobsStatusFilter !== "all") result = result.filter((j) => j.status === jobsStatusFilter);
+    if (jobsSearch.trim()) {
+      const q = jobsSearch.trim().toLowerCase();
+      result = result.filter((j) => j.originalFileName.toLowerCase().includes(q) || j.id.toLowerCase().includes(q));
+    }
+    return result;
+  }, [jobs, jobsTemplateFilter, jobsStatusFilter, jobsSearch]);
 
   async function handlePreview() {
     setActionError("");
@@ -151,6 +169,7 @@ export function useExcelImportController({
 
   return {
     jobs,
+    filteredJobs,
     activeJob,
     rows,
     summary,
@@ -163,9 +182,16 @@ export function useExcelImportController({
     activeTab,
     confirmingJobId,
     canManage,
+    onNavigate,
+    jobsTemplateFilter,
+    jobsStatusFilter,
+    jobsSearch,
     setTemplateType,
     setFile,
     setActiveTab,
+    setJobsTemplateFilter,
+    setJobsStatusFilter,
+    setJobsSearch,
     handlePreview,
     handleRequestConfirm,
     handleCancelConfirm,

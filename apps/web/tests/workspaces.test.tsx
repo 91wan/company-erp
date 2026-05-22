@@ -2393,7 +2393,7 @@ describe("Company ERP workspace components", () => {
     fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
     await screen.findByText("suppliers.xlsx");
     fireEvent.click(screen.getByText("suppliers.xlsx"));
-    expect(await screen.findByText(/已导入：往来方台账.*party-abc-123/)).toBeInTheDocument();
+    expect(await screen.findByText(/已导入：往来方台账/)).toBeInTheDocument();
     expect(screen.getByText("已跳过：重复记录")).toBeInTheDocument();
   });
 

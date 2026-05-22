@@ -180,7 +180,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           ) : null}
           {activeWorkspace === "Excel 导入" ? (
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
-              <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} />
+              <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} onNavigate={navigate} />
             </Suspense>
           ) : null}
           {activeWorkspace === "系统设置" ? (
