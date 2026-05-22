@@ -1,25 +1,124 @@
+/**
+ * P0-4: Import batch ledger with template-type / status / search filters.
+ */
+import { Download, Eye, Filter, Search } from "lucide-react";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import { DataTable, SectionCard, StatusBadge } from "../ui";
+import { DataTable, SectionCard, StatusBadge, Toolbar } from "../ui";
+import { errorReportUrl } from "./importDownloadLinks";
 import type { ExcelImportController } from "./useExcelImportController";
 
 export function ImportJobsTab({ model }: { model: ExcelImportController }) {
+  const {
+    filteredJobs,
+    jobs,
+    canManage,
+    jobsTemplateFilter,
+    jobsStatusFilter,
+    jobsSearch,
+    setJobsTemplateFilter,
+    setJobsStatusFilter,
+    setJobsSearch,
+  } = model;
+
   return (
-    <SectionCard title="导入批次" badge={`${model.jobs.length} 批`}>
+    <SectionCard
+      title="导入批次台账"
+      badge={`${filteredJobs.length} / ${jobs.length} 批`}
+    >
+      <Toolbar
+        search={(
+          <label className="table-search">
+            <Search aria-hidden="true" size={16} />
+            <input
+              value={jobsSearch}
+              onChange={(e) => setJobsSearch(e.target.value)}
+              placeholder="搜索文件名或批次 ID"
+            />
+          </label>
+        )}
+        filters={(
+          <span className="import-jobs-filters">
+            <label className="table-filter">
+              <Filter aria-hidden="true" size={16} />
+              <select
+                value={jobsTemplateFilter}
+                onChange={(e) => setJobsTemplateFilter(e.target.value as typeof jobsTemplateFilter)}
+                aria-label="模板类型"
+              >
+                <option value="all">全部模板</option>
+                {IMPORT_TEMPLATE_TYPES.map((t) => (
+                  <option key={t.code} value={t.code}>{t.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="table-filter">
+              <Filter aria-hidden="true" size={16} />
+              <select
+                value={jobsStatusFilter}
+                onChange={(e) => setJobsStatusFilter(e.target.value as typeof jobsStatusFilter)}
+                aria-label="导入状态"
+              >
+                <option value="all">全部状态</option>
+                <option value="previewed">已预检</option>
+                <option value="confirmed">已确认导入</option>
+              </select>
+            </label>
+          </span>
+        )}
+      />
       <DataTable
-        headers={["文件", "模板", "状态", "总行", "错误", "跳过"]}
-        rows={model.jobs.map((job) => [
-          job.originalFileName,
-          IMPORT_TEMPLATE_TYPES.find((t) => t.code === job.templateType)?.label ?? job.templateType,
-          <ImportStatusBadge key={job.id} status={job.status} />,
-          job.totalRows,
-          job.errorRows,
-          job.skippedRows,
-        ])}
-        emptyState="暂无导入批次"
+        headers={["文件", "模板", "状态", "总行", "错误", "警告", "跳过", "已导入", "操作"]}
         onRowClick={(rowIndex) => {
-          const job = model.jobs[rowIndex];
+          const job = filteredJobs[rowIndex];
           if (job) void model.handleSelectJob(job.id);
         }}
+        rows={filteredJobs.map((job) => {
+          const hasIssues = (job.errorRows ?? 0) > 0 || (job.warningRows ?? 0) > 0;
+          const canContinueConfirm = canManage && job.status === "previewed" && (job.errorRows ?? 0) === 0;
+          return [
+            job.originalFileName,
+            IMPORT_TEMPLATE_TYPES.find((t) => t.code === job.templateType)?.label ?? job.templateType,
+            <ImportStatusBadge key={`${job.id}-status`} status={job.status} />,
+            job.totalRows,
+            job.errorRows ?? 0,
+            job.warningRows ?? 0,
+            job.skippedRows ?? 0,
+            job.importedRows ?? 0,
+            <span key={`${job.id}-ops`} className="import-job-ops">
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => void model.handleSelectJob(job.id)}
+                aria-label="查看行级预览"
+              >
+                <Eye size={14} aria-hidden="true" />
+                {job.status === "confirmed" ? "查看导入结果" : "查看预览"}
+              </button>
+              {hasIssues ? (
+                <a
+                  className="table-action"
+                  href={errorReportUrl(job.id)}
+                  download
+                  aria-label="下载错误/预检报告"
+                >
+                  <Download size={14} aria-hidden="true" />
+                  {(job.errorRows ?? 0) > 0 ? "错误报告" : "预检报告"}
+                </a>
+              ) : null}
+              {canContinueConfirm ? (
+                <button
+                  type="button"
+                  className="table-action"
+                  onClick={() => void model.handleSelectJob(job.id)}
+                  aria-label="继续确认导入"
+                >
+                  继续确认导入
+                </button>
+              ) : null}
+            </span>,
+          ];
+        })}
+        emptyState="暂无导入批次"
       />
     </SectionCard>
   );

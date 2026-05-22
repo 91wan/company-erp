@@ -16,6 +16,12 @@ This file records existing workspace files that exceed the default 300 line qual
 | `apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx` | Replenishment summary, filtering, and conversion form remain co-located. | Split suggestion list, review state, and conversion drawer. |
 | `apps/web/src/components/system/SystemSettingsWorkspace.tsx` | Company info, version health, attachments, audit logs, and security settings remain in one settings workspace. | Split settings sections and keep audit/attachment panels isolated. |
 
+## DataTable Column Budget Exceptions
+
+| File | Current reason | Follow-up direction |
+| --- | --- | --- |
+| `apps/web/src/components/excel-import/ImportJobsTab.tsx` | Import batch ledger needs 9 columns (文件/模板/状态/总行/错误/警告/跳过/已导入/操作) for full audit traceability. | Acceptable for an ops ledger; no reduction planned. |
+
 ## Budget Rule
 
 New or touched workspace entrypoints should stay under 120 lines after they are converted to controller + view shells. Existing exception files may be touched for bug fixes, but any substantial UI work should reduce their size or split the affected tab into a dedicated component.

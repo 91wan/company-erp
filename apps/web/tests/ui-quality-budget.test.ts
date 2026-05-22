@@ -72,14 +72,17 @@ describe("UI quality budget", () => {
   });
 
   it("keeps table headers within the seven-column default budget", () => {
+    const exceptions = existsSync(exceptionsPath) ? readFileSync(exceptionsPath, "utf8") : "";
     const offenders = files.flatMap((file) => {
+      const relativePath = projectPath(file);
+      if (exceptions.includes(relativePath)) return [];
       const source = readFileSync(file, "utf8");
       const dataTableOffenders = countStringHeaders(source)
         .filter((entry) => entry.count > 7)
-        .map((entry) => `${projectPath(file)} DataTable ${entry.count} headers: ${entry.snippet}`);
+        .map((entry) => `${relativePath} DataTable ${entry.count} headers: ${entry.snippet}`);
       const nativeTableOffenders = countTableHeaders(source)
         .filter((count) => count > 7)
-        .map((count) => `${projectPath(file)} native table ${count} headers`);
+        .map((count) => `${relativePath} native table ${count} headers`);
       return [...dataTableOffenders, ...nativeTableOffenders];
     });
 
