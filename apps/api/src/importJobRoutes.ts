@@ -116,32 +116,44 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Company ERP";
 
-    // Sheet 1: 问题行 — fixed columns + per-template field columns
+    // Sheet 1: 问题行 — fixed columns then template field columns then JSON (last)
     const sheet = workbook.addWorksheet("问题行");
-    const fixedHeaders = ["行号", "状态", "问题", "建议处理"];
-    sheet.addRow([...fixedHeaders, ...templateHeaders, "原始数据 JSON"]);
-    sheet.getRow(1).font = { bold: true };
+    const fixedHeaders = ["原始行号", "错误级别", "问题", "建议处理"];
+    const headerRow = sheet.addRow([...fixedHeaders, ...templateHeaders, "原始数据 JSON"]);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
 
+    const totalCols = fixedHeaders.length + templateHeaders.length + 1;
     if (reportRows.length === 0) {
       sheet.addRow(["", "无错误行", "", "", ...templateHeaders.map(() => ""), ""]);
     } else {
       for (const row of reportRows) {
-        const statusLabel = row.status === "error" ? "错误" : "警告";
+        const isError = row.status === "error";
+        const statusLabel = isError ? "错误" : "警告";
         const issues = (row.issues as unknown as { message: string }[]).map((i) => i.message).join("；");
-        const advice = row.status === "error" ? "修正后重新上传预检" : "确认导入时会写入（有警告）";
+        const advice = isError ? "修正后重新上传预检" : "确认导入时会写入（有警告）";
         const rawSanitized = row.rawData ? sanitizeRawData(row.rawData as Record<string, unknown>) : {};
         const fieldValues = templateHeaders.map((h) => {
           const v = rawSanitized[h];
           return v !== undefined && v !== null ? String(v) : "";
         });
-        sheet.addRow([row.rowNumber, statusLabel, issues, advice, ...fieldValues, JSON.stringify(rawSanitized)]);
+        const dataRow = sheet.addRow([row.rowNumber, statusLabel, issues, advice, ...fieldValues, JSON.stringify(rawSanitized)]);
+        const fillColor = isError ? "FFFFC7CE" : "FFFFFFEB";
+        dataRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillColor } };
       }
     }
+
     sheet.columns = [
       { width: 8 }, { width: 10 }, { width: 50 }, { width: 20 },
       ...templateHeaders.map(() => ({ width: 18 })),
-      { width: 40 },
+      { width: 40, hidden: templateHeaders.length >= 3 },  // hide JSON col if many field cols
     ];
+
+    // Freeze header row and enable AutoFilter
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+    if (reportRows.length > 0) {
+      sheet.autoFilter = { from: "A1", to: { row: 1, column: totalCols } };
+    }
 
     // Sheet 2: 导入说明 — batch metadata + instructions
     const infoSheet = workbook.addWorksheet("导入说明");

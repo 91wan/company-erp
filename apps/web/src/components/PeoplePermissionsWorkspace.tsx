@@ -46,6 +46,7 @@ type PeoplePermissionsWorkspaceProps = {
   ) => Promise<EmployeeProjectSiteAssignmentDto>;
   canManage?: boolean;
   initialTab?: string;
+  initialEntityId?: string;
 };
 
 const departmentStatusLabel = new Map(DEPARTMENT_STATUSES.map((status) => [status.code, status.label]));
@@ -187,6 +188,7 @@ export function PeoplePermissionsWorkspace({
   createProjectSiteAssignment = defaultCreateProjectSiteAssignment,
   canManage = true,
   initialTab,
+  initialEntityId,
 }: PeoplePermissionsWorkspaceProps) {
   const isPeopleTab = (v?: string): v is PeoplePermissionsTab =>
     ["employees", "departments", "userAccounts", "externalAccounts", "assignments", "permissions"].includes(v ?? "");
@@ -633,6 +635,11 @@ export function PeoplePermissionsWorkspace({
 
       {activeTab === "employees" ? (
       <section className="people-section-grid">
+        {initialEntityId && employeeStatus === "ready" && !employees.find((e) => e.id === initialEntityId) ? (
+          <div className="workspace-state workspace-state--info" role="status">
+            <span>已跳转人员权限模块，但员工记录不可见或无权限，请搜索该记录。</span>
+          </div>
+        ) : null}
         <section className="dashboard-panel table-panel">
           <PanelTitle icon={<IdCard size={18} />} title="公司员工" />
           {employeeStatus === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载员工资料..." /> : null}

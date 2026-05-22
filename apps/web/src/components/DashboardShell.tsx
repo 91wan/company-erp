@@ -11,11 +11,8 @@ import { TopBar } from "./shell/TopBar";
 
 // Lazy-load all workspace modules so each workspace is a separate JS chunk.
 // The shell (Sidebar, TopBar, DashboardOverview) remains in the initial bundle.
-const MaterialsWarehousesWorkspace = lazy(() =>
-  import("./MaterialsWarehousesWorkspace").then((m) => ({ default: m.MaterialsWarehousesWorkspace }))
-);
-const PartiesWorkspace = lazy(() =>
-  import("./PartiesWorkspace").then((m) => ({ default: m.PartiesWorkspace }))
+const BasicDataWorkspace = lazy(() =>
+  import("./basic-data/BasicDataWorkspace").then((m) => ({ default: m.BasicDataWorkspace }))
 );
 const PeoplePermissionsWorkspace = lazy(() =>
   import("./PeoplePermissionsWorkspace").then((m) => ({ default: m.PeoplePermissionsWorkspace }))
@@ -112,10 +109,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               the concurrent transition, leaving drawer backdrops in the DOM. */}
           {activeWorkspace === "基础资料" ? (
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
-              <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-              <MaterialsWarehousesWorkspace
+              <BasicDataWorkspace
                 canManage={canManage(currentUser.roles, "masterData")}
                 initialTab={activeWorkspaceTab("基础资料")}
+                initialEntityId={activeNavigationIntent.workspace === "基础资料" ? activeNavigationIntent.entityId : undefined}
               />
             </Suspense>
           ) : null}
@@ -133,6 +130,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 canManage={canManage(currentUser.roles, "inventory")}
                 showBalances={!isProjectSiteScoped && canRead(currentUser.roles, "inventoryQuantity")}
                 initialTab={activeWorkspaceTab("库存")}
+                initialEntityId={activeNavigationIntent.workspace === "库存" ? activeNavigationIntent.entityId : undefined}
               />
               <ReplenishmentSuggestionsWorkspace canManage={canManage(currentUser.roles, "procurement")} />
             </Suspense>
@@ -172,6 +170,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 usageOnly={isExternalProjectSite}
                 portalSection={activePortalSection}
                 initialTab={activeWorkspaceTab("项目点")}
+                initialEntityId={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.entityId : undefined}
                 externalProjectSiteContactName={currentUser.externalProjectSiteContactName}
                 externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
                 onPortalSectionChange={(section) => navigate({ workspace: workspaceForExternalPortalSection(section), portalSection: section })}
@@ -183,6 +182,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               <PeoplePermissionsWorkspace
                 canManage={canManage(currentUser.roles, "employees")}
                 initialTab={activeWorkspaceTab("人员权限")}
+                initialEntityId={activeNavigationIntent.workspace === "人员权限" ? activeNavigationIntent.entityId : undefined}
               />
             </Suspense>
           ) : null}

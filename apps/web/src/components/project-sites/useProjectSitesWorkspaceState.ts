@@ -14,10 +14,10 @@ import {
 } from "./projectSiteFormState";
 import type { ProjectSiteFormDrawer } from "./ProjectSitesHeadquartersView";
 
-export function useProjectSitesWorkspaceState() {
+export function useProjectSitesWorkspaceState({ initialEntityId }: { initialEntityId?: string } = {}) {
   const [query, setQuery] = useState("");
   const [usageFilter, setUsageFilter] = useState<"all" | ProjectUsageStatusCode>("all");
-  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState("");
+  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState(initialEntityId ?? "");
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [siteForm, setSiteForm] = useState<ProjectSiteCreateFormState>(createInitialSiteForm);
   const [usageForm, setUsageForm] = useState<ProjectUsageRequestFormState>(createInitialUsageForm);

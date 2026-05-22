@@ -1,7 +1,6 @@
-import { Download, ExternalLink } from "lucide-react";
-import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import type { ImportJobDto, ImportJobSummaryDto } from "@company-erp/shared";
-import { DetailDrawer, SectionCard } from "../ui";
+import { CheckCircle2, Download, ExternalLink } from "lucide-react";
+import { IMPORT_TEMPLATE_TYPES, type ImportJobDto, type ImportJobSummaryDto } from "@company-erp/shared";
+import { ConfirmAction, DetailDrawer, SectionCard } from "../ui";
 import { errorReportUrl } from "./importDownloadLinks";
 import { ImportStatusBadge } from "./ImportJobsTab";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
@@ -24,26 +23,47 @@ type Props = {
   canManage: boolean;
   confirmingJobId: string | null;
   actionStatus: string;
+  actionError?: string;
   open: boolean;
   onClose: () => void;
   onSelectJob: (id: string) => void;
   onRequestConfirm: (jobId: string) => void;
+  onCancelConfirm: () => void;
+  onConfirmJob: (jobId: string) => void;
   onNavigate?: ((intent: NavigationIntent) => void) | null;
 };
 
 export function ImportJobDetailDrawer({
-  job, detailJob, canManage, confirmingJobId, actionStatus,
-  open, onClose, onSelectJob, onRequestConfirm, onNavigate,
+  job, detailJob, canManage, confirmingJobId, actionStatus, actionError,
+  open, onClose, onSelectJob, onRequestConfirm, onCancelConfirm, onConfirmJob, onNavigate,
 }: Props) {
   if (!job) return null;
 
   const templateLabel = IMPORT_TEMPLATE_TYPES.find((t) => t.code === job.templateType)?.label ?? job.templateType;
   const hasIssues = (job.errorRows ?? 0) > 0 || (job.warningRows ?? 0) > 0;
   const canConfirm = canManage && job.status === "previewed" && (job.errorRows ?? 0) === 0;
-  const isConfirming = confirmingJobId === job.id;
+  const isConfirmingThisJob = confirmingJobId === job.id;
   const isPending = actionStatus === "saving";
 
   const targetCounts = detailJob ? computeTargetCounts(detailJob.rows as unknown as Array<{ status: string; targetRecordType?: string | null }>) : [];
+
+  const confirmSummary = (
+    <span className="import-confirm-summary">
+      <span className="import-confirm-summary__line">
+        确认导入 <strong>{templateLabel}</strong>
+        {job.originalFileName ? `（${job.originalFileName}）` : ""}
+      </span>
+      <span className="import-confirm-summary__stats">
+        总 {job.totalRows ?? 0} 行：
+        <strong className="text-success"> 可导入 {(job.validRows ?? 0) + (job.warningRows ?? 0)}</strong>
+        {(job.warningRows ?? 0) > 0 ? <strong className="text-warning">（含警告 {job.warningRows}）</strong> : null}
+        {(job.skippedRows ?? 0) > 0 ? <span>，跳过 {job.skippedRows}</span> : null}
+      </span>
+      <span className="import-confirm-summary__note">
+        当前系统不支持一键回滚；如导错，请到对应业务模块作废、停用或修正。
+      </span>
+    </span>
+  );
 
   return (
     <DetailDrawer title="批次详情" open={open} onClose={onClose}>
@@ -57,6 +77,12 @@ export function ImportJobDetailDrawer({
           <dt>文件哈希</dt><dd className="import-detail-hash">{job.fileHash}</dd>
         </dl>
       </SectionCard>
+
+      {job.status === "confirmed" ? (
+        <div className="import-detail-no-rollback-hint" role="note">
+          本批次已确认导入，不能撤销。如需修正，请到对应业务模块作废或停用相关记录。
+        </div>
+      ) : null}
 
       <SectionCard title="行级统计">
         <dl className="import-detail-list">
@@ -116,14 +142,17 @@ export function ImportJobDetailDrawer({
         ) : null}
 
         {canConfirm ? (
-          <button
-            type="button"
-            className="primary-action"
-            disabled={isConfirming || isPending}
-            onClick={() => onRequestConfirm(job.id)}
-          >
-            继续确认导入
-          </button>
+          <ConfirmAction
+            actionLabel={<><CheckCircle2 aria-hidden="true" size={14} />继续确认导入</>}
+            confirmationText={confirmSummary}
+            confirmLabel="确定导入"
+            confirming={isConfirmingThisJob}
+            pending={isPending}
+            error={actionError}
+            onRequestConfirm={() => onRequestConfirm(job.id)}
+            onCancel={onCancelConfirm}
+            onConfirm={() => onConfirmJob(job.id)}
+          />
         ) : null}
 
         {onNavigate && job.status === "confirmed" ? (

@@ -152,14 +152,13 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
       canManage={canManage}
       confirmingJobId={model.confirmingJobId}
       actionStatus={model.actionStatus}
+      actionError={model.actionError}
       open={drawerJob !== null}
       onClose={closeDrawer}
       onSelectJob={(id) => { void model.handleSelectJob(id); closeDrawer(); }}
-      onRequestConfirm={async (id) => {
-        await model.handleSelectJob(id);
-        model.handleRequestConfirm(id);
-        closeDrawer();
-      }}
+      onRequestConfirm={(id) => model.handleRequestConfirm(id)}
+      onCancelConfirm={model.handleCancelConfirm}
+      onConfirmJob={async (id) => { await model.handleConfirmJobDirectly(id); closeDrawer(); }}
       onNavigate={onNavigate}
     />
     </>
