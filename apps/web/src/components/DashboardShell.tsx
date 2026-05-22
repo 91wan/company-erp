@@ -113,7 +113,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           {activeWorkspace === "基础资料" ? (
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <PartiesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
-              <MaterialsWarehousesWorkspace canManage={canManage(currentUser.roles, "masterData")} />
+              <MaterialsWarehousesWorkspace
+                canManage={canManage(currentUser.roles, "masterData")}
+                initialTab={activeWorkspaceTab("基础资料")}
+              />
             </Suspense>
           ) : null}
           {activeWorkspace === "采购" ? (
@@ -177,7 +180,10 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           ) : null}
           {activeWorkspace === "人员权限" ? (
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
-              <PeoplePermissionsWorkspace canManage={canManage(currentUser.roles, "employees")} />
+              <PeoplePermissionsWorkspace
+                canManage={canManage(currentUser.roles, "employees")}
+                initialTab={activeWorkspaceTab("人员权限")}
+              />
             </Suspense>
           ) : null}
           {activeWorkspace === "Excel 导入" ? (

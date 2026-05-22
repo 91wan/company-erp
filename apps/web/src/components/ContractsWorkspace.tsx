@@ -157,7 +157,10 @@ export function ContractsWorkspace({
   }, [initialTab]);
 
   useEffect(() => {
-    if (initialEntityId) setSelectedContractId(initialEntityId);
+    if (initialEntityId) {
+      setSelectedContractId(initialEntityId);
+      setActiveTab("ledger");  // always open ledger tab when navigating to a contract
+    }
   }, [initialEntityId]);
 
   useEffect(() => {
@@ -328,6 +331,11 @@ export function ContractsWorkspace({
           </>
         )}
       >
+      {initialEntityId && contractStatus === "ready" && !selectedContract ? (
+        <div className="workspace-state workspace-state--info" role="status">
+          <span>已跳转合同模块，但记录不可见或无权限，请搜索该记录。</span>
+        </div>
+      ) : null}
       {activeTab === "attachments" ? (
         <EmptyState title="合同附件请从合同详情查看" description="选择合同台账中的记录后，在详情抽屉中查看或登记统一附件。" />
       ) : null}

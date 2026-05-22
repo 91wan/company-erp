@@ -40,6 +40,7 @@ type MaterialsWarehousesWorkspaceProps = {
   createMaterial?: (input: CreateMaterialInput) => Promise<MaterialDto>;
   createWarehouse?: (input: CreateWarehouseInput) => Promise<WarehouseDto>;
   canManage?: boolean;
+  initialTab?: string;
 };
 
 type MaterialsWarehousesTab = "materials" | "warehouses";
@@ -107,6 +108,7 @@ export function MaterialsWarehousesWorkspace({
   createMaterial = defaultCreateMaterial,
   createWarehouse = defaultCreateWarehouse,
   canManage = true,
+  initialTab,
 }: MaterialsWarehousesWorkspaceProps) {
   const [materials, setMaterials] = useState<MaterialDto[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -116,8 +118,14 @@ export function MaterialsWarehousesWorkspace({
   const [warehouseStatus, setWarehouseStatus] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  const isMaterialsTab = (v?: string): v is MaterialsWarehousesTab => v === "materials" || v === "warehouses";
   const [activeTab, setActiveTab] =
-    useState<MaterialsWarehousesTab>("materials");
+    useState<MaterialsWarehousesTab>(isMaterialsTab(initialTab) ? initialTab : "materials");
+  useEffect(() => {
+    if (isMaterialsTab(initialTab)) setActiveTab(initialTab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
+
   const [materialQuery, setMaterialQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [warehouseQuery, setWarehouseQuery] = useState("");

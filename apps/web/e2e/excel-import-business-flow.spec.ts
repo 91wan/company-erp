@@ -382,6 +382,146 @@ test("viewer can see download report link but not confirm button", async ({ page
 });
 
 // ---------------------------------------------------------------------------
+// P1-4: navigation after confirm — 查看 button navigates to correct workspace
+// ---------------------------------------------------------------------------
+
+test("confirmed party row shows 查看 button and clicking navigates to 基础资料", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
+
+  await mockApi.overrideOnce("POST", "/api/import-jobs/preview", {
+    importJob: {
+      id: "nav-party-001", templateType: "parties",
+      originalFileName: "nav-test.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 1, warningRows: 0, errorRows: 0, skippedRows: 0, importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: null,
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 供应商编码: "DEMO" }, normalizedData: null, issues: [],
+        status: "valid", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T08:00:00.000Z" }],
+    },
+  });
+  await mockApi.overrideOnce("POST", "/api/import-jobs/nav-party-001/confirm", {
+    importJob: {
+      id: "nav-party-001", templateType: "parties",
+      originalFileName: "nav-test.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 1, warningRows: 0, errorRows: 0, skippedRows: 0, importedRows: 1,
+      status: "confirmed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: "2026-05-13T09:00:00.000Z",
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 供应商编码: "DEMO" }, normalizedData: null, issues: [],
+        status: "imported", targetRecordType: "party", targetRecordId: "party-nav-001",
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T09:00:00.000Z" }],
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByLabel("Excel 文件").setInputFiles(DEMO_FILE);
+  await page.getByRole("button", { name: "导入预检" }).click();
+  await expect(page.getByText("通过")).toBeVisible();
+  await page.getByRole("button", { name: "确认导入" }).click();
+  await page.getByRole("button", { name: "确定导入" }).click();
+
+  // 查看 button appears in 导入结果 column
+  await expect(page.getByRole("button", { name: "查看 往来方台账" })).toBeVisible();
+
+  // Clicking it navigates to 基础资料
+  await page.getByRole("button", { name: "查看 往来方台账" }).click();
+  await expect(page.getByRole("main")).toContainText("基础资料");
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+test("confirmed certificate row shows 查看 button and clicking navigates to 证照资质", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
+
+  await mockApi.overrideOnce("POST", "/api/import-jobs/preview", {
+    importJob: {
+      id: "nav-cert-001", templateType: "health_certificates",
+      originalFileName: "health-nav.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 1, warningRows: 0, errorRows: 0, skippedRows: 0, importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: null,
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 姓名: "张三" }, normalizedData: null, issues: [],
+        status: "valid", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T08:00:00.000Z" }],
+    },
+  });
+  await mockApi.overrideOnce("POST", "/api/import-jobs/nav-cert-001/confirm", {
+    importJob: {
+      id: "nav-cert-001", templateType: "health_certificates",
+      originalFileName: "health-nav.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 1, warningRows: 0, errorRows: 0, skippedRows: 0, importedRows: 1,
+      status: "confirmed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: "2026-05-13T09:00:00.000Z",
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 姓名: "张三" },
+        normalizedData: { certificateType: "person_health_cert" }, issues: [],
+        status: "imported", targetRecordType: "certificate", targetRecordId: "cert-nav-001",
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T09:00:00.000Z" }],
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByLabel("Excel 文件").setInputFiles({ ...DEMO_FILE, name: "health-nav.xlsx" });
+  await page.getByRole("button", { name: "导入预检" }).click();
+  await expect(page.getByText("通过")).toBeVisible();
+  await page.getByRole("button", { name: "确认导入" }).click();
+  await page.getByRole("button", { name: "确定导入" }).click();
+
+  // 查看 button in result column
+  await expect(page.getByRole("button", { name: "查看 健康证台账" })).toBeVisible();
+  await page.getByRole("button", { name: "查看 健康证台账" }).click();
+  await expect(page.getByRole("main")).toContainText("证照资质");
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+test("skipped row shows 已跳过 hint and no 查看 button", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
+
+  await mockApi.overrideOnce("POST", "/api/import-jobs/preview", {
+    importJob: {
+      id: "nav-skip-001", templateType: "parties",
+      originalFileName: "skip-test.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 0, warningRows: 0, errorRows: 0, skippedRows: 1, importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: null,
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 供应商编码: "DUP" }, normalizedData: null, issues: [],
+        status: "skipped", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T08:00:00.000Z" }],
+    },
+  });
+  await mockApi.overrideOnce("POST", "/api/import-jobs/nav-skip-001/confirm", {
+    importJob: {
+      id: "nav-skip-001", templateType: "parties",
+      originalFileName: "skip-test.xlsx", fileHash: "hash",
+      totalRows: 1, validRows: 0, warningRows: 0, errorRows: 0, skippedRows: 1, importedRows: 0,
+      status: "confirmed",
+      createdAt: "2026-05-13T08:00:00.000Z", confirmedAt: "2026-05-13T09:00:00.000Z",
+      rows: [{ id: "r1", rowNumber: 2, rawData: { 供应商编码: "DUP" }, normalizedData: null, issues: [],
+        status: "skipped", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T09:00:00.000Z" }],
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByLabel("Excel 文件").setInputFiles({ ...DEMO_FILE, name: "skip-test.xlsx" });
+  await page.getByRole("button", { name: "导入预检" }).click();
+  await page.getByRole("button", { name: "确认导入" }).click();
+  await page.getByRole("button", { name: "确定导入" }).click();
+
+  // Skipped row shows hint, no 查看 button
+  await expect(page.getByText("已跳过：重复记录")).toBeVisible();
+  await expect(page.getByRole("button", { name: /查看/ })).toHaveCount(0);
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+// ---------------------------------------------------------------------------
 // P1-4e: viewer cannot upload or confirm
 // ---------------------------------------------------------------------------
 

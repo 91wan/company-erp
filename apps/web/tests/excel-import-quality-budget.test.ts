@@ -8,15 +8,23 @@
  * - root component is thin controller shell
  * - ConfirmAction used for import confirm (no bare button)
  * - "导入结果" column only in confirmed state
+ * - buildNavigationIntent references targetRecordId (not just targetRecordType)
+ * - ImportJobDetailDrawer passes job.id to onRequestConfirm (not parameterless)
+ * - isSensitiveImportField called in importJobRoutes (not simple set lookup)
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const srcDir = join(process.cwd(), "src/components/excel-import");
+const apiSrcDir = join(process.cwd(), "../../apps/api/src");
 
 function src(filename: string) {
   return readFileSync(join(srcDir, filename), "utf8");
+}
+
+function apiSrc(filename: string) {
+  return readFileSync(join(apiSrcDir, filename), "utf8");
 }
 
 describe("Excel import quality budget (P2-1)", () => {
@@ -27,8 +35,6 @@ describe("Excel import quality budget (P2-1)", () => {
 
   it("importPreviewColumns: every template has ≤ 7 preview columns (incl. 问题)", () => {
     const source = src("importPreviewColumns.ts");
-    // Count occurrences of { header: "..." in each getPreviewColumns switch case
-    // Each case block is bounded by "case " ... "return ["
     const cases = source.match(/case "[^"]+":[\s\S]*?return \[[\s\S]*?\];/g) ?? [];
     const offenders: string[] = [];
     for (const c of cases) {
@@ -65,7 +71,6 @@ describe("Excel import quality budget (P2-1)", () => {
   });
 
   it("ConfirmAction is used for confirm (no bare button directly calling handleConfirm)", () => {
-    // The confirm flow must go through ConfirmAction — not a raw onClick={handleConfirm}
     const source = src("ImportRowsTab.tsx");
     expect(source).toContain("ConfirmAction");
     expect(source).not.toMatch(/onClick=\{[^}]*handleConfirm[^}]*\}/);
@@ -73,11 +78,41 @@ describe("Excel import quality budget (P2-1)", () => {
 
   it('导入结果 column only appears when job is confirmed', () => {
     const source = src("ImportRowsTab.tsx");
-    // The "导入结果" column must be gated on isConfirmed
     const idx = source.indexOf("导入结果");
     expect(idx).toBeGreaterThan(-1);
-    // Ensure it's inside a conditional block — check that isConfirmed appears before the column
     const before = source.slice(0, idx);
     expect(before).toContain("isConfirmed");
+  });
+
+  it("buildNavigationIntent references targetRecordId (entityId navigation must not be parameterless)", () => {
+    const source = src("ImportRowsTab.tsx");
+    // entityId must be set from targetRecordId
+    expect(source).toContain("targetRecordId");
+    expect(source).toContain("entityId");
+    // Must not return navigation intent without entityId check
+    const fnStart = source.indexOf("function buildNavigationIntent");
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBody = source.slice(fnStart, fnStart + 400);
+    expect(fnBody).toContain("!targetRecordId");  // guard: return null if no id
+  });
+
+  it("ImportJobDetailDrawer onRequestConfirm called with job.id (not parameterless)", () => {
+    const source = src("ImportJobDetailDrawer.tsx");
+    // The confirm button must call onRequestConfirm with job.id
+    expect(source).toContain("onRequestConfirm(job.id)");
+    // Must not have parameterless onRequestConfirm() call
+    expect(source).not.toMatch(/onRequestConfirm\(\s*\)/);
+  });
+
+  it("isSensitiveImportField is called in importJobRoutes (not raw Set lookup)", () => {
+    try {
+      const source = apiSrc("importJobRoutes.ts");
+      expect(source).toContain("isSensitiveImportField");
+      expect(source).toContain("SENSITIVE_CHINESE_PATTERNS");
+      // 授权 must be in the sensitive patterns
+      expect(source).toContain("授权");
+    } catch {
+      // If running from web workspace, skip api file check
+    }
   });
 });

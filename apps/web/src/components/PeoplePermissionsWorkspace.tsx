@@ -45,6 +45,7 @@ type PeoplePermissionsWorkspaceProps = {
     input: CreateEmployeeProjectSiteAssignmentInput,
   ) => Promise<EmployeeProjectSiteAssignmentDto>;
   canManage?: boolean;
+  initialTab?: string;
 };
 
 const departmentStatusLabel = new Map(DEPARTMENT_STATUSES.map((status) => [status.code, status.label]));
@@ -185,7 +186,10 @@ export function PeoplePermissionsWorkspace({
   updateExternalProjectSiteAccount = defaultUpdateExternalProjectSiteAccount,
   createProjectSiteAssignment = defaultCreateProjectSiteAssignment,
   canManage = true,
+  initialTab,
 }: PeoplePermissionsWorkspaceProps) {
+  const isPeopleTab = (v?: string): v is PeoplePermissionsTab =>
+    ["employees", "departments", "userAccounts", "externalAccounts", "assignments", "permissions"].includes(v ?? "");
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [userAccounts, setUserAccounts] = useState<UserAccountDto[]>([]);
@@ -198,7 +202,11 @@ export function PeoplePermissionsWorkspace({
   const [externalAccountStatus, setExternalAccountStatus] = useState<"loading" | "ready" | "error">("loading");
   const [assignmentStatus, setAssignmentStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<PeoplePermissionsTab>("employees");
+  const [activeTab, setActiveTab] = useState<PeoplePermissionsTab>(isPeopleTab(initialTab) ? initialTab : "employees");
+  useEffect(() => {
+    if (isPeopleTab(initialTab)) setActiveTab(initialTab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
   const [openFormDrawer, setOpenFormDrawer] = useState<PeopleFormDrawer | null>(null);
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");

@@ -1,11 +1,12 @@
 /**
  * P0-4: Import batch ledger with template-type / status / search filters.
  * P0-5: Batch detail drawer.
+ * P0-2 (round 3): onRequestConfirm passes job.id; fetch detailJob for confirmed jobs.
  */
 import { useState } from "react";
-import { Download, Eye, Filter, Info, Search } from "lucide-react";
+import { Download, Eye, Filter, Search } from "lucide-react";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import type { ImportJobSummaryDto } from "@company-erp/shared";
+import type { ImportJobDto, ImportJobSummaryDto } from "@company-erp/shared";
 import { DataTable, SectionCard, StatusBadge, Toolbar } from "../ui";
 import { errorReportUrl } from "./importDownloadLinks";
 import { ImportJobDetailDrawer } from "./ImportJobDetailDrawer";
@@ -25,9 +26,25 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
     onNavigate,
   } = model;
   const [drawerJob, setDrawerJob] = useState<ImportJobSummaryDto | null>(null);
+  const [drawerDetailJob, setDrawerDetailJob] = useState<ImportJobDto | null>(null);
 
-  function openDetail(job: ImportJobSummaryDto) {
+  async function openDetail(job: ImportJobSummaryDto) {
     setDrawerJob(job);
+    setDrawerDetailJob(null);
+    // Load full detail for confirmed jobs (to show target counts)
+    if (job.status === "confirmed") {
+      try {
+        const detail = await model.handleLoadDetail(job.id);
+        setDrawerDetailJob(detail);
+      } catch {
+        // detail counts will be unavailable; drawer still opens
+      }
+    }
+  }
+
+  function closeDrawer() {
+    setDrawerJob(null);
+    setDrawerDetailJob(null);
   }
 
   return (
@@ -98,7 +115,7 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
               <button
                 type="button"
                 className="table-action"
-                onClick={() => void model.handleSelectJob(job.id)}
+                onClick={(e) => { e.stopPropagation(); void model.handleSelectJob(job.id); }}
                 aria-label="查看行级预览"
               >
                 <Eye size={14} aria-hidden="true" />
@@ -118,10 +135,9 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
               <button
                 type="button"
                 className="table-action"
-                onClick={(e) => { e.stopPropagation(); openDetail(job); }}
+                onClick={(e) => { e.stopPropagation(); void openDetail(job); }}
                 aria-label="查看批次详情"
               >
-                <Info size={14} aria-hidden="true" />
                 详情
               </button>
             </span>,
@@ -132,13 +148,18 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
     </SectionCard>
     <ImportJobDetailDrawer
       job={drawerJob}
+      detailJob={drawerDetailJob}
       canManage={canManage}
       confirmingJobId={model.confirmingJobId}
       actionStatus={model.actionStatus}
       open={drawerJob !== null}
-      onClose={() => setDrawerJob(null)}
-      onSelectJob={(id) => { void model.handleSelectJob(id); setDrawerJob(null); }}
-      onRequestConfirm={() => { model.handleRequestConfirm(); setDrawerJob(null); }}
+      onClose={closeDrawer}
+      onSelectJob={(id) => { void model.handleSelectJob(id); closeDrawer(); }}
+      onRequestConfirm={async (id) => {
+        await model.handleSelectJob(id);
+        model.handleRequestConfirm(id);
+        closeDrawer();
+      }}
       onNavigate={onNavigate}
     />
     </>

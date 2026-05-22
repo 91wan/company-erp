@@ -128,8 +128,9 @@ export function useExcelImportController({
     }
   }
 
-  function handleRequestConfirm() {
-    if (activeJob) setConfirmingJobId(activeJob.id);
+  function handleRequestConfirm(jobId?: string) {
+    const id = jobId ?? activeJob?.id;
+    if (id) setConfirmingJobId(id);
   }
 
   function handleCancelConfirm() {
@@ -137,14 +138,13 @@ export function useExcelImportController({
   }
 
   async function handleConfirm() {
-    if (!selectedJob && !activeJob) return;
-    const jobToConfirm = selectedJob ?? activeJob;
-    if (!jobToConfirm) return;
+    const id = confirmingJobId;
+    if (!id) return;
     setConfirmingJobId(null);
     setActionError("");
     setActionStatus("saving");
     try {
-      const confirmed = await confirmImportJob(jobToConfirm.id);
+      const confirmed = await confirmImportJob(id);
       setSelectedJob(confirmed);
       setJobs((current) => current.map((item) => (item.id === confirmed.id ? confirmed : item)));
       setActionStatus("success");
@@ -165,6 +165,11 @@ export function useExcelImportController({
       setActionError("Excel 导入操作失败");
       setActionStatus("error");
     }
+  }
+
+  /** Load job detail without switching tabs — for drawer target counts */
+  async function handleLoadDetail(id: string): Promise<ImportJobDto> {
+    return loadImportJobDetail(id);
   }
 
   return {
@@ -197,5 +202,6 @@ export function useExcelImportController({
     handleCancelConfirm,
     handleConfirm,
     handleSelectJob,
+    handleLoadDetail,
   };
 }

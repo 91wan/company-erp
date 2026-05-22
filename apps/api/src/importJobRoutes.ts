@@ -12,7 +12,7 @@ const SENSITIVE_NORMALIZED = new Set([
   "token", "cookie", "secret", "authorization", "bearer", "csrf",
 ]);
 // Chinese PII patterns: match these as substrings except when followed by safe suffixes like "后四位".
-const SENSITIVE_CHINESE_PATTERNS = ["身份证号", "密码", "令牌", "密钥"];
+const SENSITIVE_CHINESE_PATTERNS = ["身份证号", "密码", "令牌", "密钥", "授权"];
 // 身份证 alone is sensitive, but 身份证后四位 is an allowed low-sensitivity field.
 const SENSITIVE_CHINESE_EXACT = ["身份证"];
 const ALLOWED_SUFFIXES_AFTER_IDCARD = ["后四位"];
@@ -170,11 +170,15 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
       r.getCell(1).font = { bold: true };
     }
 
-    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-    return reply
-      .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-      .header("content-disposition", `attachment; filename="import_job_${id}_error_report.xlsx"`)
-      .send(buffer);
+    try {
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      return reply
+        .header("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .header("content-disposition", `attachment; filename="import_job_${id}_error_report.xlsx"`)
+        .send(buffer);
+    } catch {
+      return reply.status(500).send({ error: "IMPORT_REPORT_GENERATION_FAILED" });
+    }
   });
 
   app.post("/api/import-jobs/preview", async (request, reply) => {

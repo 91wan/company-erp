@@ -55,7 +55,7 @@ function buildNavigationIntent(row: ImportJobRowDto): NavigationIntent | null {
     case "material":
       return { workspace: "基础资料", tab: "materials", entityId };
     case "party":
-      return { workspace: "基础资料", entityId };
+      return { workspace: "基础资料", entityId };  // 基础资料 uses PartiesWorkspace (no tab)
     case "inventoryMovement":
       return { workspace: "库存", tab: "inbound", entityId };
     case "employee":
