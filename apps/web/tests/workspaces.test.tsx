@@ -2280,11 +2280,121 @@ describe("Company ERP workspace components", () => {
       screen.getByRole("button", { name: "确认导入" }),
     ).toBeInTheDocument();
 
+    // P0-1: two-step confirm — first click opens the confirm panel
     fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
+    // Confirm panel is now visible; click the final confirm button
+    fireEvent.click(await screen.findByRole("button", { name: "确定导入" }));
     fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
 
     expect(await screen.findByText("已确认导入")).toBeInTheDocument();
     expect(screen.getAllByText("已导入").length).toBeGreaterThan(0);
+  });
+
+  it("P0-1: confirm dialog shows summary and cancel does not call confirm API", async () => {
+    let confirmCalls = 0;
+    render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([])}
+        previewImportJob={() => Promise.resolve(importJob)}
+        confirmImportJob={async () => { confirmCalls++; return { ...importJob, status: "confirmed" as const, importedRows: 1 }; }}
+      />,
+    );
+
+    // Preview a job
+    fireEvent.change(screen.getByLabelText("Excel 文件"), {
+      target: { files: [new File(["xlsx"], "suppliers.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "导入预检" }));
+    expect(await screen.findByText("编码已存在，确认导入时会跳过")).toBeInTheDocument();
+
+    // Click "确认导入" — confirm panel opens, no API call yet
+    fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
+    expect(confirmCalls).toBe(0);
+
+    // Cancel — confirm panel closes, still no API call
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(confirmCalls).toBe(0);
+
+    // Click "确认导入" again, then "确定导入" — API called
+    fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
+    fireEvent.click(await screen.findByRole("button", { name: "确定导入" }));
+    // Switch to batch list tab to verify the confirmed job appears
+    fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
+    await screen.findByText("已确认导入");
+    expect(confirmCalls).toBe(1);
+  });
+
+  it("P0-1: errorRows > 0 hides confirm button; warningRows shown in confirm panel", async () => {
+    const errorJob = {
+      ...importJob,
+      status: "previewed" as const,
+      errorRows: 1,
+      warningRows: 0,
+      rows: [{ ...importJob.rows[0], status: "error" as const, issues: [{ level: "error" as const, field: "供应商编码", message: "格式错误" }] }],
+    };
+    const warnJob = {
+      ...importJob,
+      status: "previewed" as const,
+      errorRows: 0,
+      warningRows: 1,
+      validRows: 0,
+      rows: [{ ...importJob.rows[0], status: "warning" as const, issues: [{ level: "warning" as const, field: "供应商编码", message: "编码已存在" }] }],
+    };
+
+    // Error job: switch to batch tab, click the job, verify no confirm button
+    const { rerender } = render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([{ ...importJob, status: "previewed" as const, errorRows: 1 }])}
+        loadImportJobDetail={() => Promise.resolve(errorJob)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
+    await screen.findByText("suppliers.xlsx");
+    fireEvent.click(screen.getByText("suppliers.xlsx"));
+    await screen.findByText("格式错误");
+    expect(screen.queryByRole("button", { name: "确认导入" })).not.toBeInTheDocument();
+
+    // Warning job: confirm button present, panel shows warning info
+    rerender(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([{ ...importJob, status: "previewed" as const, warningRows: 1, errorRows: 0, validRows: 0 }])}
+        loadImportJobDetail={() => Promise.resolve(warnJob)}
+        confirmImportJob={async () => ({ ...warnJob, status: "confirmed" as const, importedRows: 1 })}
+      />,
+    );
+    // After the previous job click the tab is "rows"; navigate back to batch list
+    fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
+    await screen.findByText("suppliers.xlsx");
+    fireEvent.click(screen.getByText("suppliers.xlsx"));
+    await screen.findByText("编码已存在");
+    fireEvent.click(await screen.findByRole("button", { name: "确认导入" }));
+    // Confirm panel shows summary text including "警告"
+    expect(await screen.findByRole("button", { name: "确定导入" })).toBeInTheDocument();
+  });
+
+  it("P0-5: confirmed imported rows show targetRecordType / targetRecordId", async () => {
+    const confirmedJob = {
+      ...importJob,
+      status: "confirmed" as const,
+      importedRows: 1,
+      confirmedAt: "2026-05-21T00:00:00.000Z",
+      rows: [
+        { ...importJob.rows[0], status: "imported" as const, targetRecordType: "party", targetRecordId: "party-abc-123" },
+        { ...importJob.rows[1], status: "skipped" as const },
+      ],
+    };
+    render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve([confirmedJob])}
+        loadImportJobDetail={() => Promise.resolve(confirmedJob)}
+      />,
+    );
+    // Start on "导入批次" tab where the job list is rendered
+    fireEvent.click(screen.getByRole("tab", { name: "导入批次" }));
+    await screen.findByText("suppliers.xlsx");
+    fireEvent.click(screen.getByText("suppliers.xlsx"));
+    expect(await screen.findByText(/已导入：往来方台账.*party-abc-123/)).toBeInTheDocument();
+    expect(screen.getByText("已跳过：重复记录")).toBeInTheDocument();
   });
 
   it("offers template downloads and keeps read-only users out of preview actions", async () => {
@@ -2401,8 +2511,18 @@ describe("Company ERP workspace components", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "导入预检" }));
 
-    expect(await screen.findByText("项目点健康证 / SITE0001 / 王示例 / 2027-05-01")).toBeInTheDocument();
-    expect(screen.getByText("公司健康证 / EMP0001 / 李公司 / 2027-05-02 / licompany.png")).toBeInTheDocument();
+    // P0-2: health_certificates now shows individual columns (not single summary string)
+    expect(await screen.findByText("项目点健康证")).toBeInTheDocument();
+    expect(screen.getByText("SITE0001")).toBeInTheDocument();
+    expect(screen.getAllByText("王示例").length).toBeGreaterThan(0);
+    expect(screen.getByText("公司健康证")).toBeInTheDocument();
+    expect(screen.getByText("EMP0001")).toBeInTheDocument();
+    expect(screen.getByText("licompany.png")).toBeInTheDocument();
+    // Column headers
+    expect(screen.getByText("归属类型")).toBeInTheDocument();
+    expect(screen.getByText("项目点/员工编码")).toBeInTheDocument();
+    expect(screen.getByText("到期日期")).toBeInTheDocument();
+    // Forbidden fields must not appear
     expect(screen.queryByText("身份证后四位")).not.toBeInTheDocument();
     expect(screen.queryByText("健康证编号")).not.toBeInTheDocument();
     expect(screen.queryByText("发证机构")).not.toBeInTheDocument();

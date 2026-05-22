@@ -893,25 +893,48 @@ function normalizeHealthCertificate(row: RawRow, context: PreviewContext): Norma
           (person) => person.status === "active" && person.projectSiteId === projectSite.id && person.personName === personName,
         )
       : [];
-  // When multiple roster people share the same name on a site, narrow by phone if provided.
-  const phoneNarrowedMatches =
-    rosterMatches.length > 1 && personPhone
-      ? rosterMatches.filter((person) => person.phone && person.phone === personPhone)
-      : rosterMatches;
-  const rosterPerson = phoneNarrowedMatches.length === 1 ? phoneNarrowedMatches[0] : null;
-  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length === 0) {
-    issues.push(issue("error", "姓名", "未匹配到项目点现场人员"));
-  }
-  if (ownerKind === "project_site" && projectSite && personName && rosterMatches.length > 1 && phoneNarrowedMatches.length !== 1) {
-    issues.push(
-      issue(
-        "error",
-        "手机号",
-        phoneNarrowedMatches.length === 0
-          ? "手机号未能匹配到同名在场人员，请检查手机号或先在项目点现场人员台账中补充手机号。"
-          : "同一项目点存在同名在场人员，请填写手机号以区分，或先在项目点现场人员台账中区分备注。",
-      ),
-    );
+  // Phone-based roster matching and consistency check.
+  // Case 1: unique name match — if phone provided, it must match the roster person's phone.
+  // Case 2: multiple name matches — narrow by phone; phone required when ambiguous.
+  let rosterPerson: (typeof rosterMatches)[0] | null = null;
+  if (ownerKind === "project_site" && projectSite && personName) {
+    if (rosterMatches.length === 0) {
+      issues.push(issue("error", "姓名", "未匹配到项目点现场人员"));
+    } else if (rosterMatches.length === 1) {
+      const match = rosterMatches[0];
+      if (personPhone) {
+        // Phone provided: must match the roster person's recorded phone.
+        if (match.phone && match.phone === personPhone) {
+          rosterPerson = match;
+        } else {
+          issues.push(issue("error", "手机号", "手机号与项目点现场人员台账不一致。"));
+        }
+      } else {
+        rosterPerson = match;
+      }
+    } else {
+      // Multiple same-name roster people: phone required for disambiguation.
+      if (personPhone) {
+        const narrowed = rosterMatches.filter((p) => p.phone && p.phone === personPhone);
+        if (narrowed.length === 1) {
+          rosterPerson = narrowed[0];
+        } else {
+          issues.push(
+            issue(
+              "error",
+              "手机号",
+              narrowed.length === 0
+                ? "手机号未能匹配到同名在场人员，请检查手机号或先在项目点现场人员台账中补充手机号。"
+                : "同一项目点存在同名在场人员，请填写手机号以区分，或先在项目点现场人员台账中区分备注。",
+            ),
+          );
+        }
+      } else {
+        issues.push(
+          issue("error", "手机号", "同一项目点存在同名在场人员，请填写手机号以区分，或先在项目点现场人员台账中区分备注。"),
+        );
+      }
+    }
   }
 
   const certificateCode =

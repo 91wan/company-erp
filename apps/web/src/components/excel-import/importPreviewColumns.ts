@@ -78,19 +78,15 @@ const COLUMNS: Record<ImportTemplateTypeCode, PreviewColumn[]> = {
     ISSUES_COL,
   ],
   health_certificates: [
+    { header: "行号", getValue: (r) => r.rowNumber },
+    { header: "归属类型", getValue: (r) => raw(r, "健康证归属类型") },
     {
-      header: "健康证记录",
-      getValue: (r) => {
-        const parts = [
-          raw(r, "健康证归属类型"),
-          raw(r, "项目点编码") || raw(r, "员工编码"),
-          raw(r, "姓名"),
-          raw(r, "到期日期"),
-          raw(r, "图片文件名"),
-        ].filter((v) => v !== "");
-        return parts.join(" / ");
-      },
+      header: "项目点/员工编码",
+      getValue: (r) => raw(r, "项目点编码") || raw(r, "员工编码"),
     },
+    { header: "姓名", getValue: (r) => raw(r, "姓名") },
+    { header: "到期日期", getValue: (r) => raw(r, "到期日期") },
+    { header: "图片文件名", getValue: (r) => raw(r, "图片文件名") || "-" },
     ISSUES_COL,
   ],
 };

@@ -30,7 +30,7 @@ export function CertificateFilterToolbar({
       search={(
         <label className="table-search">
           <Search aria-hidden="true" size={16} />
-          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索证照、归属对象或证照编号" />
+          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索证照、归属对象或编号" />
         </label>
       )}
       filters={(
@@ -77,7 +77,9 @@ export function CertificateRiskTable({
             <strong>{certificate.certificateName}</strong>
             <small>
               <span>{certificate.certificateCode}</span>
-              <span>{certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : " / 未录入证号"}</span>
+              {certificate.certificateType !== "person_health_cert" ? (
+                <span>{certificate.certificateNumber ? ` / ${certificate.certificateNumber}` : " / 未录入证号"}</span>
+              ) : null}
             </small>
           </span>,
           typeLabel.get(certificate.certificateType) ?? certificate.certificateType,
