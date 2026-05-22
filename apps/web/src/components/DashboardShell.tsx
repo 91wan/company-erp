@@ -139,6 +139,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
               <ContractsWorkspace
                 canManage={canManage(currentUser.roles, "contracts")}
                 initialTab={activeWorkspaceTab("合同")}
+                initialEntityId={activeNavigationIntent.workspace === "合同" ? activeNavigationIntent.entityId : undefined}
               />
             </Suspense>
           ) : null}
@@ -155,6 +156,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 allowedPersonOwnerSources={isProjectSiteScoped ? SCOPED_CERTIFICATE_PERSON_OWNER_SOURCES : undefined}
                 portalSection={isExternalProjectSite ? activePortalSection : undefined}
                 initialTab={activeWorkspaceTab("证照资质")}
+                initialEntityId={activeNavigationIntent.workspace === "证照资质" ? activeNavigationIntent.entityId : undefined}
               />
             </Suspense>
           ) : null}

@@ -29,22 +29,40 @@ const OBJECT_TYPE_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Navigation intent mapping (P0-3)
+// Navigation intent mapping (P0-3 / P0-1 enhanced with entityId + tab)
 // ---------------------------------------------------------------------------
 
-function buildNavigationIntent(targetRecordType: string | null | undefined): NavigationIntent | null {
-  if (!targetRecordType) return null;
-  const map: Record<string, NavigationIntent> = {
-    certificate: { workspace: "证照资质" },
-    contract: { workspace: "合同" },
-    projectSiteRosterPerson: { workspace: "项目点" },
-    projectSite: { workspace: "项目点" },
-    material: { workspace: "基础资料" },
-    party: { workspace: "基础资料" },
-    inventoryMovement: { workspace: "库存" },
-    employee: { workspace: "人员权限" },
-  };
-  return map[targetRecordType] ?? null;
+function certTabFromNormalizedData(normalizedData: Record<string, unknown> | null | undefined): string {
+  const t = normalizedData?.certificateType as string | undefined;
+  if (t === "person_health_cert") return "health";
+  if (t === "food_operation_license") return "food";
+  return "risk";
+}
+
+function buildNavigationIntent(row: ImportJobRowDto): NavigationIntent | null {
+  const { targetRecordType, targetRecordId, normalizedData } = row;
+  if (!targetRecordType || !targetRecordId) return null;
+  const entityId = targetRecordId;
+  switch (targetRecordType) {
+    case "certificate":
+      return { workspace: "证照资质", tab: certTabFromNormalizedData(normalizedData as Record<string, unknown> | null), entityId };
+    case "contract":
+      return { workspace: "合同", tab: "ledger", entityId };
+    case "projectSiteRosterPerson":
+      return { workspace: "项目点", tab: "review", entityId };
+    case "projectSite":
+      return { workspace: "项目点", tab: "risk", entityId };
+    case "material":
+      return { workspace: "基础资料", tab: "materials", entityId };
+    case "party":
+      return { workspace: "基础资料", entityId };
+    case "inventoryMovement":
+      return { workspace: "库存", tab: "inbound", entityId };
+    case "employee":
+      return { workspace: "人员权限", tab: "employees", entityId };
+    default:
+      return null;
+  }
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -232,7 +250,7 @@ function buildResultCell(
   if (row.status !== "imported") return "-";
 
   const areaLabel = AREA_LABELS[row.targetRecordType ?? ""] ?? row.targetRecordType ?? "";
-  const intent = buildNavigationIntent(row.targetRecordType);
+  const intent = buildNavigationIntent(row);
 
   // P1-2: health cert image filename hint
   const imageFileName = row.normalizedData?.imageFileName as string | undefined;

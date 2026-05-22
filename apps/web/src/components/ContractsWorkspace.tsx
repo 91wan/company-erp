@@ -35,6 +35,7 @@ type ContractsWorkspaceProps = {
   getUnifiedAttachmentDownloadUrl?: (id: string) => Promise<string>;
   canManage?: boolean;
   initialTab?: string;
+  initialEntityId?: string;
 };
 
 type ContractFormState = {
@@ -115,6 +116,7 @@ export function ContractsWorkspace({
   getUnifiedAttachmentDownloadUrl = getAttachmentDownloadUrl,
   canManage = true,
   initialTab,
+  initialEntityId,
 }: ContractsWorkspaceProps) {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
   const [parties, setParties] = useState<PartyDto[]>([]);
@@ -153,6 +155,10 @@ export function ContractsWorkspace({
   useEffect(() => {
     if (isContractTab(initialTab)) setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (initialEntityId) setSelectedContractId(initialEntityId);
+  }, [initialEntityId]);
 
   useEffect(() => {
     let mounted = true;

@@ -589,6 +589,127 @@ describe("import job error-report.xlsx", () => {
     const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1) as string[];
     expect(dataRow.join("")).toContain("无错误行");
   });
+
+  // P1-4: 导入说明 sheet
+  it("error report includes 导入说明 sheet with batch metadata", async () => {
+    const job = makeJob({
+      templateType: "parties",
+      originalFileName: "my-suppliers.xlsx",
+      totalRows: 5,
+      errorRows: 1,
+      warningRows: 0,
+      validRows: 3,
+      skippedRows: 1,
+      importedRows: 0,
+      rows: [{
+        id: "row-s1", rowNumber: 2,
+        rawData: { 供应商编码: "BAD", 供应商名称: "" }, normalizedData: null,
+        issues: [{ level: "error", field: "供应商名称", message: "必填" }],
+        status: "error", targetRecordType: null, targetRecordId: null,
+        createdAt: now, updatedAt: now,
+      }],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+
+    expect(workbook.getWorksheet("问题行")).toBeDefined();
+    const infoSheet = workbook.getWorksheet("导入说明");
+    expect(infoSheet).toBeDefined();
+
+    const sheetText = infoSheet!.getSheetValues()
+      .flat()
+      .filter(Boolean)
+      .map(String)
+      .join(" ");
+    expect(sheetText).toContain("my-suppliers.xlsx");
+    expect(sheetText).toContain("5"); // 总行数
+    expect(sheetText).toContain("1"); // 错误行数
+    expect(sheetText).toContain("往来方");
+  });
+
+  // P1-4: health_certificates report fields
+  it("health_certificates error report includes correct columns and excludes legacy fields", async () => {
+    const job = makeJob({
+      templateType: "health_certificates",
+      errorRows: 1,
+      rows: [{
+        id: "hc-err",
+        rowNumber: 2,
+        rawData: {
+          健康证归属类型: "项目点健康证",
+          项目点编码: "SITE001",
+          员工编码: "",
+          姓名: "张三",
+          手机号: "138xxx",
+          到期日期: "2027-01-01",
+          图片文件名: "",
+          备注: "",
+        },
+        normalizedData: null,
+        issues: [{ level: "error", field: "项目点编码", message: "项目点不存在" }],
+        status: "error",
+        targetRecordType: null, targetRecordId: null,
+        createdAt: now, updatedAt: now,
+      }],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行");
+    const headerRow = (sheet!.getRow(1).values as unknown[]).slice(1) as string[];
+
+    expect(headerRow).toContain("健康证归属类型");
+    expect(headerRow).toContain("姓名");
+    expect(headerRow).toContain("到期日期");
+    expect(headerRow).toContain("图片文件名");
+    expect(headerRow).not.toContain("身份证后四位");
+    expect(headerRow).not.toContain("健康证编号");
+    expect(headerRow).not.toContain("发证机关");
+  });
+
+  // P0-4: sensitive rawData fields filtered from JSON column
+  it("sanitizes sensitive fields from raw data JSON column", async () => {
+    const job = makeJob({
+      errorRows: 1,
+      rows: [{
+        id: "row-sens",
+        rowNumber: 2,
+        rawData: {
+          供应商编码: "SUP001",
+          storageKey: "secret-key-123",
+          storage_key: "another-secret",
+          passwordHash: "hashed",
+          身份证号: "123456789012",
+          供应商名称: "测试",
+        },
+        normalizedData: null,
+        issues: [{ level: "error", field: "供应商名称", message: "必填" }],
+        status: "error", targetRecordType: null, targetRecordId: null,
+        createdAt: now, updatedAt: now,
+      }],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行");
+    const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1) as unknown[];
+    const jsonCell = String(dataRow[dataRow.length - 1]);
+    expect(jsonCell).not.toContain("secret-key-123");
+    expect(jsonCell).not.toContain("another-secret");
+    expect(jsonCell).not.toContain("hashed");
+    expect(jsonCell).not.toContain("123456789012");
+    expect(jsonCell).toContain("SUP001");
+  });
 });
 
 // ---------------------------------------------------------------------------

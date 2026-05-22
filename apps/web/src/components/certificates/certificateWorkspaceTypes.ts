@@ -28,6 +28,7 @@ export type CertificatesWorkspaceProps = {
   allowedPersonOwnerSources?: readonly CertificateFormState["ownerPersonSource"][];
   portalSection?: ExternalProjectSitePortalSection;
   initialTab?: string;
+  initialEntityId?: string;
 };
 
 export type CertificateFormState = {
