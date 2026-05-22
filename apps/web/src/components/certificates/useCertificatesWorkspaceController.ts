@@ -73,6 +73,7 @@ export function useCertificatesWorkspaceController({
   allowedPersonOwnerSources,
   portalSection,
   initialTab,
+  initialEntityId,
 }: CertificatesWorkspaceProps) {
   const ownerOptions = useMemo(
     () => buildCertificateOwnerOptions({ allowedOwnerTypes, allowedPersonOwnerSources, portalSection }),
@@ -101,6 +102,10 @@ export function useCertificatesWorkspaceController({
   useEffect(() => {
     setActiveTab(isCertificateTab(initialTab) ? initialTab : tabForPortalSection(portalSection));
   }, [initialTab, portalSection]);
+
+  useEffect(() => {
+    if (initialEntityId) setSelectedCertificateId(initialEntityId);
+  }, [initialEntityId]);
 
   useEffect(() => {
     const portalOwnerType = ownerOptions.portalOwnerType;

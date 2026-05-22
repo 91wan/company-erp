@@ -1,14 +1,39 @@
 import ExcelJS from "exceljs";
 import type { FastifyInstance } from "fastify";
 import { writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
+import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
 import { ImportJobValidationError, normalizeImportJobFilters, normalizeImportTemplateType } from "./importJobs.js";
 import { buildAllTemplatesZip, buildImportTemplateWorkbook, IMPORT_TEMPLATE_DEFINITIONS, listImportTemplateDownloads } from "./importTemplates.js";
 
-const SENSITIVE_FIELDS = new Set(["storageKey", "passwordHash", "identityNo", "token", "cookie", "secret"]);
+// Normalized sensitive-field matching: case-insensitive, strips spaces/dashes/underscores.
+// Also matches common Chinese PII field names.
+const SENSITIVE_NORMALIZED = new Set([
+  "storagekey", "passwordhash", "identityno", "identitynumber",
+  "token", "cookie", "secret", "authorization", "bearer", "csrf",
+]);
+// Chinese PII patterns: match these as substrings except when followed by safe suffixes like "后四位".
+const SENSITIVE_CHINESE_PATTERNS = ["身份证号", "密码", "令牌", "密钥"];
+// 身份证 alone is sensitive, but 身份证后四位 is an allowed low-sensitivity field.
+const SENSITIVE_CHINESE_EXACT = ["身份证"];
+const ALLOWED_SUFFIXES_AFTER_IDCARD = ["后四位"];
+
+export function isSensitiveImportField(key: string): boolean {
+  const norm = key.toLowerCase().replace(/[\s\-_]/g, "");
+  if (SENSITIVE_NORMALIZED.has(norm)) return true;
+  if (SENSITIVE_CHINESE_PATTERNS.some((p) => key.includes(p))) return true;
+  for (const exact of SENSITIVE_CHINESE_EXACT) {
+    if (key.includes(exact)) {
+      const after = key.slice(key.indexOf(exact) + exact.length);
+      if (!ALLOWED_SUFFIXES_AFTER_IDCARD.some((suffix) => after.startsWith(suffix))) return true;
+    }
+  }
+  return false;
+}
+
 function sanitizeRawData(rawData: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(rawData)) {
-    if (!SENSITIVE_FIELDS.has(key)) result[key] = value;
+    if (!isSensitiveImportField(key)) result[key] = value;
   }
   return result;
 }
@@ -85,7 +110,8 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
     const rows = importJob.rows ?? [];
     const reportRows = rows.filter((row) => row.status === "error" || row.status === "warning");
     const templateDef = IMPORT_TEMPLATE_DEFINITIONS[importJob.templateType as keyof typeof IMPORT_TEMPLATE_DEFINITIONS];
-    const templateHeaders: string[] = templateDef ? [...templateDef.headers] : [];
+    // Filter sensitive column names from template headers too
+    const templateHeaders: string[] = (templateDef ? [...templateDef.headers] : []).filter((h) => !isSensitiveImportField(h));
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Company ERP";
@@ -116,6 +142,33 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
       ...templateHeaders.map(() => ({ width: 18 })),
       { width: 40 },
     ];
+
+    // Sheet 2: 导入说明 — batch metadata + instructions
+    const infoSheet = workbook.addWorksheet("导入说明");
+    infoSheet.getColumn(1).width = 20;
+    infoSheet.getColumn(2).width = 40;
+    const importedRows = (importJob as unknown as Record<string, unknown>).importedRows as number | undefined;
+    const templateLabel = IMPORT_TEMPLATE_TYPES.find((t) => t.code === importJob.templateType)?.label ?? importJob.templateType;
+    const statusLabel = importJob.status === "confirmed" ? "已确认导入" : importJob.status === "failed" ? "失败" : "已预检";
+    const infoRows: [string, string | number][] = [
+      ["模板类型", importJob.templateType],
+      ["模板名称", templateLabel],
+      ["原文件名", importJob.originalFileName],
+      ["总行数", importJob.totalRows ?? 0],
+      ["可导入行数", (importJob.validRows ?? 0) + (importJob.warningRows ?? 0)],
+      ["错误行数", importJob.errorRows ?? 0],
+      ["警告行数", importJob.warningRows ?? 0],
+      ["跳过行数", importJob.skippedRows ?? 0],
+      ["已导入行数", importedRows ?? 0],
+      ["批次状态", statusLabel],
+      ["创建时间", importJob.createdAt],
+      ["确认时间", importJob.confirmedAt ?? "—"],
+      ["说明", "修正错误行后重新上传预检；警告行可确认导入但需人工复核；跳过行不会写入，也不会覆盖既有记录。"],
+    ];
+    for (const [label, value] of infoRows) {
+      const r = infoSheet.addRow([label, value]);
+      r.getCell(1).font = { bold: true };
+    }
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     return reply

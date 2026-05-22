@@ -1,10 +1,14 @@
 /**
  * P0-4: Import batch ledger with template-type / status / search filters.
+ * P0-5: Batch detail drawer.
  */
-import { Download, Eye, Filter, Search } from "lucide-react";
+import { useState } from "react";
+import { Download, Eye, Filter, Info, Search } from "lucide-react";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
+import type { ImportJobSummaryDto } from "@company-erp/shared";
 import { DataTable, SectionCard, StatusBadge, Toolbar } from "../ui";
 import { errorReportUrl } from "./importDownloadLinks";
+import { ImportJobDetailDrawer } from "./ImportJobDetailDrawer";
 import type { ExcelImportController } from "./useExcelImportController";
 
 export function ImportJobsTab({ model }: { model: ExcelImportController }) {
@@ -18,9 +22,16 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
     setJobsTemplateFilter,
     setJobsStatusFilter,
     setJobsSearch,
+    onNavigate,
   } = model;
+  const [drawerJob, setDrawerJob] = useState<ImportJobSummaryDto | null>(null);
+
+  function openDetail(job: ImportJobSummaryDto) {
+    setDrawerJob(job);
+  }
 
   return (
+    <>
     <SectionCard
       title="导入批次台账"
       badge={`${filteredJobs.length} / ${jobs.length} 批`}
@@ -74,7 +85,6 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
         }}
         rows={filteredJobs.map((job) => {
           const hasIssues = (job.errorRows ?? 0) > 0 || (job.warningRows ?? 0) > 0;
-          const canContinueConfirm = canManage && job.status === "previewed" && (job.errorRows ?? 0) === 0;
           return [
             job.originalFileName,
             IMPORT_TEMPLATE_TYPES.find((t) => t.code === job.templateType)?.label ?? job.templateType,
@@ -105,22 +115,33 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
                   {(job.errorRows ?? 0) > 0 ? "错误报告" : "预检报告"}
                 </a>
               ) : null}
-              {canContinueConfirm ? (
-                <button
-                  type="button"
-                  className="table-action"
-                  onClick={() => void model.handleSelectJob(job.id)}
-                  aria-label="继续确认导入"
-                >
-                  继续确认导入
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="table-action"
+                onClick={(e) => { e.stopPropagation(); openDetail(job); }}
+                aria-label="查看批次详情"
+              >
+                <Info size={14} aria-hidden="true" />
+                详情
+              </button>
             </span>,
           ];
         })}
         emptyState="暂无导入批次"
       />
     </SectionCard>
+    <ImportJobDetailDrawer
+      job={drawerJob}
+      canManage={canManage}
+      confirmingJobId={model.confirmingJobId}
+      actionStatus={model.actionStatus}
+      open={drawerJob !== null}
+      onClose={() => setDrawerJob(null)}
+      onSelectJob={(id) => { void model.handleSelectJob(id); setDrawerJob(null); }}
+      onRequestConfirm={() => { model.handleRequestConfirm(); setDrawerJob(null); }}
+      onNavigate={onNavigate}
+    />
+    </>
   );
 }
 

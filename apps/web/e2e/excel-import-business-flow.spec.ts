@@ -262,6 +262,126 @@ test("confirmed job row preview shows 导入结果 column after two-step confirm
 });
 
 // ---------------------------------------------------------------------------
+// P1-3: error report download link visibility
+// ---------------------------------------------------------------------------
+
+test("error rows show 下载错误行 link with correct href", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
+
+  await mockApi.overrideOnce("POST", "/api/import-jobs/preview", {
+    importJob: {
+      id: "dl-err-001",
+      templateType: "parties",
+      originalFileName: "bad.xlsx",
+      fileHash: "hash",
+      totalRows: 1,
+      validRows: 0,
+      warningRows: 0,
+      errorRows: 1,
+      skippedRows: 0,
+      importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z",
+      confirmedAt: null,
+      rows: [{
+        id: "r1", rowNumber: 2,
+        rawData: { 供应商编码: "" }, normalizedData: null,
+        issues: [{ level: "error", field: "供应商编码", message: "必填" }],
+        status: "error", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T08:00:00.000Z",
+      }],
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByLabel("Excel 文件").setInputFiles(DEMO_FILE);
+  await page.getByRole("button", { name: "导入预检" }).click();
+
+  // 行级预览 tab shows download link
+  const downloadLink = await page.waitForSelector('a[download][aria-label="下载错误行"]');
+  const href = await downloadLink.getAttribute("href");
+  expect(href).toContain("/api/import-jobs/dl-err-001/error-report.xlsx");
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+test("warning rows show 下载预检报告 (not 错误行) link", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: adminUser });
+
+  await mockApi.overrideOnce("POST", "/api/import-jobs/preview", {
+    importJob: {
+      id: "dl-warn-001",
+      templateType: "parties",
+      originalFileName: "warn.xlsx",
+      fileHash: "hash",
+      totalRows: 1,
+      validRows: 0,
+      warningRows: 1,
+      errorRows: 0,
+      skippedRows: 0,
+      importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z",
+      confirmedAt: null,
+      rows: [{
+        id: "r2", rowNumber: 2,
+        rawData: { 供应商编码: "DUP" }, normalizedData: null,
+        issues: [{ level: "warning", field: "供应商编码", message: "已存在" }],
+        status: "warning", targetRecordType: null, targetRecordId: null,
+        createdAt: "2026-05-13T08:00:00.000Z", updatedAt: "2026-05-13T08:00:00.000Z",
+      }],
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByLabel("Excel 文件").setInputFiles(DEMO_FILE);
+  await page.getByRole("button", { name: "导入预检" }).click();
+
+  await expect(page.getByText("下载预检报告")).toBeVisible();
+  await expect(page.getByText("下载错误行")).toHaveCount(0);
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+test("viewer can see download report link but not confirm button", async ({ page }) => {
+  const issues = trackBrowserIssues(page);
+  const mockApi = await createMockCompanyErpApi(page, { user: viewerUser });
+
+  await mockApi.overrideOnce("GET", "/api/import-jobs", {
+    importJobs: [{
+      id: "viewer-job-001",
+      templateType: "parties",
+      originalFileName: "viewer.xlsx",
+      fileHash: "hash",
+      totalRows: 2,
+      validRows: 1,
+      warningRows: 1,
+      errorRows: 0,
+      skippedRows: 0,
+      importedRows: 0,
+      status: "previewed",
+      createdAt: "2026-05-13T08:00:00.000Z",
+      confirmedAt: null,
+    }],
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Excel 导入" }).click();
+  await page.getByRole("tab", { name: "导入批次" }).click();
+
+  await expect(page.locator("tbody").getByText("viewer.xlsx")).toBeVisible();
+  const dlLink = page.locator(`a[href*="viewer-job-001/error-report.xlsx"]`);
+  await expect(dlLink).toBeVisible();
+  await expect(page.getByRole("button", { name: "确认导入" })).toHaveCount(0);
+
+  await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
+});
+
+// ---------------------------------------------------------------------------
 // P1-4e: viewer cannot upload or confirm
 // ---------------------------------------------------------------------------
 
