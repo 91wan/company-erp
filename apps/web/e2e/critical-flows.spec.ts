@@ -218,7 +218,7 @@ test("contract failure and Excel import permissions are visible in the browser",
   await page.getByRole("button", { name: "确认导入" }).click();
   await page.getByRole("button", { name: "确定导入" }).click();
   await page.getByRole("tab", { name: "导入批次" }).click();
-  await expect(page.getByText("已确认导入")).toBeVisible();
+  await expect(page.getByText("已确认导入").first()).toBeVisible();
   await expectHealthyShell(page, adminIssues, {
     allowFailedNetworkResources: true,
   });

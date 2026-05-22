@@ -42,7 +42,7 @@ test("two-step confirm: 确认导入 opens panel, 取消 aborts, 确定导入 co
   await page.getByRole("button", { name: "确认导入" }).click();
   await page.getByRole("button", { name: "确定导入" }).click();
   await page.getByRole("tab", { name: "导入批次" }).click();
-  await expect(page.getByText("已确认导入")).toBeVisible();
+  await expect(page.getByText("已确认导入").first()).toBeVisible();
 
   await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
 });
