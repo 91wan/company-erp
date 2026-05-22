@@ -1,24 +1,40 @@
 import { Download, ExternalLink } from "lucide-react";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import type { ImportJobSummaryDto } from "@company-erp/shared";
+import type { ImportJobDto, ImportJobSummaryDto } from "@company-erp/shared";
 import { DetailDrawer, SectionCard } from "../ui";
 import { errorReportUrl } from "./importDownloadLinks";
 import { ImportStatusBadge } from "./ImportJobsTab";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 
+// Labels for targetRecordType grouping
+const TARGET_TYPE_LABELS: Record<string, string> = {
+  party: "往来方",
+  material: "物料",
+  employee: "员工",
+  projectSite: "项目点",
+  projectSiteRosterPerson: "项目点现场人员",
+  certificate: "证照",
+  contract: "合同",
+  inventoryMovement: "库存流水",
+};
+
 type Props = {
   job: ImportJobSummaryDto | null;
+  detailJob?: ImportJobDto | null;
   canManage: boolean;
   confirmingJobId: string | null;
   actionStatus: string;
   open: boolean;
   onClose: () => void;
   onSelectJob: (id: string) => void;
-  onRequestConfirm: () => void;
+  onRequestConfirm: (jobId: string) => void;
   onNavigate?: ((intent: NavigationIntent) => void) | null;
 };
 
-export function ImportJobDetailDrawer({ job, canManage, confirmingJobId, actionStatus, open, onClose, onSelectJob, onRequestConfirm, onNavigate }: Props) {
+export function ImportJobDetailDrawer({
+  job, detailJob, canManage, confirmingJobId, actionStatus,
+  open, onClose, onSelectJob, onRequestConfirm, onNavigate,
+}: Props) {
   if (!job) return null;
 
   const templateLabel = IMPORT_TEMPLATE_TYPES.find((t) => t.code === job.templateType)?.label ?? job.templateType;
@@ -26,6 +42,8 @@ export function ImportJobDetailDrawer({ job, canManage, confirmingJobId, actionS
   const canConfirm = canManage && job.status === "previewed" && (job.errorRows ?? 0) === 0;
   const isConfirming = confirmingJobId === job.id;
   const isPending = actionStatus === "saving";
+
+  const targetCounts = detailJob ? computeTargetCounts(detailJob.rows as unknown as Array<{ status: string; targetRecordType?: string | null }>) : [];
 
   return (
     <DetailDrawer title="批次详情" open={open} onClose={onClose}>
@@ -50,6 +68,26 @@ export function ImportJobDetailDrawer({ job, canManage, confirmingJobId, actionS
           {job.status === "confirmed" ? <><dt>已导入</dt><dd>{job.importedRows ?? 0}</dd></> : null}
         </dl>
       </SectionCard>
+
+      {targetCounts.length > 0 ? (
+        <SectionCard title="导入目标统计">
+          <dl className="import-detail-list">
+            {targetCounts.map(({ type, count }) => (
+              <span key={type} className="import-detail-target-row">
+                <dt>{TARGET_TYPE_LABELS[type] ?? type}</dt><dd>{count} 条</dd>
+              </span>
+            ))}
+          </dl>
+        </SectionCard>
+      ) : job.status === "confirmed" && !detailJob ? (
+        <SectionCard title="导入目标统计">
+          <p className="import-detail-actor-note">加载行级统计中…</p>
+        </SectionCard>
+      ) : job.status === "previewed" ? (
+        <SectionCard title="导入目标统计">
+          <p className="import-detail-actor-note">尚未确认导入，暂无目标统计。</p>
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="操作人">
         <p className="import-detail-actor-note">操作人记录请到审计日志查看（系统设置 › 审计日志，操作类型：import_job.preview / import_job.confirm）。</p>
@@ -82,7 +120,7 @@ export function ImportJobDetailDrawer({ job, canManage, confirmingJobId, actionS
             type="button"
             className="primary-action"
             disabled={isConfirming || isPending}
-            onClick={onRequestConfirm}
+            onClick={() => onRequestConfirm(job.id)}
           >
             继续确认导入
           </button>
@@ -102,3 +140,12 @@ export function ImportJobDetailDrawer({ job, canManage, confirmingJobId, actionS
   );
 }
 
+function computeTargetCounts(rows: Array<{ status: string; targetRecordType?: string | null }>): { type: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.status === "imported" && row.targetRecordType) {
+      counts.set(row.targetRecordType, (counts.get(row.targetRecordType) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].map(([type, count]) => ({ type, count }));
+}

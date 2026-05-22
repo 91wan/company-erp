@@ -28,6 +28,9 @@ describe("isSensitiveImportField (P0-4)", () => {
     expect(isSensitiveImportField("密码")).toBe(true);
     expect(isSensitiveImportField("令牌")).toBe(true);
     expect(isSensitiveImportField("密钥")).toBe(true);
+    expect(isSensitiveImportField("授权")).toBe(true);
+    expect(isSensitiveImportField("授权码")).toBe(true);
+    expect(isSensitiveImportField("授权密钥")).toBe(true);
   });
 
   it("does NOT filter legitimate short fields", () => {

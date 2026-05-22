@@ -62,6 +62,11 @@ export function CertificatesWorkspaceView({ model }: { model: CertificatesWorksp
           <p className="form-helper">{portalCopy.description}</p>
         </SectionCard>
       ) : null}
+      {model.entityNotVisible ? (
+        <div className="workspace-state workspace-state--info" role="status">
+          <span>已跳转证照模块，但记录不可见或无权限，请搜索该记录。</span>
+        </div>
+      ) : null}
       <CertificateFilterToolbar
         query={model.query}
         onQueryChange={model.setQuery}

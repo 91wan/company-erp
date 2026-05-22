@@ -107,6 +107,18 @@ export function useCertificatesWorkspaceController({
     if (initialEntityId) setSelectedCertificateId(initialEntityId);
   }, [initialEntityId]);
 
+  // Auto-switch tab when the target certificate is found in the loaded list
+  useEffect(() => {
+    if (!selectedCertificateId) return;
+    const cert = certificates.find((c) => c.id === selectedCertificateId);
+    if (!cert) return;
+    const type = cert.certificateType;
+    if (type === "person_health_cert") setActiveTab("health");
+    else if (type === "food_operation_license") setActiveTab("food");
+    else setActiveTab("risk");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCertificateId, certificates]);
+
   useEffect(() => {
     const portalOwnerType = ownerOptions.portalOwnerType;
     if (!portalOwnerType || !ownerOptions.ownerTypeOptions.some((item) => item.code === portalOwnerType)) return;
@@ -285,10 +297,14 @@ export function useCertificatesWorkspaceController({
     }
   }
 
+  // True when navigating to a specific entity that isn't visible (not in loaded list or filtered out)
+  const entityNotVisible = Boolean(initialEntityId && status === "ready" && !selectedCertificate);
+
   return {
     activeTab,
     canManage,
     createDrawerOpen,
+    entityNotVisible,
     employees,
     expiringCount,
     expiredCount,
