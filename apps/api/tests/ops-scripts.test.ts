@@ -181,6 +181,9 @@ describe("NAS preflight script", () => {
         "POSTGRES_PASSWORD=correct-horse-db-secret",
         "AUTH_SESSION_SECRET=correct-horse-session-secret-32",
         "IDENTITY_ENCRYPTION_SECRET=correct-horse-identity-secret-32",
+        "BOOTSTRAP_ADMIN_PASSWORD=correct-horse-bootstrap-secret",
+        "RESET_ACCOUNT_PASSWORD=correct-horse-reset-secret",
+        "PILOT_ADMIN_PASSWORD=correct-horse-pilot-secret",
         `NAS_DATA_ROOT=${dataRoot}`,
         `NAS_ATTACHMENTS_ROOT=${attachmentsRoot}`,
         "ERP_WEB_BIND_HOST=127.0.0.1",
@@ -219,6 +222,41 @@ describe("NAS preflight script", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("POSTGRES_PASSWORD");
     expect(result.stderr).toContain("placeholder");
+  });
+
+  it("fails when bootstrap, reset, or pilot passwords are placeholders", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-ops-password-placeholder-"));
+    const binDir = join(tempRoot, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+      { mode: 0o755 },
+    );
+    const envFile = join(tempRoot, "placeholder.env");
+    writeFileSync(
+      envFile,
+      [
+        "APP_ENVIRONMENT=nas",
+        "POSTGRES_PASSWORD=correct-horse-db-secret",
+        "AUTH_SESSION_SECRET=correct-horse-session-secret-32",
+        "IDENTITY_ENCRYPTION_SECRET=correct-horse-identity-secret-32",
+        "BOOTSTRAP_ADMIN_PASSWORD=change-me-before-use",
+        "RESET_ACCOUNT_PASSWORD=change-me",
+        "PILOT_ADMIN_PASSWORD=placeholder",
+        `NAS_DATA_ROOT=${join(tempRoot, "data")}`,
+        `NAS_ATTACHMENTS_ROOT=${join(tempRoot, "attachments")}`,
+        "PUBLIC_ACCESS_ENABLED=false",
+      ].join("\n"),
+    );
+
+    const result = runPreflight(envFile, binDir);
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("BOOTSTRAP_ADMIN_PASSWORD");
+    expect(result.stderr).toContain("RESET_ACCOUNT_PASSWORD");
+    expect(result.stderr).toContain("PILOT_ADMIN_PASSWORD");
   });
 
   it("rejects public access without secure cookies and HTTPS CORS origins", () => {
