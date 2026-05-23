@@ -33,6 +33,7 @@ import type {
   ProjectSiteRepository,
   ProjectSiteRosterPersonListFilters,
 } from "../src/projectSites";
+import { resetAttachmentUploadQuotaForTests } from "../src/diskSpaceGuard";
 
 const now = "2026-05-14T10:00:00.000Z";
 
@@ -460,6 +461,7 @@ function csrfHeaders(session: { csrfToken: string }, headers: Record<string, str
 describe("attachments API", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    resetAttachmentUploadQuotaForTests();
   });
 
   it("requires attachment permissions for list/detail/create/update", async () => {
@@ -640,6 +642,99 @@ describe("attachments API", () => {
       expect(logs.map((log) => log.action)).toContain("attachment.upload");
       expect(JSON.stringify(logs)).not.toContain(root);
       expect(JSON.stringify(logs)).not.toContain("PDF demo content");
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks attachment uploads when the NAS attachment volume is below the free-space threshold", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    vi.stubEnv("ATTACHMENTS_MIN_FREE_BYTES", "999999999999999");
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const session = await loginSession(app);
+      const uploadPayload = multipartPayload(
+        {
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          ownerEntityId: "33333333-3333-4333-8333-333333333333",
+        },
+        { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
+      const uploaded = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: session.cookie },
+        ...uploadPayload,
+        headers: csrfHeaders(session, uploadPayload.headers),
+      });
+
+      expect(uploaded.statusCode).toBe(507);
+      expect(uploaded.json()).toMatchObject({ error: "ATTACHMENT_STORAGE_INSUFFICIENT_SPACE" });
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("enforces the per-account daily attachment upload quota", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-upload-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    vi.stubEnv("ATTACHMENTS_DAILY_UPLOAD_LIMIT", "1");
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const session = await loginSession(app);
+      const firstPayload = multipartPayload(
+        {
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          ownerEntityId: "33333333-3333-4333-8333-333333333333",
+        },
+        { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
+      const secondPayload = multipartPayload(
+        {
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          ownerEntityId: "33333333-3333-4333-8333-333333333333",
+        },
+        { name: "signed-contract-2.pdf", type: "application/pdf", content: "PDF demo content 2" },
+      );
+
+      const firstUpload = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: session.cookie },
+        ...firstPayload,
+        headers: csrfHeaders(session, firstPayload.headers),
+      });
+      const secondUpload = await app.inject({
+        method: "POST",
+        url: "/api/attachments/upload",
+        cookies: { company_erp_session: session.cookie },
+        ...secondPayload,
+        headers: csrfHeaders(session, secondPayload.headers),
+      });
+
+      expect(firstUpload.statusCode).toBe(201);
+      expect(secondUpload.statusCode).toBe(429);
+      expect(secondUpload.json()).toEqual({ error: "ATTACHMENT_UPLOAD_QUOTA_EXCEEDED", limit: 1 });
     } finally {
       await app.close();
       await rm(root, { recursive: true, force: true });
