@@ -240,6 +240,7 @@ export function InventoryWorkspace({
           movement.warehouseCode,
           movement.warehouseName,
           movement.handledBy,
+          movement.id,
         ]
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(normalizedQuery));
@@ -622,7 +623,7 @@ export function InventoryWorkspace({
         <SectionCard title="库存流水" action={<ClipboardList aria-hidden="true" size={16} />}>
           {movementsEntityNotVisible ? (
             <div className="workspace-state workspace-state--info" role="status">
-              <span>已跳转库存模块，但流水记录不可见或无权限，请搜索对应记录。</span>
+              <span>库存流水记录不可见或无权限，请搜索单号核查。记录 ID：{initialEntityId}</span>
             </div>
           ) : null}
           <Toolbar

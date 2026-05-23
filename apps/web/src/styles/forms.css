@@ -287,3 +287,7 @@
 .read-only-shell .project-issue-form {
   display: none;
 }
+
+.read-only-shell .table-action.read-only-visible-action {
+  display: inline-flex;
+}

@@ -349,9 +349,8 @@ test("warning rows show 下载预检报告 (not 错误行) link", async ({ page 
 
 test("viewer can see download report link but not confirm button", async ({ page }) => {
   const issues = trackBrowserIssues(page);
-  const mockApi = await createMockCompanyErpApi(page, { user: viewerUser });
-
-  await mockApi.overrideOnce("GET", "/api/import-jobs", {
+  await createMockCompanyErpApi(page, {
+    user: viewerUser,
     importJobs: [{
       id: "viewer-job-001",
       templateType: "parties",
@@ -423,10 +422,11 @@ test("confirmed party row shows 查看 button and clicking navigates to 基础�
   await page.getByRole("button", { name: "确定导入" }).click();
 
   // 查看 button appears in 导入结果 column
-  await expect(page.getByRole("button", { name: "查看 往来方台账" })).toBeVisible();
+  const partyViewButton = page.getByRole("button", { name: /查看往来方/ });
+  await expect(partyViewButton).toBeVisible();
 
   // Clicking it navigates to 基础资料
-  await page.getByRole("button", { name: "查看 往来方台账" }).click();
+  await partyViewButton.click();
   await expect(page.getByRole("main")).toContainText("基础资料");
 
   await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });
@@ -471,8 +471,9 @@ test("confirmed certificate row shows 查看 button and clicking navigates to �
   await page.getByRole("button", { name: "确定导入" }).click();
 
   // 查看 button in result column
-  await expect(page.getByRole("button", { name: "查看 健康证台账" })).toBeVisible();
-  await page.getByRole("button", { name: "查看 健康证台账" }).click();
+  const certificateViewButton = page.getByRole("button", { name: /查看证照/ });
+  await expect(certificateViewButton).toBeVisible();
+  await certificateViewButton.click();
   await expect(page.getByRole("main")).toContainText("证照资质");
 
   await expectHealthyShell(page, issues, { allowFailedNetworkResources: true });

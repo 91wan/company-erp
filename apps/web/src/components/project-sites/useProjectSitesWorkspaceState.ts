@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ProjectUsageStatusCode } from "@company-erp/shared";
 import type { ProjectSiteCreateFormState } from "./ProjectSiteCreateFormDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
@@ -14,10 +14,14 @@ import {
 } from "./projectSiteFormState";
 import type { ProjectSiteFormDrawer } from "./ProjectSitesHeadquartersView";
 
-export function useProjectSitesWorkspaceState({ initialEntityId }: { initialEntityId?: string } = {}) {
+export function useProjectSitesWorkspaceState({
+  initialEntityId,
+  initialEntityType,
+}: { initialEntityId?: string; initialEntityType?: string } = {}) {
+  const isProjectSiteEntity = !initialEntityType || initialEntityType === "projectSite";
   const [query, setQuery] = useState("");
   const [usageFilter, setUsageFilter] = useState<"all" | ProjectUsageStatusCode>("all");
-  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState(initialEntityId ?? "");
+  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState(isProjectSiteEntity ? initialEntityId ?? "" : "");
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [siteForm, setSiteForm] = useState<ProjectSiteCreateFormState>(createInitialSiteForm);
   const [usageForm, setUsageForm] = useState<ProjectUsageRequestFormState>(createInitialUsageForm);
@@ -34,6 +38,17 @@ export function useProjectSitesWorkspaceState({ initialEntityId }: { initialEnti
     setPendingIssueConfirm(false);
     setOpenFormDrawer(null);
   }, []);
+
+  useEffect(() => {
+    if (!initialEntityId) return;
+    if (initialEntityType === "projectSiteRosterPerson") {
+      setSelectedDetailSiteId("");
+      return;
+    }
+    if (!initialEntityType || initialEntityType === "projectSite") {
+      setSelectedDetailSiteId(initialEntityId);
+    }
+  }, [initialEntityId, initialEntityType]);
 
   return {
     query,

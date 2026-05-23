@@ -30,6 +30,7 @@ type MockApiOptions = {
   user?: MockUser | null;
   companyName?: string;
   failures?: ApiFailure[];
+  importJobs?: Record<string, unknown>[];
 };
 
 const demoAppVersion = {
@@ -357,7 +358,7 @@ const demoCertificate = {
   ownerPartyName: null,
   ownerNameSnapshot: demoProjectSite.siteName,
   certificateNumber: "DEMO-CERT-NO-001",
-  issuingAuthority: "DEMO 发证机关",
+  issuingAuthority: "DEMO 机构",
   certificateScope: "DEMO 范围",
   issueDate: "2026-01-01",
   validityType: "fixed_expiry",
@@ -527,7 +528,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       },
     ],
     contractAttachments: [] as Record<string, unknown>[],
-    importJobs: [] as Record<string, unknown>[],
+    importJobs: [...(options.importJobs ?? [])],
   };
 
   const nextId = (prefix: string) => `${prefix}-${idCounter++}`;

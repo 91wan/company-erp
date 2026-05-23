@@ -490,6 +490,7 @@ test("dashboard and tables stay scrollable across browser viewports", async ({
   expect(["auto", "visible"]).toContain(scrollMetrics.overflowY);
 
   await page.getByRole("button", { name: "基础资料" }).click();
+  await page.getByRole("tab", { name: "物料" }).click();
   await expect(page.getByText("DEMO 项目耗材")).toBeVisible();
   const tableMetrics = await page
     .locator(".table-wrap")

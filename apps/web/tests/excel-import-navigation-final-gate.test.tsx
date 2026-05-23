@@ -67,12 +67,37 @@ describe("Excel import navigation final gate (P2-1)", () => {
     const source = src("ImportRowsTab.tsx");
     const idx = source.indexOf('"inventoryMovement"');
     expect(idx).toBeGreaterThan(-1);
-    const block = source.slice(idx, idx + 300);
+    const block = source.slice(idx, idx + 700);
     // Must reference movements tab (for opening/default)
     expect(block).toContain("movements");
+    expect(block).toContain("movementType");
+    expect(block).toContain("normalizedData");
     // Must not hardcode "inbound" as the only option
     const hasHardcodedInbound = /return.*"库存".*tab.*"inbound"/s.test(block);
     expect(hasHardcodedInbound).toBe(false);
+  });
+
+  it("buildNavigationIntent: inventoryMovement keeps inbound and outbound as their dedicated tabs", () => {
+    const source = src("ImportRowsTab.tsx");
+    const idx = source.indexOf('"inventoryMovement"');
+    const block = source.slice(idx, idx + 900);
+    expect(block).toContain('"inbound"');
+    expect(block).toContain('"outbound"');
+    expect(block).toContain('"opening"');
+    expect(block).toContain('"adjustment_in"');
+    expect(block).toContain('"adjustment_out"');
+  });
+
+  it("buildNavigationIntent: projectSite and projectSiteRosterPerson carry distinct entityType", () => {
+    const source = src("ImportRowsTab.tsx");
+    const projectSiteIdx = source.indexOf('"projectSite"');
+    const rosterIdx = source.indexOf('"projectSiteRosterPerson"');
+    expect(projectSiteIdx).toBeGreaterThan(-1);
+    expect(rosterIdx).toBeGreaterThan(-1);
+    expect(source.slice(projectSiteIdx, projectSiteIdx + 180)).toContain("entityType");
+    expect(source.slice(projectSiteIdx, projectSiteIdx + 180)).toContain("projectSite");
+    expect(source.slice(rosterIdx, rosterIdx + 220)).toContain("entityType");
+    expect(source.slice(rosterIdx, rosterIdx + 220)).toContain("projectSiteRosterPerson");
   });
 
   it("buildNavigationIntent: all cases set entityId from targetRecordId", () => {
@@ -96,6 +121,7 @@ describe("Excel import navigation final gate (P2-1)", () => {
     expect(jsxIdx).toBeGreaterThan(-1);
     const block = shell.slice(jsxIdx, jsxIdx + 800);
     expect(block).toContain("initialEntityId");
+    expect(block).toContain("initialEntityType");
   });
 
   it("DashboardShell passes initialEntityId to PeoplePermissionsWorkspace", () => {
@@ -127,6 +153,14 @@ describe("Excel import navigation final gate (P2-1)", () => {
     const source = readFileSync(basicDataSrc, "utf8");
     expect(source).toContain("initialEntityId");
     expect(source).toContain("workspace-state");
+    expect(source).toContain("PartiesWorkspace");
+    expect(source).toContain("MaterialsWarehousesWorkspace");
+  });
+
+  it("ProjectSitesWorkspace state does not treat projectSiteRosterPerson id as projectSite id", () => {
+    const source = readFileSync(join(process.cwd(), "src/components/project-sites/useProjectSitesWorkspaceState.ts"), "utf8");
+    expect(source).toContain("initialEntityType");
+    expect(source).toContain("projectSiteRosterPerson");
   });
 
   // ── InventoryWorkspace movements tab ────────────────────────────────────

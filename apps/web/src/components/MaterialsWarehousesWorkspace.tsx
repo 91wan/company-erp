@@ -41,6 +41,7 @@ type MaterialsWarehousesWorkspaceProps = {
   createWarehouse?: (input: CreateWarehouseInput) => Promise<WarehouseDto>;
   canManage?: boolean;
   initialTab?: string;
+  initialEntityId?: string;
 };
 
 type MaterialsWarehousesTab = "materials" | "warehouses";
@@ -109,6 +110,7 @@ export function MaterialsWarehousesWorkspace({
   createWarehouse = defaultCreateWarehouse,
   canManage = true,
   initialTab,
+  initialEntityId,
 }: MaterialsWarehousesWorkspaceProps) {
   const [materials, setMaterials] = useState<MaterialDto[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -129,6 +131,12 @@ export function MaterialsWarehousesWorkspace({
   const [materialQuery, setMaterialQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [warehouseQuery, setWarehouseQuery] = useState("");
+
+  useEffect(() => {
+    if (!initialEntityId) return;
+    if (activeTab === "materials") setMaterialQuery(initialEntityId);
+    if (activeTab === "warehouses") setWarehouseQuery(initialEntityId);
+  }, [activeTab, initialEntityId]);
   const [materialSubmitState, setMaterialSubmitState] = useState<
     "idle" | "saving" | "error"
   >("idle");
@@ -208,6 +216,7 @@ export function MaterialsWarehousesWorkspace({
           material.specification,
           material.defaultWarehouseName,
           material.defaultSupplierPartyName,
+          material.id,
         ]
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(normalizedQuery));
@@ -227,6 +236,7 @@ export function MaterialsWarehousesWorkspace({
         warehouse.warehouseName,
         warehouse.managerName,
         warehouse.managerPhone,
+        warehouse.id,
       ]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(normalizedQuery));
@@ -352,6 +362,11 @@ export function MaterialsWarehousesWorkspace({
               title="物料台账"
               action={<Boxes aria-hidden="true" size={17} />}
             >
+              {initialEntityId ? (
+                <div className="workspace-state workspace-state--info" role="status">
+                  <span>已跳转物料台账，请核查记录 ID：{initialEntityId}。</span>
+                </div>
+              ) : null}
               <Toolbar
                 search={
                   <label className="table-search">
@@ -409,6 +424,11 @@ export function MaterialsWarehousesWorkspace({
               title="仓库台账"
               action={<Warehouse aria-hidden="true" size={17} />}
             >
+              {initialEntityId ? (
+                <div className="workspace-state workspace-state--info" role="status">
+                  <span>已跳转仓库台账，请核查记录 ID：{initialEntityId}。</span>
+                </div>
+              ) : null}
               <Toolbar
                 search={
                   <label className="table-search">

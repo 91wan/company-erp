@@ -13,6 +13,7 @@ type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
   createParty?: (input: CreatePartyInput) => Promise<PartyDto>;
   canManage?: boolean;
+  initialEntityId?: string;
 };
 
 async function defaultLoadParties(): Promise<PartyDto[]> {
@@ -35,6 +36,7 @@ export function PartiesWorkspace({
   loadParties = defaultLoadParties,
   createParty = defaultCreateParty,
   canManage = true,
+  initialEntityId,
 }: PartiesWorkspaceProps) {
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -69,6 +71,10 @@ export function PartiesWorkspace({
     };
   }, [loadParties]);
 
+  useEffect(() => {
+    if (initialEntityId) setQuery(initialEntityId);
+  }, [initialEntityId]);
+
   const filteredParties = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -77,6 +83,7 @@ export function PartiesWorkspace({
       const matchesQuery =
         normalizedQuery.length === 0 ||
         [party.partyCode, party.partyName, party.primaryContactName, party.primaryContactPhone]
+          .concat(party.id)
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(normalizedQuery));
 
@@ -144,6 +151,11 @@ export function PartiesWorkspace({
     >
       <section className="parties-workspace" aria-label="往来方基础资料">
         <SectionCard title="往来单位台账">
+          {initialEntityId ? (
+            <div className="workspace-state workspace-state--info" role="status">
+              <span>已跳转往来方台账，请核查记录 ID：{initialEntityId}。</span>
+            </div>
+          ) : null}
           <Toolbar
             search={(
               <label className="table-search">

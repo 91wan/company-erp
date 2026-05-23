@@ -56,6 +56,7 @@ export function useProjectSitesWorkspaceController(
     portalSection,
     initialTab,
     initialEntityId,
+    initialEntityType,
     onPortalSectionChange,
     externalProjectSiteContactName,
     externalProjectSiteContactPhone,
@@ -91,7 +92,7 @@ export function useProjectSitesWorkspaceController(
     pendingIssueConfirm,
     setPendingIssueConfirm,
     closeFormDrawer,
-  } = useProjectSitesWorkspaceState({ initialEntityId });
+  } = useProjectSitesWorkspaceState({ initialEntityId, initialEntityType });
 
   const {
     onProjectSitesLoaded,
@@ -237,6 +238,11 @@ export function useProjectSitesWorkspaceController(
     setUsageForm,
   });
 
+  const importLocationNotice =
+    initialEntityType === "projectSiteRosterPerson" && initialEntityId
+      ? `已跳转项目点资料审核；项目点现场人员记录不可见或无权限，请在项目点详情中按人员姓名核查该导入记录。记录 ID：${initialEntityId}`
+      : undefined;
+
   const externalInput = buildExternalProjectSitesWorkspaceInput({
     portal: buildExternalProjectSitePortalOptions({
       portalSection,
@@ -379,6 +385,7 @@ export function useProjectSitesWorkspaceController(
     },
     navigation: {
       initialTab,
+      importLocationNotice,
     },
   });
 
