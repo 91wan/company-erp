@@ -11,6 +11,20 @@ jobs:
   test:
     name: Typecheck, test, and build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: company_erp
+          POSTGRES_PASSWORD: company_erp
+          POSTGRES_DB: company_erp_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U company_erp -d company_erp_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgresql://company_erp:company_erp@localhost:5432/company_erp_ci
 
@@ -32,6 +46,19 @@ jobs:
 
       - name: Validate Prisma schema
         run: npm run db:validate
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply database migrations
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: company_erp
+          POSTGRES_PASSWORD: company_erp
+          POSTGRES_DB: company_erp_ci
+          MIGRATIONS_DIR: database/migrations
+        run: scripts/run-migrations.sh
 
       - name: Typecheck
         run: npm run typecheck

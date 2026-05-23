@@ -1104,6 +1104,8 @@ model Contract {
   projectSiteId            String?            @map("project_site_id") @db.Uuid
   signedDate               DateTime?          @map("signed_date") @db.Date
   startDate                DateTime           @map("start_date") @db.Date
+  /// DB CHECK contracts_end_date_required_for_non_framework:
+  /// only framework contracts may omit end_date; every non-framework contract must keep end_date non-null.
   endDate                  DateTime?          @map("end_date") @db.Date
   amount                   Decimal?           @db.Decimal(14, 2)
   budgetAmount             Decimal?           @map("budget_amount") @db.Decimal(14, 2)
