@@ -21,7 +21,8 @@
     "audit:verify-export": "node scripts/verify-audit-export.mjs",
     "attachments:legacy-report": "node scripts/attachments-legacy-report.mjs",
     "nas:trial-readiness": "node scripts/nas-trial-readiness-gate.mjs",
-    "import:pilot-check": "node scripts/import-pilot-check.mjs"
+    "import:pilot-check": "node scripts/import-pilot-check.mjs",
+    "import:pilot-smoke": "node scripts/import-pilot-smoke.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

@@ -43,6 +43,25 @@ function readWeb(relPath) {
 
 console.log("\n─── NAS 试点导入前置检查 ───\n");
 
+check("package.json 定义 import:pilot-check 和 import:pilot-smoke", () => {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  if (pkg.scripts?.["import:pilot-check"] !== "node scripts/import-pilot-check.mjs") {
+    throw new Error("package.json 缺少 import:pilot-check");
+  }
+  if (pkg.scripts?.["import:pilot-smoke"] !== "node scripts/import-pilot-smoke.mjs") {
+    throw new Error("package.json 缺少 import:pilot-smoke");
+  }
+});
+
+check("import:pilot-smoke 脚本存在", () => {
+  if (!existsSync(join(root, "scripts/import-pilot-smoke.mjs"))) {
+    throw new Error("缺少 scripts/import-pilot-smoke.mjs");
+  }
+  if (!existsSync(join(root, "apps/api/src/importPilotSmoke.ts"))) {
+    throw new Error("缺少 apps/api/src/importPilotSmoke.ts");
+  }
+});
+
 // 1. IMPORT_TEMPLATE_DEFINITIONS 八个模板均存在
 check("importTemplates.ts 定义了全部 8 个模板", () => {
   const src = readSrc("importTemplates.ts");
@@ -117,11 +136,26 @@ check("docs/import/nas-pilot-import-drill.md 存在", () => {
   }
 });
 
+check("nas-pilot-import-drill.md 包含静态检查和真实导入演练命令", () => {
+  const src = readFileSync(join(root, "docs/import/nas-pilot-import-drill.md"), "utf8");
+  if (!src.includes("npm run import:pilot-check")) throw new Error("缺少 import:pilot-check 命令");
+  if (!src.includes("npm run import:pilot-smoke")) throw new Error("缺少 import:pilot-smoke 命令");
+});
+
 // 9. nas-pilot-import-drill.md 包含不能回滚说明
 check("nas-pilot-import-drill.md 包含不能回滚说明", () => {
   const src = readFileSync(join(root, "docs/import/nas-pilot-import-drill.md"), "utf8");
   if (!src.includes("不支持导入回滚") && !src.includes("不能回滚")) {
     throw new Error("缺少不能回滚说明");
+  }
+});
+
+check("import-module-stop-line.md 存在并写明导入停止线", () => {
+  const docPath = join(root, "docs/import/import-module-stop-line.md");
+  if (!existsSync(docPath)) throw new Error("缺少 docs/import/import-module-stop-line.md");
+  const src = readFileSync(docPath, "utf8");
+  for (const phrase of ["不做", "OCR", "ZIP 图片批量入库", "合同 PDF", "导入一键回滚", "外部项目点账号自助全局导入", "Storage Key"]) {
+    if (!src.includes(phrase)) throw new Error(`停止线文档缺少：${phrase}`);
   }
 });
 
@@ -193,17 +227,26 @@ check("ImportRowsTab 区分 projectSite 与 projectSiteRosterPerson entityType",
   if (rosterIdx < 0 || !src.slice(rosterIdx, rosterIdx + 260).includes('entityType: "projectSiteRosterPerson"')) {
     throw new Error("projectSiteRosterPerson 导入跳转缺少 entityType=projectSiteRosterPerson");
   }
+  if (!src.slice(rosterIdx, rosterIdx + 420).includes("relatedEntityId")) {
+    throw new Error("projectSiteRosterPerson 导入跳转缺少 relatedEntityId，无法定位所属项目点");
+  }
 });
 
 // 17. ProjectSitesWorkspace 支持 entityType，不误把 rosterPersonId 当 projectSiteId
-check("ProjectSitesWorkspace 支持 initialEntityType", () => {
+check("ProjectSitesWorkspace 支持 initialEntityType/initialRelatedEntityId", () => {
   const stateSrc = readWeb("components/project-sites/useProjectSitesWorkspaceState.ts");
   const controllerSrc = readWeb("components/project-sites/useProjectSitesWorkspaceController.ts");
   if (!stateSrc.includes("initialEntityType") || !stateSrc.includes("projectSiteRosterPerson")) {
     throw new Error("项目点状态层未处理 projectSiteRosterPerson");
   }
+  if (!stateSrc.includes("initialRelatedEntityId")) {
+    throw new Error("项目点状态层缺少 initialRelatedEntityId，不能打开所属项目点");
+  }
   if (!controllerSrc.includes("项目点现场人员记录不可见或无权限")) {
     throw new Error("项目点导入定位缺少项目点现场人员不可见提示");
+  }
+  if (!controllerSrc.includes("已定位到导入的项目点现场人员")) {
+    throw new Error("项目点导入定位缺少已定位到所属项目点的提示");
   }
 });
 
@@ -221,7 +264,12 @@ check("默认仓库名为无锡总部仓库", () => {
   if (!templates.includes("无锡总部仓库")) throw new Error("导入模板示例未使用无锡总部仓库");
 });
 
-console.log(`\n─── 结果：${passed} 通过 / ${failed} 失败 ───\n`);
+console.log(`\n─── 结果：${passed} 通过 / ${failed} 失败 ───`);
+if (failed === 0) {
+  console.log("静态检查已通过；请继续运行 npm run import:pilot-smoke 完成真实导入演练。\n");
+} else {
+  console.log("");
+}
 if (failed > 0) {
   process.exit(1);
 }

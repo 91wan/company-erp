@@ -9,9 +9,12 @@
  * - skipped/error rows showing a 查看 button
  * - DashboardShell passing initialEntityId to workspaces
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { ImportJobDto, ImportJobRowDto } from "@company-erp/shared";
+import { ImportRowsTab } from "../src/components/excel-import/ImportRowsTab";
 
 const srcDir = join(process.cwd(), "src/components/excel-import");
 const shellSrc = join(process.cwd(), "src/components/DashboardShell.tsx");
@@ -122,6 +125,7 @@ describe("Excel import navigation final gate (P2-1)", () => {
     const block = shell.slice(jsxIdx, jsxIdx + 800);
     expect(block).toContain("initialEntityId");
     expect(block).toContain("initialEntityType");
+    expect(block).toContain("initialRelatedEntityId");
   });
 
   it("DashboardShell passes initialEntityId to PeoplePermissionsWorkspace", () => {
@@ -161,6 +165,8 @@ describe("Excel import navigation final gate (P2-1)", () => {
     const source = readFileSync(join(process.cwd(), "src/components/project-sites/useProjectSitesWorkspaceState.ts"), "utf8");
     expect(source).toContain("initialEntityType");
     expect(source).toContain("projectSiteRosterPerson");
+    expect(source).toContain("initialRelatedEntityId");
+    expect(source).toContain("setSelectedDetailSiteId(initialRelatedEntityId ?? \"\")");
   });
 
   // ── InventoryWorkspace movements tab ────────────────────────────────────
@@ -200,5 +206,91 @@ describe("Excel import navigation final gate (P2-1)", () => {
     const source = src("ImportJobDetailDrawer.tsx");
     expect(source).toContain("ConfirmAction");
     expect(source).not.toMatch(/onClick=\{[^}]*onRequestConfirm[^}]*\}/);
+  });
+});
+
+describe("Excel import navigation render gate", () => {
+  function row(overrides: Partial<ImportJobRowDto>): ImportJobRowDto {
+    return {
+      id: overrides.id ?? "row-1",
+      rowNumber: overrides.rowNumber ?? 2,
+      rawData: overrides.rawData ?? {},
+      normalizedData: overrides.normalizedData ?? null,
+      issues: overrides.issues ?? [],
+      status: overrides.status ?? "imported",
+      targetRecordType: Object.hasOwn(overrides, "targetRecordType") ? overrides.targetRecordType ?? null : "party",
+      targetRecordId: Object.hasOwn(overrides, "targetRecordId") ? overrides.targetRecordId ?? null : "record-1",
+      createdAt: "2026-05-23T00:00:00.000Z",
+      updatedAt: "2026-05-23T00:00:00.000Z",
+    };
+  }
+
+  function renderRows(rows: ImportJobRowDto[], onNavigate = vi.fn()) {
+    const activeJob: ImportJobDto = {
+      id: "job-1",
+      templateType: "parties",
+      originalFileName: "pilot.xlsx",
+      fileHash: "hash",
+      status: "confirmed",
+      totalRows: rows.length,
+      validRows: rows.length,
+      warningRows: 0,
+      errorRows: 0,
+      skippedRows: 0,
+      importedRows: rows.filter((item) => item.status === "imported").length,
+      createdAt: "2026-05-23T00:00:00.000Z",
+      confirmedAt: "2026-05-23T00:05:00.000Z",
+      rows,
+    };
+    render(
+      <ImportRowsTab
+        model={{
+          activeJob,
+          rows,
+          summary: { total: rows.length, valid: rows.length, warning: 0, error: 0, skipped: 0, imported: 0 },
+          confirmingJobId: null,
+          canManage: true,
+          onNavigate,
+          templateLabel: "导入模板",
+          actionStatus: "idle",
+          actionError: "",
+          handleRequestConfirm: vi.fn(),
+          handleCancelConfirm: vi.fn(),
+          handleConfirm: vi.fn(),
+        } as never}
+      />,
+    );
+    return onNavigate;
+  }
+
+  it.each([
+    ["certificate", "查看证照", { certificateType: "person_health_cert" }, { workspace: "证照资质", tab: "health", entityId: "cert-1" }],
+    ["contract", "查看合同", {}, { workspace: "合同", tab: "ledger", entityId: "contract-1" }],
+    ["material", "查看物料", {}, { workspace: "基础资料", tab: "materials", entityId: "material-1" }],
+    ["party", "查看往来方", {}, { workspace: "基础资料", tab: "parties", entityId: "party-1" }],
+    ["inventoryMovement", "查看库存流水", { movementType: "opening" }, { workspace: "库存", tab: "movements", entityId: "movement-1" }],
+    [
+      "projectSiteRosterPerson",
+      "查看现场人员",
+      { projectSiteId: "site-1" },
+      { workspace: "项目点", tab: "review", entityId: "roster-1", entityType: "projectSiteRosterPerson", relatedEntityId: "site-1" },
+    ],
+  ])("clicking %s result emits the precise NavigationIntent", (targetRecordType, label, normalizedData, expected) => {
+    const targetRecordId = String(expected.entityId);
+    const onNavigate = renderRows([row({ targetRecordType, targetRecordId, normalizedData })]);
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(label) }));
+
+    expect(onNavigate).toHaveBeenCalledWith(expected);
+  });
+
+  it("does not show view buttons for skipped, error, or missing target rows", () => {
+    renderRows([
+      row({ id: "skipped", status: "skipped", targetRecordType: "party", targetRecordId: "party-1" }),
+      row({ id: "error", status: "error", targetRecordType: "party", targetRecordId: "party-2" }),
+      row({ id: "missing", status: "imported", targetRecordType: null, targetRecordId: null }),
+    ]);
+
+    expect(screen.queryByRole("button", { name: /查看/ })).not.toBeInTheDocument();
   });
 });

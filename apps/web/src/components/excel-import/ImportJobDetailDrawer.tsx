@@ -74,7 +74,6 @@ export function ImportJobDetailDrawer({
           <dt>状态</dt><dd><ImportStatusBadge status={job.status} /></dd>
           <dt>创建时间</dt><dd>{new Date(job.createdAt).toLocaleString("zh-CN")}</dd>
           {job.confirmedAt ? <><dt>确认时间</dt><dd>{new Date(job.confirmedAt).toLocaleString("zh-CN")}</dd></> : null}
-          <dt>文件哈希</dt><dd className="import-detail-hash">{job.fileHash}</dd>
         </dl>
       </SectionCard>
 

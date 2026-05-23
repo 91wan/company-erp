@@ -14,6 +14,25 @@
 
 ---
 
+## 试点前必须运行的命令
+
+在进入 NAS 内网试点导入窗口前，先在本地或 CI 环境完成：
+
+```bash
+npm run db:generate
+npm run db:validate
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e -w @company-erp/web
+npm run import:pilot-check
+npm run import:pilot-smoke
+```
+
+其中 `import:pilot-check` 是静态门禁；`import:pilot-smoke` 是 mock 模式真实导入演练，不读取 NAS、不需要真实附件、不连接生产数据库。
+
+---
+
 ## 推荐导入顺序
 
 按依赖关系由浅到深：
@@ -80,7 +99,7 @@
 ### 步骤 7：物料
 
 1. 模板选"物料"
-2. 默认供应商编码须与步骤 1 中往来方编码一致
+2. 默认供应商编码可以留空；如果填写，建议与步骤 1 中往来方编码一致
 3. 预检、确认导入
 4. **复核**：跳转到 **基础资料 › 物料**
 
@@ -90,7 +109,7 @@
 2. 仓库使用无锡总部仓库（默认仓库编码见模板说明行）
 3. 物料编码须与步骤 7 中一致
 4. 预检、确认导入
-5. **复核**：跳转到 **库存 › 当前库存** 核查余额
+5. **复核**：跳转到 **库存 › 库存流水** 核查 opening 流水，再到当前库存核查余额
 
 ---
 
@@ -139,17 +158,18 @@
 ## NAS 试点前最后检查清单
 
 1. `npm run import:pilot-check` 通过。
-2. Excel 导入模板包可下载。
-3. 试导入 1 个项目点。
-4. 试导入项目点现场人员。
-5. 试导入 2 条健康证。
-6. 健康证能在证照模块看到。
-7. 项目点合规 summary 有变化。
-8. 错误报告可下载并可读。
-9. 导入结果“查看”能跳到对应模块和分区。
-10. 审计日志能查 `import_job.preview` / `import_job.confirm`。
-11. 确认导入 UI 明确提示不能回滚。
-12. `external_project_site` 无法看到 Excel 导入。
+2. `npm run import:pilot-smoke` 通过，完成真实导入演练。
+3. Excel 导入模板包可下载。
+4. 试导入 1 个项目点。
+5. 试导入项目点现场人员。
+6. 试导入 2 条健康证。
+7. 健康证能在证照模块看到。
+8. 项目点合规 summary 有变化。
+9. 错误报告可下载并可读。
+10. 导入结果“查看”能跳到对应模块和分区。
+11. 审计日志能查 `import_job.preview` / `import_job.confirm`。
+12. 确认导入 UI 明确提示不能回滚。
+13. `external_project_site` 无法看到 Excel 导入。
 
 ---
 

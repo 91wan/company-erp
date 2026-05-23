@@ -631,6 +631,67 @@ describe("import job error-report.xlsx", () => {
     expect(sheetText).toContain("往来方");
   });
 
+  it("error report has readable workbook formatting for fixing Excel rows", async () => {
+    const job = makeJob({
+      templateType: "parties",
+      errorRows: 1,
+      warningRows: 1,
+      rows: [
+        {
+          id: "row-error-format",
+          rowNumber: 2,
+          rawData: { 供应商编码: "BAD", 供应商名称: "" },
+          normalizedData: null,
+          issues: [{ level: "error", field: "供应商名称", message: "供应商名称必填" }],
+          status: "error",
+          targetRecordType: null,
+          targetRecordId: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "row-warning-format",
+          rowNumber: 3,
+          rawData: { 供应商编码: "SUP0002", 供应商名称: "已存在供应商" },
+          normalizedData: null,
+          issues: [{ level: "warning", field: "供应商编码", message: "编码已存在，确认导入时会跳过" }],
+          status: "warning",
+          targetRecordType: "party",
+          targetRecordId: "party-1",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+    const app = await buildApp({ importJobRepository: createFakeRepository([job]) });
+    const response = await app.inject({ method: "GET", url: `/api/import-jobs/${job.id}/error-report.xlsx` });
+    await app.close();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.rawPayload as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet("问题行")!;
+    const infoSheet = workbook.getWorksheet("导入说明")!;
+    const headerRow = (sheet.getRow(1).values as unknown[]).slice(1) as string[];
+
+    expect(sheet.views).toEqual(expect.arrayContaining([expect.objectContaining({ state: "frozen", ySplit: 1 })]));
+    expect(sheet.autoFilter).toBeDefined();
+    expect(headerRow.slice(0, 4)).toEqual(["行号", "状态", "问题", "建议处理"]);
+    expect(headerRow[4]).toBe("供应商编码");
+    expect(headerRow[headerRow.length - 1]).toBe("原始数据 JSON");
+    expect(sheet.getColumn(3).width).toBeGreaterThanOrEqual(50);
+    expect(sheet.getColumn(4).width).toBeGreaterThanOrEqual(24);
+    expect(sheet.getRow(2).fill).not.toEqual(sheet.getRow(3).fill);
+
+    const infoText = infoSheet.getSheetValues().flat().filter(Boolean).map(String).join(" ");
+    expect(infoText).toContain("模板类型");
+    expect(infoText).toContain("模板名称");
+    expect(infoText).toContain("原文件名");
+    expect(infoText).toContain("总行数");
+    expect(infoText).toContain("错误行数");
+    expect(infoText).toContain("警告行数");
+    expect(infoText).toContain("已预检");
+  });
+
   // P1-4: health_certificates report fields
   it("health_certificates error report includes correct columns and excludes legacy fields", async () => {
     const job = makeJob({
@@ -683,9 +744,11 @@ describe("import job error-report.xlsx", () => {
         rowNumber: 2,
         rawData: {
           供应商编码: "SUP001",
+          "Storage Key": "visible-storage-key",
           storageKey: "secret-key-123",
           storage_key: "another-secret",
           passwordHash: "hashed",
+          Authorization: "Bearer secret-token",
           身份证号: "123456789012",
           供应商名称: "测试",
         },
@@ -704,9 +767,11 @@ describe("import job error-report.xlsx", () => {
     const sheet = workbook.getWorksheet("问题行");
     const dataRow = (sheet!.getRow(2).values as unknown[]).slice(1) as unknown[];
     const jsonCell = String(dataRow[dataRow.length - 1]);
+    expect(jsonCell).not.toContain("visible-storage-key");
     expect(jsonCell).not.toContain("secret-key-123");
     expect(jsonCell).not.toContain("another-secret");
     expect(jsonCell).not.toContain("hashed");
+    expect(jsonCell).not.toContain("Bearer secret-token");
     expect(jsonCell).not.toContain("123456789012");
     expect(jsonCell).toContain("SUP001");
   });
@@ -774,6 +839,39 @@ describe("import permission enforcement", () => {
     const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
     const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}` } });
     await app.close();
+    expect(previewResponse.statusCode).toBe(403);
+    expect(confirmResponse.statusCode).toBe(403);
+  });
+
+  it("external_project_site user cannot access global import templates, jobs, reports, preview, or confirm", async () => {
+    const { app, cookie } = await buildAuthedApp(["external_project_site"]);
+    const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
+    const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
+    const cookieHeader = { cookie: `company_erp_session=${cookie}` };
+
+    const templatesResponse = await app.inject({ method: "GET", url: "/api/import-templates", headers: cookieHeader });
+    const jobsResponse = await app.inject({ method: "GET", url: "/api/import-jobs", headers: cookieHeader });
+    const reportResponse = await app.inject({
+      method: "GET",
+      url: `/api/import-jobs/${makeJob().id}/error-report.xlsx`,
+      headers: cookieHeader,
+    });
+    const previewResponse = await app.inject({
+      method: "POST",
+      url: "/api/import-jobs/preview",
+      payload,
+      headers: { ...headers, ...cookieHeader },
+    });
+    const confirmResponse = await app.inject({
+      method: "POST",
+      url: `/api/import-jobs/${makeJob().id}/confirm`,
+      headers: cookieHeader,
+    });
+    await app.close();
+
+    expect(templatesResponse.statusCode).toBe(403);
+    expect(jobsResponse.statusCode).toBe(403);
+    expect(reportResponse.statusCode).toBe(403);
     expect(previewResponse.statusCode).toBe(403);
     expect(confirmResponse.statusCode).toBe(403);
   });

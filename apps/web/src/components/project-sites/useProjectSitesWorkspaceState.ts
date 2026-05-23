@@ -17,11 +17,14 @@ import type { ProjectSiteFormDrawer } from "./ProjectSitesHeadquartersView";
 export function useProjectSitesWorkspaceState({
   initialEntityId,
   initialEntityType,
-}: { initialEntityId?: string; initialEntityType?: string } = {}) {
+  initialRelatedEntityId,
+}: { initialEntityId?: string; initialEntityType?: string; initialRelatedEntityId?: string } = {}) {
   const isProjectSiteEntity = !initialEntityType || initialEntityType === "projectSite";
   const [query, setQuery] = useState("");
   const [usageFilter, setUsageFilter] = useState<"all" | ProjectUsageStatusCode>("all");
-  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState(isProjectSiteEntity ? initialEntityId ?? "" : "");
+  const [selectedDetailSiteId, setSelectedDetailSiteId] = useState(
+    isProjectSiteEntity ? initialEntityId ?? "" : initialEntityType === "projectSiteRosterPerson" ? initialRelatedEntityId ?? "" : "",
+  );
   const [openFormDrawer, setOpenFormDrawer] = useState<ProjectSiteFormDrawer>(null);
   const [siteForm, setSiteForm] = useState<ProjectSiteCreateFormState>(createInitialSiteForm);
   const [usageForm, setUsageForm] = useState<ProjectUsageRequestFormState>(createInitialUsageForm);
@@ -42,13 +45,13 @@ export function useProjectSitesWorkspaceState({
   useEffect(() => {
     if (!initialEntityId) return;
     if (initialEntityType === "projectSiteRosterPerson") {
-      setSelectedDetailSiteId("");
+      setSelectedDetailSiteId(initialRelatedEntityId ?? "");
       return;
     }
     if (!initialEntityType || initialEntityType === "projectSite") {
       setSelectedDetailSiteId(initialEntityId);
     }
-  }, [initialEntityId, initialEntityType]);
+  }, [initialEntityId, initialEntityType, initialRelatedEntityId]);
 
   return {
     query,

@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedTabs, WorkspaceScaffold, type TabItem } from "../ui";
 import { ImportJobsTab } from "./ImportJobsTab";
+import { ImportPilotReviewPanel } from "./ImportPilotReviewPanel";
 import { ImportPreviewTab } from "./ImportPreviewTab";
 import { ImportRowsTab } from "./ImportRowsTab";
 import { ImportSummaryCards } from "./ImportSummaryCards";
@@ -11,6 +12,7 @@ const TABS: TabItem<ExcelImportTab>[] = [
   { key: "preview", label: "导入预检" },
   { key: "jobs", label: "导入批次" },
   { key: "rows", label: "行级预览" },
+  { key: "review", label: "试点复核" },
 ];
 
 function useImportRiskSummary(model: ExcelImportController) {
@@ -77,6 +79,7 @@ export function ExcelImportWorkspaceView({ model }: { model: ExcelImportControll
         {model.activeTab === "preview" ? <ImportPreviewTab model={model} /> : null}
         {model.activeTab === "jobs" ? <ImportJobsTab model={model} /> : null}
         {model.activeTab === "rows" ? <ImportRowsTab model={model} /> : null}
+        {model.activeTab === "review" ? <ImportPilotReviewPanel model={model} /> : null}
       </div>
     </WorkspaceScaffold>
   );

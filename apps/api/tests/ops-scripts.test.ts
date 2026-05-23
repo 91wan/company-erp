@@ -301,6 +301,26 @@ describe("backup restore drill script", () => {
   });
 });
 
+describe("Excel import pilot gate scripts", () => {
+  it("keeps root package scripts wired for static and smoke gates", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+
+    expect(packageJson.scripts["import:pilot-check"]).toBe("node scripts/import-pilot-check.mjs");
+    expect(packageJson.scripts["import:pilot-smoke"]).toBe("node scripts/import-pilot-smoke.mjs");
+  });
+
+  it("pilot-check reminds operators to run the real smoke drill", () => {
+    const result = spawnSync("npm", ["run", "import:pilot-check"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("npm run import:pilot-smoke");
+    expect(result.stdout).toContain("真实导入演练");
+  });
+});
+
 describe("operator runbook command smoke", () => {
   const runbookPath = join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md");
   const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
