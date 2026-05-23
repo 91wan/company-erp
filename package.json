@@ -22,7 +22,8 @@
     "attachments:legacy-report": "node scripts/attachments-legacy-report.mjs",
     "nas:trial-readiness": "node scripts/nas-trial-readiness-gate.mjs",
     "import:pilot-check": "node scripts/import-pilot-check.mjs",
-    "import:pilot-smoke": "node scripts/import-pilot-smoke.mjs"
+    "import:pilot-smoke": "node scripts/import-pilot-smoke.mjs",
+    "pilot:ready": "npm run db:generate && npm run db:validate && npm run typecheck && npm run test && npm run build && npm run test:e2e -w @company-erp/web && npm run import:pilot-check && npm run import:pilot-smoke && npm run nas:trial-readiness"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

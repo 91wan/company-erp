@@ -173,6 +173,8 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 initialEntityId={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.entityId : undefined}
                 initialEntityType={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.entityType : undefined}
                 initialRelatedEntityId={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.relatedEntityId : undefined}
+                initialRelatedEntityType={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.relatedEntityType : undefined}
+                initialRelatedEntityCode={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.relatedEntityCode : undefined}
                 externalProjectSiteContactName={currentUser.externalProjectSiteContactName}
                 externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
                 onPortalSectionChange={(section) => navigate({ workspace: workspaceForExternalPortalSection(section), portalSection: section })}

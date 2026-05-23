@@ -77,6 +77,8 @@ export type ProjectSitesWorkspaceOptions = {
   initialEntityId?: string;
   initialEntityType?: string;
   initialRelatedEntityId?: string;
+  initialRelatedEntityType?: string;
+  initialRelatedEntityCode?: string;
   onPortalSectionChange?: (section: ExternalProjectSitePortalSection) => void;
   externalProjectSiteContactName?: string | null;
   externalProjectSiteContactPhone?: string | null;

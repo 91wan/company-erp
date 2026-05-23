@@ -213,6 +213,25 @@ expected revision.
 
 ## Preflight Before Starting
 
+Before scheduling a NAS intranet trial, run the full local readiness command:
+
+```bash
+npm run pilot:ready
+```
+
+Passing `pilot:ready` only means the team can arrange a small NAS intranet trial
+for 1-3 project sites. It is not a formal production launch. The command does
+not start production containers or read real NAS attachment roots; it runs local
+verification, browser E2E, Excel import gates, and the NAS readiness gate. A
+browser-capable environment is required for `npm run test:e2e -w @company-erp/web`.
+
+Do not expose API or PostgreSQL to the public internet. Do not import all real
+data directly for the first drill; start with desensitized data or a small
+controlled sample. The current import module does not do OCR, ZIP image batch
+ingestion, contract PDF batch upload, import rollback, or overwrite-style import.
+If a row is imported incorrectly, void, disable, or correct it in the business
+module instead of deleting database rows directly.
+
 Run the NAS preflight before `docker compose up` or any update. It validates the
 real `.env`, creates the configured NAS data and attachment roots if possible,
 checks placeholder secrets, enforces the public-access guardrails, and runs

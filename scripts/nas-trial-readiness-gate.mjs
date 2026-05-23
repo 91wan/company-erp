@@ -26,6 +26,8 @@ const checks = [
   { label: "pilot evidence help", command: "npm", args: ["run", "pilot:verify-evidence", "--", "--help"], expect: "Usage: npm run pilot:verify-evidence" },
   { label: "audit export help", command: "npm", args: ["run", "audit:verify-export", "--", "--help"], expect: "Usage: npm run audit:verify-export" },
   { label: "legacy report help", command: "npm", args: ["run", "attachments:legacy-report", "--", "--help"], expect: "Usage: npm run attachments:legacy-report" },
+  { label: "import pilot static gate", command: "npm", args: ["run", "import:pilot-check"], expect: "NAS 试点导入前置检查" },
+  { label: "import pilot smoke", command: "npm", args: ["run", "import:pilot-smoke"], expect: "导入试点 smoke 通过" },
   {
     label: "doc static gate",
     command: "npm",

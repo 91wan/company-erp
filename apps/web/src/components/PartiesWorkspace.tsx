@@ -14,6 +14,7 @@ type PartiesWorkspaceProps = {
   createParty?: (input: CreatePartyInput) => Promise<PartyDto>;
   canManage?: boolean;
   initialEntityId?: string;
+  embedded?: boolean;
 };
 
 async function defaultLoadParties(): Promise<PartyDto[]> {
@@ -37,6 +38,7 @@ export function PartiesWorkspace({
   createParty = defaultCreateParty,
   canManage = true,
   initialEntityId,
+  embedded = false,
 }: PartiesWorkspaceProps) {
   const [parties, setParties] = useState<PartyDto[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -129,12 +131,7 @@ export function PartiesWorkspace({
     </div>
   );
 
-  return (
-    <WorkspaceScaffold
-      eyebrow="基础资料"
-      title="往来单位"
-      subtitle="统一维护客户、供应商、分包主体、个人承包人和运营主体。"
-      actions={(
+  const actions = (
         <>
           <span className="parties-total">
             <Building2 aria-hidden="true" size={18} />
@@ -146,9 +143,17 @@ export function PartiesWorkspace({
             </button>
           ) : null}
         </>
-      )}
-      summary={summary}
-    >
+  );
+
+  const content = (
+    <>
+      {embedded && canManage ? (
+        <div className="workspace-primary-actions">
+          <button type="button" className="primary-action" onClick={() => setIsCreateDrawerOpen(true)}>
+            新增往来方
+          </button>
+        </div>
+      ) : null}
       <section className="parties-workspace" aria-label="往来方基础资料">
         <SectionCard title="往来单位台账">
           {initialEntityId ? (
@@ -273,6 +278,20 @@ export function PartiesWorkspace({
           {submitState === "error" ? <p className="form-error">保存失败，请检查编码是否重复或稍后重试。</p> : null}
         </form>
       </FormDrawer>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <WorkspaceScaffold
+      eyebrow="基础资料"
+      title="往来单位"
+      subtitle="统一维护客户、供应商、分包主体、个人承包人和运营主体。"
+      actions={actions}
+      summary={summary}
+    >
+      {content}
     </WorkspaceScaffold>
   );
 }

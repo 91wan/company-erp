@@ -6,6 +6,23 @@ Company ERP is a lightweight internal web ERP for company operations, designed
 for NAS intranet deployment. It focuses on practical daily workflows rather
 than public SaaS, finance automation, OCR, or mobile apps.
 
+## NAS Trial Readiness
+
+Before scheduling a NAS intranet trial, run:
+
+```bash
+npm run pilot:ready
+```
+
+Passing this command only means the team can arrange a small NAS intranet trial
+for 1-3 project sites; it is not a formal production launch. Do not expose API
+or PostgreSQL to the public internet. Do not import all real data directly for
+the first drill; use desensitized data or a small controlled sample first. The
+current Excel import module does not do OCR, ZIP image batch ingestion, contract
+PDF batch upload, import rollback, or overwrite-style import. If data is
+imported incorrectly, void, disable, or correct it in the business module
+instead of deleting database rows directly.
+
 ## Current Capabilities
 
 - React + Vite + TypeScript web app with an Apple-style internal dashboard.

@@ -810,6 +810,7 @@ describe("import permission enforcement", () => {
     const { app, cookie } = await buildAuthedApp(["viewer"]);
 
     const templateResponse = await app.inject({ method: "GET", url: "/api/import-templates/parties.xlsx", headers: { cookie: `company_erp_session=${cookie}` } });
+    const allTemplatesResponse = await app.inject({ method: "GET", url: "/api/import-templates/all.zip", headers: { cookie: `company_erp_session=${cookie}` } });
     const listResponse = await app.inject({ method: "GET", url: "/api/import-jobs", headers: { cookie: `company_erp_session=${cookie}` } });
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
     const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
@@ -818,6 +819,7 @@ describe("import permission enforcement", () => {
     await app.close();
 
     expect(templateResponse.statusCode).toBe(200);
+    expect(allTemplatesResponse.statusCode).toBe(200);
     expect(listResponse.statusCode).toBe(200);
     expect(previewResponse.statusCode).toBe(403);
     expect(confirmResponse.statusCode).toBe(403);
@@ -850,6 +852,7 @@ describe("import permission enforcement", () => {
     const cookieHeader = { cookie: `company_erp_session=${cookie}` };
 
     const templatesResponse = await app.inject({ method: "GET", url: "/api/import-templates", headers: cookieHeader });
+    const allTemplatesResponse = await app.inject({ method: "GET", url: "/api/import-templates/all.zip", headers: cookieHeader });
     const jobsResponse = await app.inject({ method: "GET", url: "/api/import-jobs", headers: cookieHeader });
     const reportResponse = await app.inject({
       method: "GET",
@@ -870,6 +873,7 @@ describe("import permission enforcement", () => {
     await app.close();
 
     expect(templatesResponse.statusCode).toBe(403);
+    expect(allTemplatesResponse.statusCode).toBe(403);
     expect(jobsResponse.statusCode).toBe(403);
     expect(reportResponse.statusCode).toBe(403);
     expect(previewResponse.statusCode).toBe(403);

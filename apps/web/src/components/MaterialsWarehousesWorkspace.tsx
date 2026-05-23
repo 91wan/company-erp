@@ -42,6 +42,7 @@ type MaterialsWarehousesWorkspaceProps = {
   canManage?: boolean;
   initialTab?: string;
   initialEntityId?: string;
+  embedded?: boolean;
 };
 
 type MaterialsWarehousesTab = "materials" | "warehouses";
@@ -111,6 +112,7 @@ export function MaterialsWarehousesWorkspace({
   canManage = true,
   initialTab,
   initialEntityId,
+  embedded = false,
 }: MaterialsWarehousesWorkspaceProps) {
   const [materials, setMaterials] = useState<MaterialDto[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -338,20 +340,9 @@ export function MaterialsWarehousesWorkspace({
     </>
   );
 
-  return (
-    <WorkspaceScaffold
-      eyebrow="基础资料"
-      title="物料与仓库"
-      subtitle="分区维护物料、仓库和库存基础口径。"
-      actions={
-        <span className="parties-total">
-          <Boxes aria-hidden="true" size={18} />
-          {materials.length} 个物料
-        </span>
-      }
-      summary={summary}
-      tabs={tabs}
-    >
+  const content = (
+    <>
+      {embedded ? <div className="basic-data-embedded-tabs">{tabs}</div> : null}
       <section
         className="materials-warehouses-workspace"
         aria-label="物料和仓库基础资料"
@@ -728,6 +719,26 @@ export function MaterialsWarehousesWorkspace({
           ) : null}
         </form>
       </FormDrawer>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <WorkspaceScaffold
+      eyebrow="基础资料"
+      title="物料与仓库"
+      subtitle="分区维护物料、仓库和库存基础口径。"
+      actions={
+        <span className="parties-total">
+          <Boxes aria-hidden="true" size={18} />
+          {materials.length} 个物料
+        </span>
+      }
+      summary={summary}
+      tabs={tabs}
+    >
+      {content}
     </WorkspaceScaffold>
   );
 }
