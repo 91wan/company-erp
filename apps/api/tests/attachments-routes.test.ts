@@ -1357,10 +1357,12 @@ describe("attachments API", () => {
       expect(adminContent.headers["content-type"]).toContain("text/plain");
       expect(adminContent.headers["content-disposition"]).toBe('attachment; filename="site-license.txt"');
       expect(adminContent.headers["x-content-type-options"]).toBe("nosniff");
+      expect(adminContent.headers["content-length"] ?? adminContent.headers["transfer-encoding"]).toBeDefined();
       expect(scopedContent.statusCode).toBe(200);
       expect(scopedContent.payload).toBe("DEMO attachment content");
       expect(scopedContent.headers["content-disposition"]).toBe('attachment; filename="site-license.txt"');
       expect(scopedContent.headers["x-content-type-options"]).toBe("nosniff");
+      expect(scopedContent.headers["content-length"] ?? scopedContent.headers["transfer-encoding"]).toBeDefined();
       expect(JSON.stringify(scopedContent.headers)).not.toContain(root);
       expect(outOfScope.statusCode).toBe(404);
       expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
@@ -1369,6 +1371,144 @@ describe("attachments API", () => {
       expect(logs.map((log) => log.action)).toEqual(["attachment.content_read", "attachment.content_read"]);
       expect(JSON.stringify(logs)).not.toContain(root);
       expect(JSON.stringify(logs)).not.toContain("project-sites/site-license.txt");
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rate limits attachment content reads by client IP", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-attachments-limit-"));
+    await mkdir(join(root, "project-sites"), { recursive: true });
+    await writeFile(join(root, "project-sites", "site-license.txt"), "DEMO attachment content");
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([
+        makeAttachment({
+          id: "22222222-2222-4222-8222-222222222222",
+          storageKey: "project-sites/site-license.txt",
+          originalFileName: "site-license.txt",
+          fileType: "text/plain",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: assignedProjectSiteId,
+        }),
+      ]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const cookie = await loginCookie(app);
+      let lastStatus = 0;
+      for (let i = 0; i < 31; i += 1) {
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+          cookies: { company_erp_session: cookie },
+          remoteAddress: "192.168.88.10",
+        });
+        lastStatus = response.statusCode;
+      }
+
+      expect(lastStatus).toBe(429);
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rate limits direct attachment uploads by client IP", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-upload-limit-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const session = await loginSession(app);
+      let lastStatus = 0;
+      for (let i = 0; i < 11; i += 1) {
+        const uploadPayload = multipartPayload(
+          {
+            ownerModule: "contracts",
+            ownerEntityType: "contract",
+            ownerEntityId: "33333333-3333-4333-8333-333333333333",
+            displayName: `合同附件 ${i}`,
+          },
+          { name: `contract-${i}.pdf`, type: "application/pdf", content: `PDF demo content ${i}` },
+        );
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/attachments/upload",
+          cookies: { company_erp_session: session.cookie },
+          headers: csrfHeaders(session, uploadPayload.headers),
+          remoteAddress: "192.168.88.11",
+          payload: uploadPayload.payload,
+        });
+        lastStatus = response.statusCode;
+      }
+
+      expect(lastStatus).toBe(429);
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rate limits business attachment uploads by account per day", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-business-upload-limit-"));
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({
+          id: "77777777-7777-4777-8777-000000000001",
+          username: "external-site",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [assignedProjectSiteId],
+        }),
+      ]),
+      attachmentRepository: createFakeAttachmentRepository([]),
+      auditLogRepository: createFakeAuditLogRepository(),
+      certificateRepository: createFakeCertificateRepository(),
+      projectSiteRepository: createFakeProjectSiteRepository(),
+      projectSiteComplianceRepository: createFakeComplianceRepository(),
+    });
+
+    try {
+      const session = await loginSession(app, "external-site");
+      let lastStatus = 0;
+      for (let i = 0; i < 51; i += 1) {
+        const uploadPayload = multipartPayload(
+          {
+            targetType: "certificate_record",
+            targetId: assignedCertificateId,
+            displayName: `食品经营许可证附件 ${i}`,
+          },
+          { name: `food-license-${i}.pdf`, type: "application/pdf", content: `PDF demo content ${i}` },
+        );
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/project-site-attachment-uploads",
+          cookies: { company_erp_session: session.cookie },
+          headers: csrfHeaders(session, uploadPayload.headers),
+          remoteAddress: `192.168.89.${i + 1}`,
+          payload: uploadPayload.payload,
+        });
+        lastStatus = response.statusCode;
+      }
+
+      expect(lastStatus).toBe(429);
     } finally {
       await app.close();
       await rm(root, { recursive: true, force: true });
