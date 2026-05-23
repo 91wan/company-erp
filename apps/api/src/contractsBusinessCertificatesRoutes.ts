@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { AttachmentRecordDto, CertificateRecordDto, ContractDto, CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
-import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
+import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "./businessProjects.js";
 import {
   CertificateConflictError,
@@ -214,12 +214,15 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
 
     try {
       const input = normalizeContractInput(request.body, "create");
-      const contract = await options.contractRepository.create(input);
-      await writeAuditLog(request, options, {
-        action: "contract.create",
-        entityType: "contract",
-        entityId: contract.id,
-        afterJson: contract,
+      const contract = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.contractRepository!.create(input);
+        await writeAuditLog(request, options, {
+          action: "contract.create",
+          entityType: "contract",
+          entityId: created.id,
+          afterJson: created,
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ contract });
     } catch (error) {
@@ -251,15 +254,19 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         endDate: input.endDate !== undefined ? input.endDate : current.endDate,
       });
       if (finalStateIssues.length > 0) throw new ContractValidationError(finalStateIssues);
-      const contract = await options.contractRepository.update(id, input);
-      if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
-      await writeAuditLog(request, options, {
-        action: "contract.update",
-        entityType: "contract",
-        entityId: contract.id,
-        beforeJson: current,
-        afterJson: contract,
+      const contract = await runWithAuditTransaction(options, async (txOptions) => {
+        const updated = await txOptions.contractRepository!.update(id, input);
+        if (!updated) return null;
+        await writeAuditLog(request, options, {
+          action: "contract.update",
+          entityType: "contract",
+          entityId: updated.id,
+          beforeJson: current,
+          afterJson: updated,
+        }, { tx: txOptions });
+        return updated;
       });
+      if (!contract) return reply.status(404).send({ error: "CONTRACT_NOT_FOUND" });
       return { contract };
     } catch (error) {
       if (error instanceof ContractValidationError) {

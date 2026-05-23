@@ -54,6 +54,7 @@ export type BuildAppOptions = {
   certificateRepository?: CertificateRepository;
   importJobRepository?: ImportJobRepository;
   marketOperationsHandoffRepository?: MarketOperationsHandoffRepository;
+  runInTransaction?: <T>(callback: (txOptions: BuildAppOptions) => Promise<T>) => Promise<T>;
 };
 
 const SCOPED_PROJECT_SITE_ROLES = new Set<MvpRoleCode>(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles);
@@ -157,11 +158,13 @@ export async function writeAuditLog(
     beforeJson?: unknown | null;
     afterJson?: unknown | null;
   },
+  writeOptions: { tx?: Pick<BuildAppOptions, "auditLogRepository"> } = {},
 ): Promise<void> {
-  if (!options.auditLogRepository) return;
+  const auditOptions = writeOptions.tx ?? options;
+  if (!auditOptions.auditLogRepository) return;
   const user = (request as AuthenticatedRequest).currentUser;
   try {
-    await options.auditLogRepository.create({
+    await auditOptions.auditLogRepository.create({
       actorUserId: user?.id ?? null,
       actorUsername: user?.username ?? null,
       action: event.action,
@@ -178,4 +181,11 @@ export async function writeAuditLog(
   } catch {
     throw new AuditLogWriteError();
   }
+}
+
+export async function runWithAuditTransaction<T>(
+  options: BuildAppOptions,
+  callback: (txOptions: BuildAppOptions) => Promise<T>,
+): Promise<T> {
+  return options.runInTransaction ? options.runInTransaction(callback) : callback(options);
 }

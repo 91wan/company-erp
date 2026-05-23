@@ -7,7 +7,7 @@ import type {
   ProjectSitePayrollSubmissionDto,
 } from "@company-erp/shared";
 import type { AuthenticatedRequest } from "./auth.js";
-import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
+import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteInsuranceCoveredPersonFilters, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
 function kitchenEquipmentAuditSnapshot(equipment: ProjectSiteKitchenEquipmentDto) {
@@ -168,12 +168,15 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSites", requiredLevel: "manage" });
       }
       const input = normalizeProjectSiteInput(request.body, "create");
-      const projectSite = await options.projectSiteRepository.create(input);
-      await writeAuditLog(request, options, {
-        action: "project_site.create",
-        entityType: "project_site",
-        entityId: projectSite.id,
-        afterJson: projectSite,
+      const projectSite = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.projectSiteRepository!.create(input);
+        await writeAuditLog(request, options, {
+          action: "project_site.create",
+          entityType: "project_site",
+          entityId: created.id,
+          afterJson: created,
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ projectSite });
     } catch (error) {
@@ -198,16 +201,20 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         return reply.status(403).send({ error: "FORBIDDEN", permissionArea: "projectSites", requiredLevel: "manage" });
       }
       const input = normalizeProjectSiteInput(request.body, "update");
-      const before = await options.projectSiteRepository.getById(id);
-      const projectSite = await options.projectSiteRepository.update(id, input);
-      if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
-      await writeAuditLog(request, options, {
-        action: "project_site.update",
-        entityType: "project_site",
-        entityId: projectSite.id,
-        beforeJson: before,
-        afterJson: projectSite,
+      const projectSite = await runWithAuditTransaction(options, async (txOptions) => {
+        const before = await txOptions.projectSiteRepository!.getById(id);
+        const updated = await txOptions.projectSiteRepository!.update(id, input);
+        if (!updated) return null;
+        await writeAuditLog(request, options, {
+          action: "project_site.update",
+          entityType: "project_site",
+          entityId: updated.id,
+          beforeJson: before,
+          afterJson: updated,
+        }, { tx: txOptions });
+        return updated;
       });
+      if (!projectSite) return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       return { projectSite };
     } catch (error) {
       if (error instanceof ProjectSiteValidationError) {
@@ -251,12 +258,15 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
       if (isOutsideProjectSiteScope(scopedProjectSiteIds(request), input.projectSiteId)) {
         return reply.status(404).send({ error: "PROJECT_SITE_NOT_FOUND" });
       }
-      const rosterPerson = await options.projectSiteComplianceRepository.createRosterPerson(input);
-      await writeAuditLog(request, options, {
-        action: "project_site_roster_person.create",
-        entityType: "project_site_roster_person",
-        entityId: rosterPerson.id,
-        afterJson: rosterPerson,
+      const rosterPerson = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.projectSiteComplianceRepository!.createRosterPerson(input);
+        await writeAuditLog(request, options, {
+          action: "project_site_roster_person.create",
+          entityType: "project_site_roster_person",
+          entityId: created.id,
+          afterJson: created,
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ rosterPerson });
     } catch (error) {
@@ -769,14 +779,18 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
     const { id } = request.params as { id: string };
     try {
       const input = normalizeIssueProjectUsageRequestInput(request.body);
-      const projectUsageRequest = await options.projectUsageRequestRepository.issue(id, input);
-      if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
-      await writeAuditLog(request, options, {
-        action: "project_usage_request.issue",
-        entityType: "project_usage_request",
-        entityId: projectUsageRequest.id,
-        afterJson: projectUsageRequest,
+      const projectUsageRequest = await runWithAuditTransaction(options, async (txOptions) => {
+        const issued = await txOptions.projectUsageRequestRepository!.issue(id, input);
+        if (!issued) return null;
+        await writeAuditLog(request, options, {
+          action: "project_usage_request.issue",
+          entityType: "project_usage_request",
+          entityId: issued.id,
+          afterJson: issued,
+        }, { tx: txOptions });
+        return issued;
       });
+      if (!projectUsageRequest) return reply.status(404).send({ error: "PROJECT_USAGE_REQUEST_NOT_FOUND" });
       return reply.status(201).send({ projectUsageRequest });
     } catch (error) {
       if (error instanceof ProjectUsageRequestValidationError) {
