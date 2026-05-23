@@ -123,7 +123,7 @@ export function ImportJobsTab({ model }: { model: ExcelImportController }) {
               </button>
               {hasIssues ? (
                 <a
-                  className="table-action"
+                  className="table-action read-only-visible-action"
                   href={errorReportUrl(job.id)}
                   download
                   aria-label="下载错误/预检报告"

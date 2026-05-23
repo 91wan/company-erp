@@ -117,6 +117,7 @@ export type ProjectSitesHeadquartersViewProps = {
   loadAttachments: (filters: AttachmentFilters) => Promise<AttachmentRecordDto[]>;
   getAttachmentDownloadUrl: (id: string) => Promise<string>;
   initialTab?: string;
+  importLocationNotice?: string;
 };
 
 const usageStatusLabel = new Map(PROJECT_USAGE_STATUSES.map((status) => [status.code, status.label]));
@@ -209,6 +210,7 @@ export function ProjectSitesHeadquartersView({
   loadAttachments,
   getAttachmentDownloadUrl,
   initialTab,
+  importLocationNotice,
 }: ProjectSitesHeadquartersViewProps) {
   const [activeTab, setActiveTab] = useState<ProjectSitesHeadquartersTab>(
     isProjectSitesHeadquartersTab(initialTab) ? initialTab : "risk",
@@ -253,6 +255,12 @@ export function ProjectSitesHeadquartersView({
           </>
         )}
       >
+        {importLocationNotice ? (
+          <div className="workspace-state workspace-state--info" role="status">
+            <span>{importLocationNotice}</span>
+          </div>
+        ) : null}
+
         {activeTab === "risk" ? (
           <>
             <ProjectSiteToolbar

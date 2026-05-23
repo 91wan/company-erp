@@ -39,15 +39,15 @@ export function BasicDataWorkspace({ canManage = true, initialTab, initialEntity
         <div className="workspace-state workspace-state--info" role="status">
           <span>
             已从导入结果跳转至{activeTab === "parties" ? "往来方" : activeTab === "materials" ? "物料" : "仓库"}台账，
-            请搜索对应记录核查（记录不可见时请检查筛选条件或权限）。
+            请核查记录 ID：{initialEntityId}（记录不可见时请检查筛选条件或权限）。
           </span>
         </div>
       ) : null}
       {activeTab === "parties" ? (
-        <PartiesWorkspace canManage={canManage} />
+        <PartiesWorkspace canManage={canManage} initialEntityId={initialEntityId} />
       ) : null}
       {activeTab === "materials" || activeTab === "warehouses" ? (
-        <MaterialsWarehousesWorkspace canManage={canManage} initialTab={activeTab} />
+        <MaterialsWarehousesWorkspace canManage={canManage} initialTab={activeTab} initialEntityId={initialEntityId} />
       ) : null}
     </div>
   );

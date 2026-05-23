@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const apiSrc = join(root, "apps/api/src");
+const webSrc = join(root, "apps/web/src");
 
 let passed = 0;
 let failed = 0;
@@ -34,6 +35,10 @@ function check(label, fn) {
 
 function readSrc(relPath) {
   return readFileSync(join(apiSrc, relPath), "utf8");
+}
+
+function readWeb(relPath) {
+  return readFileSync(join(webSrc, relPath), "utf8");
 }
 
 console.log("\n─── NAS 试点导入前置检查 ───\n");
@@ -59,7 +64,9 @@ check("health_certificates 模板不含身份证后四位/健康证编号/发证
   const headersMatch = block.match(/headers:\s*\[([^\]]+)\]/);
   const headersStr = headersMatch ? headersMatch[1] : "";
   if (headersStr.includes("健康证编号")) throw new Error("健康证编号 出现在 health_certificates headers");
+  if (headersStr.includes("身份证后四位")) throw new Error("身份证后四位 出现在 health_certificates headers");
   if (headersStr.includes("发证机关")) throw new Error("发证机关 出现在 health_certificates headers");
+  if (headersStr.includes("发证机构")) throw new Error("发证机构 出现在 health_certificates headers");
 });
 
 // 3. 图片文件名存在于 health_certificates 模板
@@ -88,6 +95,12 @@ check("error-report 路由有生成失败保护 (IMPORT_REPORT_GENERATION_FAILED
 check("error-report XLSX 有 views freeze (header row frozen)", () => {
   const src = readSrc("importJobRoutes.ts");
   if (!src.includes("frozen")) throw new Error("问题行 sheet 未设置冻结行");
+});
+
+// 6b. error-report 有导入说明 sheet
+check("error-report XLSX 有导入说明 sheet", () => {
+  const src = readSrc("importJobRoutes.ts");
+  if (!src.includes("导入说明")) throw new Error("缺少导入说明 sheet");
 });
 
 // 7. docs/import/pilot-import-runbook.md 存在
@@ -126,23 +139,86 @@ check("BasicDataWorkspace 组件存在（P0-1）", () => {
   }
 });
 
-// 12. InventoryWorkspace 包含 movements tab
+// 12. BasicDataWorkspace 支持 initialEntityId 透传
+check("BasicDataWorkspace 支持 initialTab/initialEntityId 定位", () => {
+  const src = readWeb("components/basic-data/BasicDataWorkspace.tsx");
+  if (!src.includes("initialTab")) throw new Error("缺少 initialTab");
+  if (!src.includes("initialEntityId")) throw new Error("缺少 initialEntityId");
+  if (!src.includes("PartiesWorkspace") || !src.includes("initialEntityId={initialEntityId}")) {
+    throw new Error("未把 initialEntityId 透传给基础资料子工作区");
+  }
+});
+
+// 13. InventoryWorkspace 包含 movements tab
 check("InventoryWorkspace 包含 movements tab", () => {
   const src = readFileSync(join(root, "apps/web/src/components/InventoryWorkspace.tsx"), "utf8");
   if (!src.includes('"movements"') && !src.includes("movements")) throw new Error("缺少 movements tab");
 });
 
-// 13. buildNavigationIntent 不再全部跳 inbound
-check("ImportRowsTab buildNavigationIntent 对 opening 不返回 inbound", () => {
-  const src = readFileSync(
-    join(root, "apps/web/src/components/excel-import/ImportRowsTab.tsx"), "utf8"
-  );
-  const idx = src.indexOf("inventoryMovement");
-  if (idx < 0) throw new Error("缺少 inventoryMovement case");
-  const block = src.slice(idx, idx + 300);
-  if (block.includes('"inbound"') && !block.includes("movements")) {
-    throw new Error("inventoryMovement 仍然固定跳 inbound，应改为 movements");
+// 14. ImportRowsTab 的基础资料跳转必须带 tab
+check("ImportRowsTab party/material 跳转包含精确 tab", () => {
+  const src = readWeb("components/excel-import/ImportRowsTab.tsx");
+  const partyIdx = src.indexOf('case "party"');
+  const materialIdx = src.indexOf('case "material"');
+  if (partyIdx < 0 || !src.slice(partyIdx, partyIdx + 180).includes('tab: "parties"')) {
+    throw new Error("party 导入结果缺少 tab=parties");
   }
+  if (materialIdx < 0 || !src.slice(materialIdx, materialIdx + 180).includes('tab: "materials"')) {
+    throw new Error("material 导入结果缺少 tab=materials");
+  }
+});
+
+// 15. buildNavigationIntent 不再全部跳 inbound，并按 movementType 分流
+check("ImportRowsTab inventoryMovement 按 movementType 跳转库存流水", () => {
+  const src = readWeb("components/excel-import/ImportRowsTab.tsx");
+  const idx = src.indexOf('case "inventoryMovement"');
+  if (idx < 0) throw new Error("缺少 inventoryMovement case");
+  const block = src.slice(idx, idx + 900);
+  for (const token of ["normalizedData", "movementType", '"movements"', '"opening"', '"inbound"', '"outbound"', '"adjustment_in"', '"adjustment_out"']) {
+    if (!block.includes(token)) throw new Error(`inventoryMovement 缺少 ${token}`);
+  }
+  if (/return\s*\{\s*workspace:\s*"库存"\s*,\s*tab:\s*"inbound"/s.test(block)) {
+    throw new Error("inventoryMovement 仍然固定跳 inbound，应按 movementType 分流");
+  }
+});
+
+// 16. projectSiteRosterPerson 不能被当成 projectSiteId
+check("ImportRowsTab 区分 projectSite 与 projectSiteRosterPerson entityType", () => {
+  const src = readWeb("components/excel-import/ImportRowsTab.tsx");
+  const projectIdx = src.indexOf('case "projectSite"');
+  const rosterIdx = src.indexOf('case "projectSiteRosterPerson"');
+  if (projectIdx < 0 || !src.slice(projectIdx, projectIdx + 220).includes('entityType: "projectSite"')) {
+    throw new Error("projectSite 导入跳转缺少 entityType=projectSite");
+  }
+  if (rosterIdx < 0 || !src.slice(rosterIdx, rosterIdx + 260).includes('entityType: "projectSiteRosterPerson"')) {
+    throw new Error("projectSiteRosterPerson 导入跳转缺少 entityType=projectSiteRosterPerson");
+  }
+});
+
+// 17. ProjectSitesWorkspace 支持 entityType，不误把 rosterPersonId 当 projectSiteId
+check("ProjectSitesWorkspace 支持 initialEntityType", () => {
+  const stateSrc = readWeb("components/project-sites/useProjectSitesWorkspaceState.ts");
+  const controllerSrc = readWeb("components/project-sites/useProjectSitesWorkspaceController.ts");
+  if (!stateSrc.includes("initialEntityType") || !stateSrc.includes("projectSiteRosterPerson")) {
+    throw new Error("项目点状态层未处理 projectSiteRosterPerson");
+  }
+  if (!controllerSrc.includes("项目点现场人员记录不可见或无权限")) {
+    throw new Error("项目点导入定位缺少项目点现场人员不可见提示");
+  }
+});
+
+// 18. ConfirmAction 摘要必须提示不可一键回滚
+check("确认导入 UI 包含不能一键回滚提示", () => {
+  const src = readWeb("components/excel-import/ImportRowsTab.tsx");
+  if (!src.includes("不支持一键回滚")) throw new Error("确认摘要缺少不能一键回滚提示");
+});
+
+// 19. 默认仓库名
+check("默认仓库名为无锡总部仓库", () => {
+  const trial = readSrc("trialData.ts");
+  const templates = readSrc("importTemplates.ts");
+  if (!trial.includes('warehouseName: "无锡总部仓库"')) throw new Error("trialData 默认仓库名不是无锡总部仓库");
+  if (!templates.includes("无锡总部仓库")) throw new Error("导入模板示例未使用无锡总部仓库");
 });
 
 console.log(`\n─── 结果：${passed} 通过 / ${failed} 失败 ───\n`);

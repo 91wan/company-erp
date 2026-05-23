@@ -171,6 +171,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 portalSection={activePortalSection}
                 initialTab={activeWorkspaceTab("项目点")}
                 initialEntityId={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.entityId : undefined}
+                initialEntityType={activeNavigationIntent.workspace === "项目点" ? activeNavigationIntent.entityType : undefined}
                 externalProjectSiteContactName={currentUser.externalProjectSiteContactName}
                 externalProjectSiteContactPhone={currentUser.externalProjectSiteContactPhone}
                 onPortalSectionChange={(section) => navigate({ workspace: workspaceForExternalPortalSection(section), portalSection: section })}

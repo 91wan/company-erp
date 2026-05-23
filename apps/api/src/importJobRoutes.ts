@@ -118,7 +118,7 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
 
     // Sheet 1: 问题行 — fixed columns then template field columns then JSON (last)
     const sheet = workbook.addWorksheet("问题行");
-    const fixedHeaders = ["原始行号", "错误级别", "问题", "建议处理"];
+    const fixedHeaders = ["行号", "状态", "问题", "建议处理"];
     const headerRow = sheet.addRow([...fixedHeaders, ...templateHeaders, "原始数据 JSON"]);
     headerRow.font = { bold: true };
     headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
@@ -144,16 +144,14 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
     }
 
     sheet.columns = [
-      { width: 8 }, { width: 10 }, { width: 50 }, { width: 20 },
+      { width: 8 }, { width: 10 }, { width: 50 }, { width: 24 },
       ...templateHeaders.map(() => ({ width: 18 })),
-      { width: 40, hidden: templateHeaders.length >= 3 },  // hide JSON col if many field cols
+      { width: 16, hidden: templateHeaders.length >= 3 },
     ];
 
     // Freeze header row and enable AutoFilter
     sheet.views = [{ state: "frozen", ySplit: 1 }];
-    if (reportRows.length > 0) {
-      sheet.autoFilter = { from: "A1", to: { row: 1, column: totalCols } };
-    }
+    sheet.autoFilter = { from: "A1", to: { row: 1, column: totalCols } };
 
     // Sheet 2: 导入说明 — batch metadata + instructions
     const infoSheet = workbook.addWorksheet("导入说明");
@@ -180,6 +178,7 @@ export function registerImportJobRoutes(app: FastifyInstance, options: BuildAppO
     for (const [label, value] of infoRows) {
       const r = infoSheet.addRow([label, value]);
       r.getCell(1).font = { bold: true };
+      r.getCell(2).alignment = { wrapText: true };
     }
 
     try {

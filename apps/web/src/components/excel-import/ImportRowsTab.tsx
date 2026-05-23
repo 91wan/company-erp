@@ -1,9 +1,3 @@
-/**
- * P0-2: Enhanced confirm summary (object type, total/valid/warning/skipped/error).
- * P0-3: Per-row 查看 navigation button for confirmed jobs.
- * P1-1: Post-confirm review hints by template type.
- * P1-2: Health cert image filename hint in result column.
- */
 import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileSpreadsheet, XCircle } from "lucide-react";
 import { IMPORT_TEMPLATE_TYPES, type ImportJobRowDto } from "@company-erp/shared";
 import { ConfirmAction, DataTable, SectionCard } from "../ui";
@@ -12,10 +6,6 @@ import { getPreviewColumns } from "./importPreviewColumns";
 import { ImportStatusBadge } from "./ImportJobsTab";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 import type { ExcelImportController } from "./useExcelImportController";
-
-// ---------------------------------------------------------------------------
-// Business object type labels (P0-2)
-// ---------------------------------------------------------------------------
 
 const OBJECT_TYPE_LABELS: Record<string, string> = {
   parties: "往来方",
@@ -27,10 +17,6 @@ const OBJECT_TYPE_LABELS: Record<string, string> = {
   project_site_roster_people: "项目点现场人员",
   health_certificates: "健康证",
 };
-
-// ---------------------------------------------------------------------------
-// Navigation intent mapping (P0-3 / P0-1 enhanced with entityId + tab)
-// ---------------------------------------------------------------------------
 
 function certTabFromNormalizedData(normalizedData: Record<string, unknown> | null | undefined): string {
   const t = normalizedData?.certificateType as string | undefined;
@@ -49,16 +35,21 @@ function buildNavigationIntent(row: ImportJobRowDto): NavigationIntent | null {
     case "contract":
       return { workspace: "合同", tab: "ledger", entityId };
     case "projectSiteRosterPerson":
-      return { workspace: "项目点", tab: "review", entityId };
+      return { workspace: "项目点", tab: "review", entityId, entityType: "projectSiteRosterPerson" };
     case "projectSite":
-      return { workspace: "项目点", tab: "risk", entityId };
+      return { workspace: "项目点", tab: "risk", entityId, entityType: "projectSite" };
     case "material":
       return { workspace: "基础资料", tab: "materials", entityId };
     case "party":
       return { workspace: "基础资料", tab: "parties", entityId };
     case "inventoryMovement": {
       const movementType = (normalizedData as Record<string, unknown> | null)?.movementType as string | undefined;
-      const invTab = (movementType === "outbound" || movementType === "adjustment_out") ? "outbound" : "movements";
+      let invTab = "movements";
+      if (movementType === "inbound") invTab = "inbound";
+      if (movementType === "outbound") invTab = "outbound";
+      if (movementType === "opening" || movementType === "adjustment_in" || movementType === "adjustment_out") {
+        invTab = "movements";
+      }
       return { workspace: "库存", tab: invTab, entityId };
     }
     case "employee":
@@ -79,9 +70,21 @@ const AREA_LABELS: Record<string, string> = {
   employee: "员工台账",
 };
 
-// ---------------------------------------------------------------------------
-// Post-confirm review hints (P1-1)
-// ---------------------------------------------------------------------------
+const VIEW_LABELS: Record<string, string> = {
+  certificate: "查看证照",
+  contract: "查看合同",
+  projectSiteRosterPerson: "查看现场人员",
+  projectSite: "查看项目点",
+  material: "查看物料",
+  party: "查看往来方",
+  inventoryMovement: "查看库存流水",
+  employee: "查看员工",
+};
+
+function shortRecordId(recordId?: string | null): string {
+  if (!recordId) return "";
+  return recordId.length <= 6 ? recordId : recordId.slice(-6);
+}
 
 const REVIEW_HINTS: Record<string, string> = {
   contracts: "请到 合同 > 合同风险 检查到期提醒是否正确。",
@@ -105,10 +108,6 @@ const REVIEW_HINT_NAVIGATION: Record<string, NavigationIntent> = {
   project_sites: { workspace: "项目点" },
 };
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function ImportRowsTab({ model }: { model: ExcelImportController }) {
   const { activeJob, rows, summary, confirmingJobId, canManage, onNavigate } = model;
   const isConfirmed = activeJob?.status === "confirmed";
@@ -123,7 +122,6 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
   const isConfirming = confirmingJobId === activeJob?.id;
   const canConfirm = canManage && activeJob?.status === "previewed" && (activeJob.errorRows ?? 0) === 0;
 
-  // P0-2: Enhanced confirm summary
   const confirmationSummary = (
     <span className="import-confirm-summary">
       <span className="import-confirm-summary__line">
@@ -153,7 +151,6 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
     </span>
   );
 
-  // P1-1: Review hint
   const reviewHint = isConfirmed && REVIEW_HINTS[templateType] ? (
     <div className="import-review-hint" role="status">
       <CheckCircle2 size={16} aria-hidden="true" />
@@ -241,10 +238,6 @@ export function ImportRowsTab({ model }: { model: ExcelImportController }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Result cell (P0-3 + P1-2)
-// ---------------------------------------------------------------------------
-
 function buildResultCell(
   row: ImportJobRowDto,
   onNavigate?: ((intent: NavigationIntent) => void) | null | undefined,
@@ -254,9 +247,10 @@ function buildResultCell(
   if (row.status !== "imported") return "-";
 
   const areaLabel = AREA_LABELS[row.targetRecordType ?? ""] ?? row.targetRecordType ?? "";
+  const viewLabel = VIEW_LABELS[row.targetRecordType ?? ""] ?? "查看记录";
+  const recordIdLabel = shortRecordId(row.targetRecordId);
   const intent = buildNavigationIntent(row);
 
-  // P1-2: health cert image filename hint
   const imageFileName = row.normalizedData?.imageFileName as string | undefined;
   const imageHint =
     row.targetRecordType === "certificate" && imageFileName
@@ -271,10 +265,12 @@ function buildResultCell(
           type="button"
           className="import-result-view-btn"
           onClick={() => onNavigate(intent)}
-          aria-label={`查看 ${areaLabel}`}
+          aria-label={`${viewLabel} ${row.targetRecordId}`}
+          title={`记录 ID：${row.targetRecordId}`}
         >
           <ExternalLink size={12} aria-hidden="true" />
-          查看
+          {viewLabel}
+          {recordIdLabel ? <span className="import-result-view-btn__id">#{recordIdLabel}</span> : null}
         </button>
       ) : null}
     </span>

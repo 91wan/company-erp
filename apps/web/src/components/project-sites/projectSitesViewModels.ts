@@ -94,7 +94,7 @@ export type HeadquartersViewModelInput = {
     | "onReviewKitchenEquipmentChangeRequest"
   >;
   attachments: Pick<ProjectSitesHeadquartersViewProps, "loadAttachments" | "getAttachmentDownloadUrl">;
-  navigation?: Pick<ProjectSitesHeadquartersViewProps, "initialTab">;
+  navigation?: Pick<ProjectSitesHeadquartersViewProps, "initialTab" | "importLocationNotice">;
 };
 
 type ExternalMetrics = Pick<
