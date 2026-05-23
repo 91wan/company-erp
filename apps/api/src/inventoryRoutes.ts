@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { isOutsideProjectSiteScope, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
+import { isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { InventoryMovementConflictError, InventoryMovementValidationError, normalizeInventoryBalanceFilters, normalizeInventoryMovementFilters, normalizeInventoryMovementInput } from "./inventory.js";
 import { ReplenishmentSuggestionConflictError, ReplenishmentSuggestionValidationError, normalizeConvertReplenishmentSuggestionInput, normalizeReplenishmentSuggestionFilters, normalizeUpdateReplenishmentSuggestionInput } from "./replenishment.js";
 
@@ -54,12 +54,15 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
     try {
       const input = normalizeInventoryMovementInput(request.body);
       await validateInventoryMovementBusinessRules(input, options);
-      const inventoryMovement = await options.inventoryRepository.createMovement(input);
-      await writeAuditLog(request, options, {
-        action: "inventory_movement.create",
-        entityType: "inventory_movement",
-        entityId: inventoryMovement.id,
-        afterJson: inventoryMovement,
+      const inventoryMovement = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.inventoryRepository!.createMovement(input);
+        await writeAuditLog(request, options, {
+          action: "inventory_movement.create",
+          entityType: "inventory_movement",
+          entityId: created.id,
+          afterJson: created,
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ inventoryMovement });
     } catch (error) {

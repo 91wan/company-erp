@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { buildApp, validateRuntimeSecurityEnvironment } from "./app.js";
+import type { BuildAppOptions } from "./appRouteContext.js";
 import { validateIdentityEncryptionSecret } from "./identityCrypto.js";
 import {
   createPrismaMaterialRepository,
@@ -53,42 +54,50 @@ if (prisma) {
   validateIdentityEncryptionSecret();
 }
 
-const app = await buildApp({
-  auth: prisma
+function buildPrismaAppOptions(client: PrismaClient): BuildAppOptions {
+  return {
+    auth: {
+      enabled: true,
+      sessionSecret: process.env.AUTH_SESSION_SECRET,
+      cookieSecure: process.env.AUTH_COOKIE_SECURE === "true",
+    },
+    authRepository: createPrismaAuthRepository(client),
+    auditLogRepository: createPrismaAuditLogRepository(client),
+    attachmentRepository: createPrismaAttachmentRepository(client),
+    appConfigRepository: createPrismaAppConfigRepository(client),
+    partyRepository: createPrismaPartyRepository(client),
+    materialRepository: createPrismaMaterialRepository(client),
+    warehouseRepository: createPrismaWarehouseRepository(client),
+    departmentRepository: createPrismaDepartmentRepository(client),
+    employeeRepository: createPrismaEmployeeRepository(client),
+    userAccountRepository: createPrismaUserAccountRepository(client),
+    externalProjectSiteAccountRepository: createPrismaExternalProjectSiteAccountRepository(client),
+    projectSiteAssignmentRepository: createPrismaProjectSiteAssignmentRepository(client),
+    purchaseRequestRepository: createPrismaPurchaseRequestRepository(client),
+    purchaseRecordRepository: createPrismaPurchaseRecordRepository(client),
+    inventoryRepository: createPrismaInventoryRepository(client),
+    replenishmentSuggestionRepository: createPrismaReplenishmentSuggestionRepository(client),
+    projectSiteRepository: createPrismaProjectSiteRepository(client),
+    projectSiteComplianceRepository: createPrismaProjectSiteComplianceRepository(client),
+    projectSiteKitchenEquipmentRepository: createPrismaProjectSiteKitchenEquipmentRepository(client),
+    projectUsageRequestRepository: createPrismaProjectUsageRequestRepository(client),
+    contractRepository: createPrismaContractRepository(client),
+    businessProjectRepository: createPrismaBusinessProjectRepository(client),
+    certificateRepository: createPrismaCertificateRepository(client),
+    importJobRepository: createPrismaImportJobRepository(client),
+    marketOperationsHandoffRepository: createPrismaMarketOperationsHandoffRepository(client),
+  };
+}
+
+const appOptions: BuildAppOptions = prisma
     ? {
-        enabled: true,
-        sessionSecret: process.env.AUTH_SESSION_SECRET,
-        cookieSecure: process.env.AUTH_COOKIE_SECURE === "true",
+        ...buildPrismaAppOptions(prisma),
+        runInTransaction: async (callback) =>
+          prisma.$transaction((tx) => callback(buildPrismaAppOptions(tx as unknown as PrismaClient))),
       }
-    : { enabled: false },
-  authRepository: prisma ? createPrismaAuthRepository(prisma) : undefined,
-  auditLogRepository: prisma ? createPrismaAuditLogRepository(prisma) : undefined,
-  attachmentRepository: prisma ? createPrismaAttachmentRepository(prisma) : undefined,
-  appConfigRepository: prisma ? createPrismaAppConfigRepository(prisma) : undefined,
-  partyRepository: prisma ? createPrismaPartyRepository(prisma) : undefined,
-  materialRepository: prisma ? createPrismaMaterialRepository(prisma) : undefined,
-  warehouseRepository: prisma ? createPrismaWarehouseRepository(prisma) : undefined,
-  departmentRepository: prisma ? createPrismaDepartmentRepository(prisma) : undefined,
-  employeeRepository: prisma ? createPrismaEmployeeRepository(prisma) : undefined,
-  userAccountRepository: prisma ? createPrismaUserAccountRepository(prisma) : undefined,
-  externalProjectSiteAccountRepository: prisma
-    ? createPrismaExternalProjectSiteAccountRepository(prisma)
-    : undefined,
-  projectSiteAssignmentRepository: prisma ? createPrismaProjectSiteAssignmentRepository(prisma) : undefined,
-  purchaseRequestRepository: prisma ? createPrismaPurchaseRequestRepository(prisma) : undefined,
-  purchaseRecordRepository: prisma ? createPrismaPurchaseRecordRepository(prisma) : undefined,
-  inventoryRepository: prisma ? createPrismaInventoryRepository(prisma) : undefined,
-  replenishmentSuggestionRepository: prisma ? createPrismaReplenishmentSuggestionRepository(prisma) : undefined,
-  projectSiteRepository: prisma ? createPrismaProjectSiteRepository(prisma) : undefined,
-  projectSiteComplianceRepository: prisma ? createPrismaProjectSiteComplianceRepository(prisma) : undefined,
-  projectSiteKitchenEquipmentRepository: prisma ? createPrismaProjectSiteKitchenEquipmentRepository(prisma) : undefined,
-  projectUsageRequestRepository: prisma ? createPrismaProjectUsageRequestRepository(prisma) : undefined,
-  contractRepository: prisma ? createPrismaContractRepository(prisma) : undefined,
-  businessProjectRepository: prisma ? createPrismaBusinessProjectRepository(prisma) : undefined,
-  certificateRepository: prisma ? createPrismaCertificateRepository(prisma) : undefined,
-  importJobRepository: prisma ? createPrismaImportJobRepository(prisma) : undefined,
-  marketOperationsHandoffRepository: prisma ? createPrismaMarketOperationsHandoffRepository(prisma) : undefined,
-});
+    : { auth: { enabled: false } };
+
+const app = await buildApp(appOptions);
 
 if (prisma) {
   app.addHook("onClose", async () => {

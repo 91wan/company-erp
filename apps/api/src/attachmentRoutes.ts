@@ -15,6 +15,7 @@ import { type AuthenticatedRequest } from "./auth.js";
 import {
   isOutsideCertificateScope,
   isOutsideProjectSiteScope,
+  runWithAuditTransaction,
   scopedProjectSiteIds,
   type BuildAppOptions,
   writeAuditLog,
@@ -428,12 +429,15 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
         ...normalizeCreateAttachmentInput(request.body as Record<string, unknown>),
         ...actorFields(request),
       };
-      const attachment = await options.attachmentRepository.create(input);
-      await writeAuditLog(request, options, {
-        action: "attachment.create",
-        entityType: "attachment",
-        entityId: attachment.id,
-        afterJson: attachment,
+      const attachment = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.attachmentRepository!.create(input);
+        await writeAuditLog(request, options, {
+          action: "attachment.create",
+          entityType: "attachment",
+          entityId: created.id,
+          afterJson: created,
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
     } catch (error) {
@@ -501,15 +505,18 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       const contentPath = resolveAttachmentContentPath(input.storageKey);
       await mkdir(dirname(contentPath), { recursive: true });
       await writeFile(contentPath, buffer);
-      const attachment = await options.attachmentRepository.create(input);
-      await writeAuditLog(request, options, {
-        action: "attachment.upload",
-        entityType: "attachment",
-        entityId: attachment.id,
-        afterJson: {
-          ...attachment,
-          storageKey: "[generated]",
-        },
+      const attachment = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await txOptions.attachmentRepository!.create(input);
+        await writeAuditLog(request, options, {
+          action: "attachment.upload",
+          entityType: "attachment",
+          entityId: created.id,
+          afterJson: {
+            ...created,
+            storageKey: "[generated]",
+          },
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
     } catch (error) {
@@ -540,21 +547,24 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       const { targetType, targetId } = validateBusinessUploadFields(fields);
       const target = await resolveBusinessAttachmentTarget(request, options, targetType!, targetId!);
       if (!target.ok) return reply.status(target.statusCode).send(target.body);
-      const attachment = await createUploadedAttachment(
-        request,
-        options,
-        file,
-        fields,
-        target.owner,
-      );
-      await writeAuditLog(request, options, {
-        action: "attachment.business_upload",
-        entityType: "attachment",
-        entityId: attachment.id,
-        afterJson: {
-          ...attachment,
-          storageKey: "[generated]",
-        },
+      const attachment = await runWithAuditTransaction(options, async (txOptions) => {
+        const created = await createUploadedAttachment(
+          request,
+          txOptions,
+          file,
+          fields,
+          target.owner,
+        );
+        await writeAuditLog(request, options, {
+          action: "attachment.business_upload",
+          entityType: "attachment",
+          entityId: created.id,
+          afterJson: {
+            ...created,
+            storageKey: "[generated]",
+          },
+        }, { tx: txOptions });
+        return created;
       });
       return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
     } catch (error) {
@@ -575,18 +585,22 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
 
     const { id } = request.params as { id: string };
     try {
-      const before = await options.attachmentRepository.getById(id);
-      if (!before) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
       const input = normalizeUpdateAttachmentInput(request.body as Record<string, unknown>);
-      const attachment = await options.attachmentRepository.update(id, input);
-      if (!attachment) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
-      await writeAuditLog(request, options, {
-        action: "attachment.update",
-        entityType: "attachment",
-        entityId: attachment.id,
-        beforeJson: before,
-        afterJson: attachment,
+      const attachment = await runWithAuditTransaction(options, async (txOptions) => {
+        const before = await txOptions.attachmentRepository!.getById(id);
+        if (!before) return null;
+        const updated = await txOptions.attachmentRepository!.update(id, input);
+        if (!updated) return null;
+        await writeAuditLog(request, options, {
+          action: "attachment.update",
+          entityType: "attachment",
+          entityId: updated.id,
+          beforeJson: before,
+          afterJson: updated,
+        }, { tx: txOptions });
+        return updated;
       });
+      if (!attachment) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
       return { attachment };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {

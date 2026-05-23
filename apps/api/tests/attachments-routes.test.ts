@@ -586,6 +586,79 @@ describe("attachments API", () => {
     expect(JSON.stringify(logs)).not.toContain("secret");
   });
 
+  it("rolls back attachment metadata updates when audit logging fails inside a transaction", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const id = "22222222-2222-4222-8222-222222222222";
+    let persistedAttachment = makeAttachment({ id, displayName: "原始附件", status: "active" });
+    function repositoryFor(get: () => AttachmentRecordDto, set: (attachment: AttachmentRecordDto) => void): AttachmentRecordRepository {
+      return {
+        async list() {
+          return [get()];
+        },
+        async getById(attachmentId) {
+          return attachmentId === id ? get() : null;
+        },
+        async create() {
+          throw new Error("not used");
+        },
+        async update(attachmentId, input) {
+          if (attachmentId !== id) return null;
+          const updated = { ...get(), ...input, updatedAt: now };
+          set(updated);
+          return updated;
+        },
+      };
+    }
+    const baseRepository = repositoryFor(() => persistedAttachment, (attachment) => {
+      persistedAttachment = attachment;
+    });
+    const options = {
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: baseRepository,
+      auditLogRepository: {
+        async list() {
+          return [];
+        },
+        async create() {
+          throw new Error("audit unavailable");
+        },
+      },
+    };
+    const app = await buildApp({
+      ...options,
+      async runInTransaction(callback) {
+        const before = persistedAttachment;
+        let transactionAttachment = { ...persistedAttachment };
+        const transactionRepository = repositoryFor(() => transactionAttachment, (attachment) => {
+          transactionAttachment = attachment;
+        });
+        try {
+          const result = await callback({ ...options, attachmentRepository: transactionRepository });
+          persistedAttachment = transactionAttachment;
+          return result;
+        } catch (error) {
+          persistedAttachment = before;
+          throw error;
+        }
+      },
+    });
+
+    const session = await loginSession(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/attachments/${id}`,
+      cookies: { company_erp_session: session.cookie },
+      headers: csrfHeaders(session),
+      payload: { displayName: "已错误更新", status: "disabled" },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "AUDIT_LOG_WRITE_FAILED" });
+    expect(persistedAttachment).toMatchObject({ displayName: "原始附件", status: "active" });
+  });
+
   it("uploads an attachment file with a backend-generated storage key and audit log", async () => {
     const root = await mkdtemp(join(tmpdir(), "company-erp-upload-"));
     vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
