@@ -7,10 +7,10 @@ import {
   type AuthenticatedUserDto,
   type EmployeeStatusCode,
   type MvpRoleCode,
-  type PermissionAreaCode,
   type UserAccountStatusCode,
 } from "@company-erp/shared";
 import { verifyPassword } from "./password.js";
+import { isPublicPath, routePermission } from "./routePermission.js";
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -333,99 +333,6 @@ async function rotateCsrfToken(sessionStore: AuthSessionStore, sessionId: string
   const csrfToken = createCsrfToken();
   await sessionStore.updateSessionCsrfToken(sessionId, hashCsrfToken(csrfToken), new Date());
   return csrfToken;
-}
-
-function routePermission(pathname: string, method: string): { area: PermissionAreaCode; requiredLevel: "read" | "manage" } | null {
-  const requiredLevel = method === "GET" ? "read" : "manage";
-  if (pathname.startsWith("/api/audit-logs")) {
-    return { area: "auditLogs", requiredLevel };
-  }
-  if (pathname.startsWith("/api/attachments")) {
-    return { area: "attachments", requiredLevel };
-  }
-  if (pathname.startsWith("/api/project-site-attachment-uploads")) {
-    return { area: "certificates", requiredLevel: "manage" };
-  }
-  if (pathname.startsWith("/api/app-config")) {
-    return { area: "systemSettings", requiredLevel };
-  }
-  if (pathname.startsWith("/api/dashboard")) {
-    return { area: "dashboard", requiredLevel: "read" };
-  }
-  if (pathname.startsWith("/api/parties") || pathname.startsWith("/api/materials") || pathname.startsWith("/api/warehouses")) {
-    return { area: "masterData", requiredLevel };
-  }
-  if (pathname.startsWith("/api/departments")) return { area: "departments", requiredLevel };
-  if (pathname.startsWith("/api/employees")) return { area: "employees", requiredLevel };
-  if (pathname.startsWith("/api/user-accounts")) return { area: "userAccounts", requiredLevel };
-  if (pathname.startsWith("/api/external-project-site-accounts")) return { area: "userAccounts", requiredLevel };
-  if (pathname.startsWith("/api/project-site-assignments")) return { area: "employees", requiredLevel };
-  if (pathname.startsWith("/api/purchase-requests") || pathname.startsWith("/api/purchase-records") || pathname.startsWith("/api/replenishment-suggestions")) {
-    return { area: "procurement", requiredLevel };
-  }
-  if (pathname.startsWith("/api/inventory-balances")) {
-    return { area: "inventoryQuantity", requiredLevel };
-  }
-  if (pathname.startsWith("/api/inventory-movements")) {
-    return { area: "inventory", requiredLevel };
-  }
-  if (pathname.startsWith("/api/project-sites")) {
-    return { area: "projectSites", requiredLevel };
-  }
-  if (
-    pathname.startsWith("/api/project-site-kitchen-equipment") ||
-    pathname.startsWith("/api/project-site-kitchen-equipment-change-requests")
-  ) {
-    return { area: "projectSiteKitchenEquipment", requiredLevel };
-  }
-  if (pathname.startsWith("/api/project-usage-options")) {
-    return { area: "projectUsageRequest", requiredLevel: "read" };
-  }
-  if (pathname.startsWith("/api/project-usage-requests")) {
-    if (pathname.endsWith("/issue")) return { area: "inventory", requiredLevel: "manage" };
-    if (method === "POST") return { area: "projectUsageRequest", requiredLevel: "manage" };
-    return { area: "projectUsage", requiredLevel };
-  }
-  if (pathname.startsWith("/api/market-operations-handoffs")) {
-    return { area: "marketOperationsHandoffs", requiredLevel };
-  }
-  if (pathname.startsWith("/api/business-projects")) {
-    return { area: "businessProjects", requiredLevel };
-  }
-  if (pathname.startsWith("/api/contracts") || pathname.startsWith("/api/contract-attachments")) {
-    return { area: "contracts", requiredLevel };
-  }
-  if (
-    pathname.startsWith("/api/project-site-roster-persons") ||
-    pathname.startsWith("/api/employer-liability-insurance-policies") ||
-    pathname.startsWith("/api/employer-liability-insurance-covered-persons") ||
-    pathname.startsWith("/api/project-site-payroll-submissions") ||
-    pathname.includes("/compliance-summary")
-  ) {
-    return { area: "certificates", requiredLevel };
-  }
-  if (pathname.startsWith("/api/certificates")) {
-    return { area: "certificates", requiredLevel };
-  }
-  if (pathname.startsWith("/api/import-jobs")) {
-    return method === "GET"
-      ? { area: "masterData", requiredLevel: "read" }
-      : { area: "systemSettings", requiredLevel: "manage" };
-  }
-  if (pathname.startsWith("/api/import-templates")) {
-    return { area: "masterData", requiredLevel: "read" };
-  }
-  return null;
-}
-
-function isPublicPath(pathname: string, method: string): boolean {
-  return (
-    pathname === "/health" ||
-    pathname.startsWith("/api/meta/") ||
-    pathname.startsWith("/api/auth/") ||
-    pathname === "/api/app-version" ||
-    (pathname === "/api/app-config" && method === "GET")
-  );
 }
 
 export function registerAuth(
