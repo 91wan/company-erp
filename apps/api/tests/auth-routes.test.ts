@@ -159,6 +159,45 @@ describe("auth API", () => {
     ).rejects.toThrow(/AUTH_SESSION_SECRET/);
   });
 
+  it("fails fast when an auth repository only implements part of the session store contract", async () => {
+    const partialSessionRepository: AuthRepository = {
+      async findByUsername() {
+        return null;
+      },
+      async findById() {
+        return null;
+      },
+      async updateLastLogin() {},
+      async createSession() {
+        throw new Error("not used");
+      },
+    };
+
+    await expect(
+      buildApp({
+        auth: { enabled: true, sessionSecret: "test-secret" },
+        authRepository: partialSessionRepository,
+      }),
+    ).rejects.toThrow(/AUTH_SESSION_STORE_NOT_CONFIGURED/);
+  });
+
+  it("returns service unavailable for auth routes when auth is enabled without an auth repository", async () => {
+    const app = await buildApp({ auth: { enabled: true, sessionSecret: "test-secret" } });
+
+    const me = await app.inject({ method: "GET", url: "/api/auth/me" });
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "ChangeMe123!" },
+    });
+    await app.close();
+
+    expect(me.statusCode).toBe(503);
+    expect(me.json()).toEqual({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    expect(login.statusCode).toBe(503);
+    expect(login.json()).toEqual({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+  });
+
   it("logs in active accounts, sets an HttpOnly session cookie, and never leaks password hashes", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const account = makeAuthAccount({ passwordHash, roles: ["admin", "viewer"] });
