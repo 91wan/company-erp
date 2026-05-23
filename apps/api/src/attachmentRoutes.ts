@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -18,6 +18,12 @@ import {
   type BuildAppOptions,
   writeAuditLog,
 } from "./appRouteContext.js";
+import {
+  assertAttachmentUploadQuota,
+  AttachmentStorageInsufficientSpaceError,
+  AttachmentUploadQuotaExceededError,
+  ensureAttachmentStorageHasFreeSpace,
+} from "./diskSpaceGuard.js";
 
 function actorFields(request: unknown) {
   const user = (request as AuthenticatedRequest).currentUser;
@@ -262,6 +268,26 @@ async function createUploadedAttachment(
 }
 
 export function registerAttachmentRoutes(app: FastifyInstance, options: BuildAppOptions) {
+  const uploadPreHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!options.attachmentRepository) return;
+    try {
+      await ensureAttachmentStorageHasFreeSpace();
+      assertAttachmentUploadQuota(request);
+    } catch (error) {
+      if (error instanceof AttachmentStorageInsufficientSpaceError) {
+        return reply.status(507).send({
+          error: "ATTACHMENT_STORAGE_INSUFFICIENT_SPACE",
+          freeBytes: error.freeBytes,
+          minFreeBytes: error.minFreeBytes,
+        });
+      }
+      if (error instanceof AttachmentUploadQuotaExceededError) {
+        return reply.status(429).send({ error: "ATTACHMENT_UPLOAD_QUOTA_EXCEEDED", limit: error.limit });
+      }
+      throw error;
+    }
+  };
+
   app.get("/api/attachments", async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
@@ -405,7 +431,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     }
   });
 
-  app.post("/api/attachments/upload", async (request, reply) => {
+  app.post("/api/attachments/upload", { preHandler: uploadPreHandler }, async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
@@ -478,7 +504,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     }
   });
 
-  app.post("/api/project-site-attachment-uploads", async (request, reply) => {
+  app.post("/api/project-site-attachment-uploads", { preHandler: uploadPreHandler }, async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
