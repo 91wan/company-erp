@@ -10,6 +10,7 @@ export PGPORT="${POSTGRES_PORT:-5432}"
 export PGUSER="$POSTGRES_USER"
 export PGPASSWORD="$POSTGRES_PASSWORD"
 export PGDATABASE="$POSTGRES_DB"
+MIGRATIONS_DIR="${MIGRATIONS_DIR:-/migrations}"
 
 echo "Waiting for PostgreSQL at ${PGHOST}:${PGPORT}/${PGDATABASE}..."
 until pg_isready -q; do
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 SQL
 
-for migration_dir in /migrations/*; do
+for migration_dir in "$MIGRATIONS_DIR"/*; do
   [ -d "$migration_dir" ] || continue
 
   version="$(basename "$migration_dir")"
