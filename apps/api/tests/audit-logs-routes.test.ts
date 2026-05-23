@@ -7,6 +7,8 @@ import type { AuthAccountRecord, AuthRepository } from "../src/auth";
 import { hashPassword } from "../src/password";
 import type { UserAccountRepository } from "../src/peoplePermissions";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-14T10:00:00.000Z";
 
 function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccountRecord {
@@ -31,6 +33,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

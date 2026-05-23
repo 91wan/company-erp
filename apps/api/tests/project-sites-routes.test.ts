@@ -36,6 +36,8 @@ import {
 } from "../src/projectSites";
 import type { MaterialRepository, WarehouseRepository } from "../src/materialsWarehouses";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-11T13:00:00.000Z";
 const warehouseId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const materialId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -758,6 +760,7 @@ function makeExternalProjectSiteAuthAccount(overrides: Partial<AuthAccountRecord
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

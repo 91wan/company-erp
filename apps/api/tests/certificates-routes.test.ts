@@ -31,6 +31,8 @@ import type {
   ProjectSiteRosterPersonListFilters,
 } from "../src/projectSites";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-12T08:00:00.000Z";
 const certificateId = "11111111-1111-4111-8111-111111111111";
 const assignedProjectSiteId = "22222222-2222-4222-8222-222222222222";
@@ -282,6 +284,7 @@ function makeExternalProjectSiteAuthAccount(overrides: Partial<AuthAccountRecord
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

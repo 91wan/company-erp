@@ -14,6 +14,8 @@ import {
   type BusinessProjectRepository,
 } from "../src/businessProjects";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-13T09:00:00.000Z";
 const businessProjectId = "77777777-7777-4777-8777-777777777777";
 
@@ -119,6 +121,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

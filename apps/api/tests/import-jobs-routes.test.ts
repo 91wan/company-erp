@@ -7,6 +7,8 @@ import type { AuditLogRepository } from "../src/auditLogs";
 import { ImportJobValidationError, type ImportJobPreviewInput, type ImportJobRepository } from "../src/importJobs";
 import { hashPassword } from "../src/password";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-11T12:00:00.000Z";
 
 async function workbookBuffer(headers: string[], rows: readonly (readonly unknown[])[]) {
@@ -155,6 +157,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

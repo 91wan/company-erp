@@ -12,6 +12,8 @@ import {
   type MarketOperationsHandoffRepository,
 } from "../src/marketOperationsHandoffs";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-13T10:00:00.000Z";
 
 function makeHandoff(overrides: Partial<MarketOperationsHandoffDto> = {}): MarketOperationsHandoffDto {
@@ -103,6 +105,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

@@ -20,6 +20,8 @@ import type { InventoryRepository } from "../src/inventory";
 import type { ProjectSiteComplianceRepository, ProjectSiteRepository, ProjectUsageRequestRepository } from "../src/projectSites";
 import type { PurchaseRecordRepository, PurchaseRequestRepository } from "../src/purchases";
 
+import { createFakeAuthSessionMethods } from "./testAuthSessionStore";
+
 const now = "2026-05-15T08:00:00.000Z";
 const assignedProjectSiteId = "11111111-1111-4111-8111-111111111111";
 const otherProjectSiteId = "22222222-2222-4222-8222-222222222222";
@@ -47,6 +49,7 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   const accounts = [...seed];
   return {
+    ...createFakeAuthSessionMethods(),
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },

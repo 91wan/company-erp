@@ -182,71 +182,6 @@ type AuthSessionStore = Required<Pick<
   | "revokeSessionsForAccount"
 >>;
 
-function createInMemorySessionStore(): AuthSessionStore {
-  const sessions = new Map<string, AuthSessionRecord>();
-  return {
-    async createSession(input) {
-      const now = input.createdAt.toISOString();
-      const session: AuthSessionRecord = {
-        id: randomBytes(16).toString("hex"),
-        userAccountId: input.userAccountId,
-        tokenHash: input.tokenHash,
-        csrfTokenHash: input.csrfTokenHash ?? null,
-        expiresAt: input.expiresAt.toISOString(),
-        revokedAt: null,
-        revokedReason: null,
-        ip: input.ip ?? null,
-        userAgent: input.userAgent ?? null,
-        lastSeenAt: now,
-        createdAt: now,
-        updatedAt: now,
-      };
-      sessions.set(session.tokenHash, session);
-      return session;
-    },
-    async findSessionByTokenHash(tokenHash) {
-      return sessions.get(tokenHash) ?? null;
-    },
-    async touchSession(id, at) {
-      for (const session of sessions.values()) {
-        if (session.id === id) {
-          session.lastSeenAt = at.toISOString();
-          session.updatedAt = at.toISOString();
-          return;
-        }
-      }
-    },
-    async updateSessionCsrfToken(id, csrfTokenHash, at) {
-      for (const session of sessions.values()) {
-        if (session.id === id) {
-          session.csrfTokenHash = csrfTokenHash;
-          session.updatedAt = at.toISOString();
-          return;
-        }
-      }
-    },
-    async revokeSession(id, at, reason) {
-      for (const session of sessions.values()) {
-        if (session.id === id) {
-          session.revokedAt = at.toISOString();
-          session.revokedReason = reason;
-          session.updatedAt = at.toISOString();
-          return;
-        }
-      }
-    },
-    async revokeSessionsForAccount(userAccountId, at, reason) {
-      for (const session of sessions.values()) {
-        if (session.userAccountId === userAccountId && !session.revokedAt) {
-          session.revokedAt = at.toISOString();
-          session.revokedReason = reason;
-          session.updatedAt = at.toISOString();
-        }
-      }
-    },
-  };
-}
-
 function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
   if (
     authRepository.createSession &&
@@ -265,7 +200,7 @@ function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
       revokeSessionsForAccount: authRepository.revokeSessionsForAccount.bind(authRepository),
     };
   }
-  return createInMemorySessionStore();
+  throw new Error("AUTH_SESSION_STORE_NOT_CONFIGURED");
 }
 
 function normalizeLoginPayload(payload: unknown): { username: string; password: string } | { issues: string[] } {
@@ -437,26 +372,23 @@ export function registerAuth(
   if (!enabled) return;
 
   normalizeSessionSecret(authOptions?.sessionSecret);
+  if (!authRepository) throw new Error("AUTH_REPOSITORY_NOT_CONFIGURED");
   const ttlSeconds = authOptions?.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
   const secure = authOptions?.cookieSecure ?? false;
-  const sessionStore = authRepository ? createSessionStore(authRepository) : null;
+  const sessionStore = createSessionStore(authRepository);
 
   app.addHook("preHandler", async (request, reply) => {
     const pathname = new URL(request.url, "http://company-erp.local").pathname;
     if (isPublicPath(pathname, request.method)) return;
 
-    if (!authRepository) {
-      return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
-    }
-
     // Require a valid session for ALL non-public paths (default-deny for unauthenticated)
-    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
+    const user = await resolveSessionUser(request, authRepository, sessionStore);
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
 
     (request as AuthenticatedRequest).currentUser = user;
 
     if (publicAccessEnabled() && unsafeMethods.has(request.method)) {
-      const session = await sessionForRequest(request, sessionStore ?? createInMemorySessionStore());
+      const session = await sessionForRequest(request, sessionStore);
       if (!session || !csrfTokenMatches(session, csrfTokenFromHeader(request))) {
         return reply.status(403).send({ error: "CSRF_TOKEN_INVALID" });
       }
@@ -494,8 +426,6 @@ export function registerAuth(
       },
     },
     async (request, reply) => {
-      if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
-
       const normalized = normalizeLoginPayload(request.body);
       if ("issues" in normalized) {
         return reply.status(400).send({ error: "LOGIN_VALIDATION_FAILED", issues: normalized.issues });
@@ -513,7 +443,7 @@ export function registerAuth(
       const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
       const token = createOpaqueSessionToken();
       const csrfToken = createCsrfToken();
-      await (sessionStore ?? createInMemorySessionStore()).createSession({
+      await sessionStore.createSession({
         userAccountId: account.id,
         tokenHash: hashSessionToken(token),
         csrfTokenHash: hashCsrfToken(csrfToken),
@@ -536,23 +466,20 @@ export function registerAuth(
   );
 
   app.get("/api/auth/me", async (request) => {
-    if (!authRepository) return { user: null };
-    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
+    const user = await resolveSessionUser(request, authRepository, sessionStore);
     const currentSessionId = (request as AuthenticatedRequest).currentSessionId;
-    if (!user || !currentSessionId || !sessionStore) return { user };
+    if (!user || !currentSessionId) return { user };
     const csrfToken = await rotateCsrfToken(sessionStore, currentSessionId);
     return { user, csrfToken };
   });
 
   app.post("/api/auth/logout", async (request, reply: FastifyReply) => {
-    if (authRepository && sessionStore) {
-      const requestWithCookies = request as FastifyRequest & { cookies?: Record<string, string> };
-      const cookies = { ...parseCookieHeader(request.headers.cookie), ...(requestWithCookies.cookies ?? {}) };
-      const token = cookies[AUTH_COOKIE_NAME];
-      if (token) {
-        const session = await sessionStore.findSessionByTokenHash(hashSessionToken(token));
-        if (session && !session.revokedAt) await sessionStore.revokeSession(session.id, new Date(), "logout");
-      }
+    const requestWithCookies = request as FastifyRequest & { cookies?: Record<string, string> };
+    const cookies = { ...parseCookieHeader(request.headers.cookie), ...(requestWithCookies.cookies ?? {}) };
+    const token = cookies[AUTH_COOKIE_NAME];
+    if (token) {
+      const session = await sessionStore.findSessionByTokenHash(hashSessionToken(token));
+      if (session && !session.revokedAt) await sessionStore.revokeSession(session.id, new Date(), "logout");
     }
     reply.header(
       "Set-Cookie",

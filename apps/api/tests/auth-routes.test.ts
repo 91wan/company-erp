@@ -147,6 +147,24 @@ describe("auth API", () => {
     ).rejects.toThrow(/AUTH_SESSION_SECRET/);
   });
 
+  it("fails fast when auth is enabled without an auth repository", async () => {
+    await expect(buildApp({ auth: { enabled: true, sessionSecret: "test-secret" } })).rejects.toThrow(
+      "AUTH_REPOSITORY_NOT_CONFIGURED",
+    );
+  });
+
+  it("fails fast when the auth repository does not provide the complete session store contract", async () => {
+    const repository = createFakeAuthRepository([]);
+    const { revokeSession: _revokeSession, ...partialRepository } = repository;
+
+    await expect(
+      buildApp({
+        auth: { enabled: true, sessionSecret: "test-secret" },
+        authRepository: partialRepository as AuthRepository,
+      }),
+    ).rejects.toThrow("AUTH_SESSION_STORE_NOT_CONFIGURED");
+  });
+
   it("logs in active accounts, sets an HttpOnly session cookie, and never leaks password hashes", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const account = makeAuthAccount({ passwordHash, roles: ["admin", "viewer"] });
