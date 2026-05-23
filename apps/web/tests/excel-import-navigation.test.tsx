@@ -159,6 +159,8 @@ describe("P0-5: ImportJobDetailDrawer", () => {
     expect(await screen.findByText("批次详情")).toBeInTheDocument();
     expect(screen.getByText("suppliers.xlsx")).toBeInTheDocument();
     expect(screen.getByText("操作人记录请到审计日志查看", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("文件哈希")).not.toBeInTheDocument();
+    expect(screen.queryByText(confirmedJob.fileHash)).not.toBeInTheDocument();
   });
 
   it("read-only user sees 详情 but not 继续确认导入", async () => {

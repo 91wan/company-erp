@@ -16,6 +16,7 @@ export type NavigationIntent = {
   portalSection?: ExternalProjectSitePortalSection;
   entityId?: string;
   entityType?: string;
+  relatedEntityId?: string;
 };
 
 export function isExternalProjectSiteUser(currentUser: AuthenticatedUserDto): boolean {

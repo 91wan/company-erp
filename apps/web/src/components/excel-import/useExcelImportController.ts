@@ -39,7 +39,7 @@ export async function defaultConfirmImportJob(id: string): Promise<ImportJobDto>
 // Controller types
 // ---------------------------------------------------------------------------
 
-export type ExcelImportTab = "preview" | "jobs" | "rows";
+export type ExcelImportTab = "preview" | "jobs" | "rows" | "review";
 
 export type ExcelImportWorkspaceProps = {
   loadImportJobs?: () => Promise<ImportJobSummaryDto[]>;
