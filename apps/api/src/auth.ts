@@ -248,6 +248,18 @@ function createInMemorySessionStore(): AuthSessionStore {
 }
 
 function createSessionStore(authRepository: AuthRepository): AuthSessionStore {
+  const sessionMethodNames = [
+    "createSession",
+    "findSessionByTokenHash",
+    "touchSession",
+    "updateSessionCsrfToken",
+    "revokeSession",
+    "revokeSessionsForAccount",
+  ] as const;
+  const implementedSessionMethods = sessionMethodNames.filter((methodName) => typeof authRepository[methodName] === "function");
+  if (implementedSessionMethods.length > 0 && implementedSessionMethods.length !== sessionMethodNames.length) {
+    throw new Error("AUTH_SESSION_STORE_NOT_CONFIGURED");
+  }
   if (
     authRepository.createSession &&
     authRepository.findSessionByTokenHash &&
@@ -353,7 +365,10 @@ export function registerAuth(
     }
 
     // Require a valid session for ALL non-public paths (default-deny for unauthenticated)
-    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
+    if (!sessionStore) {
+      return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    }
+    const user = await resolveSessionUser(request, authRepository, sessionStore);
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
 
     (request as AuthenticatedRequest).currentUser = user;
@@ -417,7 +432,8 @@ export function registerAuth(
       const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
       const token = createOpaqueSessionToken();
       const csrfToken = createCsrfToken();
-      await (sessionStore ?? createInMemorySessionStore()).createSession({
+      if (!sessionStore) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+      await sessionStore.createSession({
         userAccountId: account.id,
         tokenHash: hashSessionToken(token),
         csrfTokenHash: hashCsrfToken(csrfToken),
@@ -439,9 +455,9 @@ export function registerAuth(
     },
   );
 
-  app.get("/api/auth/me", async (request) => {
-    if (!authRepository) return { user: null };
-    const user = await resolveSessionUser(request, authRepository, sessionStore ?? createInMemorySessionStore());
+  app.get("/api/auth/me", async (request, reply) => {
+    if (!authRepository || !sessionStore) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    const user = await resolveSessionUser(request, authRepository, sessionStore);
     const currentSessionId = (request as AuthenticatedRequest).currentSessionId;
     if (!user || !currentSessionId || !sessionStore) return { user };
     const csrfToken = await rotateCsrfToken(sessionStore, currentSessionId);
