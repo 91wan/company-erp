@@ -23,7 +23,7 @@ Usage: npm run preflight:nas
 
 Checks:
   - APP_ENVIRONMENT is nas or production
-  - POSTGRES_PASSWORD, AUTH_SESSION_SECRET, and IDENTITY_ENCRYPTION_SECRET are non-placeholder values
+  - POSTGRES_PASSWORD, AUTH_SESSION_SECRET, IDENTITY_ENCRYPTION_SECRET, and deployment operator passwords are non-placeholder values
   - NAS_DATA_ROOT and NAS_ATTACHMENTS_ROOT exist or can be created
   - PUBLIC_ACCESS_ENABLED=true uses secure cookies and HTTPS CORS origins
   - docker compose config passes
@@ -54,6 +54,11 @@ value_of() {
 is_placeholder() {
   local value="$1"
   [[ -z "$value" ]] && return 0
+  [[ "$value" == "change-me-in-nas" ]] && return 0
+  [[ "$value" == "change-me-long-random-local-secret" ]] && return 0
+  [[ "$value" == "change-me-long-random-identity-secret" ]] && return 0
+  [[ "$value" == "company-erp-local-dev-session-secret-change-me" ]] && return 0
+  [[ "$value" == "company-erp-local-identity-secret-change-before-production" ]] && return 0
   [[ "$value" == "change-me" ]] && return 0
   [[ "$value" == change-me-* ]] && return 0
   [[ "$value" == *"<"*">"* ]] && return 0
@@ -76,6 +81,20 @@ require_secret() {
 
   if (( ${#value} < min_length )); then
     fail "$name must be at least $min_length characters"
+  fi
+}
+
+reject_placeholder_when_set() {
+  local name="$1"
+  local value
+  value="$(value_of "$name")"
+
+  if [[ -z "$value" ]]; then
+    return
+  fi
+
+  if is_placeholder "$value"; then
+    fail "$name must be set to a non-placeholder value when provided"
   fi
 }
 
@@ -150,6 +169,9 @@ main() {
   require_secret "POSTGRES_PASSWORD" 16
   require_secret "AUTH_SESSION_SECRET" 24
   require_secret "IDENTITY_ENCRYPTION_SECRET" 24
+  reject_placeholder_when_set "BOOTSTRAP_ADMIN_PASSWORD"
+  reject_placeholder_when_set "RESET_ACCOUNT_PASSWORD"
+  reject_placeholder_when_set "PILOT_ADMIN_PASSWORD"
   ensure_directory "NAS_DATA_ROOT"
   ensure_directory "NAS_ATTACHMENTS_ROOT"
 
