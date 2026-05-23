@@ -304,10 +304,6 @@ async function resolveSessionUser(
   return toAuthenticatedUser(account);
 }
 
-function publicAccessEnabled(): boolean {
-  return process.env.PUBLIC_ACCESS_ENABLED === "true" || process.env.PUBLIC_ACCESS_ENABLED === "1";
-}
-
 function csrfTokenFromHeader(request: FastifyRequest): string {
   const header = request.headers["x-csrf-token"];
   return typeof header === "string" ? header : "";
@@ -455,8 +451,9 @@ export function registerAuth(
 
     (request as AuthenticatedRequest).currentUser = user;
 
-    if (publicAccessEnabled() && unsafeMethods.has(request.method)) {
-      const session = await sessionForRequest(request, sessionStore ?? createInMemorySessionStore());
+    if (unsafeMethods.has(request.method)) {
+      if (!sessionStore) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+      const session = await sessionForRequest(request, sessionStore);
       if (!session || !csrfTokenMatches(session, csrfTokenFromHeader(request))) {
         return reply.status(403).send({ error: "CSRF_TOKEN_INVALID" });
       }

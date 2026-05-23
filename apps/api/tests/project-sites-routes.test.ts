@@ -776,6 +776,14 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "site-user", password = "ChangeMe123!") {
+  const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password } });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("project site API", () => {
   it("reports project site API as unavailable when no repository is configured", async () => {
     const app = await buildApp();
@@ -1184,19 +1192,20 @@ describe("project usage request API", () => {
       projectSiteRepository: createFakeProjectSiteRepository([assignedSite, unassignedSite]),
       projectUsageRequestRepository: createFakeUsageRepository([assignedUsage, unassignedUsage]),
     });
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
 
-    const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    const siteList = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: session.cookie } });
     const unassignedSiteDetail = await app.inject({
       method: "GET",
       url: `/api/project-sites/${unassignedSite.id}`,
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
     });
-    const usageList = await app.inject({ method: "GET", url: "/api/project-usage-requests", cookies: { company_erp_session: cookie } });
+    const usageList = await app.inject({ method: "GET", url: "/api/project-usage-requests", cookies: { company_erp_session: session.cookie } });
     const createAssigned = await app.inject({
       method: "POST",
       url: "/api/project-usage-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         requestNo: "USE20260511003",
         requestDate: "2026-05-11",
@@ -1210,7 +1219,8 @@ describe("project usage request API", () => {
     const createUnassigned = await app.inject({
       method: "POST",
       url: "/api/project-usage-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         requestNo: "USE20260511004",
         requestDate: "2026-05-11",
@@ -1224,7 +1234,8 @@ describe("project usage request API", () => {
     const createIssued = await app.inject({
       method: "POST",
       url: "/api/project-usage-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         requestNo: "USE20260511005",
         requestDate: "2026-05-11",
@@ -1239,7 +1250,8 @@ describe("project usage request API", () => {
     const issue = await app.inject({
       method: "POST",
       url: `/api/project-usage-requests/${assignedUsage.id}/issue`,
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { outboundNo: "OUT20260511001", movementDate: "2026-05-11", quantity: 1 },
     });
     await app.close();
@@ -1327,12 +1339,13 @@ describe("project usage request API", () => {
         chargeRemark: "项目点领用收费价",
       }),
     });
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
 
     const create = await app.inject({
       method: "POST",
       url: "/api/project-usage-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         requestNo: "USE20260511006",
         requestDate: "2026-05-11",
@@ -1346,7 +1359,8 @@ describe("project usage request API", () => {
     const issue = await app.inject({
       method: "POST",
       url: `/api/project-usage-requests/${usageRequest.id}/issue`,
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { outboundNo: "OUT20260511099", movementDate: "2026-05-11", quantity: 1 },
     });
     await app.close();
@@ -1377,14 +1391,16 @@ describe("project usage request API", () => {
       materialRepository: createFakeMaterialRepository([makeMaterial()]),
       warehouseRepository: createFakeWarehouseRepository([makeWarehouse()]),
     });
-    const cookie = await loginCookie(app, "site-manager");
+    const session = await loginSession(app, "site-manager");
 
-    const me = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: cookie } });
-    const options = await app.inject({ method: "GET", url: "/api/project-usage-options", cookies: { company_erp_session: cookie } });
+    const me = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { company_erp_session: session.cookie } });
+    const refreshedCsrfToken = me.json().csrfToken as string;
+    const options = await app.inject({ method: "GET", url: "/api/project-usage-options", cookies: { company_erp_session: session.cookie } });
     const create = await app.inject({
       method: "POST",
       url: "/api/project-usage-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": refreshedCsrfToken },
       payload: {
         requestNo: "USE20260511007",
         requestDate: "2026-05-11",
@@ -1396,10 +1412,10 @@ describe("project usage request API", () => {
         status: "issued",
       },
     });
-    const partyAccess = await app.inject({ method: "GET", url: "/api/parties", cookies: { company_erp_session: cookie } });
-    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: cookie } });
-    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: cookie } });
-    const projectSiteAccess = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: cookie } });
+    const partyAccess = await app.inject({ method: "GET", url: "/api/parties", cookies: { company_erp_session: session.cookie } });
+    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: session.cookie } });
+    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: session.cookie } });
+    const projectSiteAccess = await app.inject({ method: "GET", url: "/api/project-sites", cookies: { company_erp_session: session.cookie } });
     await app.close();
 
     expect(me.json()).toMatchObject({
@@ -1447,12 +1463,13 @@ describe("project usage request API", () => {
         }),
       ]),
     });
-    const cookie = await loginCookie(app, "site-manager");
+    const session = await loginSession(app, "site-manager");
 
     const assignedRoster = await app.inject({
       method: "POST",
       url: "/api/project-site-roster-persons",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         personName: "赵新员工",
@@ -1462,7 +1479,8 @@ describe("project usage request API", () => {
     const unassignedRoster = await app.inject({
       method: "POST",
       url: "/api/project-site-roster-persons",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "22222222-2222-4222-8222-222222222222",
         personName: "越权人员",
@@ -1472,7 +1490,8 @@ describe("project usage request API", () => {
     const assignedPolicy = await app.inject({
       method: "POST",
       url: "/api/employer-liability-insurance-policies",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         policyNo: "ELI202605002",
@@ -1484,7 +1503,8 @@ describe("project usage request API", () => {
     const assignedCoveredPerson = await app.inject({
       method: "POST",
       url: "/api/employer-liability-insurance-covered-persons",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         policyId: "13131313-1313-4131-8131-131313131313",
         rosterPersonId: "12121212-1212-4121-8121-121212121212",
@@ -1494,7 +1514,8 @@ describe("project usage request API", () => {
     const unassignedPolicyCoveredPerson = await app.inject({
       method: "POST",
       url: "/api/employer-liability-insurance-covered-persons",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         policyId: "31313131-3131-4313-8313-313131313131",
         rosterPersonId: "12121212-1212-4121-8121-121212121212",
@@ -1504,7 +1525,8 @@ describe("project usage request API", () => {
     const unassignedRosterCoveredPerson = await app.inject({
       method: "POST",
       url: "/api/employer-liability-insurance-covered-persons",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         policyId: "13131313-1313-4131-8131-131313131313",
         rosterPersonId: "30303030-3030-4303-8303-303030303030",
@@ -1514,7 +1536,8 @@ describe("project usage request API", () => {
     const assignedPayroll = await app.inject({
       method: "POST",
       url: "/api/project-site-payroll-submissions",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         payrollMonth: "2026-05",
@@ -1523,7 +1546,8 @@ describe("project usage request API", () => {
     const payrollWithStorageKey = await app.inject({
       method: "POST",
       url: "/api/project-site-payroll-submissions",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         payrollMonth: "2026-06",
@@ -1533,7 +1557,8 @@ describe("project usage request API", () => {
     const updateProjectSite = await app.inject({
       method: "PATCH",
       url: "/api/project-sites/11111111-1111-4111-8111-111111111111",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { remark: "不能改主数据" },
     });
     await app.close();
@@ -1695,17 +1720,18 @@ describe("project-site kitchen equipment API", () => {
       contractRepository: undefined,
       inventoryRepository: undefined,
     });
-    const cookie = await loginCookie(app, "site-manager");
+    const session = await loginSession(app, "site-manager");
 
     const list = await app.inject({
       method: "GET",
       url: "/api/project-site-kitchen-equipment",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
     });
     const createDirectEquipment = await app.inject({
       method: "POST",
       url: "/api/project-site-kitchen-equipment",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "11111111-1111-4111-8111-111111111111",
         equipmentName: "绕过新增",
@@ -1716,7 +1742,8 @@ describe("project-site kitchen equipment API", () => {
     const report = await app.inject({
       method: "POST",
       url: "/api/project-site-kitchen-equipment-change-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         projectSiteId: "22222222-2222-4222-8222-222222222222",
         equipmentId: kitchenEquipmentId,
@@ -1729,10 +1756,10 @@ describe("project-site kitchen equipment API", () => {
     const requests = await app.inject({
       method: "GET",
       url: "/api/project-site-kitchen-equipment-change-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
     });
-    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: cookie } });
-    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: cookie } });
+    const contractAccess = await app.inject({ method: "GET", url: "/api/contracts", cookies: { company_erp_session: session.cookie } });
+    const inventoryAccess = await app.inject({ method: "GET", url: "/api/inventory-balances", cookies: { company_erp_session: session.cookie } });
     await app.close();
 
     expect(list.statusCode).toBe(200);

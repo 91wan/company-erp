@@ -116,9 +116,12 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "marketing-user") {
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "marketing-user") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password: "ChangeMe123!" } });
-  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
 }
 
 describe("market operations handoff API", () => {
@@ -171,25 +174,27 @@ describe("market operations handoff API", () => {
       ]),
       marketOperationsHandoffRepository: createFakeHandoffRepository([makeHandoff()]),
     });
-    const marketingCookie = await loginCookie(app, "marketing-user");
-    const opsCookie = await loginCookie(app, "ops-user");
-    const viewerCookie = await loginCookie(app, "viewer");
+    const marketingSession = await loginSession(app, "marketing-user");
+    const opsSession = await loginSession(app, "ops-user");
+    const viewerSession = await loginSession(app, "viewer");
 
     const marketingList = await app.inject({
       method: "GET",
       url: "/api/market-operations-handoffs",
-      cookies: { company_erp_session: marketingCookie },
+      cookies: { company_erp_session: marketingSession.cookie },
     });
     const opsUpdate = await app.inject({
       method: "PATCH",
       url: "/api/market-operations-handoffs/11111111-1111-4111-8111-111111111111",
-      cookies: { company_erp_session: opsCookie },
+      cookies: { company_erp_session: opsSession.cookie },
+      headers: { "x-csrf-token": opsSession.csrfToken },
       payload: { status: "accepted" },
     });
     const viewerCreate = await app.inject({
       method: "POST",
       url: "/api/market-operations-handoffs",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
+      headers: { "x-csrf-token": viewerSession.csrfToken },
       payload: {
         handoffNo: "MOH20260513003",
         projectName: "无权限项目",

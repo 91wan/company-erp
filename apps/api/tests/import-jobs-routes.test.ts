@@ -203,6 +203,18 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username: 
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username: string, password = "ChangeMe123!") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("import jobs API", () => {
   it("reports import API as unavailable when no repository is configured", async () => {
     const app = await buildApp();
@@ -345,24 +357,26 @@ describe("import jobs API", () => {
     });
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "晨光贸易有限公司", "启用"]]);
     const upload = multipartPayload({ templateType: "parties", file, fileName: "suppliers.xlsx" });
-    const viewerCookie = await loginCookie(app, "viewer");
-    const adminCookie = await loginCookie(app, "admin");
+    const viewerSession = await loginSession(app, "viewer");
+    const adminSession = await loginSession(app, "admin");
 
     const viewerRead = await app.inject({
       method: "GET",
       url: "/api/import-jobs",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
     });
     const viewerPreview = await app.inject({
       method: "POST",
       url: "/api/import-jobs/preview",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
       ...upload,
+      headers: { ...upload.headers, "x-csrf-token": viewerSession.csrfToken },
     });
     const adminConfirm = await app.inject({
       method: "POST",
       url: `/api/import-jobs/${job.id}/confirm`,
-      cookies: { company_erp_session: adminCookie },
+      cookies: { company_erp_session: adminSession.cookie },
+      headers: { "x-csrf-token": adminSession.csrfToken },
     });
     await app.close();
 
@@ -795,8 +809,8 @@ describe("import permission enforcement", () => {
       authRepository,
       auth: { enabled: true, sessionSecret: TEST_SESSION_SECRET },
     });
-    const cookie = await loginCookie(app, "testuser", password);
-    return { app, cookie };
+    const session = await loginSession(app, "testuser", password);
+    return { app, cookie: session.cookie, csrfToken: session.csrfToken };
   }
 
   it("admin can GET import templates", async () => {
@@ -807,15 +821,15 @@ describe("import permission enforcement", () => {
   });
 
   it("viewer (masterData read) can download templates and list jobs but cannot preview or confirm", async () => {
-    const { app, cookie } = await buildAuthedApp(["viewer"]);
+    const { app, cookie, csrfToken } = await buildAuthedApp(["viewer"]);
 
     const templateResponse = await app.inject({ method: "GET", url: "/api/import-templates/parties.xlsx", headers: { cookie: `company_erp_session=${cookie}` } });
     const allTemplatesResponse = await app.inject({ method: "GET", url: "/api/import-templates/all.zip", headers: { cookie: `company_erp_session=${cookie}` } });
     const listResponse = await app.inject({ method: "GET", url: "/api/import-jobs", headers: { cookie: `company_erp_session=${cookie}` } });
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
     const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
-    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
-    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}` } });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}`, "x-csrf-token": csrfToken } });
+    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}`, "x-csrf-token": csrfToken } });
     await app.close();
 
     expect(templateResponse.statusCode).toBe(200);
@@ -826,20 +840,20 @@ describe("import permission enforcement", () => {
   });
 
   it("admin can preview and confirm", async () => {
-    const { app, cookie } = await buildAuthedApp(["admin"]);
+    const { app, cookie, csrfToken } = await buildAuthedApp(["admin"]);
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
     const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
-    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}`, "x-csrf-token": csrfToken } });
     await app.close();
     expect(previewResponse.statusCode).toBe(201);
   });
 
   it("external_project_site user cannot preview or confirm import jobs", async () => {
-    const { app, cookie } = await buildAuthedApp(["external_project_site"]);
+    const { app, cookie, csrfToken } = await buildAuthedApp(["external_project_site"]);
     const file = await workbookBuffer(["供应商编码", "供应商名称", "状态"], [["SUP0001", "示例", "启用"]]);
     const { payload, headers } = multipartPayload({ templateType: "parties", file, fileName: "t.xlsx" });
-    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}` } });
-    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}` } });
+    const previewResponse = await app.inject({ method: "POST", url: "/api/import-jobs/preview", payload, headers: { ...headers, cookie: `company_erp_session=${cookie}`, "x-csrf-token": csrfToken } });
+    const confirmResponse = await app.inject({ method: "POST", url: `/api/import-jobs/${makeJob().id}/confirm`, headers: { cookie: `company_erp_session=${cookie}`, "x-csrf-token": csrfToken } });
     await app.close();
     expect(previewResponse.statusCode).toBe(403);
     expect(confirmResponse.statusCode).toBe(403);

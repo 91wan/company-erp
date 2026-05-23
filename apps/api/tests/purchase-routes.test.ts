@@ -376,6 +376,18 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>) {
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username: "site-user", password: "ChangeMe123!" },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("purchase requests API", () => {
   it("reports purchase requests API as unavailable when no repository is configured", async () => {
     const app = await buildApp();
@@ -674,17 +686,18 @@ describe("purchase requests API", () => {
       authRepository: createFakeAuthRepository([makeAuthAccount({ passwordHash, roles: ["viewer"] })]),
       purchaseRequestRepository: createFakePurchaseRequestRepository([makePurchaseRequest()]),
     });
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
 
     const listResponse = await app.inject({
       method: "GET",
       url: "/api/purchase-requests",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
     });
     const submitResponse = await app.inject({
       method: "POST",
       url: "/api/purchase-requests/11111111-1111-4111-8111-111111111111/submit",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
     });
     await app.close();
 

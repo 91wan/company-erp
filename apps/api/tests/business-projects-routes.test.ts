@@ -132,9 +132,12 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "viewer") {
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "viewer") {
   const response = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username, password: "ChangeMe123!" } });
-  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
 }
 
 describe("business projects API", () => {
@@ -256,25 +259,27 @@ describe("business projects API", () => {
       ]),
       businessProjectRepository: createFakeBusinessProjectRepository([makeBusinessProject()]),
     });
-    const viewerCookie = await loginCookie(app, "viewer");
-    const adminCookie = await loginCookie(app, "admin");
+    const viewerSession = await loginSession(app, "viewer");
+    const adminSession = await loginSession(app, "admin");
 
     const anonymousList = await app.inject({ method: "GET", url: "/api/business-projects" });
     const viewerList = await app.inject({
       method: "GET",
       url: "/api/business-projects",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
     });
     const viewerCreate = await app.inject({
       method: "POST",
       url: "/api/business-projects",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
+      headers: { "x-csrf-token": viewerSession.csrfToken },
       payload: { projectCode: "BP-YZ-CK-003", projectName: "只读用户项目" },
     });
     const adminCreate = await app.inject({
       method: "POST",
       url: "/api/business-projects",
-      cookies: { company_erp_session: adminCookie },
+      cookies: { company_erp_session: adminSession.cookie },
+      headers: { "x-csrf-token": adminSession.csrfToken },
       payload: { projectCode: "BP-YZ-CK-004", projectName: "管理员项目" },
     });
     await app.close();

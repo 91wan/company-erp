@@ -304,6 +304,18 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "user") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password: "ChangeMe123!" },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("certificate status helper", () => {
   it("calculates expiry, review, archive, and disabled statuses", () => {
     const reference = new Date("2026-05-12T00:00:00.000Z");
@@ -687,12 +699,13 @@ describe("certificates API", () => {
       certificateRepository: createFakeCertificateRepository(),
       projectSiteComplianceRepository: createFakeComplianceRepository(),
     });
-    const cookie = await loginCookie(app, "site-manager");
+    const session = await loginSession(app, "site-manager");
 
     const assignedHealth = await app.inject({
       method: "POST",
       url: "/api/certificates",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         certificateCode: "HC-ASSIGNED-001",
         certificateName: "本项目点健康证",
@@ -707,7 +720,8 @@ describe("certificates API", () => {
     const unassignedHealth = await app.inject({
       method: "POST",
       url: "/api/certificates",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         certificateCode: "HC-UNASSIGNED-001",
         certificateName: "其他项目点健康证",
@@ -722,7 +736,8 @@ describe("certificates API", () => {
     const assignedFoodLicense = await app.inject({
       method: "POST",
       url: "/api/certificates",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         certificateCode: "FOOD-ASSIGNED-001",
         certificateName: "本项目点食品经营许可证",
@@ -737,7 +752,8 @@ describe("certificates API", () => {
     const unassignedFoodLicense = await app.inject({
       method: "POST",
       url: "/api/certificates",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         certificateCode: "FOOD-UNASSIGNED-001",
         certificateName: "其他项目点食品经营许可证",
@@ -752,7 +768,8 @@ describe("certificates API", () => {
     const supplierCertificate = await app.inject({
       method: "POST",
       url: "/api/certificates",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         certificateCode: "SUP-FORBIDDEN-001",
         certificateName: "供应商资质",

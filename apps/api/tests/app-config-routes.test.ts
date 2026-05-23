@@ -43,13 +43,16 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
   const response = await app.inject({
     method: "POST",
     url: "/api/auth/login",
     payload: { username, password: "ChangeMe123!" },
   });
-  return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
 }
 
 describe("app config API", () => {
@@ -71,11 +74,12 @@ describe("app config API", () => {
       appConfigRepository: createMemoryAppConfigRepository(),
     });
 
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
     const response = await app.inject({
       method: "PATCH",
       url: "/api/app-config",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { companyName: "无锡餐服 ERP" },
     });
     const readBack = await app.inject({ method: "GET", url: "/api/app-config" });
@@ -116,11 +120,12 @@ describe("app config API", () => {
       },
     });
 
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
     const response = await app.inject({
       method: "PATCH",
       url: "/api/app-config",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { companyName: "无锡市帝都餐饮服务有限公司" },
     });
     await app.close();
@@ -151,18 +156,20 @@ describe("app config API", () => {
       appConfigRepository: createMemoryAppConfigRepository(),
     });
 
-    const adminCookie = await loginCookie(app, "admin");
+    const adminSession = await loginSession(app, "admin");
     const invalid = await app.inject({
       method: "PATCH",
       url: "/api/app-config",
-      cookies: { company_erp_session: adminCookie },
+      cookies: { company_erp_session: adminSession.cookie },
+      headers: { "x-csrf-token": adminSession.csrfToken },
       payload: { companyName: "   " },
     });
-    const viewerCookie = await loginCookie(app, "viewer");
+    const viewerSession = await loginSession(app, "viewer");
     const forbidden = await app.inject({
       method: "PATCH",
       url: "/api/app-config",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
+      headers: { "x-csrf-token": viewerSession.csrfToken },
       payload: { companyName: "Viewer ERP" },
     });
     await app.close();
