@@ -145,6 +145,18 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password: "ChangeMe123!" },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("audit logs API", () => {
   it("requires admin permissions and supports basic filters", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
@@ -293,11 +305,12 @@ describe("audit logs API", () => {
       auditLogRepository: auditRepository,
     });
 
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
     const created = await app.inject({
       method: "POST",
       url: "/api/user-accounts",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { username: "zhangsan", initialPassword: "DemoPasswordForAudit123!", roles: ["viewer"] },
     });
     const logs = await auditRepository.list({ action: "user_account.create" });
@@ -326,11 +339,12 @@ describe("audit logs API", () => {
         },
       },
     });
-    const failingCookie = await loginCookie(failingApp);
+    const failingSession = await loginSession(failingApp);
     const failed = await failingApp.inject({
       method: "POST",
       url: "/api/user-accounts",
-      cookies: { company_erp_session: failingCookie },
+      cookies: { company_erp_session: failingSession.cookie },
+      headers: { "x-csrf-token": failingSession.csrfToken },
       payload: { username: "lisi", initialPassword: "DemoPasswordForAudit123!", roles: ["viewer"] },
     });
     await failingApp.close();
@@ -353,11 +367,12 @@ describe("audit logs API", () => {
         },
       },
     });
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
     const failed = await app.inject({
       method: "PATCH",
       url: "/api/app-config",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { companyName: "Company ERP Demo" },
     });
     await app.close();

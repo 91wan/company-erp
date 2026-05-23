@@ -314,6 +314,18 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "site-user") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password: "ChangeMe123!" },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("inventory movements API", () => {
   it("reports inventory API as unavailable when no repository is configured", async () => {
     const app = await buildApp();
@@ -667,18 +679,19 @@ describe("inventory balances API", () => {
       ]),
       inventoryRepository: createFakeInventoryRepository(),
     });
-    const opsCookie = await loginCookie(app, "ops");
+    const opsSession = await loginSession(app, "ops");
     const marketingCookie = await loginCookie(app, "marketing");
 
     const opsBalances = await app.inject({
       method: "GET",
       url: "/api/inventory-balances?lowStockOnly=true",
-      cookies: { company_erp_session: opsCookie },
+      cookies: { company_erp_session: opsSession.cookie },
     });
     const opsMovementCreate = await app.inject({
       method: "POST",
       url: "/api/inventory-movements",
-      cookies: { company_erp_session: opsCookie },
+      cookies: { company_erp_session: opsSession.cookie },
+      headers: { "x-csrf-token": opsSession.csrfToken },
       payload: {
         movementNo: "RK20260511099",
         movementDate: "2026-05-11",

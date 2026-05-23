@@ -134,6 +134,18 @@ async function loginCookie(app: BuiltApp, username = "admin", password = "Change
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: BuiltApp, username = "admin", password = "ChangeMe123!") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
 describe("auth API", () => {
   it("fails closed when auth is enabled without a real session secret", async () => {
     await expect(buildApp({ auth: { enabled: true }, authRepository: createFakeAuthRepository([]) })).rejects.toThrow(
@@ -352,19 +364,21 @@ describe("auth API", () => {
 
     const publicMeta = await app.inject({ method: "GET", url: "/api/meta/roles" });
     const anonymous = await app.inject({ method: "GET", url: "/api/departments" });
-    const viewerCookie = await loginCookie(app, "viewer");
-    const viewerRead = await app.inject({ method: "GET", url: "/api/departments", cookies: { company_erp_session: viewerCookie } });
+    const viewerSession = await loginSession(app, "viewer");
+    const viewerRead = await app.inject({ method: "GET", url: "/api/departments", cookies: { company_erp_session: viewerSession.cookie } });
     const viewerWrite = await app.inject({
       method: "POST",
       url: "/api/departments",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
+      headers: { "x-csrf-token": viewerSession.csrfToken },
       payload: { departmentCode: "DEP-FIN", name: "财务部" },
     });
-    const adminCookie = await loginCookie(app, "admin");
+    const adminSession = await loginSession(app, "admin");
     const adminWrite = await app.inject({
       method: "POST",
       url: "/api/departments",
-      cookies: { company_erp_session: adminCookie },
+      cookies: { company_erp_session: adminSession.cookie },
+      headers: { "x-csrf-token": adminSession.csrfToken },
       payload: { departmentCode: "DEP-FIN", name: "财务部" },
     });
     await app.close();
@@ -376,5 +390,34 @@ describe("auth API", () => {
     expect(viewerWrite.statusCode).toBe(403);
     expect(viewerWrite.json()).toMatchObject({ error: "FORBIDDEN", permissionArea: "departments", requiredLevel: "manage" });
     expect(adminWrite.statusCode).toBe(201);
+  });
+
+  it("requires a CSRF token for authenticated unsafe requests even in internal-only mode", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      departmentRepository: createFakeDepartmentRepository(),
+    });
+
+    const session = await loginSession(app);
+    const missingToken = await app.inject({
+      method: "POST",
+      url: "/api/departments",
+      cookies: { company_erp_session: session.cookie },
+      payload: { departmentCode: "DEP-FIN", name: "财务部" },
+    });
+    const validToken = await app.inject({
+      method: "POST",
+      url: "/api/departments",
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
+      payload: { departmentCode: "DEP-FIN", name: "财务部" },
+    });
+    await app.close();
+
+    expect(missingToken.statusCode).toBe(403);
+    expect(missingToken.json()).toEqual({ error: "CSRF_TOKEN_INVALID" });
+    expect(validToken.statusCode).toBe(201);
   });
 });

@@ -441,6 +441,22 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username =
   return response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "";
 }
 
+async function loginSession(app: Awaited<ReturnType<typeof buildApp>>, username = "admin") {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { username, password: "ChangeMe123!" },
+  });
+  return {
+    cookie: response.cookies.find((cookie) => cookie.name === "company_erp_session")?.value ?? "",
+    csrfToken: response.json().csrfToken as string,
+  };
+}
+
+function csrfHeaders(session: { csrfToken: string }, headers: Record<string, string> = {}) {
+  return { ...headers, "x-csrf-token": session.csrfToken };
+}
+
 describe("attachments API", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -470,23 +486,24 @@ describe("attachments API", () => {
     });
 
     const anonymous = await app.inject({ method: "GET", url: "/api/attachments" });
-    const adminCookie = await loginCookie(app, "admin");
-    const procurementCookie = await loginCookie(app, "procurement");
-    const viewerCookie = await loginCookie(app, "viewer");
+    const adminSession = await loginSession(app, "admin");
+    const procurementSession = await loginSession(app, "procurement");
+    const viewerSession = await loginSession(app, "viewer");
     const list = await app.inject({
       method: "GET",
       url: "/api/attachments?ownerModule=contracts&q=DEMO",
-      cookies: { company_erp_session: procurementCookie },
+      cookies: { company_erp_session: procurementSession.cookie },
     });
     const forbiddenRead = await app.inject({
       method: "GET",
       url: "/api/attachments",
-      cookies: { company_erp_session: viewerCookie },
+      cookies: { company_erp_session: viewerSession.cookie },
     });
     const forbiddenWrite = await app.inject({
       method: "POST",
       url: "/api/attachments",
-      cookies: { company_erp_session: procurementCookie },
+      cookies: { company_erp_session: procurementSession.cookie },
+      headers: { "x-csrf-token": procurementSession.csrfToken },
       payload: {
         attachmentCode: "ATT-DEMO-002",
         displayName: "DEMO 证照附件",
@@ -498,7 +515,7 @@ describe("attachments API", () => {
     const detail = await app.inject({
       method: "GET",
       url: "/api/attachments/22222222-2222-4222-8222-222222222222",
-      cookies: { company_erp_session: adminCookie },
+      cookies: { company_erp_session: adminSession.cookie },
     });
     await app.close();
 
@@ -522,11 +539,12 @@ describe("attachments API", () => {
       auditLogRepository,
     });
 
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
     const created = await app.inject({
       method: "POST",
       url: "/api/attachments",
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: {
         attachmentCode: "ATT-DEMO-002",
         displayName: "DEMO 证照附件",
@@ -544,7 +562,8 @@ describe("attachments API", () => {
     const updated = await app.inject({
       method: "PATCH",
       url: `/api/attachments/${id}`,
-      cookies: { company_erp_session: cookie },
+      cookies: { company_erp_session: session.cookie },
+      headers: { "x-csrf-token": session.csrfToken },
       payload: { displayName: "DEMO 证照附件 v2", status: "disabled" },
     });
     const logs = await auditLogRepository.list({});
@@ -579,21 +598,23 @@ describe("attachments API", () => {
     });
 
     try {
-      const cookie = await loginCookie(app);
+      const session = await loginSession(app);
+      const uploadPayload = multipartPayload(
+        {
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          ownerEntityId: "33333333-3333-4333-8333-333333333333",
+          displayName: "合同盖章扫描件",
+          remark: "总部登记上传",
+        },
+        { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const uploaded = await app.inject({
         method: "POST",
         url: "/api/attachments/upload",
-        cookies: { company_erp_session: cookie },
-        ...multipartPayload(
-          {
-            ownerModule: "contracts",
-            ownerEntityType: "contract",
-            ownerEntityId: "33333333-3333-4333-8333-333333333333",
-            displayName: "合同盖章扫描件",
-            remark: "总部登记上传",
-          },
-          { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: session.cookie },
+        ...uploadPayload,
+        headers: csrfHeaders(session, uploadPayload.headers),
       });
       const body = uploaded.json();
       const storedPath = join(root, body.attachment.storageKey);
@@ -646,34 +667,38 @@ describe("attachments API", () => {
     });
 
     try {
-      const adminCookie = await loginCookie(app, "admin");
-      const externalCookie = await loginCookie(app, "external-site");
+      const adminSession = await loginSession(app, "admin");
+      const externalSession = await loginSession(app, "external-site");
+      const unsafePayload = multipartPayload(
+        {
+          ownerModule: "contracts",
+          ownerEntityType: "contract",
+          storageKey: "contracts/user-supplied.pdf",
+        },
+        { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const unsafeStorageKey = await app.inject({
         method: "POST",
         url: "/api/attachments/upload",
-        cookies: { company_erp_session: adminCookie },
-        ...multipartPayload(
-          {
-            ownerModule: "contracts",
-            ownerEntityType: "contract",
-            storageKey: "contracts/user-supplied.pdf",
-          },
-          { name: "signed-contract.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: adminSession.cookie },
+        ...unsafePayload,
+        headers: csrfHeaders(adminSession, unsafePayload.headers),
       });
+      const externalPayload = multipartPayload(
+        {
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: "77777777-7777-4777-8777-777777777777",
+          displayName: "外部项目点附件",
+        },
+        { name: "site-license.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const externalUpload = await app.inject({
         method: "POST",
         url: "/api/attachments/upload",
-        cookies: { company_erp_session: externalCookie },
-        ...multipartPayload(
-          {
-            ownerModule: "project_sites",
-            ownerEntityType: "project_site",
-            ownerEntityId: "77777777-7777-4777-8777-777777777777",
-            displayName: "外部项目点附件",
-          },
-          { name: "site-license.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: externalSession.cookie },
+        ...externalPayload,
+        headers: csrfHeaders(externalSession, externalPayload.headers),
       });
       await app.close();
 
@@ -720,20 +745,22 @@ describe("attachments API", () => {
     });
 
     try {
-      const externalCookie = await loginCookie(app, "external-site");
+      const externalSession = await loginSession(app, "external-site");
+      const uploadPayload = multipartPayload(
+        {
+          targetType: "certificate_record",
+          targetId: assignedCertificateId,
+          displayName: "食品经营许可证附件",
+          remark: "外部项目点提交",
+        },
+        { name: "food-license.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const uploaded = await app.inject({
         method: "POST",
         url: "/api/project-site-attachment-uploads",
-        cookies: { company_erp_session: externalCookie },
-        ...multipartPayload(
-          {
-            targetType: "certificate_record",
-            targetId: assignedCertificateId,
-            displayName: "食品经营许可证附件",
-            remark: "外部项目点提交",
-          },
-          { name: "food-license.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: externalSession.cookie },
+        ...uploadPayload,
+        headers: csrfHeaders(externalSession, uploadPayload.headers),
       });
       const body = uploaded.json();
       const [createdAttachment] = await attachmentRepository.list({});
@@ -791,23 +818,25 @@ describe("attachments API", () => {
     });
 
     try {
-      const externalCookie = await loginCookie(app, "external-site");
+      const externalSession = await loginSession(app, "external-site");
       for (const target of [
         { targetType: "employer_liability_policy", targetId: assignedPolicyId },
         { targetType: "payroll_submission", targetId: assignedPayrollSubmissionId },
         { targetType: "project_site_food_license", targetId: assignedProjectSiteId },
       ]) {
+        const uploadPayload = multipartPayload(
+          {
+            ...target,
+            displayName: `${target.targetType} 附件`,
+          },
+          { name: `${target.targetType}.pdf`, type: "application/pdf", content: "PDF demo content" },
+        );
         const response = await app.inject({
           method: "POST",
           url: "/api/project-site-attachment-uploads",
-          cookies: { company_erp_session: externalCookie },
-          ...multipartPayload(
-            {
-              ...target,
-              displayName: `${target.targetType} 附件`,
-            },
-            { name: `${target.targetType}.pdf`, type: "application/pdf", content: "PDF demo content" },
-          ),
+          cookies: { company_erp_session: externalSession.cookie },
+          ...uploadPayload,
+          headers: csrfHeaders(externalSession, uploadPayload.headers),
         });
 
         expect(response.statusCode).toBe(201);
@@ -867,47 +896,53 @@ describe("attachments API", () => {
     });
 
     try {
-      const externalCookie = await loginCookie(app, "external-site");
+      const externalSession = await loginSession(app, "external-site");
+      const crossProjectPayload = multipartPayload(
+        {
+          targetType: "certificate_record",
+          targetId: otherCertificateId,
+          displayName: "其他项目点证照",
+        },
+        { name: "other-license.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const crossProjectCertificate = await app.inject({
         method: "POST",
         url: "/api/project-site-attachment-uploads",
-        cookies: { company_erp_session: externalCookie },
-        ...multipartPayload(
-          {
-            targetType: "certificate_record",
-            targetId: otherCertificateId,
-            displayName: "其他项目点证照",
-          },
-          { name: "other-license.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: externalSession.cookie },
+        ...crossProjectPayload,
+        headers: csrfHeaders(externalSession, crossProjectPayload.headers),
       });
+      const callerOwnerPayload = multipartPayload(
+        {
+          targetType: "payroll_submission",
+          targetId: assignedPayrollSubmissionId,
+          ownerModule: "project-sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: otherProjectSiteId,
+          storageKey: "project-sites/user-supplied.pdf",
+        },
+        { name: "payroll.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const callerOwner = await app.inject({
         method: "POST",
         url: "/api/project-site-attachment-uploads",
-        cookies: { company_erp_session: externalCookie },
-        ...multipartPayload(
-          {
-            targetType: "payroll_submission",
-            targetId: assignedPayrollSubmissionId,
-            ownerModule: "project-sites",
-            ownerEntityType: "project_site",
-            ownerEntityId: otherProjectSiteId,
-            storageKey: "project-sites/user-supplied.pdf",
-          },
-          { name: "payroll.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: externalSession.cookie },
+        ...callerOwnerPayload,
+        headers: csrfHeaders(externalSession, callerOwnerPayload.headers),
       });
+      const invalidPayload = multipartPayload(
+        {
+          targetType: "supplier_certificate",
+          targetId: assignedCertificateId,
+        },
+        { name: "supplier.pdf", type: "application/pdf", content: "PDF demo content" },
+      );
       const invalidTarget = await app.inject({
         method: "POST",
         url: "/api/project-site-attachment-uploads",
-        cookies: { company_erp_session: externalCookie },
-        ...multipartPayload(
-          {
-            targetType: "supplier_certificate",
-            targetId: assignedCertificateId,
-          },
-          { name: "supplier.pdf", type: "application/pdf", content: "PDF demo content" },
-        ),
+        cookies: { company_erp_session: externalSession.cookie },
+        ...invalidPayload,
+        headers: csrfHeaders(externalSession, invalidPayload.headers),
       });
 
       expect(crossProjectCertificate.statusCode).toBe(404);
@@ -936,13 +971,14 @@ describe("attachments API", () => {
       attachmentRepository: createFakeAttachmentRepository([]),
       auditLogRepository: createFakeAuditLogRepository(),
     });
-    const cookie = await loginCookie(app);
+    const session = await loginSession(app);
 
     for (const storageKey of ["", "/tmp/demo.pdf", "https://example.com/demo.pdf", "../demo.pdf", "contracts\\demo.pdf", "contracts/demo\u0000.pdf"]) {
       const response = await app.inject({
         method: "POST",
         url: "/api/attachments",
-        cookies: { company_erp_session: cookie },
+        cookies: { company_erp_session: session.cookie },
+        headers: { "x-csrf-token": session.csrfToken },
         payload: {
           attachmentCode: `ATT-${storageKey.length}`,
           displayName: "DEMO 附件",
@@ -1088,31 +1124,32 @@ describe("attachments API", () => {
       ]),
     });
 
-    const externalCookie = await loginCookie(app, "external-site");
+    const externalSession = await loginSession(app, "external-site");
     const list = await app.inject({
       method: "GET",
       url: "/api/attachments",
-      cookies: { company_erp_session: externalCookie },
+      cookies: { company_erp_session: externalSession.cookie },
     });
     const ownerFilteredOutOfScopeList = await app.inject({
       method: "GET",
       url: `/api/attachments?ownerModule=project_sites&ownerEntityType=project_site&ownerEntityId=${otherSiteId}`,
-      cookies: { company_erp_session: externalCookie },
+      cookies: { company_erp_session: externalSession.cookie },
     });
     const assignedDetail = await app.inject({
       method: "GET",
       url: "/api/attachments/22222222-2222-4222-8222-222222222222",
-      cookies: { company_erp_session: externalCookie },
+      cookies: { company_erp_session: externalSession.cookie },
     });
     const outOfScopeDetail = await app.inject({
       method: "GET",
       url: "/api/attachments/33333333-3333-4333-8333-333333333333",
-      cookies: { company_erp_session: externalCookie },
+      cookies: { company_erp_session: externalSession.cookie },
     });
     const arbitraryCreate = await app.inject({
       method: "POST",
       url: "/api/attachments",
-      cookies: { company_erp_session: externalCookie },
+      cookies: { company_erp_session: externalSession.cookie },
+      headers: { "x-csrf-token": externalSession.csrfToken },
       payload: {
         attachmentCode: "ATT-SITE-NEW",
         displayName: "外部项目点任意附件",
