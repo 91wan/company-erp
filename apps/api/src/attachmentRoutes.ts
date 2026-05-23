@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -94,6 +95,20 @@ const uploadMimeExtensions = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
 ]);
+
+const attachmentContentIpRateLimit = {
+  max: 30,
+  timeWindow: "1 minute",
+  keyGenerator: (request: FastifyRequest) => `attachment-content:${request.ip}`,
+};
+
+function attachmentUploadIpRateLimit(routeName: string) {
+  return {
+    max: 10,
+    timeWindow: "1 minute",
+    keyGenerator: (request: FastifyRequest) => `${routeName}:${request.ip}`,
+  };
+}
 
 function multipartFieldValue(field: unknown): string | undefined {
   if (!field || typeof field !== "object" || !("value" in field)) return undefined;
@@ -322,7 +337,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     return { attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) };
   });
 
-  app.get("/api/attachments/:id/content", async (request, reply) => {
+  app.get("/api/attachments/:id/content", { config: { rateLimit: attachmentContentIpRateLimit } }, async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
@@ -335,9 +350,10 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     }
     try {
       const contentPath = resolveAttachmentContentPath(attachment.storageKey);
-      const content = await readFile(contentPath);
-      if (attachment.fileType) reply.type(attachment.fileType);
+      const contentStats = await stat(contentPath);
+      reply.type(attachment.fileType || "application/octet-stream");
       reply.header("Content-Disposition", `attachment; filename="${contentDispositionFileName(attachment)}"`);
+      reply.header("Content-Length", contentStats.size);
       reply.header("X-Content-Type-Options", "nosniff");
       await writeAuditLog(request, options, {
         action: "attachment.content_read",
@@ -351,7 +367,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
           storageKey: "[redacted]",
         },
       });
-      return reply.send(content);
+      return reply.send(createReadStream(contentPath));
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -431,7 +447,10 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     }
   });
 
-  app.post("/api/attachments/upload", { preHandler: uploadPreHandler }, async (request, reply) => {
+  app.post("/api/attachments/upload", {
+    config: { rateLimit: attachmentUploadIpRateLimit("attachment-upload") },
+    preHandler: uploadPreHandler,
+  }, async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
@@ -504,7 +523,10 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     }
   });
 
-  app.post("/api/project-site-attachment-uploads", { preHandler: uploadPreHandler }, async (request, reply) => {
+  app.post("/api/project-site-attachment-uploads", {
+    config: { rateLimit: attachmentUploadIpRateLimit("project-site-attachment-upload") },
+    preHandler: uploadPreHandler,
+  }, async (request, reply) => {
     if (!options.attachmentRepository) {
       return reply.status(503).send({ error: "ATTACHMENT_REPOSITORY_NOT_CONFIGURED" });
     }
