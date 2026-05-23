@@ -19,6 +19,14 @@
 在进入 NAS 内网试点导入窗口前，先在本地或 CI 环境完成：
 
 ```bash
+npm run pilot:ready
+```
+
+`pilot:ready` 会串联数据库校验、类型检查、单元测试、构建、浏览器 E2E、导入静态门禁、导入 smoke 演练和 NAS 试点 readiness gate。通过后只代表可以安排 1-3 个项目点的 NAS 内网小范围试点，不代表正式上线。
+
+如需分步排查，可逐项运行：
+
+```bash
 npm run db:generate
 npm run db:validate
 npm run typecheck
@@ -30,6 +38,7 @@ npm run import:pilot-smoke
 ```
 
 其中 `import:pilot-check` 是静态门禁；`import:pilot-smoke` 是 mock 模式真实导入演练，不读取 NAS、不需要真实附件、不连接生产数据库。
+当前阶段不做 OCR、ZIP 图片批量入库、合同 PDF 扫描件批量上传、导入一键回滚或覆盖式更新导入。导错后到业务模块作废、停用或修正，不要直接删数据库。
 
 ---
 

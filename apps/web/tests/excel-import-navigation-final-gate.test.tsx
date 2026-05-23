@@ -99,8 +99,8 @@ describe("Excel import navigation final gate (P2-1)", () => {
     expect(rosterIdx).toBeGreaterThan(-1);
     expect(source.slice(projectSiteIdx, projectSiteIdx + 180)).toContain("entityType");
     expect(source.slice(projectSiteIdx, projectSiteIdx + 180)).toContain("projectSite");
-    expect(source.slice(rosterIdx, rosterIdx + 220)).toContain("entityType");
-    expect(source.slice(rosterIdx, rosterIdx + 220)).toContain("projectSiteRosterPerson");
+    expect(source.slice(rosterIdx, rosterIdx + 500)).toContain("entityType");
+    expect(source.slice(rosterIdx, rosterIdx + 500)).toContain("projectSiteRosterPerson");
   });
 
   it("buildNavigationIntent: all cases set entityId from targetRecordId", () => {
@@ -122,10 +122,11 @@ describe("Excel import navigation final gate (P2-1)", () => {
     // Find JSX usage (not the lazy import declaration)
     const jsxIdx = shell.indexOf("<ProjectSitesWorkspace");
     expect(jsxIdx).toBeGreaterThan(-1);
-    const block = shell.slice(jsxIdx, jsxIdx + 800);
+    const block = shell.slice(jsxIdx, jsxIdx + 1100);
     expect(block).toContain("initialEntityId");
     expect(block).toContain("initialEntityType");
     expect(block).toContain("initialRelatedEntityId");
+    expect(block).toContain("initialRelatedEntityCode");
   });
 
   it("DashboardShell passes initialEntityId to PeoplePermissionsWorkspace", () => {
@@ -151,6 +152,7 @@ describe("Excel import navigation final gate (P2-1)", () => {
     expect(source).toContain('"materials"');
     expect(source).toContain('"warehouses"');
     expect(source).toContain("initialTab");
+    expect(source).toContain("WorkspaceScaffold");
   });
 
   it("BasicDataWorkspace shows entity hint when initialEntityId is set", () => {
@@ -159,6 +161,7 @@ describe("Excel import navigation final gate (P2-1)", () => {
     expect(source).toContain("workspace-state");
     expect(source).toContain("PartiesWorkspace");
     expect(source).toContain("MaterialsWarehousesWorkspace");
+    expect(source).toContain("embedded");
   });
 
   it("ProjectSitesWorkspace state does not treat projectSiteRosterPerson id as projectSite id", () => {
@@ -272,8 +275,16 @@ describe("Excel import navigation render gate", () => {
     [
       "projectSiteRosterPerson",
       "查看现场人员",
-      { projectSiteId: "site-1" },
-      { workspace: "项目点", tab: "review", entityId: "roster-1", entityType: "projectSiteRosterPerson", relatedEntityId: "site-1" },
+      { projectSiteId: "site-1", projectSiteCode: "SITE0001" },
+      {
+        workspace: "项目点",
+        tab: "review",
+        entityId: "roster-1",
+        entityType: "projectSiteRosterPerson",
+        relatedEntityId: "site-1",
+        relatedEntityType: "projectSite",
+        relatedEntityCode: "SITE0001",
+      },
     ],
   ])("clicking %s result emits the precise NavigationIntent", (targetRecordType, label, normalizedData, expected) => {
     const targetRecordId = String(expected.entityId);

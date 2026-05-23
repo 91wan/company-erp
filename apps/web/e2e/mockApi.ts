@@ -33,6 +33,8 @@ type MockApiOptions = {
   importJobs?: Record<string, unknown>[];
 };
 
+type MockState = Record<string, Record<string, any>[]>;
+
 const demoAppVersion = {
   packageVersion: "0.1.0",
   commitSha: "9ac5cb74a9eb36136c2634399e9812def3be26d6",
@@ -460,7 +462,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
   const now = "2026-05-13T08:00:00.000Z";
   let idCounter = 1;
 
-  const state = {
+  const state: MockState = {
     parties: [{ ...demoParty }],
     materials: [{ ...demoMaterial }],
     warehouses: [{ ...demoWarehouse }],
@@ -1046,7 +1048,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
   return { capturedRequests, overrideOnce };
 }
 
-function responseForCollection(pathname: string, state: ReturnType<typeof makeStateShape>): unknown {
+function responseForCollection(pathname: string, state: MockState): unknown {
   if (pathname === "/api/parties") return { parties: state.parties };
   if (pathname === "/api/materials") return { materials: state.materials };
   if (pathname === "/api/warehouses") return { warehouses: state.warehouses };
@@ -1074,30 +1076,6 @@ function responseForCollection(pathname: string, state: ReturnType<typeof makeSt
   if (pathname.startsWith("/api/audit-logs")) return { auditLogs: state.auditLogs };
   if (pathname.startsWith("/api/attachments")) return { attachments: state.attachments };
   return {};
-}
-
-function makeStateShape() {
-  return {
-    parties: [demoParty],
-    materials: [demoMaterial],
-    warehouses: [demoWarehouse],
-    purchaseRequests: [demoPurchaseRequest],
-    purchaseRecords: [demoPurchaseRecord],
-    inventoryMovements: [demoInventoryMovement],
-    inventoryBalances: [] as Record<string, unknown>[],
-    projectSites: [demoProjectSite],
-    rosterPeople: [demoRosterPerson],
-    projectUsageRequests: [demoUsageRequest],
-    contracts: [demoContract],
-    certificates: [demoCertificate],
-    insurancePolicies: [demoInsurancePolicy],
-    coveredPersons: [demoCoveredPerson],
-    payrollSubmissions: [demoPayrollSubmission],
-    auditLogs: [] as Record<string, unknown>[],
-    attachments: [] as Record<string, unknown>[],
-    contractAttachments: [] as Record<string, unknown>[],
-    importJobs: [] as Record<string, unknown>[],
-  };
 }
 
 function createImportJob(id: string, status: string, importedRows: number) {

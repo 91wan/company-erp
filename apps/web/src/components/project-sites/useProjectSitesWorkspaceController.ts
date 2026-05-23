@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   resolveProjectSitesWorkspaceProps,
   type ProjectSitesWorkspaceProps,
@@ -58,6 +59,7 @@ export function useProjectSitesWorkspaceController(
     initialEntityId,
     initialEntityType,
     initialRelatedEntityId,
+    initialRelatedEntityCode,
     onPortalSectionChange,
     externalProjectSiteContactName,
     externalProjectSiteContactPhone,
@@ -156,6 +158,14 @@ export function useProjectSitesWorkspaceController(
     },
   }));
 
+  useEffect(() => {
+    if (initialEntityType !== "projectSiteRosterPerson") return;
+    if (selectedDetailSiteId) return;
+    if (!initialRelatedEntityCode) return;
+    const matchedSite = sites.find((site) => site.siteCode === initialRelatedEntityCode);
+    if (matchedSite) setSelectedDetailSiteId(matchedSite.id);
+  }, [initialEntityType, initialRelatedEntityCode, selectedDetailSiteId, sites, setSelectedDetailSiteId]);
+
   const {
     siteSubmitState,
     usageSubmitState,
@@ -241,9 +251,9 @@ export function useProjectSitesWorkspaceController(
 
   const importLocationNotice =
     initialEntityType === "projectSiteRosterPerson" && initialEntityId
-      ? initialRelatedEntityId
+      ? initialRelatedEntityId || selectedDetailSiteId
         ? `已定位到导入的项目点现场人员，请在该项目点现场人员/合规摘要中复核。人员记录 ID：${initialEntityId}。`
-        : `已跳转项目点资料审核；项目点现场人员记录不可见或无权限，请在项目点详情中按人员姓名核查该导入记录。记录 ID：${initialEntityId}`
+        : `项目点现场人员记录不可见或无权限，请在项目点台账中手动核查。人员记录 ID：${initialEntityId}。`
       : undefined;
 
   const externalInput = buildExternalProjectSitesWorkspaceInput({

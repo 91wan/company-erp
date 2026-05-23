@@ -23,6 +23,10 @@ type SmokeResult = {
     companyHealthCertificateAffectsCompliance: boolean;
     openingInventoryMovementType: string | null;
     defaultWarehouseName: string | null;
+    rosterPersonHasProjectSiteLocator: boolean;
+    contractHasExpiryLocator: boolean;
+    openingInventoryHasMovementLocator: boolean;
+    defaultSupplierOptionalWorks: boolean;
   };
 };
 
@@ -284,10 +288,16 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
 
   let projectSiteId: string | null = null;
   let projectSiteRosterPersonId: string | null = null;
+  let rosterPersonHasProjectSiteLocator = false;
   let projectSiteHealthCertificateProjectSiteId: string | null = null;
   let companyHealthCertificateProjectSiteId: string | null = null;
+  let projectSiteHealthCertificateHasLocator = false;
+  let companyHealthCertificateHasLocator = false;
+  let contractHasExpiryLocator = false;
   let openingInventoryMovementType: string | null = null;
   let defaultWarehouseName: string | null = null;
+  let openingInventoryHasMovementLocator = false;
+  let defaultSupplierOptionalWorks = false;
 
   await step("基础资料：往来方导入", async () => {
     const { imported } = await previewAndConfirm(repository, "parties", [["SUP-SMOKE", "试点供应商", "", "", "", "", "", "", "", "启用", ""]]);
@@ -298,6 +308,8 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
   await step("基础资料：物料导入", async () => {
     const { imported } = await previewAndConfirm(repository, "materials", [["MAT-SMOKE", "试点物料", "", "食材", "件", "", 10, "启用", ""]]);
     if (!imported?.targetRecordId) throw new Error("默认供应商为空的物料未导入");
+    defaultSupplierOptionalWorks = imported.normalizedData?.defaultSupplierPartyId == null;
+    if (!defaultSupplierOptionalWorks) throw new Error("默认供应商为空时不应写入 defaultSupplierPartyId");
     return { targetRecordType: imported.targetRecordType ?? undefined, targetRecordId: imported.targetRecordId };
   });
 
@@ -327,6 +339,8 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
     ]]);
     projectSiteRosterPersonId = imported?.targetRecordId ?? null;
     if (!projectSiteRosterPersonId) throw new Error("项目点现场人员未导入");
+    rosterPersonHasProjectSiteLocator = Boolean(imported?.normalizedData?.projectSiteId && imported.normalizedData.projectSiteCode && imported.normalizedData.personName);
+    if (!rosterPersonHasProjectSiteLocator) throw new Error("项目点现场人员导入行缺少 projectSiteId/projectSiteCode/personName 定位字段");
     return { targetRecordType: imported?.targetRecordType ?? undefined, targetRecordId: projectSiteRosterPersonId };
   });
 
@@ -336,6 +350,10 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
     ]]);
     projectSiteHealthCertificateProjectSiteId = imported?.normalizedData?.ownerProjectSiteId as string | null;
     if (!imported?.targetRecordId) throw new Error("项目点健康证未导入");
+    projectSiteHealthCertificateHasLocator =
+      imported.normalizedData?.certificateType === "person_health_cert" &&
+      Boolean(imported.normalizedData.ownerProjectSiteId);
+    if (!projectSiteHealthCertificateHasLocator) throw new Error("项目点健康证缺少 ownerProjectSiteId 定位字段");
     return { targetRecordType: imported.targetRecordType ?? undefined, targetRecordId: imported.targetRecordId };
   });
 
@@ -345,6 +363,10 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
     ]]);
     companyHealthCertificateProjectSiteId = imported?.normalizedData?.ownerProjectSiteId as string | null;
     if (!imported?.targetRecordId) throw new Error("公司健康证未导入");
+    companyHealthCertificateHasLocator =
+      imported.normalizedData?.certificateType === "person_health_cert" &&
+      imported.normalizedData?.ownerProjectSiteId == null;
+    if (!companyHealthCertificateHasLocator) throw new Error("公司健康证不应带 ownerProjectSiteId");
     return { targetRecordType: imported.targetRecordType ?? undefined, targetRecordId: imported.targetRecordId };
   });
 
@@ -353,6 +375,8 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
       "CON-SMOKE", "试点到期合同", "试点供应商", "采购合同", "固定期限合同", "食材", "2026-01-01", "2026-05-30", "履行中", "", "", "", "2026-01-01", "", "CNY", "", "", "", "未上传",
     ]]);
     if (!imported?.targetRecordId) throw new Error("无 PDF 附件的合同未导入");
+    contractHasExpiryLocator = imported.targetRecordType === "contract" && Boolean(imported.normalizedData?.endDate);
+    if (!contractHasExpiryLocator) throw new Error("合同导入行缺少 endDate 到期定位字段");
     return { targetRecordType: imported.targetRecordType ?? undefined, targetRecordId: imported.targetRecordId };
   });
 
@@ -364,6 +388,11 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
     defaultWarehouseName = imported?.normalizedData?.warehouseCode === "WH-WX-HQ" ? "无锡总部仓库" : null;
     if (openingInventoryMovementType !== "opening") throw new Error("期初库存未写入 opening movement");
     if (defaultWarehouseName !== "无锡总部仓库") throw new Error("默认仓库名称不是无锡总部仓库");
+    openingInventoryHasMovementLocator =
+      imported?.targetRecordType === "inventoryMovement" &&
+      imported.normalizedData?.movementType === "opening" &&
+      imported.normalizedData?.warehouseCode === "WH-WX-HQ";
+    if (!openingInventoryHasMovementLocator) throw new Error("期初库存导入行缺少库存流水定位字段");
     return { targetRecordType: imported?.targetRecordType ?? undefined, targetRecordId: imported?.targetRecordId ?? undefined };
   });
 
@@ -372,9 +401,19 @@ export async function runImportPilotSmoke(options: SmokeOptions = {}): Promise<S
     companyHealthCertificateAffectsCompliance: Boolean(projectSiteId && companyHealthCertificateProjectSiteId === projectSiteId),
     openingInventoryMovementType,
     defaultWarehouseName,
+    rosterPersonHasProjectSiteLocator,
+    contractHasExpiryLocator,
+    openingInventoryHasMovementLocator,
+    defaultSupplierOptionalWorks,
   };
   if (!summary.projectSiteHealthCertificateAffectsCompliance) failures.push("项目点健康证未绑定项目点合规范围");
   if (summary.companyHealthCertificateAffectsCompliance) failures.push("公司健康证不应影响项目点合规范围");
+  if (!projectSiteHealthCertificateHasLocator) failures.push("项目点健康证缺少前端复核定位字段");
+  if (!companyHealthCertificateHasLocator) failures.push("公司健康证缺少前端复核定位字段");
+  if (!summary.rosterPersonHasProjectSiteLocator) failures.push("项目点现场人员缺少所属项目点定位字段");
+  if (!summary.contractHasExpiryLocator) failures.push("合同缺少到期复核定位字段");
+  if (!summary.openingInventoryHasMovementLocator) failures.push("期初库存缺少库存流水定位字段");
+  if (!summary.defaultSupplierOptionalWorks) failures.push("默认供应商为空时物料导入不应失败或写入供应商");
 
   return { ok: failures.length === 0, steps, failures, summary };
 }

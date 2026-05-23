@@ -154,7 +154,15 @@ check("import-module-stop-line.md 存在并写明导入停止线", () => {
   const docPath = join(root, "docs/import/import-module-stop-line.md");
   if (!existsSync(docPath)) throw new Error("缺少 docs/import/import-module-stop-line.md");
   const src = readFileSync(docPath, "utf8");
-  for (const phrase of ["不做", "OCR", "ZIP 图片批量入库", "合同 PDF", "导入一键回滚", "外部项目点账号自助全局导入", "Storage Key"]) {
+  for (const phrase of [
+    "不做 OCR",
+    "ZIP 图片批量入库",
+    "合同 PDF 扫描件批量上传",
+    "导入一键回滚",
+    "覆盖式更新导入",
+    "外部项目点账号自助全局导入",
+    "用户手填 Storage Key",
+  ]) {
     if (!src.includes(phrase)) throw new Error(`停止线文档缺少：${phrase}`);
   }
 });
@@ -224,11 +232,17 @@ check("ImportRowsTab 区分 projectSite 与 projectSiteRosterPerson entityType",
   if (projectIdx < 0 || !src.slice(projectIdx, projectIdx + 220).includes('entityType: "projectSite"')) {
     throw new Error("projectSite 导入跳转缺少 entityType=projectSite");
   }
-  if (rosterIdx < 0 || !src.slice(rosterIdx, rosterIdx + 260).includes('entityType: "projectSiteRosterPerson"')) {
+  if (rosterIdx < 0 || !src.slice(rosterIdx, rosterIdx + 600).includes('entityType: "projectSiteRosterPerson"')) {
     throw new Error("projectSiteRosterPerson 导入跳转缺少 entityType=projectSiteRosterPerson");
   }
-  if (!src.slice(rosterIdx, rosterIdx + 420).includes("relatedEntityId")) {
+  if (!src.slice(rosterIdx, rosterIdx + 700).includes("relatedEntityId")) {
     throw new Error("projectSiteRosterPerson 导入跳转缺少 relatedEntityId，无法定位所属项目点");
+  }
+  if (!src.slice(rosterIdx, rosterIdx + 700).includes('relatedEntityType: "projectSite"')) {
+    throw new Error("projectSiteRosterPerson 导入跳转缺少 relatedEntityType=projectSite");
+  }
+  if (!src.slice(rosterIdx, rosterIdx + 700).includes("relatedEntityCode")) {
+    throw new Error("projectSiteRosterPerson 导入跳转缺少 relatedEntityCode，无法用项目点编码降级定位");
   }
 });
 

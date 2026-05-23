@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   IMPORT_TEMPLATE_TYPES,
   type ImportJobDto,
@@ -168,9 +168,9 @@ export function useExcelImportController({
   }
 
   /** Load job detail without switching tabs — for drawer target counts */
-  async function handleLoadDetail(id: string): Promise<ImportJobDto> {
+  const handleLoadDetail = useCallback(async function handleLoadDetail(id: string): Promise<ImportJobDto> {
     return loadImportJobDetail(id);
-  }
+  }, [loadImportJobDetail]);
 
   /** Confirm a job directly by ID (used by ImportJobDetailDrawer P0-5) */
   async function handleConfirmJobDirectly(id: string) {

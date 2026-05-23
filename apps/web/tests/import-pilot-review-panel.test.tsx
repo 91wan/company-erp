@@ -100,4 +100,33 @@ describe("ImportPilotReviewPanel", () => {
 
     expect(await screen.findByText("暂无导入后复核任务")).toBeInTheDocument();
   });
+
+  it("loads at most the latest 20 confirmed batches and does not reload stable jobs on rerender", async () => {
+    const jobs = Array.from({ length: 30 }, (_, index) => job({
+      id: `job-${index}`,
+      templateType: "health_certificates",
+      createdAt: `2026-05-${String((index % 20) + 1).padStart(2, "0")}T00:00:00.000Z`,
+      rows: [{ ...baseRow, id: `row-${index}`, normalizedData: { healthCertificateOwnerTypeLabel: "项目点健康证", expiryDate: "2026-05-25" } }],
+    }));
+    const loadDetail = vi.fn((id: string) => Promise.resolve(jobs.find((item) => item.id === id)!));
+    const { rerender } = render(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve(jobs.map(summary))}
+        loadImportJobDetail={loadDetail}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("tab", { name: "试点复核" }));
+    expect(await screen.findByText("统计范围：最近 20 个确认批次，以及最近 7 天的错误、警告和待确认批次。")).toBeInTheDocument();
+    expect(loadDetail).toHaveBeenCalledTimes(20);
+
+    rerender(
+      <ExcelImportWorkspace
+        loadImportJobs={() => Promise.resolve(jobs.map(summary))}
+        loadImportJobDetail={loadDetail}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("tab", { name: "试点复核" }));
+    expect(loadDetail).toHaveBeenCalledTimes(20);
+  });
 });

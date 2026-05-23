@@ -36,7 +36,8 @@ function buildNavigationIntent(row: ImportJobRowDto): NavigationIntent | null {
       return { workspace: "合同", tab: "ledger", entityId };
     case "projectSiteRosterPerson": {
       const relatedEntityId = (normalizedData as Record<string, unknown> | null)?.projectSiteId as string | undefined;
-      return { workspace: "项目点", tab: "review", entityId, entityType: "projectSiteRosterPerson", relatedEntityId };
+      const relatedEntityCode = (normalizedData as Record<string, unknown> | null)?.projectSiteCode as string | undefined;
+      return { workspace: "项目点", tab: "review", entityId, entityType: "projectSiteRosterPerson", relatedEntityId, relatedEntityType: "projectSite", relatedEntityCode };
     }
     case "projectSite":
       return { workspace: "项目点", tab: "risk", entityId, entityType: "projectSite" };

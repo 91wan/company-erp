@@ -71,7 +71,7 @@ export function DashboardOverview({
         <RecentActivityPanel data={data} onNavigate={onNavigate} />
       </section>
       <section className="dashboard-grid dashboard-grid-secondary">
-        <DashboardQuickEntries onNavigate={onNavigate} />
+        <DashboardQuickEntries currentUser={currentUser} onNavigate={onNavigate} />
         <LowStockPanel
           dashboardSummary={dashboardSummary(data)}
           inventoryBalances={data.inventoryBalances}

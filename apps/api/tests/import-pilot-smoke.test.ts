@@ -22,5 +22,9 @@ describe("import pilot smoke runner", () => {
     expect(result.summary.companyHealthCertificateAffectsCompliance).toBe(false);
     expect(result.summary.openingInventoryMovementType).toBe("opening");
     expect(result.summary.defaultWarehouseName).toBe("无锡总部仓库");
+    expect(result.summary.rosterPersonHasProjectSiteLocator).toBe(true);
+    expect(result.summary.contractHasExpiryLocator).toBe(true);
+    expect(result.summary.openingInventoryHasMovementLocator).toBe(true);
+    expect(result.summary.defaultSupplierOptionalWorks).toBe(true);
   });
 });

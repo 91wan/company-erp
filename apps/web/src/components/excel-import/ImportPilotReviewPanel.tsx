@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ImportJobDto, ImportJobRowDto } from "@company-erp/shared";
 import { SectionCard } from "../ui";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
@@ -23,12 +23,20 @@ function importedRows(details: ImportJobDto[], templateType: string): ImportJobR
 
 export function ImportPilotReviewPanel({ model }: { model: ExcelImportController }) {
   const [details, setDetails] = useState<ImportJobDto[]>([]);
+  const detailCache = useRef(new Map<string, ImportJobDto>());
 
   useEffect(() => {
     let mounted = true;
-    const detailJobs = model.jobs.filter((job) => job.status === "confirmed");
-    Promise.all(detailJobs.map((job) => model.handleLoadDetail(job.id).catch(() => null))).then((loaded) => {
-      if (mounted) setDetails(loaded.filter(Boolean) as ImportJobDto[]);
+    const confirmedJobs = model.jobs
+      .filter((job) => job.status === "confirmed")
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 20);
+    const missingJobs = confirmedJobs.filter((job) => !detailCache.current.has(job.id));
+    Promise.all(missingJobs.map((job) => model.handleLoadDetail(job.id).catch(() => null))).then((loaded) => {
+      loaded.filter(Boolean).forEach((job) => detailCache.current.set((job as ImportJobDto).id, job as ImportJobDto));
+      if (mounted) {
+        setDetails(confirmedJobs.map((job) => detailCache.current.get(job.id)).filter(Boolean) as ImportJobDto[]);
+      }
     });
     return () => { mounted = false; };
   }, [model.jobs, model.handleLoadDetail]);
@@ -93,15 +101,21 @@ export function ImportPilotReviewPanel({ model }: { model: ExcelImportController
   if (!hasData) {
     return (
       <SectionCard title="试点复核">
-        <div className="workspace-state">暂无导入后复核任务</div>
+        <div className="workspace-state">
+          <strong>暂无导入后复核任务</strong>
+          <span>统计范围：最近 20 个确认批次。</span>
+        </div>
       </SectionCard>
     );
   }
 
   return (
-    <div className="import-pilot-review-grid" aria-label="试点复核任务">
+    <>
+      <p className="workspace-help-text">统计范围：最近 20 个确认批次，以及最近 7 天的错误、警告和待确认批次。</p>
+      <div className="import-pilot-review-grid" aria-label="试点复核任务">
       <ReviewCard
         title="合同复核"
+        status={review.contracts.expired + review.contracts.expiringSoon > 0 ? "待复核" : "正常"}
         lines={[`最近导入 ${review.contracts.total} 条`, `已到期 ${review.contracts.expired} 条`, `30 天内到期 ${review.contracts.expiringSoon} 条`]}
         actionLabel="去合同风险"
         target={{ workspace: "合同", tab: "risk" }}
@@ -109,6 +123,7 @@ export function ImportPilotReviewPanel({ model }: { model: ExcelImportController
       />
       <ReviewCard
         title="健康证复核"
+        status={review.health.expired + review.health.expiringSoon > 0 ? "待复核" : "正常"}
         lines={[
           `最近导入 ${review.health.total} 条`,
           `已过期 ${review.health.expired} 条`,
@@ -122,6 +137,7 @@ export function ImportPilotReviewPanel({ model }: { model: ExcelImportController
       />
       <ReviewCard
         title="项目点合规复核"
+        status={review.projectSites.blocking > 0 ? "有风险" : review.projectSites.warning > 0 ? "待复核" : "正常"}
         lines={[`受影响项目点 ${review.projectSites.affected} 个`, `阻断风险 ${review.projectSites.blocking} 个`, `黄色预警 ${review.projectSites.warning} 个`]}
         actionLabel="去项目点风险台账"
         target={{ workspace: "项目点", tab: "risk" }}
@@ -129,6 +145,7 @@ export function ImportPilotReviewPanel({ model }: { model: ExcelImportController
       />
       <ReviewCard
         title="库存复核"
+        status={review.inventory.rows > 0 ? "待复核" : "正常"}
         lines={[`期初库存 ${review.inventory.rows} 行`, `仓库 ${review.inventory.warehouses} 个`, `物料 ${review.inventory.materials} 个`]}
         actionLabel="去库存流水"
         target={{ workspace: "库存", tab: "movements" }}
@@ -136,23 +153,27 @@ export function ImportPilotReviewPanel({ model }: { model: ExcelImportController
       />
       <ReviewCard
         title="错误/警告复核"
+        status={review.issues.errorBatches > 0 ? "有风险" : review.issues.previewed > 0 ? "待确认" : review.issues.warningBatches > 0 ? "待复核" : "正常"}
         lines={[`错误批次 ${review.issues.errorBatches} 个`, `警告批次 ${review.issues.warningBatches} 个`, `待确认批次 ${review.issues.previewed} 个`]}
         actionLabel="去导入批次"
         target={{ workspace: "Excel 导入", tab: "jobs" }}
         onNavigate={model.onNavigate}
       />
-    </div>
+      </div>
+    </>
   );
 }
 
 function ReviewCard({
   title,
+  status,
   lines,
   actionLabel,
   target,
   onNavigate,
 }: {
   title: string;
+  status: "正常" | "待复核" | "有风险" | "待确认";
   lines: string[];
   actionLabel: string;
   target: NavigationIntent;
@@ -160,6 +181,7 @@ function ReviewCard({
 }) {
   return (
     <SectionCard title={title}>
+      <div className="import-pilot-review-status">{status}</div>
       <ul className="import-pilot-review-list">
         {lines.map((line) => <li key={line}>{line}</li>)}
       </ul>
