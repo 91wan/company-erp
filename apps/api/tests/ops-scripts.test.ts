@@ -1132,6 +1132,27 @@ describe("NAS trial deploy notification readiness gate", () => {
       expect(doc).toContain(marker);
     }
   });
+
+  it("documents the CSRF and Origin production policy without changing runtime behavior", () => {
+    const doc = readFile(join(repoRoot, "docs", "security", "csrf-origin-production-policy.md"));
+
+    for (const marker of [
+      "PUBLIC_ACCESS_ENABLED=true",
+      "Origin/Host",
+      "公司内网正式上线建议",
+      "浏览器访问",
+      "登录 Cookie",
+      "INTERNAL_ORIGIN_CHECK_ENABLED",
+      "AUTH_COOKIE_SAMESITE",
+      "non-GET CSRF header",
+      "可信 LAN + 同源 Nginx",
+      "P1",
+      "跨网段/远程/反代访问",
+      "P0",
+    ]) {
+      expect(doc).toContain(marker);
+    }
+  });
 });
 
 function markerForReadinessLabel(label: string): string {
