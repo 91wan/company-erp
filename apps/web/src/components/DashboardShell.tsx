@@ -192,7 +192,11 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
           ) : null}
           {activeWorkspace === "Excel 导入" ? (
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
-              <ExcelImportWorkspace canManage={canManage(currentUser.roles, "systemSettings")} onNavigate={navigate} />
+              <ExcelImportWorkspace
+                canManage={canManage(currentUser.roles, "systemSettings")}
+                onNavigate={navigate}
+                initialTab={activeWorkspaceTab("Excel 导入")}
+              />
             </Suspense>
           ) : null}
           {activeWorkspace === "系统设置" ? (

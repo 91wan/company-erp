@@ -1289,6 +1289,20 @@ describe("Company ERP app shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens the Excel import pilot review tab from the dashboard quick entry", async () => {
+    mockShellFetch(adminUser);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /导入试点复核/ }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Excel 导入" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "试点复核", selected: true })).toBeInTheDocument();
+    expect(screen.getByText("暂无导入后复核任务")).toBeInTheDocument();
+  });
+
   it("shows API health success state", async () => {
     render(
       <ApiStatus
