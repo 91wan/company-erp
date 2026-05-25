@@ -855,6 +855,9 @@ describe("NAS trial deploy notification readiness gate", () => {
         if (path === "docs/deployment/nas-docker.md") {
           return "pilot:ready production:ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
         }
+        if (path === "docs/operations/go-live-data-freeze.md") {
+          return "最后一次导入时间 导入批次 ID 不直接删数据库";
+        }
         return "ok";
       },
     });
@@ -868,6 +871,7 @@ describe("NAS trial deploy notification readiness gate", () => {
           return "npm run pilot:ready\nDATABASE_URL=postgresql://user:secret@db/company\n/volume1/company-erp";
         }
         if (path === "docs/deployment/nas-docker.md") return "pilot:ready only";
+        if (path === "docs/operations/go-live-data-freeze.md") throw new Error(`missing ${path}`);
         throw new Error(`missing ${path}`);
       },
     });
@@ -878,6 +882,22 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(blocked.blockers.join("\n")).toContain("production-ready.sh");
     expect(blocked.blockers.join("\n")).not.toContain("/volume1/company-erp");
     expect(blocked.blockers.join("\n")).not.toContain("secret");
+  });
+
+  it("documents the formal go-live data freeze and import stop line", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "go-live-data-freeze.md"));
+
+    expect(doc).toContain("冻结导入模板");
+    expect(doc).toContain("最后一次导入时间");
+    expect(doc).toContain("合同风险");
+    expect(doc).toContain("证照健康证");
+    expect(doc).toContain("项目点风险");
+    expect(doc).toContain("库存流水");
+    expect(doc).toContain("不再用 Excel 覆盖式更新");
+    expect(doc).toContain("业务模块修正/作废/停用");
+    expect(doc).toContain("不直接删数据库");
+    expect(doc).toContain("试点数据转正式数据的确认人");
+    expect(doc).toContain("导入批次 ID");
   });
 });
 
