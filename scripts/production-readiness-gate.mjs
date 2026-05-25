@@ -93,6 +93,13 @@ export function evaluateProductionReadiness({
     markers: ["Internal Production Go-live Boundary", "pilot:ready", "production:ready", "不公网暴露 API/PostgreSQL"],
   });
 
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/go-live-data-freeze.md",
+    markers: ["最后一次导入时间", "导入批次 ID", "不直接删数据库"],
+  });
+
   return {
     status: blockers.length === 0 ? READY : BLOCKED,
     blockers: blockers.map(sanitize),
