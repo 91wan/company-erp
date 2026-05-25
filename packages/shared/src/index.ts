@@ -604,6 +604,23 @@ export type UserAccountDto = {
   updatedAt: string;
 };
 
+export type AccessReviewUserAccountExportDto = {
+  id: string;
+  username: string;
+  status: UserAccountStatusCode;
+  roles: readonly MvpRoleCode[];
+  projectSiteIds: readonly string[];
+  activeSessionCount: number;
+  permissions?: {
+    manage: readonly PermissionAreaCode[];
+  };
+};
+
+export type AccessReviewExportDto = {
+  exportedAt: string;
+  users: readonly AccessReviewUserAccountExportDto[];
+};
+
 export type EmployeeProjectSiteAssignmentDto = {
   id: string;
   employeeId: string;
