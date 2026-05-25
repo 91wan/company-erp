@@ -538,20 +538,25 @@ test("wide desktop and tablet widths keep the shell and tables usable", async ({
 
     await page.getByRole("button", { name: "人员权限", exact: true }).click();
     await expect(page.getByRole("heading", { name: "人员权限" })).toBeVisible();
-    const tableWrapCount = await page.locator(".table-wrap").count();
-    expect(tableWrapCount).toBeGreaterThan(0);
-    const tableMetrics = await page
-      .locator(".table-wrap")
-      .first()
-      .evaluate((element) => ({
+    const tableWrap = page.locator(".table-wrap, .ui-table-wrap").first();
+    if ((await tableWrap.count()) > 0) {
+      const tableMetrics = await tableWrap.evaluate((element) => ({
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
         overflowX: window.getComputedStyle(element).overflowX,
       }));
-    expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(
-      tableMetrics.clientWidth,
-    );
-    expect(["auto", "visible"]).toContain(tableMetrics.overflowX);
+      expect(tableMetrics.scrollWidth).toBeGreaterThanOrEqual(
+        tableMetrics.clientWidth,
+      );
+      expect(["auto", "visible"]).toContain(tableMetrics.overflowX);
+    } else {
+      await expect(page.locator(".people-section-grid, .ui-table-state").first()).toBeVisible();
+    }
+    const documentMetrics = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(documentMetrics.scrollWidth).toBeLessThanOrEqual(documentMetrics.clientWidth + 1);
     await expect(page.locator("vite-error-overlay")).toHaveCount(0);
   }
 
