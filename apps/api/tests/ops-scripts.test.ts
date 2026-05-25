@@ -1020,6 +1020,9 @@ describe("NAS trial deploy notification readiness gate", () => {
         if (path === "docs/operations/go-live-data-freeze.md") {
           return "最后一次导入时间 导入批次 ID 不直接删数据库";
         }
+        if (path === "docs/operations/release-and-rollback-runbook.md") {
+          return "数据库迁移一旦执行，不能只回滚代码";
+        }
         return "ok";
       },
     });
@@ -1034,6 +1037,7 @@ describe("NAS trial deploy notification readiness gate", () => {
         }
         if (path === "docs/deployment/nas-docker.md") return "pilot:ready only";
         if (path === "docs/operations/go-live-data-freeze.md") throw new Error(`missing ${path}`);
+        if (path === "docs/operations/release-and-rollback-runbook.md") throw new Error(`missing ${path}`);
         throw new Error(`missing ${path}`);
       },
     });
@@ -1060,6 +1064,29 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(doc).toContain("不直接删数据库");
     expect(doc).toContain("试点数据转正式数据的确认人");
     expect(doc).toContain("导入批次 ID");
+  });
+
+  it("documents release and rollback steps for internal production", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "release-and-rollback-runbook.md"));
+
+    expect(doc).toContain("npm run production:ready");
+    expect(doc).toContain("手动数据库备份");
+    expect(doc).toContain("附件快照");
+    expect(doc).toContain("记录当前 commit sha");
+    expect(doc).toContain("记录新 commit sha");
+    expect(doc).toContain("docker compose build api web");
+    expect(doc).toContain("docker compose run --rm migrate");
+    expect(doc).toContain("docker compose up -d api web");
+    expect(doc).toContain("docker compose ps");
+    expect(doc).toContain("production health check");
+    expect(doc).toContain("停 API/Web");
+    expect(doc).toContain("切回上一个 commit");
+    expect(doc).toContain("恢复数据库备份");
+    expect(doc).toContain("恢复附件快照");
+    expect(doc).toContain("failure logs");
+    expect(doc).toContain("migration output");
+    expect(doc).toContain("health check output");
+    expect(doc).toContain("数据库迁移一旦执行，不能只回滚代码");
   });
 });
 
