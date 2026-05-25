@@ -1053,10 +1053,12 @@ describe("NAS trial deploy notification readiness gate", () => {
   it("wires production:ready through a local production readiness script", () => {
     const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const productionReady = readFile(join(repoRoot, "scripts", "production-ready.sh"));
+    const productionGoLiveReady = readFile(join(repoRoot, "scripts", "production-go-live-ready.sh"));
 
     expect(packageJson.scripts["production:ready"]).toBe("bash scripts/production-ready.sh");
     expect(packageJson.scripts["production:readiness-gate"]).toBe("node scripts/production-readiness-gate.mjs");
     expect(packageJson.scripts["production:go-live-check"]).toBe("node scripts/production-go-live-check.mjs");
+    expect(packageJson.scripts["production:go-live-ready"]).toBe("bash scripts/production-go-live-ready.sh");
     expect(productionReady).toContain("npm run pilot:ready");
     expect(productionReady).toContain("npm run test:backup-restore");
     expect(productionReady).toContain("npm run attachments:legacy-report -- --dry-run");
@@ -1064,6 +1066,16 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(productionReady).toContain("npm run pilot:verify-evidence -- --help");
     expect(productionReady).toContain("npm run production:readiness-gate");
     expect(productionReady).toContain("does not read production .env");
+    expect(productionGoLiveReady).toContain("npm run production:ready");
+    expect(productionGoLiveReady).toContain('npm run production:go-live-check -- "$@"');
+
+    const help = spawnSync("bash", ["scripts/production-go-live-ready.sh", "--help"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    expect(help.status).toBe(0);
+    expect(help.stdout).toContain("Usage: npm run production:go-live-ready");
+    expect(help.stdout).not.toContain("npm run db:generate");
   });
 
   it("evaluates production readiness with READY/BLOCKED output and redacted blockers", async () => {
@@ -1238,6 +1250,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     for (const marker of [
       "npm run production:ready 输出",
+      "npm run production:go-live-check 输出",
       "npm run pilot:ready 输出",
       "npm run import:pilot-check 输出",
       "npm run import:pilot-smoke 输出",
@@ -1260,6 +1273,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       "P0 阻断",
       "P1 建议",
       "Git 外",
+      "production:ready + production:go-live-check",
       "不保存真实密码",
       "不保存合同扫描件",
       "不保存健康证图片",
@@ -1277,7 +1291,10 @@ describe("NAS trial deploy notification readiness gate", () => {
       "正式上线在本项目中仅指公司内网正式运行",
       "不等于公网 SaaS",
       "不代表对外公开访问",
-      "只有 production:ready + production evidence signoff 通过后",
+      "只有 production:ready + production:go-live-check 通过后",
+      "production:go-live-check",
+      "production:go-live-ready",
+      "Git 外 evidence directory",
       "才允许从试点切正式",
       "没有恢复演练和访问复核",
       "只能保持试点状态",

@@ -5,6 +5,7 @@
 | 等级 | 证据项 | 保存要求 |
 | --- | --- | --- |
 | P0 阻断 | npm run production:ready 输出 | 保存完整终端输出，需包含最终状态。 |
+| P0 阻断 | npm run production:go-live-check 输出 | 使用 Git 外 evidence directory 运行，需包含 `READY_FOR_INTERNAL_PRODUCTION_GO_LIVE` 或阻塞项清单。 |
 | P0 阻断 | npm run pilot:ready 输出 | 证明试点总门禁仍通过。 |
 | P0 阻断 | npm run import:pilot-check 输出 | 证明导入停止线和静态门禁通过。 |
 | P0 阻断 | npm run import:pilot-smoke 输出 | 证明真实导入 smoke 链路通过。 |
@@ -38,5 +39,4 @@
 
 ## 审批结论
 
-只有 P0 阻断项全部齐全，才能进入公司内网正式上线审批。P1 建议项缺失不一定阻断，但必须记录缺失原因和补齐计划。
-
+正式上线审批要求 production:ready + production:go-live-check 都通过；其中 production:ready 是代码与静态门禁，production:go-live-check 是 Git 外证据包门禁。只有 P0 阻断项全部齐全，才能进入公司内网正式上线审批。P1 建议项缺失不一定阻断，但必须记录缺失原因和补齐计划。

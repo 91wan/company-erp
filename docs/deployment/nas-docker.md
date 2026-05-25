@@ -37,8 +37,15 @@ Use the two readiness levels separately:
   trial with 1-3 project sites.
 - `npm run production:ready`: local gates for entering internal production
   review after the trial evidence is ready.
+- `npm run production:go-live-check -- --evidence-dir <outside-git-path>`:
+  checks the Git 外 evidence directory for restore drill, attachment readiness,
+  audit export, access review, data freeze, health check, app-version, and
+  release sign-off evidence.
+- `npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>`:
+  runs `production:ready` first, then runs the evidence package gate with the
+  same arguments.
 
-只有 production:ready + production evidence signoff 通过后，才允许从试点切正式。
+只有 production:ready + production:go-live-check 通过后，才允许从试点切正式。
 如果没有恢复演练和访问复核，只能保持试点状态。Passing
 `production:ready` does not authorize public internet exposure. If the team has
 not completed restore drill evidence, access review sign-off, audit export
@@ -244,6 +251,24 @@ for 1-3 project sites. It is not a formal production launch. The command does
 not start production containers or read real NAS attachment roots; it runs local
 verification, browser E2E, Excel import gates, and the NAS readiness gate. A
 browser-capable environment is required for `npm run test:e2e -w @company-erp/web`.
+
+Before company-internal formal go-live approval, run both the static local gate
+and the Git 外 evidence directory gate:
+
+```bash
+npm run production:ready
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+```
+
+For a single operator command, use:
+
+```bash
+npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+```
+
+`production:ready` can run in CI or a local workstation without production
+evidence. `production:go-live-check` is the formal evidence gate and requires a
+Git 外 evidence directory; the directory must not be committed.
 
 Do not expose API or PostgreSQL to the public internet. Do not import all real
 data directly for the first drill; start with desensitized data or a small
