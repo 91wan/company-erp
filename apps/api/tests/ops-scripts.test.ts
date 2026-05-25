@@ -553,6 +553,78 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(pilotReady.indexOf("export DATABASE_URL")).toBeLessThan(pilotReady.indexOf("npm run db:validate"));
     expect(pilotReady).toContain("npm run nas:trial-readiness");
   });
+
+  it("wires production:ready through a local production readiness script", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const productionReady = readFile(join(repoRoot, "scripts", "production-ready.sh"));
+
+    expect(packageJson.scripts["production:ready"]).toBe("bash scripts/production-ready.sh");
+    expect(packageJson.scripts["production:readiness-gate"]).toBe("node scripts/production-readiness-gate.mjs");
+    expect(productionReady).toContain("npm run pilot:ready");
+    expect(productionReady).toContain("npm run test:backup-restore");
+    expect(productionReady).toContain("npm run attachments:legacy-report -- --dry-run");
+    expect(productionReady).toContain("npm run audit:verify-export -- --help");
+    expect(productionReady).toContain("npm run pilot:verify-evidence -- --help");
+    expect(productionReady).toContain("npm run production:readiness-gate");
+    expect(productionReady).toContain("does not read production .env");
+  });
+
+  it("evaluates production readiness with READY/BLOCKED output and redacted blockers", async () => {
+    const { evaluateProductionReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/production-readiness-gate.mjs")).href
+    )) as {
+      evaluateProductionReadiness: (input: {
+        readText?: (path: string) => string;
+        packageScripts?: Record<string, string>;
+      }) => {
+        status: string;
+        blockers: string[];
+      };
+    };
+
+    const ready = evaluateProductionReadiness({
+      packageScripts: {
+        "production:ready": "bash scripts/production-ready.sh",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+      },
+      readText: (path) => {
+        if (path === "scripts/production-ready.sh") {
+          return [
+            "npm run pilot:ready",
+            "npm run test:backup-restore",
+            "npm run attachments:legacy-report -- --dry-run",
+            "npm run audit:verify-export -- --help",
+            "npm run pilot:verify-evidence -- --help",
+            "npm run production:readiness-gate",
+          ].join("\n");
+        }
+        if (path === "docs/deployment/nas-docker.md") {
+          return "pilot:ready production:ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
+        }
+        return "ok";
+      },
+    });
+    const blocked = evaluateProductionReadiness({
+      packageScripts: {
+        "production:ready": "bash scripts/production-ready.sh",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+      },
+      readText: (path) => {
+        if (path === "scripts/production-ready.sh") {
+          return "npm run pilot:ready\nDATABASE_URL=postgresql://user:secret@db/company\n/volume1/company-erp";
+        }
+        if (path === "docs/deployment/nas-docker.md") return "pilot:ready only";
+        throw new Error(`missing ${path}`);
+      },
+    });
+
+    expect(ready.status).toBe("READY_FOR_INTERNAL_PRODUCTION_REVIEW");
+    expect(ready.blockers).toEqual([]);
+    expect(blocked.status).toBe("BLOCKED");
+    expect(blocked.blockers.join("\n")).toContain("production-ready.sh");
+    expect(blocked.blockers.join("\n")).not.toContain("/volume1/company-erp");
+    expect(blocked.blockers.join("\n")).not.toContain("secret");
+  });
 });
 
 function markerForReadinessLabel(label: string): string {

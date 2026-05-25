@@ -23,6 +23,23 @@ PDF batch upload, import rollback, or overwrite-style import. If data is
 imported incorrectly, void, disable, or correct it in the business module
 instead of deleting database rows directly.
 
+## Internal Production Review
+
+Before moving from the NAS intranet trial to company-internal formal operation,
+run:
+
+```bash
+npm run production:ready
+```
+
+`pilot:ready` means the system can be scheduled for a controlled 1-3 project
+site intranet trial. `production:ready` means the repository can enter internal
+production review after the local gates pass. It still does not authorize public
+internet access, router port forwarding, public SaaS use, or direct exposure of
+API/PostgreSQL. Production approval also requires out-of-Git evidence for
+backup restore, attachment readiness, audit export, access review, data freeze,
+health checks, and release/rollback sign-off.
+
 ## Current Capabilities
 
 - React + Vite + TypeScript web app with an Apple-style internal dashboard.

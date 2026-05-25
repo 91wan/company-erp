@@ -27,6 +27,24 @@ public DNS or router forwarding is configured. The minimum public-access gate is
 - External project-site accounts kept single-role, single-site, and scoped to
   their bound project site for every create/update/read path.
 
+## Internal Production Go-live Boundary
+
+正式上线在本项目中仅指公司内网正式运行，不等于公网 SaaS；边界口径是：不公网暴露 API/PostgreSQL.
+
+Use the two readiness levels separately:
+
+- `npm run pilot:ready`: local gates for arranging a controlled NAS intranet
+  trial with 1-3 project sites.
+- `npm run production:ready`: local gates for entering internal production
+  review after the trial evidence is ready.
+
+Passing `production:ready` does not authorize public internet exposure. If the
+team has not completed restore drill evidence, access review sign-off, audit
+export verification, attachment readiness review, data freeze sign-off, and
+release/rollback approval, the system must remain in trial status. Any future
+cross-network or public access requires a separate HTTPS, CORS allowlist,
+Origin/CSRF, cookie, audit, and attachment-security slice before deployment.
+
 ## Services
 
 `docker-compose.yml` starts four services:
