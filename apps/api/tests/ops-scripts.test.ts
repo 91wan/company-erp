@@ -512,6 +512,107 @@ describe("attachment production readiness scripts", () => {
   });
 });
 
+describe("access review production gate", () => {
+  it("checks user account export fixtures for production access review blockers", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-access-review-"));
+    const noAdminExport = join(tempRoot, "no-admin.json");
+    const externalMultiRoleExport = join(tempRoot, "external-multi-role.json");
+    const duplicateExternalExport = join(tempRoot, "duplicate-external.json");
+    const cleanExport = join(tempRoot, "clean.json");
+
+    writeFileSync(
+      noAdminExport,
+      JSON.stringify({
+        users: [{ username: "viewer1", status: "active", roles: ["viewer"] }],
+      }),
+    );
+    writeFileSync(
+      externalMultiRoleExport,
+      JSON.stringify({
+        users: [
+          { username: "admin", status: "active", roles: ["admin"] },
+          {
+            username: "site-manager",
+            status: "active",
+            roles: ["external_project_site", "viewer"],
+            projectSiteId: "site-1",
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      duplicateExternalExport,
+      JSON.stringify({
+        users: [
+          { username: "admin", status: "active", roles: ["admin"] },
+          { username: "site-a", status: "active", roles: ["external_project_site"], projectSiteId: "site-1" },
+          { username: "site-b", status: "active", roles: ["external_project_site"], projectSiteId: "site-1" },
+        ],
+      }),
+    );
+    writeFileSync(
+      cleanExport,
+      JSON.stringify({
+        users: [
+          { username: "admin", status: "active", roles: ["admin"] },
+          { username: "viewer", status: "active", roles: ["viewer"], permissions: { manage: false } },
+          { username: "site-a", status: "active", roles: ["external_project_site"], projectSiteId: "site-1" },
+        ],
+      }),
+    );
+
+    const noAdmin = spawnSync("node", ["scripts/access-review-check.mjs", "--export", noAdminExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const externalMultiRole = spawnSync("node", ["scripts/access-review-check.mjs", "--export", externalMultiRoleExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const duplicateExternal = spawnSync("node", ["scripts/access-review-check.mjs", "--export", duplicateExternalExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const pass = spawnSync("node", ["scripts/access-review-check.mjs", "--export", cleanExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(packageJson.scripts["access:review-check"]).toBe("node scripts/access-review-check.mjs");
+    expect(noAdmin.status).not.toBe(0);
+    expect(noAdmin.stderr).toContain("BLOCKED");
+    expect(noAdmin.stderr).toContain("at least one active admin");
+    expect(externalMultiRole.status).not.toBe(0);
+    expect(externalMultiRole.stderr).toContain("external_project_site account must have only one role");
+    expect(duplicateExternal.status).not.toBe(0);
+    expect(duplicateExternal.stderr).toContain("one active external_project_site account per project site");
+    expect(pass.status).toBe(0);
+    expect(pass.stdout).toContain("ACCESS_REVIEW_PASS");
+  });
+
+  it("documents the production access review runbook and external account boundaries", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "access-review-runbook.md"));
+
+    expect(doc).toContain("access-review-signoff.md");
+    expect(doc).toContain("admin");
+    expect(doc).toContain("hr");
+    expect(doc).toContain("procurement");
+    expect(doc).toContain("inventory");
+    expect(doc).toContain("operations");
+    expect(doc).toContain("viewer");
+    expect(doc).toContain("project_site");
+    expect(doc).toContain("external_project_site");
+    expect(doc).toContain("单角色");
+    expect(doc).toContain("单项目点");
+    expect(doc).toContain("最多一个 active 项目点账号");
+    expect(doc).toContain("不能访问 Excel 导入");
+    expect(doc).toContain("不能访问成本价/采购价/库存金额");
+    expect(doc).toContain("默认 admin 临时密码必须更换");
+  });
+});
+
 describe("operator runbook command smoke", () => {
   const runbookPath = join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md");
   const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
