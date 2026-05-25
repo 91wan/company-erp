@@ -992,6 +992,9 @@ describe("NAS trial deploy notification readiness gate", () => {
       packageScripts: {
         "production:ready": "bash scripts/production-ready.sh",
         "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:health-check": "node scripts/production-health-check.mjs",
+        "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
+        "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
       readText: (path) => {
         if (path === "scripts/production-ready.sh") {
@@ -1020,6 +1023,9 @@ describe("NAS trial deploy notification readiness gate", () => {
       packageScripts: {
         "production:ready": "bash scripts/production-ready.sh",
         "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:health-check": "node scripts/production-health-check.mjs",
+        "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
+        "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
       readText: (path) => {
         if (path === "scripts/production-ready.sh") {
@@ -1038,6 +1044,63 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(blocked.blockers.join("\n")).toContain("production-ready.sh");
     expect(blocked.blockers.join("\n")).not.toContain("/volume1/company-erp");
     expect(blocked.blockers.join("\n")).not.toContain("secret");
+  });
+
+  it("blocks production readiness when required production gates or runbooks are missing", async () => {
+    const { evaluateProductionReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/production-readiness-gate.mjs")).href
+    )) as {
+      evaluateProductionReadiness: (input: {
+        readText?: (path: string) => string;
+        packageScripts?: Record<string, string>;
+      }) => {
+        status: string;
+        blockers: string[];
+      };
+    };
+
+    const result = evaluateProductionReadiness({
+      packageScripts: {
+        "production:ready": "bash scripts/production-ready.sh",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+      },
+      readText: (path) => {
+        if (path === "scripts/production-ready.sh") {
+          return [
+            "npm run pilot:ready",
+            "npm run test:backup-restore",
+            "npm run attachments:legacy-report -- --dry-run",
+            "npm run audit:verify-export -- --help",
+            "npm run pilot:verify-evidence -- --help",
+            "npm run production:readiness-gate",
+          ].join("\n");
+        }
+        if (path === "docs/deployment/nas-docker.md") {
+          return "pilot:ready production:ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
+        }
+        if (path === "docs/operations/go-live-data-freeze.md") {
+          return "最后一次导入时间 导入批次 ID 不直接删数据库";
+        }
+        if (path === "docs/operations/release-and-rollback-runbook.md") {
+          return "数据库迁移一旦执行，不能只回滚代码";
+        }
+        throw new Error(`missing ${path}`);
+      },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("production:health-check");
+    expect(result.blockers.join("\n")).toContain("production:restore-drill-check");
+    expect(result.blockers.join("\n")).toContain("attachments:production-check");
+    expect(result.blockers.join("\n")).toContain("docs/operations/production-backup-restore-runbook.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/attachment-production-readiness.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/audit-production-readiness.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/access-review-runbook.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/production-monitoring-runbook.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/production-go-live-evidence-checklist.md");
+    expect(result.blockers.join("\n")).toContain("docs/security/csrf-origin-production-policy.md");
+    expect(result.blockers.join("\n")).toContain("apps/api/tests/audit-coverage.test.ts");
+    expect(result.blockers.join("\n")).toContain("docs/import/import-module-stop-line.md");
   });
 
   it("documents the formal go-live data freeze and import stop line", () => {

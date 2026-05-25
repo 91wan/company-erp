@@ -53,6 +53,14 @@ function requireText({ blockers, readText, path, markers }) {
   }
 }
 
+function requireScript({ blockers, packageScripts, name, command }) {
+  if (packageScripts[name] !== command) {
+    blockers.push(`package.json: ${name} must run ${command}`);
+    return;
+  }
+  return name;
+}
+
 export function evaluateProductionReadiness({
   readText = defaultReadText,
   packageScripts = defaultPackageScripts(),
@@ -60,16 +68,41 @@ export function evaluateProductionReadiness({
   const blockers = [];
   const passed = [];
 
-  if (packageScripts["production:ready"] !== "bash scripts/production-ready.sh") {
-    blockers.push("package.json: production:ready must run bash scripts/production-ready.sh");
-  } else {
-    passed.push("production:ready script");
-  }
-
-  if (packageScripts["production:readiness-gate"] !== "node scripts/production-readiness-gate.mjs") {
-    blockers.push("package.json: production:readiness-gate must run node scripts/production-readiness-gate.mjs");
-  } else {
-    passed.push("production:readiness-gate script");
+  for (const scriptName of [
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:ready",
+      command: "bash scripts/production-ready.sh",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:readiness-gate",
+      command: "node scripts/production-readiness-gate.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:health-check",
+      command: "node scripts/production-health-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:restore-drill-check",
+      command: "node scripts/production-restore-drill-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "attachments:production-check",
+      command: "node scripts/attachment-production-check.mjs",
+    }),
+  ]) {
+    if (scriptName) {
+      passed.push(`${scriptName} script`);
+    }
   }
 
   requireText({
@@ -92,6 +125,20 @@ export function evaluateProductionReadiness({
     path: "docs/deployment/nas-docker.md",
     markers: ["Internal Production Go-live Boundary", "pilot:ready", "production:ready", "不公网暴露 API/PostgreSQL"],
   });
+
+  for (const path of [
+    "docs/operations/production-backup-restore-runbook.md",
+    "docs/operations/attachment-production-readiness.md",
+    "docs/operations/audit-production-readiness.md",
+    "docs/operations/access-review-runbook.md",
+    "docs/operations/production-monitoring-runbook.md",
+    "docs/operations/production-go-live-evidence-checklist.md",
+    "docs/security/csrf-origin-production-policy.md",
+    "apps/api/tests/audit-coverage.test.ts",
+    "docs/import/import-module-stop-line.md",
+  ]) {
+    requireText({ blockers, readText, path, markers: [] });
+  }
 
   requireText({
     blockers,
