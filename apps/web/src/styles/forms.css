@@ -12,6 +12,34 @@
   align-items: end;
 }
 
+.import-risk-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.import-risk-banner svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.import-risk-banner--action {
+  border-color: var(--blue);
+  color: #1d4ed8;
+  background: var(--blue-soft);
+}
+
+.import-risk-banner--warning {
+  border-color: var(--orange);
+  color: #92400e;
+  background: var(--orange-soft);
+}
+
 .secondary-action {
   display: inline-flex;
   align-items: center;
