@@ -31,7 +31,8 @@
     "access:review-check": "node scripts/access-review-check.mjs",
     "production:health-check": "node scripts/production-health-check.mjs",
     "production:go-live-check": "node scripts/production-go-live-check.mjs",
-    "production:go-live-ready": "bash scripts/production-go-live-ready.sh"
+    "production:go-live-ready": "bash scripts/production-go-live-ready.sh",
+    "production:evidence-template": "node scripts/create-go-live-evidence-template.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

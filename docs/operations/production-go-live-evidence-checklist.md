@@ -2,6 +2,12 @@
 
 本清单用于公司内网正式上线审批。所有证据必须保存在 Git 外；不得保存真实密码、`.env`、数据库 dump、合同扫描件、健康证图片、工资表或附件原文到 Git 仓库。
 
+可先运行模板生成命令创建 Git 外证据目录骨架：
+
+```bash
+npm run production:evidence-template -- --output <outside-git-path>
+```
+
 | 等级 | 证据项 | 保存要求 |
 | --- | --- | --- |
 | P0 阻断 | npm run production:ready 输出 | 保存完整终端输出，需包含最终状态。 |

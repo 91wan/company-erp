@@ -1250,6 +1250,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     for (const marker of [
       "npm run production:ready 输出",
+      "npm run production:evidence-template",
       "npm run production:go-live-check 输出",
       "npm run pilot:ready 输出",
       "npm run import:pilot-check 输出",
@@ -1294,6 +1295,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       "只有 production:ready + production:go-live-check 通过后",
       "production:go-live-check",
       "production:go-live-ready",
+      "production:evidence-template",
       "Git 外 evidence directory",
       "才允许从试点切正式",
       "没有恢复演练和访问复核",
@@ -1432,6 +1434,41 @@ describe("production go-live evidence gate", () => {
     expect(gapBlocked.blockers.join("\n")).toContain("已知附件 legacy gap 已接受");
     expect(gapAccepted.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
     expect(gapAccepted.warnings.join("\n")).toContain("legacy gap");
+
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+});
+
+describe("production go-live evidence template", () => {
+  it("creates a Git-external go-live evidence template and rejects repo-inside output", async () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-template-"));
+    const outsideOutput = join(tempRoot, "go-live-evidence");
+    const repoInsideOutput = join(repoRoot, ".tmp-go-live-evidence");
+
+    const repoInside = await runNode(["scripts/create-go-live-evidence-template.mjs", "--output", repoInsideOutput]);
+    const created = await runNode(["scripts/create-go-live-evidence-template.mjs", "--output", outsideOutput]);
+
+    expect(packageJson.scripts["production:evidence-template"]).toBe("node scripts/create-go-live-evidence-template.mjs");
+    expect(repoInside.status).not.toBe(0);
+    expect(repoInside.stderr).toContain("BLOCKED");
+    expect(repoInside.stderr).toContain("outside the Git repository");
+    expect(created.status).toBe(0);
+    expect(created.stdout).toContain("GO_LIVE_EVIDENCE_TEMPLATE_CREATED");
+
+    for (const relativePath of [
+      "production-go-live-manifest.example.json",
+      "release-signoff.template.md",
+      "data-freeze-signoff.template.md",
+      "commands.md",
+      "restore-drill/README.md",
+      "screenshots/README.md",
+    ]) {
+      expect(readFile(join(outsideOutput, relativePath)), relativePath).not.toMatch(/secret|password|token/i);
+    }
+
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:go-live-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:restore-drill-check -- --evidence-dir");
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
