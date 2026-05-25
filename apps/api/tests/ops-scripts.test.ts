@@ -530,15 +530,28 @@ describe("NAS trial deploy notification readiness gate", () => {
 
   it("documents pilot:ready as the NAS trial total command", () => {
     const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const pilotReady = readFile(join(repoRoot, "scripts", "pilot-ready.sh"));
     const importDrill = readFile(join(repoRoot, "docs", "import", "nas-pilot-import-drill.md"));
     const nasDoc = readFile(join(repoRoot, "docs", "deployment", "nas-docker.md"));
 
-    expect(packageJson.scripts["pilot:ready"]).toContain("npm run nas:trial-readiness");
-    expect(packageJson.scripts["pilot:ready"]).toContain("npm run import:pilot-check");
-    expect(packageJson.scripts["pilot:ready"]).toContain("npm run import:pilot-smoke");
+    expect(packageJson.scripts["pilot:ready"]).toBe("bash scripts/pilot-ready.sh");
+    expect(pilotReady).toContain("npm run nas:trial-readiness");
+    expect(pilotReady).toContain("npm run import:pilot-check");
+    expect(pilotReady).toContain("npm run import:pilot-smoke");
     expect(importDrill).toContain("npm run pilot:ready");
     expect(nasDoc).toContain("npm run pilot:ready");
     expect(`${importDrill}\n${nasDoc}`).toContain("不代表正式上线");
+  });
+
+  it("runs pilot:ready through a script that exports the CI database URL by default", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const pilotReady = readFile(join(repoRoot, "scripts", "pilot-ready.sh"));
+
+    expect(packageJson.scripts["pilot:ready"]).toBe("bash scripts/pilot-ready.sh");
+    expect(pilotReady).toContain('DATABASE_URL="${DATABASE_URL:-postgresql://company_erp:company_erp@localhost:5432/company_erp_ci}"');
+    expect(pilotReady).toContain("export DATABASE_URL");
+    expect(pilotReady.indexOf("export DATABASE_URL")).toBeLessThan(pilotReady.indexOf("npm run db:validate"));
+    expect(pilotReady).toContain("npm run nas:trial-readiness");
   });
 });
 
