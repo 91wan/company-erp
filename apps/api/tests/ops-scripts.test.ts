@@ -204,13 +204,7 @@ describe("NAS preflight script", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-ok-"));
     const dataRoot = join(tempRoot, "data");
     const attachmentsRoot = join(tempRoot, "attachments");
-    const binDir = join(tempRoot, "bin");
-    mkdirSync(binDir, { recursive: true });
-    writeFileSync(
-      join(binDir, "docker"),
-      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
-      { mode: 0o755 },
-    );
+    const binDir = writeDockerComposeConfigStub(tempRoot);
     const envFile = join(tempRoot, "safe.env");
     writeFileSync(
       envFile,
@@ -240,6 +234,7 @@ describe("NAS preflight script", () => {
 
   it("fails when required secrets are placeholders", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-placeholder-"));
+    const binDir = writeDockerComposeConfigStub(tempRoot);
     const envFile = join(tempRoot, "placeholder.env");
     writeFileSync(
       envFile,
@@ -254,7 +249,7 @@ describe("NAS preflight script", () => {
       ].join("\n"),
     );
 
-    const result = runPreflight(envFile);
+    const result = runPreflight(envFile, binDir);
 
     rmSync(tempRoot, { recursive: true, force: true });
     expect(result.status).not.toBe(0);
@@ -264,13 +259,7 @@ describe("NAS preflight script", () => {
 
   it("fails when bootstrap, reset, or pilot passwords are placeholders", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-ops-password-placeholder-"));
-    const binDir = join(tempRoot, "bin");
-    mkdirSync(binDir, { recursive: true });
-    writeFileSync(
-      join(binDir, "docker"),
-      "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
-      { mode: 0o755 },
-    );
+    const binDir = writeDockerComposeConfigStub(tempRoot);
     const envFile = join(tempRoot, "placeholder.env");
     writeFileSync(
       envFile,
@@ -299,6 +288,7 @@ describe("NAS preflight script", () => {
 
   it("rejects public access without secure cookies and HTTPS CORS origins", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-preflight-public-"));
+    const binDir = writeDockerComposeConfigStub(tempRoot);
     const envFile = join(tempRoot, "public.env");
     writeFileSync(
       envFile,
@@ -315,7 +305,7 @@ describe("NAS preflight script", () => {
       ].join("\n"),
     );
 
-    const result = runPreflight(envFile);
+    const result = runPreflight(envFile, binDir);
 
     rmSync(tempRoot, { recursive: true, force: true });
     expect(result.status).not.toBe(0);
@@ -1828,4 +1818,15 @@ function runPreflight(envFile: string, binDir?: string) {
     },
     encoding: "utf8",
   });
+}
+
+function writeDockerComposeConfigStub(tempRoot: string): string {
+  const binDir = join(tempRoot, "bin");
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(
+    join(binDir, "docker"),
+    "#!/usr/bin/env bash\nif [[ \"$1 $2 $3\" == \"compose --env-file\"* && \"${@: -1}\" == \"config\" ]]; then exit 0; fi\necho unexpected docker args: \"$@\" >&2\nexit 9\n",
+    { mode: 0o755 },
+  );
+  return binDir;
 }
