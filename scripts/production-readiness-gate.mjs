@@ -100,6 +100,13 @@ export function evaluateProductionReadiness({
     markers: ["最后一次导入时间", "导入批次 ID", "不直接删数据库"],
   });
 
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/release-and-rollback-runbook.md",
+    markers: ["数据库迁移一旦执行，不能只回滚代码"],
+  });
+
   return {
     status: blockers.length === 0 ? READY : BLOCKED,
     blockers: blockers.map(sanitize),
