@@ -29,7 +29,8 @@
     "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
     "attachments:production-check": "node scripts/attachment-production-check.mjs",
     "access:review-check": "node scripts/access-review-check.mjs",
-    "production:health-check": "node scripts/production-health-check.mjs"
+    "production:health-check": "node scripts/production-health-check.mjs",
+    "production:go-live-check": "node scripts/production-go-live-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

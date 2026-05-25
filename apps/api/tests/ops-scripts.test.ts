@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
@@ -45,6 +45,96 @@ function writePilotEvidenceManifestFixture(evidenceDir: string, files: Record<st
   )}\n`;
   writeFileSync(join(evidenceDir, "manifest.json"), manifest);
   writeFileSync(join(evidenceDir, "manifest.sha256"), `${createHash("sha256").update(manifest).digest("hex")}  manifest.json\n`);
+}
+
+function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<string, string> = {}): string {
+  const releaseCommitSha = "a".repeat(40);
+  mkdirSync(evidenceDir, { recursive: true });
+  mkdirSync(join(evidenceDir, "restore-drill"), { recursive: true });
+  mkdirSync(join(evidenceDir, "screenshots"), { recursive: true });
+
+  const files: Record<string, string> = {
+    "production-go-live-manifest.json": `${JSON.stringify(
+      {
+        environment: "nas",
+        releaseCommitSha,
+        previousCommitSha: "b".repeat(40),
+        goLiveAt: "2026-05-25T10:00:00.000Z",
+        operator: "ops",
+        approver: "manager",
+        scope: "internal",
+        projectSiteCount: 2,
+        notes: "fixture",
+      },
+      null,
+      2,
+    )}\n`,
+    "pilot-ready.txt": "READY_FOR_NAS_INTRAnet_TRIAL\n",
+    "production-ready.txt": "READY_FOR_INTERNAL_PRODUCTION_REVIEW\n",
+    "import-pilot-check.txt": "静态检查已通过\n",
+    "import-pilot-smoke.txt": "导入试点 smoke 通过\n",
+    "attachment-legacy-report.json": `${JSON.stringify({
+      rows: [
+        {
+          module: "contracts",
+          legacyCount: 0,
+          unifiedCount: 2,
+          gapEstimate: 0,
+          pendingPlaceholderCount: 0,
+          notes: "",
+        },
+      ],
+    })}\n`,
+    "attachment-production-check.txt": "ATTACHMENT_READY_WITH_WARNINGS\nNo attachment legacy gap warnings were detected.\n",
+    "audit-export.csv": "action,entityType\nlogin,user\n",
+    "audit-export-verify.txt": "Audit export verified: 1 records\n",
+    "access-review-export.json": `${JSON.stringify({
+      users: [
+        { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
+        {
+          id: "external-1",
+          username: "site-user",
+          status: "active",
+          roles: ["external_project_site"],
+          projectSiteIds: ["site-1"],
+        },
+      ],
+    })}\n`,
+    "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 2 exported user accounts.\n",
+    "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
+    "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
+    "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
+    "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
+    "app-version.json": `${JSON.stringify({
+      commitSha: releaseCommitSha,
+      buildTime: "2026-05-25T09:00:00.000Z",
+      deployedAt: "2026-05-25T10:00:00.000Z",
+      packageVersion: "0.1.0",
+      environment: "nas",
+    })}\n`,
+    "restore-drill/backup-manifest.json": "{}\n",
+    "restore-drill/database-dump.sha256": `${"1".repeat(64)}  dump.sql\n`,
+    "restore-drill/attachments-manifest.json": "{}\n",
+    "restore-drill/restore-log.txt": "restore completed\n",
+    "restore-drill/app-version.json": `${JSON.stringify({
+      commitSha: releaseCommitSha,
+      buildTime: "2026-05-25T09:00:00.000Z",
+      deployedAt: "2026-05-25T10:00:00.000Z",
+      packageVersion: "0.1.0",
+      environment: "nas",
+    })}\n`,
+    "restore-drill/health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
+    "restore-drill/restore-signoff.md":
+      "操作人: ops\n恢复开始时间: 2026-05-25T09:10:00.000Z\n恢复结束时间: 2026-05-25T09:30:00.000Z\n验证结果: 通过\n恢复演练通过\n",
+  };
+
+  for (const [relativePath, content] of Object.entries({ ...files, ...overrides })) {
+    const fullPath = join(evidenceDir, relativePath);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+
+  return releaseCommitSha;
 }
 
 async function withMockHttpServer(
@@ -966,6 +1056,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     expect(packageJson.scripts["production:ready"]).toBe("bash scripts/production-ready.sh");
     expect(packageJson.scripts["production:readiness-gate"]).toBe("node scripts/production-readiness-gate.mjs");
+    expect(packageJson.scripts["production:go-live-check"]).toBe("node scripts/production-go-live-check.mjs");
     expect(productionReady).toContain("npm run pilot:ready");
     expect(productionReady).toContain("npm run test:backup-restore");
     expect(productionReady).toContain("npm run attachments:legacy-report -- --dry-run");
@@ -1215,6 +1306,117 @@ describe("NAS trial deploy notification readiness gate", () => {
     ]) {
       expect(doc).toContain(marker);
     }
+  });
+});
+
+describe("production go-live evidence gate", () => {
+  it("blocks missing, repo-inside, mismatched, sensitive, and incomplete evidence packages", async () => {
+    const { evaluateGoLiveEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href
+    )) as {
+      evaluateGoLiveEvidence: (input: { evidenceDir: string; expectedCommit?: string }) => Promise<{
+        status: string;
+        blockers: string[];
+      }>;
+    };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-evidence-"));
+    const completeDir = join(tempRoot, "complete");
+    const expectedCommit = writeGoLiveEvidenceFixture(completeDir);
+
+    const missingDir = await evaluateGoLiveEvidence({ evidenceDir: join(tempRoot, "missing") });
+    const repoInside = await evaluateGoLiveEvidence({ evidenceDir: repoRoot });
+    const missingAccessDir = join(tempRoot, "missing-access");
+    writeGoLiveEvidenceFixture(missingAccessDir);
+    rmSync(join(missingAccessDir, "access-review-check.txt"), { force: true });
+    const missingAccess = await evaluateGoLiveEvidence({
+      evidenceDir: missingAccessDir,
+      expectedCommit,
+    });
+    const badAccessDir = join(tempRoot, "bad-access");
+    writeGoLiveEvidenceFixture(badAccessDir, {
+      "access-review-export.json": `${JSON.stringify({
+        users: [{ id: "external-1", username: "bad", status: "active", roles: ["external_project_site", "viewer"], projectSiteIds: ["site-1"] }],
+      })}\n`,
+    });
+    const badAccess = await evaluateGoLiveEvidence({
+      evidenceDir: badAccessDir,
+      expectedCommit,
+    });
+    const mismatch = await evaluateGoLiveEvidence({ evidenceDir: completeDir, expectedCommit: "c".repeat(40) });
+    const sensitiveDir = join(tempRoot, "sensitive");
+    writeGoLiveEvidenceFixture(sensitiveDir, { "production-ready.txt": "POSTGRES_PASSWORD=plain-text\n" });
+    const sensitive = await evaluateGoLiveEvidence({
+      evidenceDir: sensitiveDir,
+      expectedCommit,
+    });
+    const ready = await evaluateGoLiveEvidence({ evidenceDir: completeDir, expectedCommit });
+
+    expect(missingDir.status).toBe("BLOCKED");
+    expect(repoInside.status).toBe("BLOCKED");
+    expect(missingAccess.status).toBe("BLOCKED");
+    expect(missingAccess.blockers.join("\n")).toContain("access-review-check.txt");
+    expect(badAccess.status).toBe("BLOCKED");
+    expect(badAccess.blockers.join("\n")).toContain("external_project_site");
+    expect(mismatch.status).toBe("BLOCKED");
+    expect(mismatch.blockers.join("\n")).toContain("expected commit");
+    expect(sensitive.status).toBe("BLOCKED");
+    expect(sensitive.blockers.join("\n")).toContain("sensitive");
+    expect(ready.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("requires restore drill success, app-version consistency, and accepted attachment legacy warnings", async () => {
+    const { evaluateGoLiveEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href
+    )) as {
+      evaluateGoLiveEvidence: (input: { evidenceDir: string; expectedCommit?: string }) => Promise<{
+        status: string;
+        blockers: string[];
+        warnings: string[];
+      }>;
+    };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-warning-"));
+    const restoreDir = join(tempRoot, "bad-restore");
+    const expectedCommit = writeGoLiveEvidenceFixture(restoreDir, { "restore-drill/restore-signoff.md": "操作人: ops\n" });
+    const healthDir = join(tempRoot, "bad-health");
+    writeGoLiveEvidenceFixture(healthDir, { "health-check.txt": "500\n" });
+    const appVersionDir = join(tempRoot, "bad-version");
+    writeGoLiveEvidenceFixture(appVersionDir, {
+      "app-version.json": `${JSON.stringify({ commitSha: expectedCommit, buildTime: "2026-05-25T09:00:00.000Z", packageVersion: "0.1.0", environment: "local" })}\n`,
+    });
+    const gapBlockedDir = join(tempRoot, "gap-blocked");
+    writeGoLiveEvidenceFixture(gapBlockedDir, {
+      "attachment-legacy-report.json": `${JSON.stringify({
+        rows: [{ module: "contracts", legacyCount: 3, unifiedCount: 0, gapEstimate: 3, pendingPlaceholderCount: 0, notes: "" }],
+      })}\n`,
+    });
+    const gapAcceptedDir = join(tempRoot, "gap-accepted");
+    writeGoLiveEvidenceFixture(gapAcceptedDir, {
+      "attachment-legacy-report.json": `${JSON.stringify({
+        rows: [{ module: "contracts", legacyCount: 3, unifiedCount: 0, gapEstimate: 3, pendingPlaceholderCount: 0, notes: "" }],
+      })}\n`,
+      "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n已知附件 legacy gap 已接受\n",
+    });
+
+    const badRestore = await evaluateGoLiveEvidence({ evidenceDir: restoreDir, expectedCommit });
+    const badHealth = await evaluateGoLiveEvidence({ evidenceDir: healthDir, expectedCommit });
+    const badVersion = await evaluateGoLiveEvidence({ evidenceDir: appVersionDir, expectedCommit });
+    const gapBlocked = await evaluateGoLiveEvidence({ evidenceDir: gapBlockedDir, expectedCommit });
+    const gapAccepted = await evaluateGoLiveEvidence({ evidenceDir: gapAcceptedDir, expectedCommit });
+
+    expect(badRestore.status).toBe("BLOCKED");
+    expect(badRestore.blockers.join("\n")).toContain("恢复演练通过");
+    expect(badHealth.status).toBe("BLOCKED");
+    expect(badHealth.blockers.join("\n")).toContain("health-check.txt");
+    expect(badVersion.status).toBe("BLOCKED");
+    expect(badVersion.blockers.join("\n")).toContain("environment");
+    expect(gapBlocked.status).toBe("BLOCKED");
+    expect(gapBlocked.blockers.join("\n")).toContain("已知附件 legacy gap 已接受");
+    expect(gapAccepted.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+    expect(gapAccepted.warnings.join("\n")).toContain("legacy gap");
+
+    rmSync(tempRoot, { recursive: true, force: true });
   });
 });
 
