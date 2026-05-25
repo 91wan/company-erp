@@ -420,6 +420,98 @@ describe("Excel import pilot gate scripts", () => {
   });
 });
 
+describe("attachment production readiness scripts", () => {
+  it("checks legacy attachment report JSON for production readiness blockers and warnings", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-attachment-production-"));
+    const missingFieldReport = join(tempRoot, "missing-field.json");
+    const warningReport = join(tempRoot, "warning.json");
+    const cleanReport = join(tempRoot, "clean.json");
+
+    writeFileSync(
+      missingFieldReport,
+      JSON.stringify({ rows: [{ module: "contracts", legacyCount: 1, unifiedCount: 0 }] }),
+    );
+    writeFileSync(
+      warningReport,
+      JSON.stringify({
+        rows: [
+          {
+            module: "contracts",
+            legacyCount: 3,
+            unifiedCount: 0,
+            gapEstimate: 3,
+            pendingPlaceholderCount: 0,
+            notes: "legacy contract attachments",
+          },
+          {
+            module: "payroll",
+            legacyCount: 0,
+            unifiedCount: 1,
+            gapEstimate: 0,
+            pendingPlaceholderCount: 2,
+            notes: "pending placeholders",
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      cleanReport,
+      JSON.stringify({
+        rows: [
+          {
+            module: "certificates",
+            legacyCount: 0,
+            unifiedCount: 2,
+            gapEstimate: 0,
+            pendingPlaceholderCount: 0,
+            notes: "ready",
+          },
+        ],
+      }),
+    );
+
+    const blocked = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", missingFieldReport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const warning = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", warningReport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const pass = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", cleanReport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(packageJson.scripts["attachments:production-check"]).toBe("node scripts/attachment-production-check.mjs");
+    expect(blocked.status).not.toBe(0);
+    expect(blocked.stderr).toContain("BLOCKED");
+    expect(blocked.stderr).toContain("gapEstimate");
+    expect(warning.status).toBe(0);
+    expect(warning.stdout).toContain("ATTACHMENT_READY_WITH_WARNINGS");
+    expect(warning.stdout).toContain("legacy gap");
+    expect(warning.stdout).toContain("pending placeholder");
+    expect(pass.status).toBe(0);
+    expect(pass.stdout).toContain("ATTACHMENT_READY_WITH_WARNINGS");
+  });
+
+  it("documents attachment production readiness and legacy gap handling", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "attachment-production-readiness.md"));
+
+    expect(doc).toContain("统一附件模块为正式入口");
+    expect(doc).toContain("legacy attachmentPath");
+    expect(doc).toContain("不能手填 storageKey");
+    expect(doc).toContain("external_project_site 看不到 storageKey");
+    expect(doc).toContain("附件下载必须鉴权");
+    expect(doc).toContain("content route 必须 scope check");
+    expect(doc).toContain("合同 PDF 和健康证图片可以后续补");
+    expect(doc).toContain("attachments:legacy-report");
+    expect(doc).toContain("legacy gap");
+  });
+});
+
 describe("operator runbook command smoke", () => {
   const runbookPath = join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md");
   const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
