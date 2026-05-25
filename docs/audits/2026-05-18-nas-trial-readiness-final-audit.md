@@ -6,7 +6,7 @@ Scope: final pre-trial audit for the current internal NAS deployment candidate. 
 ## 结论
 
 - 当前版本可进入 NAS 内网试点，前提是部署前通过 `npm run preflight:nas`，并继续只在内网或受控反代后访问。
-- 当前版本不等同于正式合规档案系统全面上线：真实附件上传、附件迁移、OCR、长期审计归档、正式公网方案和业务方合规验收仍是后续工作。
+- 当前版本不等同于正式合规档案系统全面上线：真实附件上传、附件迁移、OCR、长期审计归档、公网访问专项方案和业务方合规验收仍是后续工作。
 - 明确禁止公网暴露 API/PostgreSQL。跨网访问必须另行走 HTTPS 反代或隧道方案，并启用 `PUBLIC_ACCESS_ENABLED=true`、`AUTH_COOKIE_SECURE=true` 和 HTTPS `CORS_ALLOWED_ORIGINS`。
 
 ## 覆盖范围
