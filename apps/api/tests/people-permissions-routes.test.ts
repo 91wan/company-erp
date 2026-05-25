@@ -666,6 +666,85 @@ describe("user accounts API", () => {
       expect(response.json().issues).toContain("project_site and external_project_site roles must be assigned as the only role");
     }
   });
+
+  it("exports access-review JSON for admin without leaking secrets", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const adminAccount = makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] });
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-access-review-export" },
+      authRepository: createFakeAuthRepository([adminAccount]),
+      userAccountRepository: createFakeUserAccountRepository([
+        makeUserAccount({ id: "admin-user", username: "admin", roles: ["admin"] }),
+        makeUserAccount({
+          id: "viewer-user",
+          username: "viewer",
+          roles: ["viewer"],
+          status: "disabled",
+        }),
+        makeUserAccount({
+          id: "external-user",
+          username: "site-manager",
+          roles: ["external_project_site"],
+          externalProjectSiteId: projectSiteId,
+          externalProjectSiteName: "科技园一期项目点",
+        }),
+      ]),
+    });
+    const cookie = await loginCookie(app, "admin");
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-disposition"]).toContain("access-review-export.json");
+    const payload = response.json();
+    expect(payload).toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({ username: "admin", roles: ["admin"], activeSessionCount: 0 }),
+        expect.objectContaining({ username: "viewer", status: "disabled", roles: ["viewer"] }),
+        expect.objectContaining({
+          username: "site-manager",
+          roles: ["external_project_site"],
+          projectSiteIds: [projectSiteId],
+        }),
+      ]),
+    });
+    expect(typeof payload.exportedAt).toBe("string");
+    expect(JSON.stringify(payload)).not.toMatch(/passwordHash|token|cookie|secret/i);
+  });
+
+  it("blocks viewer and external project-site users from access-review export", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-access-review-export-forbidden" },
+      authRepository: createFakeAuthRepository([
+        makeAuthAccount({ username: "viewer", passwordHash, roles: ["viewer"] }),
+        makeAuthAccount({ username: "site-manager", passwordHash, roles: ["external_project_site"], assignedProjectSiteIds: [projectSiteId] }),
+      ]),
+      userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]),
+    });
+    const viewerCookie = await loginCookie(app, "viewer");
+    const externalCookie = await loginCookie(app, "site-manager");
+
+    const viewerResponse = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: viewerCookie },
+    });
+    const externalResponse = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: externalCookie },
+    });
+    await app.close();
+
+    expect(viewerResponse.statusCode).toBe(403);
+    expect(externalResponse.statusCode).toBe(403);
+  });
 });
 
 describe("external project-site accounts API", () => {

@@ -1,14 +1,34 @@
 import { KeyRound, RefreshCw } from "lucide-react";
 import type { UserAccountDto } from "@company-erp/shared";
+import { apiBaseUrl } from "../../apiClient";
 import { StatusBadge } from "../ui";
 import { accountStatusLabel, formatDateTime, roleLabel } from "./peoplePermissionsLabels";
 import { PanelTitle, StateMessage, type LoadStatus } from "./PeoplePermissionsTabShared";
 
-export function UserAccountsTab({ userAccounts, status }: { userAccounts: UserAccountDto[]; status: LoadStatus }) {
+export function UserAccountsTab({
+  userAccounts,
+  status,
+  canManage,
+}: {
+  userAccounts: UserAccountDto[];
+  status: LoadStatus;
+  canManage: boolean;
+}) {
   return (
     <section className="people-section-grid">
       <section className="dashboard-panel table-panel">
-        <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
+        <div className="people-panel-heading-row">
+          <PanelTitle icon={<KeyRound size={18} />} title="普通用户账号" />
+          {canManage ? (
+            <a
+              className="secondary-action"
+              href={`${apiBaseUrl}/api/user-accounts/export-access-review`}
+              download="access-review-export.json"
+            >
+              导出权限复核 JSON
+            </a>
+          ) : null}
+        </div>
         <p className="form-hint">总部内部账号按固定角色授权；项目点账号不混入普通用户账号操作区。</p>
         {status === "loading" ? <StateMessage icon={<RefreshCw size={18} />} text="加载账号资料..." /> : null}
         {status === "error" ? <StateMessage text="账号资料加载失败" /> : null}

@@ -4,7 +4,12 @@
 
 ## 上线前导出
 
-正式上线前由 admin 导出用户账号清单，至少包含：
+正式上线前由 admin 或具备部门与员工 manage 权限的总部账号导出用户账号清单。系统提供两种等价入口：
+
+- 人员权限 > 用户账号 > `导出权限复核 JSON`。
+- 直接调用 `GET /api/user-accounts/export-access-review`。
+
+导出 JSON 至少包含：
 
 - 用户名。
 - 状态。
@@ -79,4 +84,3 @@ npm run access:review-check -- --export <outside-git-path>/user-accounts-export.
 - 抽查账号。
 - 异常账号和处理结果。
 - 是否允许进入公司内网正式上线审批。
-

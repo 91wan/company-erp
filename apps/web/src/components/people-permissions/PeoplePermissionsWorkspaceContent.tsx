@@ -616,7 +616,9 @@ export function PeoplePermissionsWorkspace({
         />
       ) : null}
 
-      {activeTab === "userAccounts" ? <UserAccountsTab userAccounts={filteredUserAccounts} status={accountStatus} /> : null}
+      {activeTab === "userAccounts" ? (
+        <UserAccountsTab userAccounts={filteredUserAccounts} status={accountStatus} canManage={canManage} />
+      ) : null}
 
       {activeTab === "assignments" ? (
         <AssignmentsTab assignments={filteredProjectSiteAssignments} status={assignmentStatus} />
