@@ -29,7 +29,7 @@ public DNS or router forwarding is configured. The minimum public-access gate is
 
 ## Internal Production Go-live Boundary
 
-正式上线在本项目中仅指公司内网正式运行，不等于公网 SaaS；边界口径是：不公网暴露 API/PostgreSQL.
+正式上线在本项目中仅指公司内网正式运行，不等于公网 SaaS，也不代表对外公开访问；边界口径是：不公网暴露 API/PostgreSQL.
 
 Use the two readiness levels separately:
 
@@ -38,9 +38,11 @@ Use the two readiness levels separately:
 - `npm run production:ready`: local gates for entering internal production
   review after the trial evidence is ready.
 
-Passing `production:ready` does not authorize public internet exposure. If the
-team has not completed restore drill evidence, access review sign-off, audit
-export verification, attachment readiness review, data freeze sign-off, and
+只有 production:ready + production evidence signoff 通过后，才允许从试点切正式。
+如果没有恢复演练和访问复核，只能保持试点状态。Passing
+`production:ready` does not authorize public internet exposure. If the team has
+not completed restore drill evidence, access review sign-off, audit export
+verification, attachment readiness review, data freeze sign-off, and
 release/rollback approval, the system must remain in trial status. Any future
 cross-network or public access requires a separate HTTPS, CORS allowlist,
 Origin/CSRF, cookie, audit, and attachment-security slice before deployment.

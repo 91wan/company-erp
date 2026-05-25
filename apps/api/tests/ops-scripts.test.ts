@@ -1124,6 +1124,24 @@ describe("NAS trial deploy notification readiness gate", () => {
       expect(doc).toContain(marker);
     }
   });
+
+  it("keeps the NAS deployment doc clear about pilot and internal production boundaries", () => {
+    const doc = readFile(join(repoRoot, "docs", "deployment", "nas-docker.md"));
+
+    for (const marker of [
+      "Internal Production Go-live Boundary",
+      "正式上线在本项目中仅指公司内网正式运行",
+      "不等于公网 SaaS",
+      "不代表对外公开访问",
+      "只有 production:ready + production evidence signoff 通过后",
+      "才允许从试点切正式",
+      "没有恢复演练和访问复核",
+      "只能保持试点状态",
+      "不公网暴露 API/PostgreSQL",
+    ]) {
+      expect(doc).toContain(marker);
+    }
+  });
 });
 
 function markerForReadinessLabel(label: string): string {
