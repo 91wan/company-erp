@@ -1088,6 +1088,42 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(doc).toContain("health check output");
     expect(doc).toContain("数据库迁移一旦执行，不能只回滚代码");
   });
+
+  it("documents the production go-live evidence checklist with P0/P1 levels", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "production-go-live-evidence-checklist.md"));
+
+    for (const marker of [
+      "npm run production:ready 输出",
+      "npm run pilot:ready 输出",
+      "npm run import:pilot-check 输出",
+      "npm run import:pilot-smoke 输出",
+      "npm run test:backup-restore 输出",
+      "production restore drill evidence folder",
+      "attachment legacy report JSON/CSV",
+      "audit export CSV + verify result",
+      "access review signoff",
+      "data freeze signoff",
+      "release commit sha",
+      ".deploy-revision.json",
+      "/health 输出",
+      "/api/app-version 输出",
+      "docker compose ps 输出",
+      "试点复核 tab 截图",
+      "合同风险截图",
+      "证照健康证截图",
+      "项目点风险台账截图",
+      "库存流水截图",
+      "P0 阻断",
+      "P1 建议",
+      "Git 外",
+      "不保存真实密码",
+      "不保存合同扫描件",
+      "不保存健康证图片",
+      "不保存工资表",
+    ]) {
+      expect(doc).toContain(marker);
+    }
+  });
 });
 
 function markerForReadinessLabel(label: string): string {
