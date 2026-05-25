@@ -37,6 +37,8 @@ Use the two readiness levels separately:
   trial with 1-3 project sites.
 - `npm run production:ready`: local gates for entering internal production
   review after the trial evidence is ready.
+- `npm run production:evidence-template -- --output <outside-git-path>`:
+  creates the Git 外 evidence directory skeleton and sign-off templates.
 - `npm run production:go-live-check -- --evidence-dir <outside-git-path>`:
   checks the Git 外 evidence directory for restore drill, attachment readiness,
   audit export, access review, data freeze, health check, app-version, and
@@ -257,6 +259,7 @@ and the Git 外 evidence directory gate:
 
 ```bash
 npm run production:ready
+npm run production:evidence-template -- --output <outside-git-path>
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
 ```
 
