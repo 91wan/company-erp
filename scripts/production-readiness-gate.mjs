@@ -132,6 +132,7 @@ export function evaluateProductionReadiness({
     "docs/operations/audit-production-readiness.md",
     "docs/operations/access-review-runbook.md",
     "docs/operations/production-monitoring-runbook.md",
+    "docs/operations/post-go-live-24h-checklist.md",
     "docs/operations/production-go-live-evidence-checklist.md",
     "docs/security/csrf-origin-production-policy.md",
     "apps/api/tests/audit-coverage.test.ts",

@@ -1200,6 +1200,7 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(result.blockers.join("\n")).toContain("docs/operations/audit-production-readiness.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/access-review-runbook.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-monitoring-runbook.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/post-go-live-24h-checklist.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-go-live-evidence-checklist.md");
     expect(result.blockers.join("\n")).toContain("docs/security/csrf-origin-production-policy.md");
     expect(result.blockers.join("\n")).toContain("apps/api/tests/audit-coverage.test.ts");
@@ -1243,6 +1244,32 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(doc).toContain("migration output");
     expect(doc).toContain("health check output");
     expect(doc).toContain("数据库迁移一旦执行，不能只回滚代码");
+  });
+
+  it("documents post go-live 24h checks with operational severity", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "post-go-live-24h-checklist.md"));
+
+    for (const marker of [
+      "admin",
+      "viewer",
+      "external_project_site",
+      "合同风险",
+      "证照健康证",
+      "项目点风险台账",
+      "库存流水",
+      "Excel 导入试点复核",
+      "import_job.preview / import_job.confirm",
+      "附件下载",
+      "库存出入库",
+      "当日数据库备份",
+      "附件快照",
+      "Dashboard 是否可用",
+      "P0 故障立即回滚/停用服务",
+      "P1 故障当天修复",
+      "P2 进入 backlog",
+    ]) {
+      expect(doc).toContain(marker);
+    }
   });
 
   it("documents the production go-live evidence checklist with P0/P1 levels", () => {
