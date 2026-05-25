@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { DEMO_CODES } from "../src/pilotSmoke.js";
 import { resetAccountPassword } from "../src/accountOps.js";
@@ -44,6 +45,43 @@ function writePilotEvidenceManifestFixture(evidenceDir: string, files: Record<st
   )}\n`;
   writeFileSync(join(evidenceDir, "manifest.json"), manifest);
   writeFileSync(join(evidenceDir, "manifest.sha256"), `${createHash("sha256").update(manifest).digest("hex")}  manifest.json\n`);
+}
+
+async function withMockHttpServer(
+  handler: (request: IncomingMessage, response: ServerResponse) => void,
+  run: (baseUrl: string) => void | Promise<void>,
+): Promise<void> {
+  const server = createServer(handler);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("mock server did not bind to a TCP port");
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+}
+
+async function runNode(args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", args, {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
 }
 
 describe("account ops", () => {
@@ -610,6 +648,130 @@ describe("access review production gate", () => {
     expect(doc).toContain("不能访问 Excel 导入");
     expect(doc).toContain("不能访问成本价/采购价/库存金额");
     expect(doc).toContain("默认 admin 临时密码必须更换");
+  });
+});
+
+describe("production monitoring health check", () => {
+  it("checks deployment health and app version endpoints with production environment constraints", async () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+
+    await withMockHttpServer((request, response) => {
+      if (request.url === "/health") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      if (request.url === "/api/app-version") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            commitSha: "a".repeat(40),
+            buildTime: "2026-05-25T00:00:00.000Z",
+            deployedAt: "2026-05-25T00:00:00.000Z",
+            packageVersion: "0.1.0",
+            environment: "nas",
+          }),
+        );
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    }, async (baseUrl) => {
+      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+
+      expect(packageJson.scripts["production:health-check"]).toBe("node scripts/production-health-check.mjs");
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("PRODUCTION_HEALTH_PASS");
+    });
+  });
+
+  it("blocks unhealthy, incomplete, or local app-version responses", async () => {
+    const cases: Array<{
+      name: string;
+      healthStatus: number;
+      appVersion: Record<string, unknown>;
+      expected: string;
+    }> = [
+      {
+        name: "health failure",
+        healthStatus: 500,
+        appVersion: {
+          commitSha: "a".repeat(40),
+          buildTime: "2026-05-25T00:00:00.000Z",
+          deployedAt: "2026-05-25T00:00:00.000Z",
+          packageVersion: "0.1.0",
+          environment: "nas",
+        },
+        expected: "/health",
+      },
+      {
+        name: "missing commit",
+        healthStatus: 200,
+        appVersion: {
+          buildTime: "2026-05-25T00:00:00.000Z",
+          deployedAt: "2026-05-25T00:00:00.000Z",
+          packageVersion: "0.1.0",
+          environment: "nas",
+        },
+        expected: "commitSha",
+      },
+      {
+        name: "local environment",
+        healthStatus: 200,
+        appVersion: {
+          commitSha: "a".repeat(40),
+          buildTime: "2026-05-25T00:00:00.000Z",
+          deployedAt: "2026-05-25T00:00:00.000Z",
+          packageVersion: "0.1.0",
+          environment: "local",
+        },
+        expected: "environment",
+      },
+    ];
+
+    for (const testCase of cases) {
+      await withMockHttpServer((request, response) => {
+        if (request.url === "/health") {
+          response.writeHead(testCase.healthStatus, { "content-type": "application/json" });
+          response.end(JSON.stringify({ ok: testCase.healthStatus === 200 }));
+          return;
+        }
+        if (request.url === "/api/app-version") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify(testCase.appVersion));
+          return;
+        }
+        response.writeHead(404);
+        response.end();
+      }, async (baseUrl) => {
+        const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+
+        expect(result.status, testCase.name).not.toBe(0);
+        expect(result.stderr, testCase.name).toContain("BLOCKED");
+        expect(result.stderr, testCase.name).toContain(testCase.expected);
+      });
+    }
+  });
+
+  it("documents production monitoring and incident handling runbook steps", () => {
+    const doc = readFile(join(repoRoot, "docs", "operations", "production-monitoring-runbook.md"));
+
+    expect(doc).toContain("docker compose ps");
+    expect(doc).toContain("/health");
+    expect(doc).toContain("/api/app-version");
+    expect(doc).toContain("PostgreSQL 容器状态");
+    expect(doc).toContain("Web 容器状态");
+    expect(doc).toContain("API 容器状态");
+    expect(doc).toContain("NAS 磁盘剩余空间");
+    expect(doc).toContain("audit export");
+    expect(doc).toContain("attachments legacy gap");
+    expect(doc).toContain("docker logs api");
+    expect(doc).toContain("API 500");
+    expect(doc).toContain("数据库连接失败");
+    expect(doc).toContain("附件下载失败");
+    expect(doc).toContain("磁盘满");
+    expect(doc).toContain("回到上一个 git commit");
+    expect(doc).toContain("人工巡检");
   });
 });
 
