@@ -23,7 +23,9 @@
     "nas:trial-readiness": "node scripts/nas-trial-readiness-gate.mjs",
     "import:pilot-check": "node scripts/import-pilot-check.mjs",
     "import:pilot-smoke": "node scripts/import-pilot-smoke.mjs",
-    "pilot:ready": "bash scripts/pilot-ready.sh"
+    "pilot:ready": "bash scripts/pilot-ready.sh",
+    "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+    "production:ready": "bash scripts/production-ready.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
