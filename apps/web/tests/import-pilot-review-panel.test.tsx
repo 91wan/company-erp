@@ -101,6 +101,15 @@ describe("ImportPilotReviewPanel", () => {
     expect(await screen.findByText("暂无导入后复核任务")).toBeInTheDocument();
   });
 
+  it("opens the review tab from initialTab for read-only users without preview actions", async () => {
+    render(<ExcelImportWorkspace loadImportJobs={() => Promise.resolve([])} canManage={false} initialTab="review" />);
+
+    expect(await screen.findByRole("tab", { name: "试点复核", selected: true })).toBeInTheDocument();
+    expect(screen.getByText("暂无导入后复核任务")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入预检" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "确认导入" })).not.toBeInTheDocument();
+  });
+
   it("loads at most the latest 20 confirmed batches and does not reload stable jobs on rerender", async () => {
     const jobs = Array.from({ length: 30 }, (_, index) => job({
       id: `job-${index}`,

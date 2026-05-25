@@ -48,9 +48,14 @@ export type ExcelImportWorkspaceProps = {
   confirmImportJob?: (id: string) => Promise<ImportJobDto>;
   canManage?: boolean;
   onNavigate?: (intent: NavigationIntent) => void;
+  initialTab?: string;
 };
 
 export type ExcelImportController = ReturnType<typeof useExcelImportController>;
+
+function isExcelImportTab(value?: string): value is ExcelImportTab {
+  return value === "preview" || value === "jobs" || value === "rows" || value === "review";
+}
 
 // ---------------------------------------------------------------------------
 // Controller
@@ -63,6 +68,7 @@ export function useExcelImportController({
   confirmImportJob = defaultConfirmImportJob,
   canManage = true,
   onNavigate,
+  initialTab,
 }: ExcelImportWorkspaceProps) {
   const [jobs, setJobs] = useState<ImportJobSummaryDto[]>([]);
   const [selectedJob, setSelectedJob] = useState<ImportJobDto | null>(null);
@@ -71,7 +77,9 @@ export function useExcelImportController({
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [actionStatus, setActionStatus] = useState<"idle" | "saving" | "error" | "success">("idle");
   const [actionError, setActionError] = useState("");
-  const [activeTab, setActiveTab] = useState<ExcelImportTab>(() => (canManage ? "preview" : "jobs"));
+  const [activeTab, setActiveTab] = useState<ExcelImportTab>(() =>
+    isExcelImportTab(initialTab) ? initialTab : canManage ? "preview" : "jobs",
+  );
   const [confirmingJobId, setConfirmingJobId] = useState<string | null>(null);
   // Batch list filters (P0-4)
   const [jobsTemplateFilter, setJobsTemplateFilter] = useState<ImportTemplateTypeCode | "all">("all");
@@ -86,6 +94,10 @@ export function useExcelImportController({
       .catch(() => { if (mounted) setLoadStatus("error"); });
     return () => { mounted = false; };
   }, [loadImportJobs]);
+
+  useEffect(() => {
+    if (isExcelImportTab(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
 
   const activeJob = selectedJob ?? jobs[0] ?? null;
   const rows = "rows" in (activeJob ?? {}) ? (activeJob as ImportJobDto).rows : [];
