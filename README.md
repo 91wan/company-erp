@@ -26,19 +26,32 @@ instead of deleting database rows directly.
 ## Internal Production Review
 
 Before moving from the NAS intranet trial to company-internal formal operation,
-run:
+run the local static gate:
 
 ```bash
 npm run production:ready
 ```
 
+Then run the Git-external evidence package gate:
+
+```bash
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+```
+
+For the final operator handoff, run both in sequence:
+
+```bash
+npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+```
+
 `pilot:ready` means the system can be scheduled for a controlled 1-3 project
 site intranet trial. `production:ready` means the repository can enter internal
-production review after the local gates pass. It still does not authorize public
-internet access, router port forwarding, public SaaS use, or direct exposure of
-API/PostgreSQL. Production approval also requires out-of-Git evidence for
-backup restore, attachment readiness, audit export, access review, data freeze,
-health checks, and release/rollback sign-off.
+production review after the local gates pass. `production:go-live-check` means
+the Git-external evidence directory has the required restore drill, attachment
+readiness, audit export, access review, data freeze, health check, and release
+sign-off proof. Internal formal go-live requires `production:ready` +
+`production:go-live-check`; it still does not authorize public internet access,
+router port forwarding, public SaaS use, or direct exposure of API/PostgreSQL.
 
 ## Current Capabilities
 
