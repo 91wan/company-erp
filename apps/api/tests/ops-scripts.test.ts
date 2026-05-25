@@ -337,6 +337,67 @@ describe("backup restore drill script", () => {
     expect(result.stderr).toContain("Docker daemon is required");
     expect(result.stdout).not.toContain("Backup/restore verification passed");
   });
+
+  it("checks production restore drill evidence folders before production review", () => {
+    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-restore-evidence-"));
+    const completeEvidenceDir = join(tempRoot, "complete");
+    const incompleteEvidenceDir = join(tempRoot, "incomplete");
+    mkdirSync(completeEvidenceDir, { recursive: true });
+    mkdirSync(incompleteEvidenceDir, { recursive: true });
+
+    for (const fileName of [
+      "backup-manifest.json",
+      "database-dump.sha256",
+      "attachments-manifest.json",
+      "restore-log.txt",
+      "app-version.json",
+      "health-check.txt",
+      "restore-signoff.md",
+    ]) {
+      writeFileSync(join(completeEvidenceDir, fileName), `${fileName} fixture\n`);
+    }
+    writeFileSync(join(incompleteEvidenceDir, "restore-log.txt"), "missing manifest fixture\n");
+
+    const help = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--help"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const blocked = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--evidence-dir", incompleteEvidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const pass = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--evidence-dir", completeEvidenceDir], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(packageJson.scripts["production:restore-drill-check"]).toBe("node scripts/production-restore-drill-check.mjs");
+    expect(help.status).toBe(0);
+    expect(help.stdout).toContain("Usage: npm run production:restore-drill-check");
+    expect(blocked.status).not.toBe(0);
+    expect(blocked.stderr).toContain("BLOCKED");
+    expect(blocked.stderr).toContain("backup-manifest.json");
+    expect(pass.status).toBe(0);
+    expect(pass.stdout).toContain("PRODUCTION_RESTORE_DRILL_EVIDENCE_PASS");
+  });
+
+  it("documents the production backup and restore drill evidence requirements", () => {
+    const runbook = readFile(join(repoRoot, "docs", "operations", "production-backup-restore-runbook.md"));
+
+    expect(runbook).toContain("PostgreSQL database");
+    expect(runbook).toContain("NAS_ATTACHMENTS_ROOT");
+    expect(runbook).toContain(".env");
+    expect(runbook).toContain(".deploy-revision.json");
+    expect(runbook).toContain("RPO");
+    expect(runbook).toContain("RTO");
+    expect(runbook).toContain("/health");
+    expect(runbook).toContain("/api/app-version");
+    expect(runbook).toContain("restore-signoff.md");
+    expect(runbook).toContain("不在 Git 里保存 dump");
+    expect(runbook).toContain("不在 Git 里保存 .env");
+  });
 });
 
 describe("Excel import pilot gate scripts", () => {

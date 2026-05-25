@@ -25,7 +25,8 @@
     "import:pilot-smoke": "node scripts/import-pilot-smoke.mjs",
     "pilot:ready": "bash scripts/pilot-ready.sh",
     "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-    "production:ready": "bash scripts/production-ready.sh"
+    "production:ready": "bash scripts/production-ready.sh",
+    "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
