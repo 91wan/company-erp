@@ -27,8 +27,20 @@ function useImportRiskSummary(model: ExcelImportController) {
   }, [model.jobs]);
 }
 
+function importEnvironmentNotice(environment: string | null): string | null {
+  const normalized = environment?.trim().toLowerCase();
+  if (normalized === "production") {
+    return "正式上线后，Excel 导入仅用于受控补录；不得用于覆盖式更新。批量导入前请完成审批和备份。";
+  }
+  if (normalized === "nas") {
+    return "NAS 试点环境：请先使用少量项目点试导入，不要直接导入全量真实数据。";
+  }
+  return null;
+}
+
 export function ExcelImportWorkspaceView({ model }: { model: ExcelImportController }) {
   const riskSummary = useImportRiskSummary(model);
+  const environmentNotice = importEnvironmentNotice(model.deploymentEnvironment);
   return (
     <WorkspaceScaffold
       eyebrow="数据初始化"
@@ -45,6 +57,12 @@ export function ExcelImportWorkspaceView({ model }: { model: ExcelImportControll
       }
     >
       <div className="excel-import-workspace">
+        {environmentNotice ? (
+          <div className="import-risk-banner import-risk-banner--warning" role="status">
+            <AlertTriangle size={16} aria-hidden="true" />
+            <span>{environmentNotice}</span>
+          </div>
+        ) : null}
         {model.loadStatus === "ready" && riskSummary.pendingConfirm > 0 ? (
           <div className="import-risk-banner import-risk-banner--action" role="status">
             <AlertTriangle size={16} aria-hidden="true" />

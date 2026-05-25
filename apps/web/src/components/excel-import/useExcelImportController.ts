@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type AppVersionDto,
   IMPORT_TEMPLATE_TYPES,
   type ImportJobDto,
   type ImportJobSummaryDto,
   type ImportTemplateTypeCode,
 } from "@company-erp/shared";
-import { apiBaseUrl, requestJson } from "../../apiClient";
+import { apiBaseUrl, getAppVersion, requestJson } from "../../apiClient";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 
 // ---------------------------------------------------------------------------
@@ -44,11 +45,13 @@ export type ExcelImportTab = "preview" | "jobs" | "rows" | "review";
 export type ExcelImportWorkspaceProps = {
   loadImportJobs?: () => Promise<ImportJobSummaryDto[]>;
   loadImportJobDetail?: (id: string) => Promise<ImportJobDto>;
+  loadAppVersion?: () => Promise<AppVersionDto>;
   previewImportJob?: (templateType: ImportTemplateTypeCode, file: File) => Promise<ImportJobDto>;
   confirmImportJob?: (id: string) => Promise<ImportJobDto>;
   canManage?: boolean;
   onNavigate?: (intent: NavigationIntent) => void;
   initialTab?: string;
+  deploymentEnvironment?: string;
 };
 
 export type ExcelImportController = ReturnType<typeof useExcelImportController>;
@@ -64,14 +67,17 @@ function isExcelImportTab(value?: string): value is ExcelImportTab {
 export function useExcelImportController({
   loadImportJobs = defaultLoadImportJobs,
   loadImportJobDetail = defaultLoadImportJobDetail,
+  loadAppVersion = getAppVersion,
   previewImportJob = defaultPreviewImportJob,
   confirmImportJob = defaultConfirmImportJob,
   canManage = true,
   onNavigate,
   initialTab,
+  deploymentEnvironment,
 }: ExcelImportWorkspaceProps) {
   const [jobs, setJobs] = useState<ImportJobSummaryDto[]>([]);
   const [selectedJob, setSelectedJob] = useState<ImportJobDto | null>(null);
+  const [resolvedDeploymentEnvironment, setResolvedDeploymentEnvironment] = useState<string | null>(deploymentEnvironment ?? null);
   const [templateType, setTemplateType] = useState<ImportTemplateTypeCode>("parties");
   const [file, setFile] = useState<File | null>(null);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -98,6 +104,22 @@ export function useExcelImportController({
   useEffect(() => {
     if (isExcelImportTab(initialTab)) setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (deploymentEnvironment) {
+      setResolvedDeploymentEnvironment(deploymentEnvironment);
+      return;
+    }
+    let mounted = true;
+    loadAppVersion()
+      .then((version) => {
+        if (mounted) setResolvedDeploymentEnvironment(version.environment);
+      })
+      .catch(() => {
+        if (mounted) setResolvedDeploymentEnvironment(null);
+      });
+    return () => { mounted = false; };
+  }, [deploymentEnvironment, loadAppVersion]);
 
   const activeJob = selectedJob ?? jobs[0] ?? null;
   const rows = "rows" in (activeJob ?? {}) ? (activeJob as ImportJobDto).rows : [];
@@ -214,6 +236,7 @@ export function useExcelImportController({
     actionStatus,
     actionError,
     activeTab,
+    deploymentEnvironment: resolvedDeploymentEnvironment,
     confirmingJobId,
     canManage,
     onNavigate,
