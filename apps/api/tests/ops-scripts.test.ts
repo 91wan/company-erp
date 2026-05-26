@@ -1085,7 +1085,7 @@ describe("NAS trial deploy notification readiness gate", () => {
     mkdirSync(binDir, { recursive: true });
     writeFileSync(
       join(binDir, "npm"),
-      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
+      `#!/bin/bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
       { mode: 0o755 },
     );
 
@@ -1093,7 +1093,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: `${binDir}:/usr/bin:/bin`,
+        PATH: binDir,
       },
       encoding: "utf8",
     });
@@ -1114,12 +1114,12 @@ describe("NAS trial deploy notification readiness gate", () => {
     mkdirSync(binDir, { recursive: true });
     writeFileSync(
       join(binDir, "npm"),
-      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
+      `#!/bin/bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
       { mode: 0o755 },
     );
     writeFileSync(
       join(binDir, "docker"),
-      "#!/usr/bin/env bash\nif [[ \"$1\" == \"info\" ]]; then exit 1; fi\nexit 0\n",
+      "#!/bin/bash\nif [[ \"$1\" == \"info\" ]]; then exit 1; fi\nexit 0\n",
       { mode: 0o755 },
     );
 
@@ -1127,7 +1127,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: `${binDir}:/usr/bin:/bin`,
+        PATH: binDir,
       },
       encoding: "utf8",
     });
@@ -1148,12 +1148,12 @@ describe("NAS trial deploy notification readiness gate", () => {
     mkdirSync(binDir, { recursive: true });
     writeFileSync(
       join(binDir, "npm"),
-      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nexit 0\n`,
+      `#!/bin/bash\necho "$*" >> "${callsPath}"\nexit 0\n`,
       { mode: 0o755 },
     );
     writeFileSync(
       join(binDir, "docker"),
-      "#!/usr/bin/env bash\nif [[ \"$1\" == \"info\" ]]; then exit 0; fi\nexit 0\n",
+      "#!/bin/bash\nif [[ \"$1\" == \"info\" ]]; then exit 0; fi\nexit 0\n",
       { mode: 0o755 },
     );
 
@@ -1161,7 +1161,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       cwd: repoRoot,
       env: {
         ...process.env,
-        PATH: `${binDir}:/usr/bin:/bin`,
+        PATH: binDir,
       },
       encoding: "utf8",
     });
