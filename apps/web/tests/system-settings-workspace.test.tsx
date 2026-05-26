@@ -293,9 +293,16 @@ describe("SystemSettingsWorkspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: "正式上线证据" }));
 
     expect(await screen.findByText("正式上线证据")).toBeInTheDocument();
-    expect(screen.getByText(/production:go-live-check/)).toBeInTheDocument();
+    expect(screen.getAllByText(/production:go-live-check/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/production:evidence-template/)).toBeInTheDocument();
+    expect(screen.getByText(/production:ready/)).toBeInTheDocument();
+    expect(screen.getByText(/production:health-check/)).toBeInTheDocument();
+    expect(screen.getByText(/production:restore-drill-check/)).toBeInTheDocument();
+    expect(screen.getByText(/attachments:production-check/)).toBeInTheDocument();
     expect(screen.getByText(/access:review-check/)).toBeInTheDocument();
     expect(screen.getByText(/audit:verify-export/)).toBeInTheDocument();
+    expect(screen.getAllByText(/证据目录必须在 Git 仓库外/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/不保存 \.env、数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git/)).toBeInTheDocument();
     expect(
       screen.getByText("docs/operations/production-go-live-evidence-checklist.md"),
     ).toBeInTheDocument();

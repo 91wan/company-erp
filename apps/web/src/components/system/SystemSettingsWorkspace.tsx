@@ -917,6 +917,10 @@ function ProductionGoLiveEvidencePanel({
         以下内容用于公司内网正式上线审批。浏览器只展示命令和证据要求；不要在页面中输入
         secret，不要使用 Git 仓库内路径保存证据包。
       </p>
+      <p className="form-hint">
+        证据目录必须在 Git 仓库外；不保存 .env、数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git。
+        证据包校验命令才是正式上线证据包门禁。
+      </p>
       <div className="settings-ops-grid">
         {goLiveEvidenceSections.map((section) => (
           <article className="settings-ops-card" key={section.title}>

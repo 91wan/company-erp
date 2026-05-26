@@ -1374,7 +1374,13 @@ describe("NAS trial deploy notification readiness gate", () => {
     for (const marker of [
       "npm run production:ready 输出",
       "npm run production:evidence-template",
+      "npm run production:readiness-gate",
       "npm run production:go-live-check 输出",
+      "npm run production:health-check",
+      "npm run production:restore-drill-check",
+      "npm run attachments:production-check",
+      "npm run access:review-check",
+      "npm run audit:verify-export",
       "npm run pilot:ready 输出",
       "npm run import:pilot-check 输出",
       "npm run import:pilot-smoke 输出",
@@ -1397,8 +1403,10 @@ describe("NAS trial deploy notification readiness gate", () => {
       "P0 阻断",
       "P1 建议",
       "Git 外",
+      "证据目录必须在 Git 仓库外",
       "production:ready + production:go-live-check",
       "不保存真实密码",
+      "不保存数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git",
       "不保存合同扫描件",
       "不保存健康证图片",
       "不保存工资表",
@@ -1616,7 +1624,11 @@ describe("production go-live evidence template", () => {
     }
 
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:go-live-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:readiness-gate");
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:restore-drill-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run audit:verify-export -- --csv");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run attachments:production-check -- --legacy-report");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run access:review-check -- --export");
     expect(readFile(join(outsideOutput, "README.md"))).toContain("actual command output");
     expect(readFile(join(outsideOutput, "restore-drill/README.md"))).toContain("restore-signoff.md");
 

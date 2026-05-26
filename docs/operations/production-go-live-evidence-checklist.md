@@ -8,6 +8,19 @@
 npm run production:evidence-template -- --output <outside-git-path>
 ```
 
+正式上线证据面板、证据模板和本清单使用同一组关键命令：
+
+```bash
+npm run production:ready
+npm run production:readiness-gate
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:health-check -- --base-url http://<nas>:8080
+npm run production:restore-drill-check -- --evidence-dir <outside-git-path>/restore-drill
+npm run attachments:production-check -- --legacy-report <outside-git-path>/attachment-legacy-report.json
+npm run access:review-check -- --export <outside-git-path>/access-review-export.json
+npm run audit:verify-export -- --csv <outside-git-path>/audit-export.csv --sha256 <sha256> --record-count <count>
+```
+
 | 等级 | 证据项 | 保存要求 |
 | --- | --- | --- |
 | P0 阻断 | npm run production:ready 输出 | 保存完整终端输出，需包含最终状态。 |
@@ -35,12 +48,13 @@ npm run production:evidence-template -- --output <outside-git-path>
 ## 存储边界
 
 - 所有证据必须保存在 Git 外。
+- 证据目录必须在 Git 仓库外。
 - 不保存真实密码。
 - 不保存合同扫描件。
 - 不保存健康证图片。
 - 不保存工资表。
 - 不保存 `.env`。
-- 不保存数据库 dump 到 Git。
+- 不保存数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git。
 - 如证据中含真实姓名、手机号、项目点业务信息，必须脱敏或放入受控内网证据目录。
 
 ## Docker 前置条件
