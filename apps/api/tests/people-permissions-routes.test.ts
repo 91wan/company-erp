@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -158,9 +158,12 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
   };
 }
 
-function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
+function createFakeAuthRepository(
+  seed: AuthAccountRecord[],
+  options: { activeSessionCounts?: Record<string, number>; includeSessionCounter?: boolean } = {},
+): AuthRepository {
   const accounts = [...seed];
-  return {
+  const repository: AuthRepository = {
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
     },
@@ -172,6 +175,11 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
       if (account) account.lastLoginAt = at.toISOString();
     },
   };
+  if (options.includeSessionCounter !== false) {
+    repository.countActiveSessionsByUserAccountIds = async (userAccountIds) =>
+      new Map(userAccountIds.map((id) => [id, options.activeSessionCounts?.[id] ?? 0]));
+  }
+  return repository;
 }
 
 function createFakeAuditLogRepository() {
@@ -785,6 +793,76 @@ describe("user accounts API", () => {
       }),
     });
     expect(JSON.stringify(exportAudit)).not.toContain("site-manager");
+  });
+
+  it("exports real active session counts and keeps disabled active sessions blocking in access review", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const adminAccount = makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] });
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-access-review-session-counts" },
+      authRepository: createFakeAuthRepository([adminAccount], {
+        activeSessionCounts: {
+          "active-user": 2,
+          "disabled-user": 1,
+        },
+      }),
+      userAccountRepository: createFakeUserAccountRepository([
+        makeUserAccount({ id: "active-user", username: "active-admin", roles: ["admin"], status: "active" }),
+        makeUserAccount({ id: "disabled-user", username: "disabled-viewer", roles: ["viewer"], status: "disabled" }),
+      ]),
+    });
+    const cookie = await loginCookie(app, "admin");
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const payload = response.json();
+    expect(payload.users).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "active-user", activeSessionCount: 2 }),
+        expect.objectContaining({ id: "disabled-user", activeSessionCount: 1 }),
+      ]),
+    );
+    expect(JSON.stringify(payload)).not.toMatch(/sessionId|token|cookie/i);
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-access-review-disabled-session-"));
+    const exportPath = join(tempDir, "access-review-export.json");
+    writeFileSync(exportPath, JSON.stringify(payload), "utf8");
+    const gate = spawnSync("node", ["scripts/access-review-check.mjs", "--export", exportPath], {
+      cwd: process.cwd().replace(/\/apps\/api$/, ""),
+      encoding: "utf8",
+    });
+    rmSync(tempDir, { recursive: true, force: true });
+
+    expect(gate.status).not.toBe(0);
+    expect(gate.stderr).toContain("Disabled user should not have active sessions");
+    expect(gate.stderr).toContain("disabled-viewer");
+  });
+
+  it("blocks access-review export when active session counts are unavailable", async () => {
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const adminAccount = makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] });
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret-access-review-session-counts-missing" },
+      authRepository: createFakeAuthRepository([adminAccount], { includeSessionCounter: false }),
+      userAccountRepository: createFakeUserAccountRepository([makeUserAccount({ id: "admin-user", username: "admin" })]),
+    });
+    const cookie = await loginCookie(app, "admin");
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: cookie },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "ACCESS_REVIEW_SESSION_REPOSITORY_NOT_CONFIGURED" });
   });
 
   it("allows employees.manage users and blocks viewer, external project-site, and anonymous users from access-review export", async () => {
