@@ -34,7 +34,64 @@ type SystemSettingsWorkspaceProps = {
   onCompanyNameChange: (appConfig: AppConfigDto) => void;
 };
 
-type SystemSettingsTab = "company" | "version" | "attachments" | "audit";
+type SystemSettingsTab = "company" | "version" | "attachments" | "audit" | "goLive";
+
+type GoLiveEvidenceSection = {
+  title: string;
+  description: string;
+  commands: string[];
+};
+
+const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
+  {
+    title: "试点与构建门禁",
+    description: "先确认代码、试点导入和正式上线静态门禁全部通过。",
+    commands: [
+      "npm run pilot:ready",
+      "npm run production:ready",
+      "npm run production:readiness-gate",
+    ],
+  },
+  {
+    title: "证据包",
+    description: "证据目录必须在 Git 仓库外；正式上线前运行证据包校验。",
+    commands: [
+      "npm run production:evidence-template -- --output <outside-git-path>",
+      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
+    ],
+  },
+  {
+    title: "权限复核",
+    description: "下载权限复核 JSON 后保存到证据目录，再运行 access review gate。",
+    commands: [
+      "GET /api/user-accounts/export-access-review",
+      "npm run access:review-check -- --export <file>",
+    ],
+  },
+  {
+    title: "审计导出",
+    description: "导出 CSV 后记录响应头中的 sha256 和 record count，再进行复核。",
+    commands: [
+      "GET /api/audit-logs/export.csv",
+      "npm run audit:verify-export -- --csv <file> --sha256 <header-sha256> --record-count <header-count>",
+    ],
+  },
+  {
+    title: "附件与恢复",
+    description: "附件 legacy gap、附件 readiness 和恢复演练证据必须进入正式上线证据包。",
+    commands: [
+      "npm run attachments:legacy-report -- --json",
+      "npm run attachments:production-check -- --legacy-report <file>",
+      "npm run production:restore-drill-check -- --evidence-dir <restore-drill-dir>",
+    ],
+  },
+];
+
+const goLiveEvidenceDocs = [
+  "docs/operations/production-go-live-evidence-checklist.md",
+  "docs/operations/access-review-runbook.md",
+  "docs/operations/production-backup-restore-runbook.md",
+];
 
 function toAuditDateTime(
   date: string,
@@ -262,6 +319,7 @@ export function SystemSettingsWorkspace({
       ? [{ key: "attachments" as const, label: "附件管理" }]
       : []),
     ...(canReadAuditLogs ? [{ key: "audit" as const, label: "审计日志" }] : []),
+    ...(canManage ? [{ key: "goLive" as const, label: "正式上线证据" }] : []),
   ];
 
   return (
@@ -732,7 +790,50 @@ export function SystemSettingsWorkspace({
             ) : null}
           </SectionCard>
         ) : null}
+
+        {activeTab === "goLive" && canManage ? (
+          <ProductionGoLiveEvidencePanel />
+        ) : null}
       </section>
     </WorkspaceScaffold>
+  );
+}
+
+function ProductionGoLiveEvidencePanel() {
+  return (
+    <SectionCard
+      title="正式上线证据包"
+      badge={<UiStatusBadge tone="warning">运维只读</UiStatusBadge>}
+    >
+      <p className="form-hint">
+        以下内容用于公司内网正式上线审批。浏览器只展示命令和证据要求；不要在页面中输入
+        secret，不要使用 Git 仓库内路径保存证据包。
+      </p>
+      <div className="settings-ops-grid">
+        {goLiveEvidenceSections.map((section) => (
+          <article className="settings-ops-card" key={section.title}>
+            <h3>{section.title}</h3>
+            <p className="form-hint">{section.description}</p>
+            <div className="settings-command-list" aria-label={`${section.title}命令`}>
+              {section.commands.map((command) => (
+                <pre className="settings-command-block" key={command}>
+                  <code>{command}</code>
+                </pre>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="settings-doc-links" aria-label="正式上线证据文档">
+        <h3>相关文档</h3>
+        <ul>
+          {goLiveEvidenceDocs.map((docPath) => (
+            <li key={docPath}>
+              <code>{docPath}</code>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </SectionCard>
   );
 }

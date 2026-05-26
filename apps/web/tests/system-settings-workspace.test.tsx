@@ -235,4 +235,50 @@ describe("SystemSettingsWorkspace", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("shows the production go-live evidence panel only to system managers", async () => {
+    mockShellFetch(adminUser, undefined, defaultAppVersion);
+
+    render(
+      <SystemSettingsWorkspace
+        companyName="Company ERP"
+        canManage={true}
+        canReadAuditLogs={true}
+        canReadAttachments={true}
+        canManageAttachments={true}
+        onCompanyNameChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "正式上线证据" }));
+
+    expect(await screen.findByText("正式上线证据")).toBeInTheDocument();
+    expect(screen.getByText(/production:go-live-check/)).toBeInTheDocument();
+    expect(screen.getByText(/access:review-check/)).toBeInTheDocument();
+    expect(screen.getByText(/audit:verify-export/)).toBeInTheDocument();
+    expect(
+      screen.getByText("docs/operations/production-go-live-evidence-checklist.md"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/POSTGRES_PASSWORD/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AUTH_SESSION_SECRET/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/IDENTITY_ENCRYPTION_SECRET/)).not.toBeInTheDocument();
+  });
+
+  it("hides the production go-live evidence panel from read-only viewers", async () => {
+    mockShellFetch(viewerUser);
+
+    render(
+      <SystemSettingsWorkspace
+        companyName="Company ERP"
+        canManage={false}
+        canReadAuditLogs={false}
+        canReadAttachments={true}
+        canManageAttachments={false}
+        onCompanyNameChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "正式上线证据" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/production:go-live-check/)).not.toBeInTheDocument();
+  });
 });

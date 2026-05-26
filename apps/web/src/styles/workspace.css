@@ -89,6 +89,61 @@
   align-items: end;
 }
 
+.settings-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+  margin-top: 12px;
+}
+
+.settings-ops-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.settings-ops-card h3,
+.settings-doc-links h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.settings-command-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-command-block {
+  margin: 0;
+  overflow-x: auto;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-doc-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.settings-doc-links ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .version-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
