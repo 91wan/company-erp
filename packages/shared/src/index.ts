@@ -612,12 +612,14 @@ export type AccessReviewUserAccountExportDto = {
   projectSiteIds: readonly string[];
   activeSessionCount: number;
   permissions?: {
+    read: readonly PermissionAreaCode[];
     manage: readonly PermissionAreaCode[];
   };
 };
 
 export type AccessReviewExportDto = {
   exportedAt: string;
+  exportedBy: string;
   users: readonly AccessReviewUserAccountExportDto[];
 };
 

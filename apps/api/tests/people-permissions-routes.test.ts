@@ -1,6 +1,11 @@
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import type { AuditLogRepository, CreateAuditLogInput } from "../src/auditLogs";
 import { hashPassword } from "../src/password";
 import {
   DepartmentConflictError,
@@ -167,6 +172,32 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
       if (account) account.lastLoginAt = at.toISOString();
     },
   };
+}
+
+function createFakeAuditLogRepository() {
+  const logs: CreateAuditLogInput[] = [];
+  const repository: AuditLogRepository = {
+    async list() {
+      return [];
+    },
+    async create(input) {
+      logs.push(input);
+      return {
+        id: `audit-${logs.length}`,
+        actorUserId: input.actorUserId ?? null,
+        actorUsername: input.actorUsername ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        beforeJson: input.beforeJson ?? null,
+        afterJson: input.afterJson ?? null,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        createdAt: now,
+      };
+    },
+  };
+  return { repository, logs };
 }
 
 async function loginCookie(app: Awaited<ReturnType<typeof buildApp>>, username = "admin", password = "ChangeMe123!") {
@@ -670,9 +701,11 @@ describe("user accounts API", () => {
   it("exports access-review JSON for admin without leaking secrets", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const adminAccount = makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] });
+    const auditLogRepository = createFakeAuditLogRepository();
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-access-review-export" },
       authRepository: createFakeAuthRepository([adminAccount]),
+      auditLogRepository: auditLogRepository.repository,
       userAccountRepository: createFakeUserAccountRepository([
         makeUserAccount({ id: "admin-user", username: "admin", roles: ["admin"] }),
         makeUserAccount({
@@ -700,12 +733,29 @@ describe("user accounts API", () => {
     await app.close();
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/json");
     expect(response.headers["content-disposition"]).toContain("access-review-export.json");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
     const payload = response.json();
     expect(payload).toMatchObject({
+      exportedBy: "admin",
       users: expect.arrayContaining([
-        expect.objectContaining({ username: "admin", roles: ["admin"], activeSessionCount: 0 }),
-        expect.objectContaining({ username: "viewer", status: "disabled", roles: ["viewer"] }),
+        expect.objectContaining({
+          username: "admin",
+          roles: ["admin"],
+          activeSessionCount: 0,
+          permissions: expect.objectContaining({
+            read: expect.arrayContaining(["employees", "userAccounts"]),
+            manage: expect.arrayContaining(["employees", "userAccounts"]),
+          }),
+        }),
+        expect.objectContaining({
+          username: "viewer",
+          status: "disabled",
+          roles: ["viewer"],
+          projectSiteIds: [],
+          permissions: expect.objectContaining({ manage: [] }),
+        }),
         expect.objectContaining({
           username: "site-manager",
           roles: ["external_project_site"],
@@ -715,21 +765,54 @@ describe("user accounts API", () => {
     });
     expect(typeof payload.exportedAt).toBe("string");
     expect(JSON.stringify(payload)).not.toMatch(/passwordHash|token|cookie|secret/i);
+    expect(JSON.stringify(payload)).not.toMatch(/sessionId|authSession|company_erp_session|identityNo|identityNoEncrypted|Storage Key/i);
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-access-review-export-"));
+    const exportPath = join(tempDir, "access-review-export.json");
+    writeFileSync(exportPath, JSON.stringify(payload), "utf8");
+    const gate = spawnSync("node", ["scripts/access-review-check.mjs", "--export", exportPath], {
+      cwd: process.cwd().replace(/\/apps\/api$/, ""),
+      encoding: "utf8",
+    });
+    expect(gate.status).toBe(0);
+    expect(gate.stdout).toContain("ACCESS_REVIEW_PASS");
+    const exportAudit = auditLogRepository.logs.find((log) => log.action === "access_review.export");
+    expect(exportAudit).toMatchObject({
+      actorUsername: "admin",
+      entityType: "user_account",
+      afterJson: expect.objectContaining({
+        exportedUserCount: 3,
+        exportedAt: payload.exportedAt,
+      }),
+    });
+    expect(JSON.stringify(exportAudit)).not.toContain("site-manager");
   });
 
-  it("blocks viewer and external project-site users from access-review export", async () => {
+  it("allows employees.manage users and blocks viewer, external project-site, and anonymous users from access-review export", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "test-secret-access-review-export-forbidden" },
       authRepository: createFakeAuthRepository([
-        makeAuthAccount({ username: "viewer", passwordHash, roles: ["viewer"] }),
-        makeAuthAccount({ username: "site-manager", passwordHash, roles: ["external_project_site"], assignedProjectSiteIds: [projectSiteId] }),
+        makeAuthAccount({ id: "44444444-4444-4444-8444-444444444444", username: "hr", passwordHash, roles: ["hr"] }),
+        makeAuthAccount({ id: "55555555-5555-4555-8555-555555555555", username: "viewer", passwordHash, roles: ["viewer"] }),
+        makeAuthAccount({
+          id: "66666666-6666-4666-8666-666666666666",
+          username: "site-manager",
+          passwordHash,
+          roles: ["external_project_site"],
+          assignedProjectSiteIds: [projectSiteId],
+        }),
       ]),
       userAccountRepository: createFakeUserAccountRepository([makeUserAccount()]),
     });
+    const hrCookie = await loginCookie(app, "hr");
     const viewerCookie = await loginCookie(app, "viewer");
     const externalCookie = await loginCookie(app, "site-manager");
 
+    const hrResponse = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+      cookies: { company_erp_session: hrCookie },
+    });
     const viewerResponse = await app.inject({
       method: "GET",
       url: "/api/user-accounts/export-access-review",
@@ -740,10 +823,17 @@ describe("user accounts API", () => {
       url: "/api/user-accounts/export-access-review",
       cookies: { company_erp_session: externalCookie },
     });
+    const anonymousResponse = await app.inject({
+      method: "GET",
+      url: "/api/user-accounts/export-access-review",
+    });
     await app.close();
 
+    expect(hrResponse.statusCode).toBe(200);
+    expect(hrResponse.json()).toMatchObject({ exportedBy: "hr" });
     expect(viewerResponse.statusCode).toBe(403);
     expect(externalResponse.statusCode).toBe(403);
+    expect(anonymousResponse.statusCode).toBe(401);
   });
 });
 

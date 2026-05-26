@@ -1,7 +1,20 @@
 import type { FastifyInstance } from "fastify";
-import { MVP_PERMISSION_MATRIX, type AccessReviewExportDto, type MvpRoleCode, type PermissionAreaCode, type UserAccountDto } from "@company-erp/shared";
+import {
+  MVP_PERMISSION_MATRIX,
+  type AccessReviewExportDto,
+  type MvpRoleCode,
+  type PermissionAreaCode,
+  type UserAccountDto,
+} from "@company-erp/shared";
+import type { AuthenticatedRequest } from "./auth.js";
 import { runWithAuditTransaction, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
 import { DepartmentConflictError, DepartmentValidationError, EmployeeConflictError, EmployeeProjectSiteAssignmentConflictError, EmployeeProjectSiteAssignmentValidationError, EmployeeValidationError, ExternalProjectSiteAccountConflictError, ExternalProjectSiteAccountValidationError, UserAccountConflictError, UserAccountValidationError, normalizeDepartmentFilters, normalizeDepartmentInput, normalizeEmployeeFilters, normalizeEmployeeInput, normalizeExternalProjectSiteAccountFilters, normalizeExternalProjectSiteAccountInput, normalizeProjectSiteAssignmentFilters, normalizeProjectSiteAssignmentInput, normalizeUserAccountFilters, normalizeUserAccountInput } from "./peoplePermissions.js";
+
+function readableAreas(roles: readonly MvpRoleCode[]): PermissionAreaCode[] {
+  return (Object.entries(MVP_PERMISSION_MATRIX) as Array<[PermissionAreaCode, { read: readonly MvpRoleCode[] }]>)
+    .filter(([, rule]) => roles.some((role) => rule.read.includes(role)))
+    .map(([area]) => area);
+}
 
 function manageableAreas(roles: readonly MvpRoleCode[]): PermissionAreaCode[] {
   return (Object.entries(MVP_PERMISSION_MATRIX) as Array<[PermissionAreaCode, { manage: readonly MvpRoleCode[] }]>)
@@ -13,9 +26,14 @@ function projectSiteIdsForAccessReview(account: UserAccountDto): string[] {
   return account.externalProjectSiteId ? [account.externalProjectSiteId] : [];
 }
 
-function buildAccessReviewExport(userAccounts: readonly UserAccountDto[]): AccessReviewExportDto {
+function buildAccessReviewExport(
+  userAccounts: readonly UserAccountDto[],
+  exportedBy: string,
+  exportedAt = new Date().toISOString(),
+): AccessReviewExportDto {
   return {
-    exportedAt: new Date().toISOString(),
+    exportedAt,
+    exportedBy,
     users: userAccounts.map((account) => ({
       id: account.id,
       username: account.username,
@@ -24,6 +42,7 @@ function buildAccessReviewExport(userAccounts: readonly UserAccountDto[]): Acces
       projectSiteIds: projectSiteIdsForAccessReview(account),
       activeSessionCount: 0,
       permissions: {
+        read: readableAreas(account.roles),
         manage: manageableAreas(account.roles),
       },
     })),
@@ -216,16 +235,28 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     }
   });
 
-  app.get("/api/user-accounts/export-access-review", async (_request, reply) => {
+  app.get("/api/user-accounts/export-access-review", async (request, reply) => {
     if (!options.userAccountRepository) {
       return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
     }
 
     const userAccounts = await options.userAccountRepository.list({});
+    const exportedBy = (request as AuthenticatedRequest).currentUser?.username ?? "unknown";
+    const exportedAt = new Date().toISOString();
+    const accessReviewExport = buildAccessReviewExport(userAccounts, exportedBy, exportedAt);
+    await writeAuditLog(request, options, {
+      action: "access_review.export",
+      entityType: "user_account",
+      afterJson: {
+        exportedUserCount: userAccounts.length,
+        exportedAt,
+      },
+    });
     return reply
       .header("Content-Type", "application/json; charset=utf-8")
       .header("Content-Disposition", 'attachment; filename="access-review-export.json"')
-      .send(buildAccessReviewExport(userAccounts));
+      .header("X-Content-Type-Options", "nosniff")
+      .send(accessReviewExport);
   });
 
   app.get("/api/user-accounts/:id", async (request, reply) => {
