@@ -959,5 +959,18 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
         data: { revokedAt: at, revokedReason: reason },
       });
     },
+    async countActiveSessionsByUserAccountIds(userAccountIds: readonly string[], at = new Date()) {
+      if (userAccountIds.length === 0) return new Map<string, number>();
+      const rows = await prisma.authSession.groupBy({
+        by: ["userAccountId"],
+        where: {
+          userAccountId: { in: [...userAccountIds] },
+          revokedAt: null,
+          expiresAt: { gt: at },
+        },
+        _count: { id: true },
+      });
+      return new Map(rows.map((row) => [row.userAccountId, row._count.id]));
+    },
   };
 }

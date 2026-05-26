@@ -29,6 +29,7 @@ function projectSiteIdsForAccessReview(account: UserAccountDto): string[] {
 function buildAccessReviewExport(
   userAccounts: readonly UserAccountDto[],
   exportedBy: string,
+  activeSessionCounts: ReadonlyMap<string, number>,
   exportedAt = new Date().toISOString(),
 ): AccessReviewExportDto {
   return {
@@ -40,7 +41,7 @@ function buildAccessReviewExport(
       status: account.status,
       roles: account.roles,
       projectSiteIds: projectSiteIdsForAccessReview(account),
-      activeSessionCount: 0,
+      activeSessionCount: activeSessionCounts.get(account.id) ?? 0,
       permissions: {
         read: readableAreas(account.roles),
         manage: manageableAreas(account.roles),
@@ -239,11 +240,18 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     if (!options.userAccountRepository) {
       return reply.status(503).send({ error: "USER_ACCOUNT_REPOSITORY_NOT_CONFIGURED" });
     }
+    if (!options.authRepository?.countActiveSessionsByUserAccountIds) {
+      return reply.status(503).send({ error: "ACCESS_REVIEW_SESSION_REPOSITORY_NOT_CONFIGURED" });
+    }
 
     const userAccounts = await options.userAccountRepository.list({});
+    const activeSessionCounts = await options.authRepository.countActiveSessionsByUserAccountIds(
+      userAccounts.map((account) => account.id),
+      new Date(),
+    );
     const exportedBy = (request as AuthenticatedRequest).currentUser?.username ?? "unknown";
     const exportedAt = new Date().toISOString();
-    const accessReviewExport = buildAccessReviewExport(userAccounts, exportedBy, exportedAt);
+    const accessReviewExport = buildAccessReviewExport(userAccounts, exportedBy, activeSessionCounts, exportedAt);
     await writeAuditLog(request, options, {
       action: "access_review.export",
       entityType: "user_account",

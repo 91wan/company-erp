@@ -46,6 +46,10 @@ export type AuthRepository = {
   updateSessionCsrfToken?(id: string, csrfTokenHash: string, at: Date): Promise<void>;
   revokeSession?(id: string, at: Date, reason: string): Promise<void>;
   revokeSessionsForAccount?(userAccountId: string, at: Date, reason: string): Promise<void>;
+  countActiveSessionsByUserAccountIds?(
+    userAccountIds: readonly string[],
+    at?: Date,
+  ): Promise<Map<string, number>>;
 };
 
 export type AuthOptions = {
