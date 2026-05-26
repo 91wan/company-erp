@@ -270,8 +270,12 @@ npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url
 ```
 
 `production:ready` can run in CI or a local workstation without production
-evidence. `production:go-live-check` is the formal evidence gate and requires a
-Git 外 evidence directory; the directory must not be committed.
+evidence, but it requires a working Docker daemon because it must execute
+`test:backup-restore`. If Docker is missing or the daemon is not accessible, it
+fails fast with `BLOCKED_DOCKER_UNAVAILABLE`; treat that as an environment
+blocker, not an application test failure. `production:go-live-check` is the
+formal evidence gate and requires a Git 外 evidence directory; the directory must
+not be committed.
 
 Do not expose API or PostgreSQL to the public internet. Do not import all real
 data directly for the first drill; start with desensitized data or a small

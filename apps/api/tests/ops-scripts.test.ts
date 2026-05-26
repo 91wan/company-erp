@@ -1078,6 +1078,102 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(help.stdout).not.toContain("npm run db:generate");
   });
 
+  it("fails production:ready fast when Docker CLI is missing before backup restore", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-no-docker-"));
+    const binDir = join(tempRoot, "bin");
+    const callsPath = join(tempRoot, "npm-calls.log");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:/usr/bin:/bin`,
+      },
+      encoding: "utf8",
+    });
+
+    const calls = readFile(callsPath);
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("BLOCKED_DOCKER_UNAVAILABLE");
+    expect(result.stderr).toContain("environment blocker");
+    expect(calls).toContain("run pilot:ready");
+    expect(calls).not.toContain("run test:backup-restore");
+  });
+
+  it("fails production:ready fast when Docker daemon is inaccessible", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-daemon-"));
+    const binDir = join(tempRoot, "bin");
+    const callsPath = join(tempRoot, "npm-calls.log");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nif [[ "$*" == "run test:backup-restore" ]]; then exit 9; fi\nexit 0\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1\" == \"info\" ]]; then exit 1; fi\nexit 0\n",
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:/usr/bin:/bin`,
+      },
+      encoding: "utf8",
+    });
+
+    const calls = readFile(callsPath);
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("BLOCKED_DOCKER_UNAVAILABLE");
+    expect(result.stderr).toContain("Docker daemon is not running or not accessible");
+    expect(calls).toContain("run pilot:ready");
+    expect(calls).not.toContain("run test:backup-restore");
+  });
+
+  it("continues production:ready to backup restore when Docker is available", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-docker-ok-"));
+    const binDir = join(tempRoot, "bin");
+    const callsPath = join(tempRoot, "npm-calls.log");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\necho "$*" >> "${callsPath}"\nexit 0\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(binDir, "docker"),
+      "#!/usr/bin/env bash\nif [[ \"$1\" == \"info\" ]]; then exit 0; fi\nexit 0\n",
+      { mode: 0o755 },
+    );
+
+    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:/usr/bin:/bin`,
+      },
+      encoding: "utf8",
+    });
+
+    const calls = readFile(callsPath);
+    rmSync(tempRoot, { recursive: true, force: true });
+    expect(result.status).toBe(0);
+    expect(calls).toContain("run pilot:ready");
+    expect(calls).toContain("run test:backup-restore");
+    expect(calls).toContain("run production:readiness-gate");
+  });
+
   it("evaluates production readiness with READY/BLOCKED output and redacted blockers", async () => {
     const { evaluateProductionReadiness } = (await import(
       pathToFileURL(join(repoRoot, "scripts/production-readiness-gate.mjs")).href

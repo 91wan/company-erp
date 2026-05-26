@@ -32,6 +32,12 @@ run the local static gate:
 npm run production:ready
 ```
 
+`production:ready` requires a working Docker daemon because it must run
+`test:backup-restore`. If Docker is missing or the daemon is not accessible, the
+command fails fast with `BLOCKED_DOCKER_UNAVAILABLE`. That is an environment
+blocker, not an application test failure; rerun the gate on a CI or operations
+machine with Docker before internal production approval.
+
 Then run the Git-external evidence package gate:
 
 ```bash

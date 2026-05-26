@@ -43,6 +43,13 @@ npm run production:evidence-template -- --output <outside-git-path>
 - 不保存数据库 dump 到 Git。
 - 如证据中含真实姓名、手机号、项目点业务信息，必须脱敏或放入受控内网证据目录。
 
+## Docker 前置条件
+
+`npm run production:ready` 必须在 Docker daemon 可用的机器上执行，因为它会运行
+`npm run test:backup-restore`。如果输出 `BLOCKED_DOCKER_UNAVAILABLE`，说明当前机器
+缺少 Docker CLI 或 daemon 不可访问；这是环境阻断，不是代码测试失败。不要跳过
+backup/restore gate，也不要用静态检查替代 production:ready。
+
 ## 审批结论
 
 正式上线审批要求 production:ready + production:go-live-check 都通过；其中 production:ready 是代码与静态门禁，production:go-live-check 是 Git 外证据包门禁。只有 P0 阻断项全部齐全，才能进入公司内网正式上线审批。P1 建议项缺失不一定阻断，但必须记录缺失原因和补齐计划。
