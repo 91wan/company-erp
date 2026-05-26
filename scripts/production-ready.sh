@@ -15,7 +15,24 @@ run_step() {
   fi
 }
 
+check_docker_for_restore_drill() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "BLOCKED_DOCKER_UNAVAILABLE: production:ready requires Docker for test:backup-restore." >&2
+    echo "This is an environment blocker, not an application test failure." >&2
+    echo "Run production:ready on a machine with a working Docker daemon before internal production approval." >&2
+    exit 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "BLOCKED_DOCKER_UNAVAILABLE: Docker daemon is not running or not accessible." >&2
+    echo "This is an environment blocker, not an application test failure." >&2
+    echo "Start Docker or run this gate on a CI/ops machine with Docker." >&2
+    exit 1
+  fi
+}
+
 run_step "pilot readiness" npm run pilot:ready
+check_docker_for_restore_drill
 run_step "backup restore verification" npm run test:backup-restore
 run_step "attachment legacy dry-run" npm run attachments:legacy-report -- --dry-run
 run_step "audit export verifier smoke" npm run audit:verify-export -- --help
