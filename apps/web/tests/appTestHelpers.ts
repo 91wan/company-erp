@@ -250,6 +250,17 @@ export function mockShellFetch(
       if (data.dashboardSummary === "error") return Promise.resolve(jsonResponse({ error: "DASHBOARD_SUMMARY_UNAVAILABLE" }, false, 500));
       return Promise.resolve(jsonResponse({ dashboardSummary: data.dashboardSummary }));
     }
+    if (pathname === "/api/audit-logs/export.csv") {
+      return Promise.resolve(new Response("createdAt,actorUsername,action,entityType\n", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="audit-export.csv"',
+          "X-Audit-Export-Record-Count": "2",
+          "X-Audit-Export-SHA256": "audit-export-sha256-demo",
+        },
+      }));
+    }
     if (url.includes("/api/audit-logs")) return Promise.resolve(jsonResponse({ auditLogs: data.auditLogs ?? [] }));
     if (pathname.match(/^\/api\/attachments\/[^/]+\/download-url$/) && method === "GET") {
       const attachmentId = pathname.split("/")[3];

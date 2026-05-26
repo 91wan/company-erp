@@ -9,11 +9,11 @@ import type {
 import {
   apiBaseUrl,
   createAttachment,
+  exportAuditLogs,
   formatApiError,
   getAppVersion,
   getAttachmentDownloadUrl,
   getAttachments,
-  getAuditLogExportUrl,
   getAuditLogs,
   updateAppConfig,
 } from "../../apiClient";
@@ -153,6 +153,14 @@ export function SystemSettingsWorkspace({
   const [attachmentDownloadError, setAttachmentDownloadError] = useState<
     string | null
   >(null);
+  const [auditExportStatus, setAuditExportStatus] = useState<
+    "idle" | "downloading" | "success" | "error"
+  >("idle");
+  const [auditExportEvidence, setAuditExportEvidence] = useState<{
+    fileName: string;
+    recordCount: string;
+    sha256: string;
+  } | null>(null);
 
   const auditFilterInput = {
     entityType: auditFilters.entityType.trim() || undefined,
@@ -312,6 +320,30 @@ export function SystemSettingsWorkspace({
     }
   }
 
+  async function handleAuditExport() {
+    setAuditExportStatus("downloading");
+    setAuditExportEvidence(null);
+    try {
+      const result = await exportAuditLogs(auditFilterInput);
+      const url = URL.createObjectURL(result.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setAuditExportEvidence({
+        fileName: result.fileName,
+        recordCount: result.recordCount,
+        sha256: result.sha256,
+      });
+      setAuditExportStatus("success");
+    } catch {
+      setAuditExportStatus("error");
+    }
+  }
+
   const tabs: TabItem<SystemSettingsTab>[] = [
     { key: "company", label: "公司信息" },
     { key: "version", label: "版本与健康检查" },
@@ -451,17 +483,38 @@ export function SystemSettingsWorkspace({
               <button
                 type="button"
                 className="secondary-action"
-                onClick={() =>
-                  window.open(
-                    getAuditLogExportUrl(auditFilterInput),
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }
+                onClick={() => void handleAuditExport()}
+                disabled={auditExportStatus === "downloading"}
               >
-                导出 CSV
+                {auditExportStatus === "downloading" ? "导出中" : "导出 CSV"}
               </button>
             </div>
+            {auditExportStatus === "error" ? (
+              <p className="form-error">审计 CSV 导出失败，请检查权限或稍后重试。</p>
+            ) : null}
+            {auditExportEvidence ? (
+              <div className="settings-export-evidence" aria-label="审计导出校验信息">
+                <dl>
+                  <div>
+                    <dt>文件名</dt>
+                    <dd>{auditExportEvidence.fileName}</dd>
+                  </div>
+                  <div>
+                    <dt>record count</dt>
+                    <dd>{auditExportEvidence.recordCount}</dd>
+                  </div>
+                  <div>
+                    <dt>sha256</dt>
+                    <dd>{auditExportEvidence.sha256}</dd>
+                  </div>
+                </dl>
+                <pre className="settings-command-block">
+                  <code>
+                    {`npm run audit:verify-export -- --csv ${auditExportEvidence.fileName} --sha256 ${auditExportEvidence.sha256} --record-count ${auditExportEvidence.recordCount}`}
+                  </code>
+                </pre>
+              </div>
+            ) : null}
 
             <div
               className="form-grid settings-filter-grid"
