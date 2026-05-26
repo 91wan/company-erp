@@ -344,6 +344,82 @@ describe("production-go-live-check fixture gate", () => {
     }
   });
 
+  it("blocks mismatched manifest and app-version commit evidence", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-commit-mismatch-"));
+    try {
+      const evidenceDir = join(tempRoot, "commit-mismatch");
+      const expectedCommit = writeFixture(evidenceDir, {
+        "app-version.json": `${JSON.stringify({
+          commitSha: "c".repeat(40),
+          buildTime: "2026-05-25T09:00:00.000Z",
+          deployedAt: "2026-05-25T10:00:00.000Z",
+          packageVersion: "0.1.0",
+          environment: "nas",
+        })}\n`,
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
+
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("manifest releaseCommitSha");
+      expect(result.blockers.join("\n")).toContain("expected commit");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks release signoff without production approval or access review confirmation", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-release-signoff-"));
+    try {
+      const missingApprovalDir = join(tempRoot, "missing-approval");
+      const expectedCommit = writeFixture(missingApprovalDir, {
+        "release-signoff.md": "approver: manager\n权限复核已完成\n",
+      });
+      const missingAccessReviewDir = join(tempRoot, "missing-access-review");
+      writeFixture(missingAccessReviewDir, {
+        "release-signoff.md": "批准正式上线\napprover: manager\n",
+      });
+
+      const missingApproval = await evaluateGoLiveEvidence({ evidenceDir: missingApprovalDir, expectedCommit });
+      const missingAccessReview = await evaluateGoLiveEvidence({ evidenceDir: missingAccessReviewDir, expectedCommit });
+
+      expect(missingApproval.status).toBe("BLOCKED");
+      expect(missingApproval.blockers.join("\n")).toContain("批准正式上线");
+      expect(missingAccessReview.status).toBe("BLOCKED");
+      expect(missingAccessReview.blockers.join("\n")).toContain("权限复核已完成");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks access review exports with external project-site role drift", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-access-review-"));
+    try {
+      const evidenceDir = join(tempRoot, "external-multirole");
+      const expectedCommit = writeFixture(evidenceDir, {
+        "access-review-export.json": `${JSON.stringify({
+          users: [
+            { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
+            {
+              id: "external-1",
+              username: "site-user",
+              status: "active",
+              roles: ["external_project_site", "viewer"],
+              projectSiteIds: ["site-1"],
+            },
+          ],
+        })}\n`,
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
+
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("external_project_site account must have only one role");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("accepts a pilot ready success marker in addition to the NAS readiness marker", async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-pilot-marker-"));
     try {
