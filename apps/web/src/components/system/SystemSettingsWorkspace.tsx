@@ -58,6 +58,7 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
     commands: [
       "npm run production:evidence-template -- --output <outside-git-path>",
       "npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
+      "npm run production:health-check -- --base-url http://<nas>:8080",
     ],
   },
   {
@@ -91,6 +92,7 @@ const goLiveEvidenceDocs = [
   "docs/operations/production-go-live-evidence-checklist.md",
   "docs/operations/access-review-runbook.md",
   "docs/operations/production-backup-restore-runbook.md",
+  "docs/operations/post-go-live-24h-checklist.md",
 ];
 
 function toAuditDateTime(
@@ -161,6 +163,9 @@ export function SystemSettingsWorkspace({
     recordCount: string;
     sha256: string;
   } | null>(null);
+  const [accessReviewExportStatus, setAccessReviewExportStatus] = useState<
+    "idle" | "downloading" | "error"
+  >("idle");
 
   const auditFilterInput = {
     entityType: auditFilters.entityType.trim() || undefined,
@@ -341,6 +346,31 @@ export function SystemSettingsWorkspace({
       setAuditExportStatus("success");
     } catch {
       setAuditExportStatus("error");
+    }
+  }
+
+  async function handleAccessReviewExport() {
+    setAccessReviewExportStatus("downloading");
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/user-accounts/export-access-review`,
+        { credentials: "include" },
+      );
+      if (!response.ok) {
+        throw new Error("access review export failed");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "access-review-export.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setAccessReviewExportStatus("idle");
+    } catch {
+      setAccessReviewExportStatus("error");
     }
   }
 
@@ -845,14 +875,39 @@ export function SystemSettingsWorkspace({
         ) : null}
 
         {activeTab === "goLive" && canManage ? (
-          <ProductionGoLiveEvidencePanel />
+          <ProductionGoLiveEvidencePanel
+            accessReviewExportStatus={accessReviewExportStatus}
+            auditExportEvidence={auditExportEvidence}
+            auditExportStatus={auditExportStatus}
+            canReadAuditLogs={canReadAuditLogs}
+            onAccessReviewExport={() => void handleAccessReviewExport()}
+            onAuditExport={() => void handleAuditExport()}
+          />
         ) : null}
       </section>
     </WorkspaceScaffold>
   );
 }
 
-function ProductionGoLiveEvidencePanel() {
+function ProductionGoLiveEvidencePanel({
+  accessReviewExportStatus,
+  auditExportEvidence,
+  auditExportStatus,
+  canReadAuditLogs,
+  onAccessReviewExport,
+  onAuditExport,
+}: {
+  accessReviewExportStatus: "idle" | "downloading" | "error";
+  auditExportEvidence: {
+    fileName: string;
+    recordCount: string;
+    sha256: string;
+  } | null;
+  auditExportStatus: "idle" | "downloading" | "success" | "error";
+  canReadAuditLogs: boolean;
+  onAccessReviewExport: () => void;
+  onAuditExport: () => void;
+}) {
   return (
     <SectionCard
       title="正式上线证据包"
@@ -867,6 +922,64 @@ function ProductionGoLiveEvidencePanel() {
           <article className="settings-ops-card" key={section.title}>
             <h3>{section.title}</h3>
             <p className="form-hint">{section.description}</p>
+            {section.title === "权限复核" ? (
+              <div className="section-actions">
+                <button
+                  type="button"
+                  className="secondary-action"
+                  onClick={onAccessReviewExport}
+                  disabled={accessReviewExportStatus === "downloading"}
+                >
+                  {accessReviewExportStatus === "downloading"
+                    ? "正在导出..."
+                    : "导出权限复核 JSON"}
+                </button>
+              </div>
+            ) : null}
+            {section.title === "权限复核" &&
+            accessReviewExportStatus === "error" ? (
+              <p className="form-error" role="alert">
+                权限复核 JSON 导出失败，请稍后重试或联系管理员。
+              </p>
+            ) : null}
+            {section.title === "审计导出" && canReadAuditLogs ? (
+              <div className="section-actions">
+                <button
+                  type="button"
+                  className="secondary-action"
+                  onClick={onAuditExport}
+                  disabled={auditExportStatus === "downloading"}
+                >
+                  {auditExportStatus === "downloading"
+                    ? "导出中"
+                    : "导出审计 CSV"}
+                </button>
+              </div>
+            ) : null}
+            {section.title === "审计导出" && auditExportStatus === "error" ? (
+              <p className="form-error">审计 CSV 导出失败，请检查权限或稍后重试。</p>
+            ) : null}
+            {section.title === "审计导出" && auditExportEvidence ? (
+              <div
+                className="settings-export-evidence"
+                aria-label="正式上线审计导出校验信息"
+              >
+                <dl>
+                  <div>
+                    <dt>文件名</dt>
+                    <dd>{auditExportEvidence.fileName}</dd>
+                  </div>
+                  <div>
+                    <dt>record count</dt>
+                    <dd>{auditExportEvidence.recordCount}</dd>
+                  </div>
+                  <div>
+                    <dt>sha256</dt>
+                    <dd>{auditExportEvidence.sha256}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
             <div className="settings-command-list" aria-label={`${section.title}命令`}>
               {section.commands.map((command) => (
                 <pre className="settings-command-block" key={command}>

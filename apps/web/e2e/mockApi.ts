@@ -1020,6 +1020,46 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
       return fulfill(route, { downloadRef: `/api/attachments/${id}/content` });
     }
 
+    if (path === "/api/user-accounts/export-access-review" && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: {
+          "Content-Disposition": 'attachment; filename="access-review-export.json"',
+          "X-Content-Type-Options": "nosniff",
+        },
+        body: JSON.stringify({
+          exportedAt: now,
+          exportedBy: currentUser?.username ?? "admin",
+          users: [
+            {
+              id: adminUser.id,
+              username: adminUser.username,
+              status: "active",
+              roles: adminUser.roles,
+              projectSiteIds: [],
+              activeSessionCount: 0,
+              permissions: { read: ["systemSettings"], manage: ["employees"] },
+            },
+          ],
+        }),
+      });
+    }
+
+    if (path === "/api/audit-logs/export.csv" && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        headers: {
+          "Content-Disposition": 'attachment; filename="audit-logs.csv"',
+          "X-Audit-Export-Record-Count": "1",
+          "X-Audit-Export-SHA256": "0".repeat(64),
+          "X-Content-Type-Options": "nosniff",
+        },
+        body: "createdAt,actorUsername,action,entityType\n2026-05-13T08:00:00.000Z,admin,login,user\n",
+      });
+    }
+
     return fulfill(route, responseForCollection(path, state));
   });
 
