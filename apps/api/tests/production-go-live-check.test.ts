@@ -262,4 +262,101 @@ describe("production-go-live-check fixture gate", () => {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("blocks placeholder or invalid go-live manifest fields", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-manifest-"));
+    try {
+      const evidenceDir = join(tempRoot, "manifest");
+      writeFixture(evidenceDir, {
+        "production-go-live-manifest.json": `${JSON.stringify(
+          {
+            environment: "nas",
+            releaseCommitSha: "abc123",
+            previousCommitSha: "<previous-commit-sha>",
+            goLiveAt: "not-a-date",
+            operator: "<operator>",
+            approver: "<approver>",
+            scope: "internal",
+            projectSiteCount: 0,
+            notes: "fixture",
+          },
+          null,
+          2,
+        )}\n`,
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir });
+
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("goLiveAt");
+      expect(result.blockers.join("\n")).toContain("projectSiteCount");
+      expect(result.blockers.join("\n")).toContain("operator");
+      expect(result.blockers.join("\n")).toContain("approver");
+      expect(result.blockers.join("\n")).toContain("releaseCommitSha");
+      expect(result.blockers.join("\n")).toContain("previousCommitSha");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks negative release signoff and data freeze placeholders", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-signoff-"));
+    try {
+      const evidenceDir = join(tempRoot, "signoff");
+      const expectedCommit = writeFixture(evidenceDir, {
+        "release-signoff.md": "批准正式上线: 否\napprover: <approver>\n权限复核已完成\n",
+        "data-freeze-signoff.md": "最后一次导入时间: <last import time>\n导入批次 ID: <import job id>\n",
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
+
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("批准正式上线");
+      expect(result.blockers.join("\n")).toContain("approver");
+      expect(result.blockers.join("\n")).toContain("data-freeze-signoff.md");
+      expect(result.blockers.join("\n")).toContain("placeholder");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("requires docker service evidence and verifiable audit export evidence", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-audit-"));
+    try {
+      const evidenceDir = join(tempRoot, "audit");
+      const expectedCommit = writeFixture(evidenceDir, {
+        "docker-compose-ps.txt": "api running\nweb running\n",
+        "audit-export.csv": "\n",
+        "audit-export-verify.txt": "Audit export verified\n",
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
+
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("docker-compose-ps.txt");
+      expect(result.blockers.join("\n")).toContain("postgres");
+      expect(result.blockers.join("\n")).toContain("audit-export.csv");
+      expect(result.blockers.join("\n")).toContain("createdAt,actorUsername,action,entityType");
+      expect(result.blockers.join("\n")).toContain("record count");
+      expect(result.blockers.join("\n")).toContain("sha256");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts a pilot ready success marker in addition to the NAS readiness marker", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-pilot-marker-"));
+    try {
+      const evidenceDir = join(tempRoot, "pilot-marker");
+      const expectedCommit = writeFixture(evidenceDir, {
+        "pilot-ready.txt": "pilot:ready completed successfully\n",
+      });
+
+      const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
+
+      expect(result.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
 });

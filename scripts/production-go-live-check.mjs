@@ -140,6 +140,17 @@ function checkTextContains({ blockers, text, path, marker, label = marker }) {
   if (!text.includes(marker)) blockers.push(`${path} must contain ${label}`);
 }
 
+function isPlaceholder(value) {
+  return /^<[^>]+>$/.test(String(value ?? "").trim());
+}
+
+function isValidIsoDateTime(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp);
+}
+
 function checkManifest(manifest, blockers) {
   if (!manifest) return;
   for (const field of manifestFields) {
@@ -153,8 +164,19 @@ function checkManifest(manifest, blockers) {
   if (manifest.scope !== "internal") {
     blockers.push("production-go-live-manifest.json scope must be internal");
   }
-  if (typeof manifest.projectSiteCount !== "number") {
-    blockers.push("production-go-live-manifest.json projectSiteCount must be a number");
+  if (!Number.isInteger(manifest.projectSiteCount) || manifest.projectSiteCount < 1) {
+    blockers.push("production-go-live-manifest.json projectSiteCount must be an integer >= 1");
+  }
+  if (!isValidIsoDateTime(manifest.goLiveAt)) {
+    blockers.push("production-go-live-manifest.json goLiveAt must be a valid ISO datetime");
+  }
+  for (const field of ["operator", "approver", "releaseCommitSha", "previousCommitSha"]) {
+    if (isPlaceholder(manifest[field])) {
+      blockers.push(`production-go-live-manifest.json ${field} must not be a placeholder`);
+    }
+  }
+  if (String(manifest.releaseCommitSha ?? "").trim().length < 7) {
+    blockers.push("production-go-live-manifest.json releaseCommitSha must be at least 7 characters");
   }
 }
 
@@ -187,6 +209,60 @@ function checkSensitiveText(text, blockers, path) {
   if (sensitivePatterns.some((pattern) => pattern.test(text))) {
     blockers.push(`sensitive value detected in ${path}`);
   }
+}
+
+function checkReleaseSignoff(text, blockers) {
+  checkTextContains({ blockers, text, path: "release-signoff.md", marker: "批准正式上线" });
+  checkTextContains({ blockers, text, path: "release-signoff.md", marker: "approver" });
+  checkTextContains({ blockers, text, path: "release-signoff.md", marker: "权限复核已完成" });
+  if (/批准正式上线\s*[:：]?\s*否/u.test(text)) {
+    blockers.push("release-signoff.md must approve 正式上线 and cannot mark 批准正式上线 as 否");
+  }
+  if (/approver\s*[:：]\s*<[^>]+>/iu.test(text)) {
+    blockers.push("release-signoff.md approver must not be a placeholder");
+  }
+}
+
+function checkDataFreezeSignoff(text, blockers) {
+  checkTextContains({ blockers, text, path: "data-freeze-signoff.md", marker: "最后一次导入时间" });
+  checkTextContains({ blockers, text, path: "data-freeze-signoff.md", marker: "导入批次 ID" });
+  if (/<[^>]+>/.test(text)) {
+    blockers.push("data-freeze-signoff.md must replace template placeholder values");
+  }
+}
+
+function checkPilotReadyEvidence(text, blockers) {
+  const acceptedMarkers = ["READY_FOR_NAS_INTRAnet_TRIAL", "pilot:ready completed successfully"];
+  if (!acceptedMarkers.some((marker) => text.includes(marker))) {
+    blockers.push("pilot-ready.txt must contain READY_FOR_NAS_INTRAnet_TRIAL or pilot:ready completed successfully");
+  }
+}
+
+function checkDockerComposeEvidence(text, blockers) {
+  const lower = text.toLowerCase();
+  for (const service of ["api", "web", "postgres"]) {
+    if (!lower.includes(service)) blockers.push(`docker-compose-ps.txt must include ${service}`);
+  }
+}
+
+function checkAuditExportCsv(text, blockers) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    blockers.push("audit-export.csv must not be empty");
+    blockers.push("audit-export.csv header must include createdAt,actorUsername,action,entityType");
+    return;
+  }
+  const header = trimmed.split(/\r?\n/, 1)[0].split(",").map((value) => value.trim());
+  const expected = ["createdAt", "actorUsername", "action", "entityType"];
+  if (!expected.every((field, index) => header[index] === field)) {
+    blockers.push("audit-export.csv header must include createdAt,actorUsername,action,entityType");
+  }
+}
+
+function checkAuditExportVerify(text, blockers) {
+  checkTextContains({ blockers, text, path: "audit-export-verify.txt", marker: "Audit export verified" });
+  if (!/record count/i.test(text)) blockers.push("audit-export-verify.txt must contain record count");
+  if (!/sha256/i.test(text)) blockers.push("audit-export-verify.txt must contain sha256");
 }
 
 function normalizeAttachmentRows(parsed) {
@@ -244,9 +320,11 @@ export async function evaluateGoLiveEvidence({
   const importPilotSmoke = readText(absoluteEvidenceDir, "import-pilot-smoke.txt", blockers);
   const attachmentCheck = readText(absoluteEvidenceDir, "attachment-production-check.txt", blockers);
   const auditExportVerify = readText(absoluteEvidenceDir, "audit-export-verify.txt", blockers);
+  const auditExportCsv = readText(absoluteEvidenceDir, "audit-export.csv", blockers);
   const accessReviewCheck = readText(absoluteEvidenceDir, "access-review-check.txt", blockers);
   const dataFreezeSignoff = readText(absoluteEvidenceDir, "data-freeze-signoff.md", blockers);
   const releaseSignoff = readText(absoluteEvidenceDir, "release-signoff.md", blockers);
+  const dockerComposePs = readText(absoluteEvidenceDir, "docker-compose-ps.txt", blockers);
   const healthCheck = readText(absoluteEvidenceDir, "health-check.txt", blockers);
   const restoreHealthCheck = readText(absoluteEvidenceDir, "restore-drill/health-check.txt", blockers);
   const restoreSignoff = readText(absoluteEvidenceDir, "restore-drill/restore-signoff.md", blockers);
@@ -260,19 +338,18 @@ export async function evaluateGoLiveEvidence({
     }
   }
 
-  checkTextContains({ blockers, text: pilotReady, path: "pilot-ready.txt", marker: "READY_FOR_NAS_INTRAnet_TRIAL" });
+  checkPilotReadyEvidence(pilotReady, blockers);
   checkTextContains({ blockers, text: productionReady, path: "production-ready.txt", marker: "READY_FOR_INTERNAL_PRODUCTION_REVIEW" });
   checkTextContains({ blockers, text: importPilotSmoke, path: "import-pilot-smoke.txt", marker: "导入试点 smoke 通过" });
   if (!attachmentCheck.includes("ATTACHMENT_READY_WITH_WARNINGS") && !attachmentCheck.includes("PASS")) {
     blockers.push("attachment-production-check.txt must contain ATTACHMENT_READY_WITH_WARNINGS or PASS");
   }
   checkTextContains({ blockers, text: accessReviewCheck, path: "access-review-check.txt", marker: "ACCESS_REVIEW_PASS" });
-  checkTextContains({ blockers, text: auditExportVerify, path: "audit-export-verify.txt", marker: "Audit export verified" });
-  checkTextContains({ blockers, text: dataFreezeSignoff, path: "data-freeze-signoff.md", marker: "最后一次导入时间" });
-  checkTextContains({ blockers, text: dataFreezeSignoff, path: "data-freeze-signoff.md", marker: "导入批次 ID" });
-  checkTextContains({ blockers, text: releaseSignoff, path: "release-signoff.md", marker: "批准正式上线" });
-  checkTextContains({ blockers, text: releaseSignoff, path: "release-signoff.md", marker: "approver" });
-  checkTextContains({ blockers, text: releaseSignoff, path: "release-signoff.md", marker: "权限复核已完成" });
+  checkAuditExportCsv(auditExportCsv, blockers);
+  checkAuditExportVerify(auditExportVerify, blockers);
+  checkDataFreezeSignoff(dataFreezeSignoff, blockers);
+  checkReleaseSignoff(releaseSignoff, blockers);
+  checkDockerComposeEvidence(dockerComposePs, blockers);
   if (!healthCheck.includes("PRODUCTION_HEALTH_PASS") && !healthCheck.includes("/health 200")) {
     blockers.push("health-check.txt must contain PRODUCTION_HEALTH_PASS or /health 200");
   }

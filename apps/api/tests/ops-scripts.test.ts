@@ -86,8 +86,8 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
       ],
     })}\n`,
     "attachment-production-check.txt": "ATTACHMENT_READY_WITH_WARNINGS\nNo attachment legacy gap warnings were detected.\n",
-    "audit-export.csv": "action,entityType\nlogin,user\n",
-    "audit-export-verify.txt": "Audit export verified: 1 records\n",
+    "audit-export.csv": "createdAt,actorUsername,action,entityType\n2026-05-25T10:00:00.000Z,admin,login,user\n",
+    "audit-export-verify.txt": "Audit export verified: record count 1 sha256 abc123\n",
     "access-review-export.json": `${JSON.stringify({
       users: [
         { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
