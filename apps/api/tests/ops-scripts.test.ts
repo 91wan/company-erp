@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -1488,14 +1488,41 @@ describe("production go-live evidence template", () => {
       "release-signoff.template.md",
       "data-freeze-signoff.template.md",
       "commands.md",
+      "README.md",
+      "pilot-ready.README.md",
+      "production-ready.README.md",
+      "import-pilot-check.README.md",
+      "import-pilot-smoke.README.md",
+      "attachment-legacy-report.README.md",
+      "attachment-production-check.README.md",
+      "audit-export.README.md",
+      "audit-export-verify.README.md",
+      "access-review-export.README.md",
+      "access-review-check.README.md",
+      "docker-compose-ps.README.md",
+      "health-check.README.md",
+      "app-version.README.md",
       "restore-drill/README.md",
       "screenshots/README.md",
     ]) {
       expect(readFile(join(outsideOutput, relativePath)), relativePath).not.toMatch(/secret|password|token/i);
     }
 
+    for (const relativePath of [
+      "pilot-ready.txt",
+      "production-ready.txt",
+      "import-pilot-check.txt",
+      "import-pilot-smoke.txt",
+      "attachment-production-check.txt",
+      "access-review-check.txt",
+    ]) {
+      expect(existsSync(join(outsideOutput, relativePath)), relativePath).toBe(false);
+    }
+
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:go-live-check -- --evidence-dir");
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:restore-drill-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "README.md"))).toContain("actual command output");
+    expect(readFile(join(outsideOutput, "restore-drill/README.md"))).toContain("restore-signoff.md");
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
