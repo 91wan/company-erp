@@ -119,8 +119,16 @@ describe("SystemSettingsWorkspace", () => {
   });
 
   it("exports audit logs with the current audit filters", async () => {
-    mockShellFetch(adminUser, undefined, defaultAppVersion, { auditLogs: [] });
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const fetchSpy = mockShellFetch(adminUser, undefined, defaultAppVersion, { auditLogs: [] });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:audit-export"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
 
     render(
       <SystemSettingsWorkspace
@@ -156,9 +164,18 @@ describe("SystemSettingsWorkspace", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }));
 
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    const [url, target, features] = openSpy.mock.calls[0];
-    const parsed = new URL(String(url));
+    expect(await screen.findByText("audit-export-sha256-demo")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(
+      screen.getByText(/npm run audit:verify-export -- --csv audit-export.csv --sha256 audit-export-sha256-demo --record-count 2/),
+    ).toBeInTheDocument();
+    expect(anchorClick).toHaveBeenCalledTimes(1);
+
+    const exportUrls = fetchSpy.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.includes("/api/audit-logs/export.csv"));
+    expect(exportUrls).toHaveLength(1);
+    const parsed = new URL(exportUrls[0]);
     expect(parsed.pathname).toBe("/api/audit-logs/export.csv");
     expect(parsed.searchParams.get("entityType")).toBe("certificate");
     expect(parsed.searchParams.get("action")).toBe("certificate.create");
@@ -167,10 +184,33 @@ describe("SystemSettingsWorkspace", () => {
       "2026-05-14T00:00:00.000Z",
     );
     expect(parsed.searchParams.get("dateTo")).toBe("2026-05-15T23:59:59.999Z");
-    expect(target).toBe("_blank");
-    expect(features).toBe("noopener,noreferrer");
+  });
 
-    openSpy.mockRestore();
+  it("shows a clear audit export failure state", async () => {
+    mockShellFetch(adminUser, undefined, defaultAppVersion, {
+      auditLogs: [],
+      failures: ["/api/audit-logs/export.csv"],
+    });
+
+    render(
+      <SystemSettingsWorkspace
+        companyName="Company ERP"
+        canManage={true}
+        canReadAuditLogs={true}
+        canReadAttachments={false}
+        canManageAttachments={false}
+        onCompanyNameChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "审计日志" }));
+    await screen.findByText("暂无审计日志。");
+    fireEvent.click(screen.getByRole("button", { name: "导出 CSV" }));
+
+    expect(
+      await screen.findByText("审计 CSV 导出失败，请检查权限或稍后重试。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("审计导出校验信息")).not.toBeInTheDocument();
   });
 
   it("shows an attachment download error without exposing a server path", async () => {
