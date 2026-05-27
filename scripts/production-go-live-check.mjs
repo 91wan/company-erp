@@ -11,7 +11,7 @@ const READY = "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE";
 const BLOCKED = "BLOCKED";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const p0Files = [
+export const requiredGoLiveEvidenceFiles = [
   "production-go-live-manifest.json",
   "pilot-ready.txt",
   "production-ready.txt",
@@ -32,12 +32,14 @@ const p0Files = [
   "access-review-check.txt",
   "data-freeze-signoff.md",
   "release-signoff.md",
+  "production-cutover-checklist.md",
+  "production-cutover-check.txt",
   "docker-compose-ps.txt",
   "health-check.txt",
   "app-version.json",
 ];
 
-const p1Files = [
+export const optionalGoLiveEvidenceFiles = [
   "screenshots/import-pilot-review.png",
   "screenshots/certificates-health.png",
   "screenshots/project-sites-risk.png",
@@ -45,7 +47,7 @@ const p1Files = [
   "screenshots/audit-log.png",
 ];
 
-const manifestFields = [
+export const requiredGoLiveManifestFields = [
   "environment",
   "releaseCommitSha",
   "previousCommitSha",
@@ -64,7 +66,7 @@ const manifestFields = [
 const appVersionFields = ["commitSha", "buildTime", "deployedAt", "packageVersion", "environment"];
 
 function usage() {
-  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--allow-warnings] [--json]
+  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--fail-on-warnings] [--json]
        node scripts/production-go-live-check.mjs --evidence-dir <outside-git-path>
 
 Checks the Git-external evidence package required before internal production go-live approval.
@@ -80,7 +82,7 @@ function sanitize(value) {
 }
 
 function parseArgs(argv) {
-  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", allowWarnings: false, json: false };
+  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", failOnWarnings: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") return { help: true, ...options };
@@ -88,8 +90,8 @@ function parseArgs(argv) {
       options.json = true;
       continue;
     }
-    if (arg === "--allow-warnings") {
-      options.allowWarnings = true;
+    if (arg === "--fail-on-warnings") {
+      options.failOnWarnings = true;
       continue;
     }
     if (arg === "--evidence-dir") {
@@ -161,7 +163,7 @@ function isValidIsoDateTime(value) {
 
 function checkManifest(manifest, blockers) {
   if (!manifest) return;
-  for (const field of manifestFields) {
+  for (const field of requiredGoLiveManifestFields) {
     if (manifest[field] === undefined || manifest[field] === null || manifest[field] === "") {
       blockers.push(`production-go-live-manifest.json missing ${field}`);
     }
@@ -233,6 +235,14 @@ function checkSensitiveText(text, blockers, path) {
     /\bIDENTITY_ENCRYPTION_SECRET\s*=\s*\S+/i,
     /\bPOSTGRES_PASSWORD\s*=\s*\S+/i,
     /\bDATABASE_URL\s*=\s*\S+/i,
+    /\bBOOTSTRAP_ADMIN_PASSWORD\s*=\s*\S+/i,
+    /\bcompany_erp_session\s*=\s*\S+/i,
+    /\bSet-Cookie\s*:/i,
+    /\bAuthorization\s*:/i,
+    /\bBearer\s+[A-Za-z0-9._~+/=-]+/i,
+    /\bpasswordHash\b/i,
+    /\btokenHash\b/i,
+    /\bcsrfTokenHash\b/i,
   ];
   if (sensitivePatterns.some((pattern) => pattern.test(text))) {
     blockers.push(`sensitive value detected in ${path}`);
@@ -335,6 +345,64 @@ function checkAccessReviewEvidence({ exportJson, checkText, blockers }) {
   }
 }
 
+function extractChecklistField(text, field) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`^\\s*${escaped}\\s*[:：]\\s*(.+?)\\s*$`, "im"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function checkCutoverEvidence({ checklist, checkText, manifest, releaseSignoff, blockers }) {
+  checkTextContains({
+    blockers,
+    text: checkText,
+    path: "production-cutover-check.txt",
+    marker: "PRODUCTION_CUTOVER_CHECK_PASS",
+  });
+  for (const marker of [
+    "previousCommitSha",
+    "releaseCommitSha",
+    "operator",
+    "approver",
+    "go/no-go",
+    "migration 已执行时不能只回滚代码",
+    "production:health-check",
+    "docker compose ps",
+  ]) {
+    checkTextContains({ blockers, text: checklist, path: "production-cutover-checklist.md", marker });
+  }
+  if (/<[^>]+>/.test(checklist)) {
+    blockers.push("production-cutover-checklist.md must replace template placeholder values");
+  }
+  if (/go\/no-go\s*[:：]\s*no-go/i.test(checklist)) {
+    blockers.push("production-cutover-checklist.md go/no-go must not be no-go");
+  }
+
+  if (!manifest) return;
+  const releaseCommitSha = extractChecklistField(checklist, "releaseCommitSha");
+  const previousCommitSha = extractChecklistField(checklist, "previousCommitSha");
+  const operator = extractChecklistField(checklist, "operator");
+  const approver = extractChecklistField(checklist, "approver");
+  const finishedAt = extractChecklistField(checklist, "finishedAt");
+
+  if (releaseCommitSha && manifest.releaseCommitSha && releaseCommitSha !== manifest.releaseCommitSha) {
+    blockers.push("cutover releaseCommitSha must match production-go-live-manifest.json releaseCommitSha");
+  }
+  if (previousCommitSha && manifest.previousCommitSha && previousCommitSha !== manifest.previousCommitSha) {
+    blockers.push("cutover previousCommitSha must match production-go-live-manifest.json previousCommitSha");
+  }
+  if (operator && manifest.operator && operator !== manifest.operator && !releaseSignoff.includes("代理操作人")) {
+    blockers.push("cutover operator must match manifest operator or release-signoff.md must explain 代理操作人");
+  }
+  if (approver && manifest.approver && approver !== manifest.approver) {
+    blockers.push("cutover approver must match manifest approver");
+  }
+  if (finishedAt && isValidIsoDateTime(finishedAt) && isValidIsoDateTime(manifest.goLiveAt)) {
+    if (Date.parse(manifest.goLiveAt) < Date.parse(finishedAt)) {
+      blockers.push("production-go-live-manifest.json goLiveAt must not be earlier than cutover finishedAt");
+    }
+  }
+}
+
 async function checkLiveHealth({ baseUrl, blockers }) {
   if (!baseUrl) return;
   const result = await evaluateProductionHealth({ baseUrl });
@@ -347,6 +415,7 @@ export async function evaluateGoLiveEvidence({
   evidenceDir,
   baseUrl = "",
   expectedCommit = "",
+  failOnWarnings = false,
   exists = existsSync,
 } = {}) {
   const blockers = [];
@@ -366,13 +435,19 @@ export async function evaluateGoLiveEvidence({
     return { status: BLOCKED, blockers, warnings, checkedFilesCount, evidenceDirectory: basename(absoluteEvidenceDir) };
   }
 
-  for (const relativePath of p0Files) {
+  const missingP0Files = [];
+  const missingP1Files = [];
+  for (const relativePath of requiredGoLiveEvidenceFiles) {
     if (!exists(filePath(absoluteEvidenceDir, relativePath))) blockers.push(`missing P0 evidence file: ${relativePath}`);
+    if (!exists(filePath(absoluteEvidenceDir, relativePath))) missingP0Files.push(relativePath);
   }
-  for (const relativePath of p1Files) {
-    if (!exists(filePath(absoluteEvidenceDir, relativePath))) warnings.push(`missing P1 evidence file: ${relativePath}`);
+  for (const relativePath of optionalGoLiveEvidenceFiles) {
+    if (!exists(filePath(absoluteEvidenceDir, relativePath))) {
+      warnings.push(`missing P1 evidence file: ${relativePath}`);
+      missingP1Files.push(relativePath);
+    }
   }
-  checkedFilesCount = p0Files.filter((relativePath) => exists(filePath(absoluteEvidenceDir, relativePath))).length;
+  checkedFilesCount = requiredGoLiveEvidenceFiles.filter((relativePath) => exists(filePath(absoluteEvidenceDir, relativePath))).length;
 
   const manifest = readJson(absoluteEvidenceDir, "production-go-live-manifest.json", blockers);
   const appVersion = readJson(absoluteEvidenceDir, "app-version.json", blockers);
@@ -388,6 +463,8 @@ export async function evaluateGoLiveEvidence({
   const accessReviewCheck = readText(absoluteEvidenceDir, "access-review-check.txt", blockers);
   const dataFreezeSignoff = readText(absoluteEvidenceDir, "data-freeze-signoff.md", blockers);
   const releaseSignoff = readText(absoluteEvidenceDir, "release-signoff.md", blockers);
+  const cutoverChecklist = readText(absoluteEvidenceDir, "production-cutover-checklist.md", blockers);
+  const cutoverCheck = readText(absoluteEvidenceDir, "production-cutover-check.txt", blockers);
   const dockerComposePs = readText(absoluteEvidenceDir, "docker-compose-ps.txt", blockers);
   const healthCheck = readText(absoluteEvidenceDir, "health-check.txt", blockers);
   const restoreHealthCheck = readText(absoluteEvidenceDir, "restore-drill/health-check.txt", blockers);
@@ -396,7 +473,7 @@ export async function evaluateGoLiveEvidence({
   const accessReviewExport = readJson(absoluteEvidenceDir, "access-review-export.json", blockers);
   const attachmentLegacyReportText = readText(absoluteEvidenceDir, "attachment-legacy-report.json", blockers);
 
-  for (const relativePath of p0Files) {
+  for (const relativePath of requiredGoLiveEvidenceFiles) {
     if (exists(filePath(absoluteEvidenceDir, relativePath))) {
       checkSensitiveText(readFileSync(filePath(absoluteEvidenceDir, relativePath), "utf8"), blockers, relativePath);
     }
@@ -414,6 +491,7 @@ export async function evaluateGoLiveEvidence({
   checkDataFreezeSignoff(dataFreezeSignoff, blockers);
   checkReleaseSignoff(releaseSignoff, blockers);
   checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, warnings });
+  checkCutoverEvidence({ checklist: cutoverChecklist, checkText: cutoverCheck, manifest, releaseSignoff, blockers });
   checkDockerComposeEvidence(dockerComposePs, blockers);
   if (!healthCheck.includes("PRODUCTION_HEALTH_PASS") && !healthCheck.includes("/health 200")) {
     blockers.push("health-check.txt must contain PRODUCTION_HEALTH_PASS or /health 200");
@@ -457,13 +535,27 @@ export async function evaluateGoLiveEvidence({
 
   await checkLiveHealth({ baseUrl, blockers });
 
+  if (failOnWarnings && warnings.length > 0) {
+    blockers.push("warnings are configured as blockers by --fail-on-warnings");
+  }
+
   return {
     status: blockers.length === 0 ? READY : BLOCKED,
     blockers: blockers.map(sanitize),
     warnings: warnings.map(sanitize),
     checkedFilesCount,
+    p0MissingCount: missingP0Files.length,
+    p1MissingCount: missingP1Files.length,
     releaseCommit: manifest?.releaseCommitSha ?? "",
     environment: manifest?.environment ?? "",
+    goLiveAt: manifest?.goLiveAt ?? "",
+    operator: manifest?.operator ?? "",
+    approver: manifest?.approver ?? "",
+    projectSiteCount: manifest?.projectSiteCount ?? 0,
+    businessScope: manifest?.businessScope ?? "",
+    dataScope: manifest?.dataScope ?? "",
+    attachmentScope: manifest?.attachmentScope ?? "",
+    publicAccess: manifest?.publicAccess ?? null,
     evidenceDirectory: basename(absoluteEvidenceDir),
   };
 }
@@ -475,6 +567,16 @@ function resultToJson(result) {
     releaseCommit: result.releaseCommit ?? "",
     evidenceDirectory: result.evidenceDirectory ?? "",
     checkedFilesCount: result.checkedFilesCount ?? 0,
+    goLiveAt: result.goLiveAt ?? "",
+    operator: result.operator ?? "",
+    approver: result.approver ?? "",
+    projectSiteCount: result.projectSiteCount ?? 0,
+    businessScope: result.businessScope ?? "",
+    dataScope: result.dataScope ?? "",
+    attachmentScope: result.attachmentScope ?? "",
+    publicAccess: result.publicAccess ?? null,
+    p0MissingCount: result.p0MissingCount ?? 0,
+    p1MissingCount: result.p1MissingCount ?? 0,
     blockers: (result.blockers ?? []).map(sanitize),
     warnings: (result.warnings ?? []).map(sanitize),
   };

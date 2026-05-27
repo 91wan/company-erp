@@ -42,8 +42,11 @@ Then run the Git-external evidence package gate:
 
 ```bash
 npm run production:evidence-template -- --output <outside-git-path>
+npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json
+npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
 For the final operator handoff, run both in sequence:
@@ -58,7 +61,10 @@ production review after the local gates pass. `production:evidence-template`
 creates the Git-external evidence directory skeleton. `production:go-live-check`
 means the Git-external evidence directory has the required restore drill,
 attachment readiness, audit export, access review, data freeze, health check,
-and release sign-off proof. Internal formal go-live requires
+cutover checklist, and release sign-off proof. `production:evidence-collect`
+can safely collect health/app-version/draft-manifest evidence without reading
+`.env`, database dumps, attachment bytes, contracts, health certificate images,
+or payroll files. Internal formal go-live requires
 `production:ready` + `production:go-live-check`; it still does not authorize
 public internet access, router port forwarding, public SaaS use, or direct
 exposure of API/PostgreSQL.

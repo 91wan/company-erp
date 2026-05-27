@@ -109,6 +109,9 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
     "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 2 exported user accounts.\n",
     "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
     "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
+    "production-cutover-checklist.md":
+      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\ngo/no-go: go\nfinishedAt: 2026-05-25T09:59:00.000Z\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+    "production-cutover-check.txt": "PRODUCTION_CUTOVER_CHECK_PASS\n",
     "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
     "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
     "app-version.json": `${JSON.stringify({
@@ -1333,7 +1336,10 @@ describe("NAS trial deploy notification readiness gate", () => {
         "production:ready": "bash scripts/production-ready.sh",
         "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
         "production:health-check": "node scripts/production-health-check.mjs",
+        "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
         "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
+        "production:cutover-check": "node scripts/production-cutover-check.mjs",
+        "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
         "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
       readText: (path) => {
@@ -1364,7 +1370,10 @@ describe("NAS trial deploy notification readiness gate", () => {
         "production:ready": "bash scripts/production-ready.sh",
         "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
         "production:health-check": "node scripts/production-health-check.mjs",
+        "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
         "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
+        "production:cutover-check": "node scripts/production-cutover-check.mjs",
+        "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
         "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
       readText: (path) => {
@@ -1430,13 +1439,17 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     expect(result.status).toBe("BLOCKED");
     expect(result.blockers.join("\n")).toContain("production:health-check");
+    expect(result.blockers.join("\n")).toContain("production:evidence-collect");
     expect(result.blockers.join("\n")).toContain("production:restore-drill-check");
+    expect(result.blockers.join("\n")).toContain("production:cutover-check");
+    expect(result.blockers.join("\n")).toContain("production:post-go-live-24h-check");
     expect(result.blockers.join("\n")).toContain("attachments:production-check");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-backup-restore-runbook.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/attachment-production-readiness.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/audit-production-readiness.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/access-review-runbook.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-monitoring-runbook.md");
+    expect(result.blockers.join("\n")).toContain("docs/operations/production-cutover-checklist.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/post-go-live-24h-checklist.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-go-live-evidence-checklist.md");
     expect(result.blockers.join("\n")).toContain("docs/security/csrf-origin-production-policy.md");

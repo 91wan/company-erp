@@ -14,6 +14,8 @@
 - 记录当前 `.deploy-revision.json`。
 - 记录数据库 migration 状态。
 - 确认 `production-go-live-evidence-checklist.md` 中 P0 证据齐全。
+- 完成 `production-cutover-checklist.md` 并运行 `npm run production:cutover-check`。
+- 运行 `npm run production:go-live-check`，确认 evidence package 已纳入 cutover checklist。
 
 发布前备份和证据必须保存在 Git 仓库外，不得提交 `.env`、数据库 dump、合同扫描件、健康证图片、工资表或真实附件原文。
 
@@ -82,4 +84,3 @@ npm run production:health-check -- --base-url http://<nas>:8080
 数据库迁移一旦执行，不能只回滚代码。涉及 schema 的发布必须有恢复方案。
 
 如没有恢复演练证据、备份证据、access review signoff 或 data freeze signoff，只能保持试点状态，不允许进入公司内网正式上线审批。
-

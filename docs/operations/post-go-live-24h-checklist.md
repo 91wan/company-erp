@@ -2,6 +2,12 @@
 
 本清单用于公司内网正式上线后 24 小时内复核。正式上线仍指公司内网运行，不代表公网访问；继续保持不公网暴露 API/PostgreSQL。
 
+复核证据保存到 Git 外目录后运行：
+
+```bash
+npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
+```
+
 ## 登录检查
 
 | 角色 | 检查步骤 | 预期结果 | 阻断级别 |

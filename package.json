@@ -32,7 +32,10 @@
     "production:health-check": "node scripts/production-health-check.mjs",
     "production:go-live-check": "node scripts/production-go-live-check.mjs",
     "production:go-live-ready": "bash scripts/production-go-live-ready.sh",
-    "production:evidence-template": "node scripts/create-go-live-evidence-template.mjs"
+    "production:evidence-template": "node scripts/create-go-live-evidence-template.mjs",
+    "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
+    "production:cutover-check": "node scripts/production-cutover-check.mjs",
+    "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
