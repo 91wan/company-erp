@@ -68,6 +68,8 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
     "audit-export.csv": "createdAt,actorUsername,action,entityType\n2026-05-25T10:00:00.000Z,admin,login,user\n",
     "audit-export-verify.txt": "Audit export verified: record count 1 sha256 abc123\n",
     "access-review-export.json": `${JSON.stringify({
+      exportedAt: "2026-05-25T10:05:00.000Z",
+      exportedBy: "admin",
       users: [
         { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
         {
@@ -398,6 +400,8 @@ describe("production-go-live-check fixture gate", () => {
       const evidenceDir = join(tempRoot, "external-multirole");
       const expectedCommit = writeFixture(evidenceDir, {
         "access-review-export.json": `${JSON.stringify({
+          exportedAt: "2026-05-25T10:05:00.000Z",
+          exportedBy: "admin",
           users: [
             { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
             {
@@ -415,6 +419,86 @@ describe("production-go-live-check fixture gate", () => {
 
       expect(result.status).toBe("BLOCKED");
       expect(result.blockers.join("\n")).toContain("external_project_site account must have only one role");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("requires access review export metadata and matching checked user count", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-access-count-"));
+    try {
+      const users = [
+        { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
+        {
+          id: "external-1",
+          username: "site-user",
+          status: "active",
+          roles: ["external_project_site"],
+          projectSiteIds: ["site-1"],
+        },
+        { id: "viewer-1", username: "viewer", status: "active", roles: ["viewer"], projectSiteIds: [] },
+      ];
+      const exportJson = `${JSON.stringify({
+        exportedAt: "2026-05-25T10:05:00.000Z",
+        exportedBy: "admin",
+        users,
+      })}\n`;
+      const validDir = join(tempRoot, "valid-count");
+      const expectedCommit = writeFixture(validDir, {
+        "access-review-export.json": exportJson,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 3 exported user accounts.\n",
+      });
+      const mismatchDir = join(tempRoot, "mismatch-count");
+      writeFixture(mismatchDir, {
+        "access-review-export.json": exportJson,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 2 exported user accounts.\n",
+      });
+      const missingCountDir = join(tempRoot, "missing-count");
+      writeFixture(missingCountDir, {
+        "access-review-export.json": exportJson,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\n",
+      });
+      const missingExportedAtDir = join(tempRoot, "missing-exported-at");
+      writeFixture(missingExportedAtDir, {
+        "access-review-export.json": `${JSON.stringify({ exportedBy: "admin", users })}\n`,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 3 exported user accounts.\n",
+      });
+      const invalidExportedAtDir = join(tempRoot, "invalid-exported-at");
+      writeFixture(invalidExportedAtDir, {
+        "access-review-export.json": `${JSON.stringify({
+          exportedAt: "not-a-date",
+          exportedBy: "admin",
+          users,
+        })}\n`,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 3 exported user accounts.\n",
+      });
+      const missingExportedByDir = join(tempRoot, "missing-exported-by");
+      writeFixture(missingExportedByDir, {
+        "access-review-export.json": `${JSON.stringify({
+          exportedAt: "2026-05-25T10:05:00.000Z",
+          users,
+        })}\n`,
+        "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 3 exported user accounts.\n",
+      });
+
+      const valid = await evaluateGoLiveEvidence({ evidenceDir: validDir, expectedCommit });
+      const mismatch = await evaluateGoLiveEvidence({ evidenceDir: mismatchDir, expectedCommit });
+      const missingCount = await evaluateGoLiveEvidence({ evidenceDir: missingCountDir, expectedCommit });
+      const missingExportedAt = await evaluateGoLiveEvidence({ evidenceDir: missingExportedAtDir, expectedCommit });
+      const invalidExportedAt = await evaluateGoLiveEvidence({ evidenceDir: invalidExportedAtDir, expectedCommit });
+      const missingExportedBy = await evaluateGoLiveEvidence({ evidenceDir: missingExportedByDir, expectedCommit });
+
+      expect(valid.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+      expect(mismatch.status).toBe("BLOCKED");
+      expect(mismatch.blockers.join("\n")).toContain("access-review-check.txt user count");
+      expect(missingCount.status).toBe("BLOCKED");
+      expect(missingCount.blockers.join("\n")).toContain("Checked N exported user accounts");
+      expect(missingExportedAt.status).toBe("BLOCKED");
+      expect(missingExportedAt.blockers.join("\n")).toContain("exportedAt");
+      expect(invalidExportedAt.status).toBe("BLOCKED");
+      expect(invalidExportedAt.blockers.join("\n")).toContain("exportedAt");
+      expect(missingExportedBy.status).toBe("BLOCKED");
+      expect(missingExportedBy.blockers.join("\n")).toContain("exportedBy");
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }

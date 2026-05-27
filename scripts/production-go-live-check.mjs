@@ -271,6 +271,42 @@ function normalizeAttachmentRows(parsed) {
   return [];
 }
 
+function normalizeAccessReviewUsers(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.users)) return parsed.users;
+  if (Array.isArray(parsed?.accounts)) return parsed.accounts;
+  if (Array.isArray(parsed?.userAccounts)) return parsed.userAccounts;
+  return null;
+}
+
+function checkAccessReviewEvidence({ exportJson, checkText, blockers }) {
+  if (!exportJson) return;
+
+  if (!exportJson.exportedAt) {
+    blockers.push("access-review-export.json missing exportedAt");
+  } else if (!isValidIsoDateTime(exportJson.exportedAt)) {
+    blockers.push("access-review-export.json exportedAt must be a valid ISO datetime");
+  }
+
+  if (!exportJson.exportedBy) {
+    blockers.push("access-review-export.json missing exportedBy");
+  }
+
+  const users = normalizeAccessReviewUsers(exportJson);
+  if (!users) return;
+
+  const countMatch = checkText.match(/Checked\s+(\d+)\s+exported user accounts\./i);
+  if (!countMatch) {
+    blockers.push("access-review-check.txt must contain Checked N exported user accounts.");
+    return;
+  }
+
+  const checkedCount = Number.parseInt(countMatch[1], 10);
+  if (checkedCount !== users.length) {
+    blockers.push("access-review-check.txt user count must match access-review-export.json users.length");
+  }
+}
+
 async function checkLiveHealth({ baseUrl, blockers }) {
   if (!baseUrl) return;
   const result = await evaluateProductionHealth({ baseUrl });
@@ -387,6 +423,7 @@ export async function evaluateGoLiveEvidence({
   if (accessReviewExport) {
     const accessResult = evaluateAccessReview(accessReviewExport);
     if (!accessResult.ok) blockers.push(...accessResult.blockers);
+    checkAccessReviewEvidence({ exportJson: accessReviewExport, checkText: accessReviewCheck, blockers });
   }
 
   await checkLiveHealth({ baseUrl, blockers });

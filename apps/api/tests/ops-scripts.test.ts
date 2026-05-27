@@ -89,6 +89,8 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
     "audit-export.csv": "createdAt,actorUsername,action,entityType\n2026-05-25T10:00:00.000Z,admin,login,user\n",
     "audit-export-verify.txt": "Audit export verified: record count 1 sha256 abc123\n",
     "access-review-export.json": `${JSON.stringify({
+      exportedAt: "2026-05-25T10:05:00.000Z",
+      exportedBy: "admin",
       users: [
         { id: "admin-1", username: "admin", status: "active", roles: ["admin"], projectSiteIds: [] },
         {
@@ -1485,6 +1487,8 @@ describe("production go-live evidence gate", () => {
     const badAccessDir = join(tempRoot, "bad-access");
     writeGoLiveEvidenceFixture(badAccessDir, {
       "access-review-export.json": `${JSON.stringify({
+        exportedAt: "2026-05-25T10:05:00.000Z",
+        exportedBy: "admin",
         users: [{ id: "external-1", username: "bad", status: "active", roles: ["external_project_site", "viewer"], projectSiteIds: ["site-1"] }],
       })}\n`,
     });
