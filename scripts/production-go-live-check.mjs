@@ -53,6 +53,10 @@ const manifestFields = [
   "operator",
   "approver",
   "scope",
+  "businessScope",
+  "dataScope",
+  "attachmentScope",
+  "publicAccess",
   "projectSiteCount",
   "notes",
 ];
@@ -60,7 +64,7 @@ const manifestFields = [
 const appVersionFields = ["commitSha", "buildTime", "deployedAt", "packageVersion", "environment"];
 
 function usage() {
-  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--allow-warnings]
+  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--allow-warnings] [--json]
        node scripts/production-go-live-check.mjs --evidence-dir <outside-git-path>
 
 Checks the Git-external evidence package required before internal production go-live approval.
@@ -76,10 +80,14 @@ function sanitize(value) {
 }
 
 function parseArgs(argv) {
-  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", allowWarnings: false };
+  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", allowWarnings: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") return { help: true, ...options };
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
     if (arg === "--allow-warnings") {
       options.allowWarnings = true;
       continue;
@@ -164,6 +172,18 @@ function checkManifest(manifest, blockers) {
   if (manifest.scope !== "internal") {
     blockers.push("production-go-live-manifest.json scope must be internal");
   }
+  if (manifest.businessScope !== "internal_erp") {
+    blockers.push("production-go-live-manifest.json businessScope must be internal_erp");
+  }
+  if (!["pilot_promoted", "full_initial_import", "manual_entry"].includes(manifest.dataScope)) {
+    blockers.push("production-go-live-manifest.json dataScope must be pilot_promoted, full_initial_import, or manual_entry");
+  }
+  if (!["metadata_only", "partial_attachments", "full_attachments"].includes(manifest.attachmentScope)) {
+    blockers.push("production-go-live-manifest.json attachmentScope must be metadata_only, partial_attachments, or full_attachments");
+  }
+  if (manifest.publicAccess !== false) {
+    blockers.push("production-go-live-manifest.json publicAccess must be false");
+  }
   if (!Number.isInteger(manifest.projectSiteCount) || manifest.projectSiteCount < 1) {
     blockers.push("production-go-live-manifest.json projectSiteCount must be an integer >= 1");
   }
@@ -177,6 +197,14 @@ function checkManifest(manifest, blockers) {
   }
   if (String(manifest.releaseCommitSha ?? "").trim().length < 7) {
     blockers.push("production-go-live-manifest.json releaseCommitSha must be at least 7 characters");
+  }
+}
+
+function checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, warnings }) {
+  if (!manifest?.attachmentScope || manifest.attachmentScope === "full_attachments") return;
+  warnings.push(`production-go-live-manifest.json attachmentScope is ${manifest.attachmentScope}; attachment range must be accepted in release signoff`);
+  if (!releaseSignoff.includes("附件范围已知并接受")) {
+    blockers.push("release-signoff.md must contain 附件范围已知并接受 when attachmentScope is not full_attachments");
   }
 }
 
@@ -385,6 +413,7 @@ export async function evaluateGoLiveEvidence({
   checkAuditExportVerify(auditExportVerify, blockers);
   checkDataFreezeSignoff(dataFreezeSignoff, blockers);
   checkReleaseSignoff(releaseSignoff, blockers);
+  checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, warnings });
   checkDockerComposeEvidence(dockerComposePs, blockers);
   if (!healthCheck.includes("PRODUCTION_HEALTH_PASS") && !healthCheck.includes("/health 200")) {
     blockers.push("health-check.txt must contain PRODUCTION_HEALTH_PASS or /health 200");
@@ -439,6 +468,18 @@ export async function evaluateGoLiveEvidence({
   };
 }
 
+function resultToJson(result) {
+  return {
+    status: result.status,
+    environment: result.environment ?? "",
+    releaseCommit: result.releaseCommit ?? "",
+    evidenceDirectory: result.evidenceDirectory ?? "",
+    checkedFilesCount: result.checkedFilesCount ?? 0,
+    blockers: (result.blockers ?? []).map(sanitize),
+    warnings: (result.warnings ?? []).map(sanitize),
+  };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -446,12 +487,26 @@ async function main() {
     return 0;
   }
   if (args.errors) {
+    if (args.json) {
+      console.log(
+        JSON.stringify(
+          resultToJson({ status: BLOCKED, blockers: args.errors, warnings: [], checkedFilesCount: 0 }),
+          null,
+          2,
+        ),
+      );
+      return 1;
+    }
     console.error(BLOCKED);
     for (const error of args.errors) console.error(`- ${sanitize(error)}`);
     return 1;
   }
 
   const result = await evaluateGoLiveEvidence(args);
+  if (args.json) {
+    console.log(JSON.stringify(resultToJson(result), null, 2));
+    return result.status === READY ? 0 : 1;
+  }
   if (result.status === READY) {
     console.log(READY);
     console.log(`environment: ${result.environment}`);

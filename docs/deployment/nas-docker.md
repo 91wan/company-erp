@@ -277,6 +277,12 @@ blocker, not an application test failure. `production:go-live-check` is the
 formal evidence gate and requires a Git 外 evidence directory; the directory must
 not be committed.
 
+The go-live manifest must keep the boundary explicit: `businessScope` is
+`internal_erp`, `publicAccess` is `false`, and `dataScope` / `attachmentScope`
+must be selected and signed off. The deployment health evidence must include the
+Web UI entrypoint, one same-origin `/assets` static file, `/health`, and
+`/api/app-version`.
+
 Do not expose API or PostgreSQL to the public internet. Do not import all real
 data directly for the first drill; start with desensitized data or a small
 controlled sample. The current import module does not do OCR, ZIP image batch

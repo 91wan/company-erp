@@ -14,6 +14,7 @@ npm run production:evidence-template -- --output <outside-git-path>
 npm run production:ready
 npm run production:readiness-gate
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json
 npm run production:health-check -- --base-url http://<nas>:8080
 npm run production:restore-drill-check -- --evidence-dir <outside-git-path>/restore-drill
 npm run attachments:production-check -- --legacy-report <outside-git-path>/attachment-legacy-report.json
@@ -38,6 +39,7 @@ npm run audit:verify-export -- --csv <outside-git-path>/audit-export.csv --sha25
 | P0 阻断 | .deploy-revision.json | 保存部署元数据副本。 |
 | P0 阻断 | /health 输出 | 记录部署后健康检查。 |
 | P0 阻断 | /api/app-version 输出 | 记录 commitSha、buildTime、deployedAt、packageVersion、environment。 |
+| P0 阻断 | Web UI 与静态资源健康检查 | `production:health-check` 必须验证首页 HTML、app root marker 和同源 `/assets` 静态资源。 |
 | P0 阻断 | docker compose ps 输出 | 记录 api/web/postgres 容器状态。 |
 | P1 建议 | 试点复核 tab 截图 | 脱敏截图即可。 |
 | P1 建议 | 合同风险截图 | 脱敏展示到期风险。 |
@@ -63,6 +65,17 @@ npm run audit:verify-export -- --csv <outside-git-path>/audit-export.csv --sha25
 `npm run test:backup-restore`。如果输出 `BLOCKED_DOCKER_UNAVAILABLE`，说明当前机器
 缺少 Docker CLI 或 daemon 不可访问；这是环境阻断，不是代码测试失败。不要跳过
 backup/restore gate，也不要用静态检查替代 production:ready。
+
+## Manifest 业务边界
+
+`production-go-live-manifest.json` 必须明确这次上线仍是公司内网 ERP，而不是公网发布：
+
+- `businessScope` 必须为 `internal_erp`。
+- `dataScope` 必须为 `pilot_promoted`、`full_initial_import` 或 `manual_entry`。
+- `attachmentScope` 必须为 `metadata_only`、`partial_attachments` 或 `full_attachments`。
+- `publicAccess` 必须为 `false`。
+- 如果 `attachmentScope` 不是 `full_attachments`，`release-signoff.md` 必须包含“附件范围已知并接受”。
+- 证据包可以保存 `production:go-live-check --json` 输出，但 JSON 中不得包含完整 NAS 路径或 secret。
 
 ## 审批结论
 

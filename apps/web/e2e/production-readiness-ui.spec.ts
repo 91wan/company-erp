@@ -21,7 +21,8 @@ test("admin can use the production go-live evidence panel without exposing secre
   await expect(
     page.getByRole("heading", { name: "正式上线证据包" }),
   ).toBeVisible();
-  await expect(page.getByText(/production:go-live-check/)).toBeVisible();
+  await expect(page.getByText(/production:go-live-check/).first()).toBeVisible();
+  await expect(page.getByText(/--json > <outside-git-path>\/production-go-live-check\.json/)).toBeVisible();
   await expect(page.getByText(/production:evidence-template/)).toBeVisible();
   await expect(page.getByText(/production:health-check/)).toBeVisible();
   await expect(page.getByText("docs/operations/post-go-live-24h-checklist.md")).toBeVisible();
