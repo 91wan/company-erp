@@ -260,7 +260,10 @@ and the Git 外 evidence directory gate:
 ```bash
 npm run production:ready
 npm run production:evidence-template -- --output <outside-git-path>
+npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
 For a single operator command, use:
@@ -276,6 +279,13 @@ fails fast with `BLOCKED_DOCKER_UNAVAILABLE`; treat that as an environment
 blocker, not an application test failure. `production:go-live-check` is the
 formal evidence gate and requires a Git 外 evidence directory; the directory must
 not be committed.
+
+`production:evidence-collect` is a safe helper for health-check/app-version and
+draft manifest evidence only. It does not read `.env`, database dumps, NAS
+attachment bytes, contract scans, health certificate images, or payroll files.
+`production:cutover-check` validates the cutover-day checklist before it is
+accepted by `production:go-live-check`. `production:post-go-live-24h-check` is
+run after go-live to verify the first 24 hours of operation.
 
 The go-live manifest must keep the boundary explicit: `businessScope` is
 `internal_erp`, `publicAccess` is `false`, and `dataScope` / `attachmentScope`

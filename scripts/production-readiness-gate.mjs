@@ -90,8 +90,26 @@ export function evaluateProductionReadiness({
     requireScript({
       blockers,
       packageScripts,
+      name: "production:evidence-collect",
+      command: "node scripts/production-evidence-collect.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
       name: "production:restore-drill-check",
       command: "node scripts/production-restore-drill-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:cutover-check",
+      command: "node scripts/production-cutover-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:post-go-live-24h-check",
+      command: "node scripts/post-go-live-24h-check.mjs",
     }),
     requireScript({
       blockers,
@@ -132,6 +150,7 @@ export function evaluateProductionReadiness({
     "docs/operations/audit-production-readiness.md",
     "docs/operations/access-review-runbook.md",
     "docs/operations/production-monitoring-runbook.md",
+    "docs/operations/production-cutover-checklist.md",
     "docs/operations/post-go-live-24h-checklist.md",
     "docs/operations/production-go-live-evidence-checklist.md",
     "docs/security/csrf-origin-production-policy.md",

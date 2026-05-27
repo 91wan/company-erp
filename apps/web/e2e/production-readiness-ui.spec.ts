@@ -24,6 +24,9 @@ test("admin can use the production go-live evidence panel without exposing secre
   await expect(page.getByText(/production:go-live-check/).first()).toBeVisible();
   await expect(page.getByText(/--json > <outside-git-path>\/production-go-live-check\.json/)).toBeVisible();
   await expect(page.getByText(/production:evidence-template/)).toBeVisible();
+  await expect(page.getByText(/production:evidence-collect/)).toBeVisible();
+  await expect(page.getByText(/production:cutover-check/)).toBeVisible();
+  await expect(page.getByText(/production:post-go-live-24h-check/)).toBeVisible();
   await expect(page.getByText(/production:health-check/)).toBeVisible();
   await expect(page.getByText("docs/operations/post-go-live-24h-checklist.md")).toBeVisible();
 

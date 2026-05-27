@@ -14,6 +14,8 @@ type GoLiveEvidenceResult = {
   warnings: string[];
   releaseCommit?: string;
   environment?: string;
+  projectSiteCount?: number;
+  publicAccess?: boolean;
 };
 
 async function evaluateGoLiveEvidence(input: {
@@ -89,6 +91,9 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
     "access-review-check.txt": "ACCESS_REVIEW_PASS\nChecked 2 exported user accounts.\n",
     "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
     "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
+    "production-cutover-checklist.md":
+      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\ngo/no-go: go\nfinishedAt: 2026-05-25T09:59:00.000Z\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+    "production-cutover-check.txt": "PRODUCTION_CUTOVER_CHECK_PASS\n",
     "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
     "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
     "app-version.json": `${JSON.stringify({
@@ -355,7 +360,9 @@ describe("production-go-live-check fixture gate", () => {
       const metadataAcceptedDir = join(tempRoot, "metadata-accepted");
       writeFixture(metadataAcceptedDir, {
         "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, attachmentScope: "metadata_only" })}\n`,
-        "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n附件范围已知并接受\n",
+      "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n附件范围已知并接受\n",
+        "production-cutover-checklist.md":
+          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\ngo/no-go: go\nfinishedAt: 2026-05-25T09:59:00.000Z\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
       });
 
       const missingBusiness = await evaluateGoLiveEvidence({ evidenceDir: missingBusinessDir, expectedCommit });
@@ -398,6 +405,10 @@ describe("production-go-live-check fixture gate", () => {
       expect(valid.status).toBe(0);
       expect(parsedValid.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
       expect(parsedValid.evidenceDirectory).toBe("valid-json");
+      expect(parsedValid.projectSiteCount).toBe(2);
+      expect(parsedValid.businessScope).toBe("internal_erp");
+      expect(parsedValid.publicAccess).toBe(false);
+      expect(parsedValid.p0MissingCount).toBe(0);
       expect(parsedValid.checkedFilesCount).toBeGreaterThan(0);
       expect(valid.stdout).not.toContain(tempRoot);
       expect(valid.stdout).not.toContain("DATABASE_URL");
@@ -624,6 +635,91 @@ describe("production-go-live-check fixture gate", () => {
       const result = await evaluateGoLiveEvidence({ evidenceDir, expectedCommit });
 
       expect(result.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("requires cutover checklist evidence and cross-checks release and previous commits", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-cutover-"));
+    try {
+      const missingCheckDir = join(tempRoot, "missing-check");
+      const expectedCommit = writeFixture(missingCheckDir, {
+        "production-cutover-check.txt": null,
+      });
+      const mismatchDir = join(tempRoot, "mismatch");
+      writeFixture(mismatchDir, {
+        "production-cutover-checklist.md":
+          "previousCommitSha: cccccccccccccccccccccccccccccccccccccccc\nreleaseCommitSha: dddddddddddddddddddddddddddddddddddddddd\noperator: ops\napprover: manager\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+      });
+      const noGoDir = join(tempRoot, "no-go");
+      writeFixture(noGoDir, {
+        "production-cutover-checklist.md":
+          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\ngo/no-go: no-go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+      });
+
+      const missingCheck = await evaluateGoLiveEvidence({ evidenceDir: missingCheckDir, expectedCommit });
+      const mismatch = await evaluateGoLiveEvidence({ evidenceDir: mismatchDir, expectedCommit });
+      const noGo = await evaluateGoLiveEvidence({ evidenceDir: noGoDir, expectedCommit });
+
+      expect(missingCheck.status).toBe("BLOCKED");
+      expect(missingCheck.blockers.join("\n")).toContain("production-cutover-check.txt");
+      expect(mismatch.status).toBe("BLOCKED");
+      expect(mismatch.blockers.join("\n")).toContain("cutover");
+      expect(noGo.status).toBe("BLOCKED");
+      expect(noGo.blockers.join("\n")).toContain("go/no-go");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("can fail on warnings and blocks expanded sensitive evidence patterns", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-warning-sensitive-"));
+    try {
+      const warningDir = join(tempRoot, "warning");
+      const expectedCommit = writeFixture(warningDir, {
+        "production-go-live-manifest.json": `${JSON.stringify(
+          {
+            environment: "nas",
+            releaseCommitSha: "a".repeat(40),
+            previousCommitSha: "b".repeat(40),
+            goLiveAt: "2026-05-25T10:00:00.000Z",
+            operator: "ops",
+            approver: "manager",
+            scope: "internal",
+            businessScope: "internal_erp",
+            dataScope: "pilot_promoted",
+            attachmentScope: "metadata_only",
+            publicAccess: false,
+            projectSiteCount: 2,
+            notes: "fixture",
+          },
+          null,
+          2,
+        )}\n`,
+        "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n附件范围已知并接受\n",
+      });
+      const sensitiveDir = join(tempRoot, "sensitive");
+      writeFixture(sensitiveDir, {
+        "health-check.txt": "PRODUCTION_HEALTH_PASS\nAuthorization: Bearer abc\nSet-Cookie: company_erp_session=abc\ntokenHash=abc\ncsrfTokenHash=abc\n",
+      });
+
+      const warningDefault = runGoLiveCheckCli(["--evidence-dir", warningDir, "--expected-commit", expectedCommit]);
+      const warningStrict = runGoLiveCheckCli([
+        "--evidence-dir",
+        warningDir,
+        "--expected-commit",
+        expectedCommit,
+        "--fail-on-warnings",
+      ]);
+      const sensitive = await evaluateGoLiveEvidence({ evidenceDir: sensitiveDir, expectedCommit });
+
+      expect(warningDefault.status).toBe(0);
+      expect(warningDefault.stdout).toContain("WARNING:");
+      expect(warningStrict.status).not.toBe(0);
+      expect(warningStrict.stderr).toContain("warnings are configured as blockers");
+      expect(sensitive.status).toBe("BLOCKED");
+      expect(sensitive.blockers.join("\n")).toContain("sensitive");
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
