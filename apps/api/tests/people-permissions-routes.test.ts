@@ -729,6 +729,12 @@ describe("user accounts API", () => {
           externalProjectSiteId: projectSiteId,
           externalProjectSiteName: "科技园一期项目点",
         }),
+        makeUserAccount({
+          id: "site-user",
+          username: "site-scoped",
+          roles: ["project_site"],
+          assignedProjectSiteIds: [projectSiteId, "99999999-9999-4999-8999-999999999999"],
+        }),
       ]),
     });
     const cookie = await loginCookie(app, "admin");
@@ -769,6 +775,11 @@ describe("user accounts API", () => {
           roles: ["external_project_site"],
           projectSiteIds: [projectSiteId],
         }),
+        expect.objectContaining({
+          username: "site-scoped",
+          roles: ["project_site"],
+          projectSiteIds: [projectSiteId, "99999999-9999-4999-8999-999999999999"],
+        }),
       ]),
     });
     expect(typeof payload.exportedAt).toBe("string");
@@ -788,7 +799,7 @@ describe("user accounts API", () => {
       actorUsername: "admin",
       entityType: "user_account",
       afterJson: expect.objectContaining({
-        exportedUserCount: 3,
+        exportedUserCount: 4,
         exportedAt: payload.exportedAt,
       }),
     });

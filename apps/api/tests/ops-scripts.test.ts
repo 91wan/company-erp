@@ -638,6 +638,8 @@ describe("access review production gate", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-access-review-"));
     const noAdminExport = join(tempRoot, "no-admin.json");
     const externalMultiRoleExport = join(tempRoot, "external-multi-role.json");
+    const projectSiteMultiRoleExport = join(tempRoot, "project-site-multi-role.json");
+    const projectSiteNoScopeExport = join(tempRoot, "project-site-no-scope.json");
     const duplicateExternalExport = join(tempRoot, "duplicate-external.json");
     const cleanExport = join(tempRoot, "clean.json");
 
@@ -672,12 +674,31 @@ describe("access review production gate", () => {
       }),
     );
     writeFileSync(
+      projectSiteNoScopeExport,
+      JSON.stringify({
+        users: [
+          { username: "admin", status: "active", roles: ["admin"] },
+          { username: "site-scoped", status: "active", roles: ["project_site"], projectSiteIds: [] },
+        ],
+      }),
+    );
+    writeFileSync(
+      projectSiteMultiRoleExport,
+      JSON.stringify({
+        users: [
+          { username: "admin", status: "active", roles: ["admin"] },
+          { username: "site-scoped", status: "active", roles: ["project_site", "viewer"], projectSiteIds: ["site-1"] },
+        ],
+      }),
+    );
+    writeFileSync(
       cleanExport,
       JSON.stringify({
         users: [
           { username: "admin", status: "active", roles: ["admin"] },
           { username: "viewer", status: "active", roles: ["viewer"], permissions: { manage: false } },
           { username: "site-a", status: "active", roles: ["external_project_site"], projectSiteId: "site-1" },
+          { username: "site-scoped", status: "active", roles: ["project_site"], projectSiteIds: ["site-1", "site-2"] },
         ],
       }),
     );
@@ -691,6 +712,14 @@ describe("access review production gate", () => {
       encoding: "utf8",
     });
     const duplicateExternal = spawnSync("node", ["scripts/access-review-check.mjs", "--export", duplicateExternalExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const projectSiteNoScope = spawnSync("node", ["scripts/access-review-check.mjs", "--export", projectSiteNoScopeExport], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    const projectSiteMultiRole = spawnSync("node", ["scripts/access-review-check.mjs", "--export", projectSiteMultiRoleExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -708,6 +737,10 @@ describe("access review production gate", () => {
     expect(externalMultiRole.stderr).toContain("external_project_site account must have only one role");
     expect(duplicateExternal.status).not.toBe(0);
     expect(duplicateExternal.stderr).toContain("one active external_project_site account per project site");
+    expect(projectSiteNoScope.status).not.toBe(0);
+    expect(projectSiteNoScope.stderr).toContain("project_site account must map to at least one project site");
+    expect(projectSiteMultiRole.status).not.toBe(0);
+    expect(projectSiteMultiRole.stderr).toContain("project_site account must have only one role");
     expect(pass.status).toBe(0);
     expect(pass.stdout).toContain("ACCESS_REVIEW_PASS");
   });
