@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -42,6 +43,10 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
         operator: "ops",
         approver: "manager",
         scope: "internal",
+        businessScope: "internal_erp",
+        dataScope: "pilot_promoted",
+        attachmentScope: "full_attachments",
+        publicAccess: false,
         projectSiteCount: 2,
         notes: "go-live fixture",
       },
@@ -133,6 +138,13 @@ async function withMockHealthServer(
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
+}
+
+function runGoLiveCheckCli(args: string[]) {
+  return spawnSync("node", [join(repoRoot, "scripts/production-go-live-check.mjs"), ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
 }
 
 describe("production-go-live-check fixture gate", () => {
@@ -296,6 +308,103 @@ describe("production-go-live-check fixture gate", () => {
       expect(result.blockers.join("\n")).toContain("approver");
       expect(result.blockers.join("\n")).toContain("releaseCommitSha");
       expect(result.blockers.join("\n")).toContain("previousCommitSha");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("requires go-live manifest business scope, data scope, attachment scope, and internal public boundary", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-boundary-"));
+    try {
+      const baseManifest = {
+        environment: "nas",
+        releaseCommitSha: "a".repeat(40),
+        previousCommitSha: "b".repeat(40),
+        goLiveAt: "2026-05-25T10:00:00.000Z",
+        operator: "ops",
+        approver: "manager",
+        scope: "internal",
+        businessScope: "internal_erp",
+        dataScope: "pilot_promoted",
+        attachmentScope: "full_attachments",
+        publicAccess: false,
+        projectSiteCount: 2,
+        notes: "fixture",
+      };
+      const expectedCommit = "a".repeat(40);
+      const missingBusinessDir = join(tempRoot, "missing-business");
+      writeFixture(missingBusinessDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, businessScope: undefined })}\n`,
+      });
+      const publicAccessDir = join(tempRoot, "public-access");
+      writeFixture(publicAccessDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, publicAccess: true })}\n`,
+      });
+      const badDataScopeDir = join(tempRoot, "bad-data-scope");
+      writeFixture(badDataScopeDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, dataScope: "all_real_data" })}\n`,
+      });
+      const badAttachmentScopeDir = join(tempRoot, "bad-attachment-scope");
+      writeFixture(badAttachmentScopeDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, attachmentScope: "unknown" })}\n`,
+      });
+      const metadataNoSignoffDir = join(tempRoot, "metadata-no-signoff");
+      writeFixture(metadataNoSignoffDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, attachmentScope: "metadata_only" })}\n`,
+      });
+      const metadataAcceptedDir = join(tempRoot, "metadata-accepted");
+      writeFixture(metadataAcceptedDir, {
+        "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, attachmentScope: "metadata_only" })}\n`,
+        "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n附件范围已知并接受\n",
+      });
+
+      const missingBusiness = await evaluateGoLiveEvidence({ evidenceDir: missingBusinessDir, expectedCommit });
+      const publicAccess = await evaluateGoLiveEvidence({ evidenceDir: publicAccessDir, expectedCommit });
+      const badDataScope = await evaluateGoLiveEvidence({ evidenceDir: badDataScopeDir, expectedCommit });
+      const badAttachmentScope = await evaluateGoLiveEvidence({ evidenceDir: badAttachmentScopeDir, expectedCommit });
+      const metadataNoSignoff = await evaluateGoLiveEvidence({ evidenceDir: metadataNoSignoffDir, expectedCommit });
+      const metadataAccepted = await evaluateGoLiveEvidence({ evidenceDir: metadataAcceptedDir, expectedCommit });
+
+      expect(missingBusiness.status).toBe("BLOCKED");
+      expect(missingBusiness.blockers.join("\n")).toContain("businessScope");
+      expect(publicAccess.status).toBe("BLOCKED");
+      expect(publicAccess.blockers.join("\n")).toContain("publicAccess");
+      expect(badDataScope.status).toBe("BLOCKED");
+      expect(badDataScope.blockers.join("\n")).toContain("dataScope");
+      expect(badAttachmentScope.status).toBe("BLOCKED");
+      expect(badAttachmentScope.blockers.join("\n")).toContain("attachmentScope");
+      expect(metadataNoSignoff.status).toBe("BLOCKED");
+      expect(metadataNoSignoff.blockers.join("\n")).toContain("附件范围已知并接受");
+      expect(metadataAccepted.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+      expect(metadataAccepted.warnings.join("\n")).toContain("attachmentScope");
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("emits machine-readable JSON without leaking full evidence paths", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-json-"));
+    try {
+      const validDir = join(tempRoot, "valid-json");
+      const expectedCommit = writeFixture(validDir);
+      const blockedDir = join(tempRoot, "blocked-json");
+      writeFixture(blockedDir, { "production-go-live-manifest.json": null });
+
+      const valid = runGoLiveCheckCli(["--evidence-dir", validDir, "--expected-commit", expectedCommit, "--json"]);
+      const blocked = runGoLiveCheckCli(["--evidence-dir", blockedDir, "--expected-commit", expectedCommit, "--json"]);
+      const parsedValid = JSON.parse(valid.stdout);
+      const parsedBlocked = JSON.parse(blocked.stdout);
+
+      expect(valid.status).toBe(0);
+      expect(parsedValid.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+      expect(parsedValid.evidenceDirectory).toBe("valid-json");
+      expect(parsedValid.checkedFilesCount).toBeGreaterThan(0);
+      expect(valid.stdout).not.toContain(tempRoot);
+      expect(valid.stdout).not.toContain("DATABASE_URL");
+      expect(blocked.status).not.toBe(0);
+      expect(parsedBlocked.status).toBe("BLOCKED");
+      expect(parsedBlocked.blockers.join("\n")).toContain("production-go-live-manifest.json");
+      expect(blocked.stderr).toBe("");
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }

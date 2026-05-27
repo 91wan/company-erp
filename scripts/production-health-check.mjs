@@ -6,7 +6,7 @@ const BLOCKED = "BLOCKED";
 function usage() {
   return `Usage: npm run production:health-check -- --base-url http://<nas>:8080
 
-Checks deployed /health and /api/app-version endpoints after internal production deployment.
+Checks deployed Web UI, static assets, /health, and /api/app-version after internal production deployment.
 This script does not read .env, does not access NAS roots, and does not start containers.`;
 }
 
@@ -27,7 +27,7 @@ function parseArgs(argv) {
 }
 
 async function readJson(url) {
-  const response = await fetch(url, { headers: { accept: "application/json" } });
+  const response = await fetch(url, { headers: { accept: "application/json" }, redirect: "manual" });
   const text = await response.text();
   let body = {};
   if (text.trim()) {
@@ -38,6 +38,12 @@ async function readJson(url) {
     }
   }
   return { response, body };
+}
+
+async function readText(url, accept = "text/plain") {
+  const response = await fetch(url, { headers: { accept }, redirect: "manual" });
+  const text = await response.text();
+  return { response, text };
 }
 
 function validateAppVersion(body) {
@@ -51,8 +57,69 @@ function validateAppVersion(body) {
   return blockers;
 }
 
+function hasAppRootMarker(html) {
+  return /\bid=["']root["']/i.test(html) || /Company ERP/i.test(html);
+}
+
+function extractStaticAssetPath(html) {
+  const match = html.match(/(?:src|href)=["']([^"']*\/assets\/[^"']+\.(?:js|css))["']/i);
+  return match?.[1] ?? "";
+}
+
+function sameOriginUrl(baseUrl, assetPath, blockers) {
+  try {
+    const base = new URL(baseUrl);
+    const asset = new URL(assetPath, base);
+    if (asset.origin !== base.origin) {
+      blockers.push("Web UI static asset must be same-origin.");
+      return null;
+    }
+    return asset.toString();
+  } catch {
+    blockers.push(`Web UI static asset URL is invalid: ${assetPath}`);
+    return null;
+  }
+}
+
+async function checkWebEntrypoint(baseUrl, blockers) {
+  let html = "";
+  try {
+    const { response, text } = await readText(`${baseUrl}/`, "text/html");
+    html = text;
+    if (response.status !== 200) blockers.push(`Web UI / expected 200, got ${response.status}.`);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("text/html")) {
+      blockers.push(`Web UI / Content-Type must include text/html, got ${contentType || "missing"}.`);
+    }
+    if (!hasAppRootMarker(html)) {
+      blockers.push("Web UI / must contain Company ERP app root marker.");
+    }
+  } catch (error) {
+    blockers.push(`Web UI / request failed: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
+  const assetPath = extractStaticAssetPath(html);
+  if (!assetPath) {
+    blockers.push("Web UI / must reference at least one /assets/*.js or /assets/*.css static asset.");
+    return;
+  }
+
+  const assetUrl = sameOriginUrl(baseUrl, assetPath, blockers);
+  if (!assetUrl) return;
+
+  try {
+    const { response } = await readText(assetUrl, "*/*");
+    if (response.status !== 200) blockers.push(`Web UI static asset expected 200, got ${response.status}: ${assetPath}.`);
+  } catch (error) {
+    blockers.push(`Web UI static asset request failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export async function evaluateProductionHealth({ baseUrl }) {
   const blockers = [];
+
+  await checkWebEntrypoint(baseUrl, blockers);
 
   try {
     const { response } = await readJson(`${baseUrl}/health`);

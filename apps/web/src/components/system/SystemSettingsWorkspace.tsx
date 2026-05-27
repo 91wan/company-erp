@@ -58,6 +58,7 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
     commands: [
       "npm run production:evidence-template -- --output <outside-git-path>",
       "npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
+      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json",
       "npm run production:health-check -- --base-url http://<nas>:8080",
     ],
   },

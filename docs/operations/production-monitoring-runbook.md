@@ -8,6 +8,7 @@
 
 - `docker compose ps`
 - `/health`
+- Web 首页 HTML 与同源 `/assets` 静态资源
 - `/api/app-version`
 - PostgreSQL 容器状态
 - Web 容器状态
@@ -21,7 +22,7 @@
 npm run production:health-check -- --base-url http://<nas>:8080
 ```
 
-该命令只检查 `/health` 和 `/api/app-version`，不读取 `.env`，不访问 NAS 文件系统，不启动容器。
+该命令检查 Web 首页、同源静态资源、`/health` 和 `/api/app-version`，不读取 `.env`，不访问 NAS 文件系统，不启动容器。
 
 ## 每周检查
 
@@ -99,4 +100,3 @@ npm run production:health-check -- --base-url http://<nas>:8080
 5. 重新验证 `/health` 和 `/api/app-version`。
 
 数据库迁移一旦执行，不能只回滚代码。涉及 schema 的发布必须有恢复方案。
-

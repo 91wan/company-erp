@@ -63,6 +63,10 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
         operator: "ops",
         approver: "manager",
         scope: "internal",
+        businessScope: "internal_erp",
+        dataScope: "pilot_promoted",
+        attachmentScope: "full_attachments",
+        publicAccess: false,
         projectSiteCount: 2,
         notes: "fixture",
       },
@@ -771,6 +775,16 @@ describe("production monitoring health check", () => {
     const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
 
     await withMockHttpServer((request, response) => {
+      if (request.url === "/") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end('<!doctype html><html><body><div id="root"></div><script src="/assets/app.js"></script></body></html>');
+        return;
+      }
+      if (request.url === "/assets/app.js") {
+        response.writeHead(200, { "content-type": "application/javascript" });
+        response.end("console.log('Company ERP');");
+        return;
+      }
       if (request.url === "/health") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ ok: true }));
@@ -798,6 +812,88 @@ describe("production monitoring health check", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("PRODUCTION_HEALTH_PASS");
     });
+  });
+
+  it("blocks deployments whose web entrypoint or extracted static asset is unavailable", async () => {
+    const cases: Array<{
+      name: string;
+      homeStatus: number;
+      contentType: string;
+      body: string;
+      assetStatus?: number;
+      expected: string;
+    }> = [
+      {
+        name: "web home failure",
+        homeStatus: 500,
+        contentType: "text/html",
+        body: '<div id="root"></div><script src="/assets/app.js"></script>',
+        expected: "Web UI / expected 200",
+      },
+      {
+        name: "non html response",
+        homeStatus: 200,
+        contentType: "application/json",
+        body: '{"ok":true}',
+        expected: "Content-Type",
+      },
+      {
+        name: "missing app marker",
+        homeStatus: 200,
+        contentType: "text/html",
+        body: "<html><body>login</body></html>",
+        expected: "app root marker",
+      },
+      {
+        name: "asset failure",
+        homeStatus: 200,
+        contentType: "text/html",
+        body: '<div id="root"></div><link rel="stylesheet" href="/assets/app.css">',
+        assetStatus: 404,
+        expected: "static asset",
+      },
+    ];
+
+    for (const testCase of cases) {
+      await withMockHttpServer((request, response) => {
+        if (request.url === "/") {
+          response.writeHead(testCase.homeStatus, { "content-type": testCase.contentType });
+          response.end(testCase.body);
+          return;
+        }
+        if (request.url === "/assets/app.css" || request.url === "/assets/app.js") {
+          response.writeHead(testCase.assetStatus ?? 200, { "content-type": "text/css" });
+          response.end("body{}");
+          return;
+        }
+        if (request.url === "/health") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ ok: true }));
+          return;
+        }
+        if (request.url === "/api/app-version") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              commitSha: "a".repeat(40),
+              buildTime: "2026-05-25T00:00:00.000Z",
+              deployedAt: "2026-05-25T00:00:00.000Z",
+              packageVersion: "0.1.0",
+              environment: "nas",
+            }),
+          );
+          return;
+        }
+        response.writeHead(404);
+        response.end();
+      }, async (baseUrl) => {
+        const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+
+        expect(result.status, testCase.name).not.toBe(0);
+        expect(result.stderr, testCase.name).toContain("BLOCKED");
+        expect(result.stderr, testCase.name).toContain(testCase.expected);
+      });
+    }
   });
 
   it("blocks unhealthy, incomplete, or local app-version responses", async () => {
@@ -846,6 +942,16 @@ describe("production monitoring health check", () => {
 
     for (const testCase of cases) {
       await withMockHttpServer((request, response) => {
+        if (request.url === "/") {
+          response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+          response.end('<div id="root"></div><script src="/assets/app.js"></script>');
+          return;
+        }
+        if (request.url === "/assets/app.js") {
+          response.writeHead(200, { "content-type": "application/javascript" });
+          response.end("console.log('Company ERP');");
+          return;
+        }
         if (request.url === "/health") {
           response.writeHead(testCase.healthStatus, { "content-type": "application/json" });
           response.end(JSON.stringify({ ok: testCase.healthStatus === 200 }));
@@ -1645,6 +1751,8 @@ describe("production go-live evidence template", () => {
       "app-version.README.md",
       "restore-drill/README.md",
       "screenshots/README.md",
+      "post-go-live-24h/README.md",
+      "post-go-live-24h-check.template.md",
     ]) {
       expect(readFile(join(outsideOutput, relativePath)), relativePath).not.toMatch(/secret|password|token/i);
     }
@@ -1666,8 +1774,12 @@ describe("production go-live evidence template", () => {
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run audit:verify-export -- --csv");
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run attachments:production-check -- --legacy-report");
     expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run access:review-check -- --export");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("production:go-live-check -- --evidence-dir");
     expect(readFile(join(outsideOutput, "README.md"))).toContain("actual command output");
     expect(readFile(join(outsideOutput, "restore-drill/README.md"))).toContain("restore-signoff.md");
+    expect(readFile(join(outsideOutput, "health-check.README.md"))).toContain("Web UI entrypoint");
+    expect(readFile(join(outsideOutput, "production-go-live-manifest.example.json"))).toContain('"businessScope": "internal_erp"');
+    expect(readFile(join(outsideOutput, "production-go-live-manifest.example.json"))).toContain('"publicAccess": false');
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
