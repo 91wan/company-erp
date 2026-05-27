@@ -595,6 +595,7 @@ export type UserAccountDto = {
   externalProjectSiteContactPhone?: string | null;
   externalProjectSiteId?: string | null;
   externalProjectSiteName?: string | null;
+  assignedProjectSiteIds?: readonly string[];
   username: string;
   status: UserAccountStatusCode;
   roles: readonly MvpRoleCode[];

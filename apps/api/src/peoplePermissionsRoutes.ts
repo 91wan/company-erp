@@ -23,7 +23,13 @@ function manageableAreas(roles: readonly MvpRoleCode[]): PermissionAreaCode[] {
 }
 
 function projectSiteIdsForAccessReview(account: UserAccountDto): string[] {
-  return account.externalProjectSiteId ? [account.externalProjectSiteId] : [];
+  if (account.roles.includes("external_project_site")) {
+    return account.externalProjectSiteId ? [account.externalProjectSiteId] : [];
+  }
+  if (account.roles.includes("project_site")) {
+    return Array.from(new Set(account.assignedProjectSiteIds ?? [])).sort();
+  }
+  return [];
 }
 
 function buildAccessReviewExport(

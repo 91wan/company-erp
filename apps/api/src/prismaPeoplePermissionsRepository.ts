@@ -56,7 +56,11 @@ type PrismaEmployee = Prisma.EmployeeGetPayload<{
 
 type PrismaUserAccount = Prisma.UserAccountGetPayload<{
   include: {
-    employee: true;
+    employee: {
+      include: {
+        projectSiteAssignments: true;
+      };
+    };
     roles: true;
     externalProjectSiteAccount: {
       include: {
@@ -163,6 +167,13 @@ function toUserAccountDto(account: PrismaUserAccount): UserAccountDto {
     externalProjectSiteContactPhone: account.externalProjectSiteAccount?.currentContactPhone ?? null,
     externalProjectSiteId: account.externalProjectSiteAccount?.projectSiteId ?? null,
     externalProjectSiteName: account.externalProjectSiteAccount?.projectSite.siteName ?? null,
+    assignedProjectSiteIds: Array.from(
+      new Set(
+        (account.employee?.projectSiteAssignments ?? [])
+          .filter(isActiveAssignment)
+          .map((assignment) => assignment.projectSiteId),
+      ),
+    ).sort(),
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
     createdAt: account.createdAt.toISOString(),
@@ -482,7 +493,7 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
 
 export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAccountRepository {
   const include = {
-    employee: true,
+    employee: { include: { projectSiteAssignments: true } },
     roles: true,
     externalProjectSiteAccount: { include: { projectSite: true, subcontractorParty: true } },
   } satisfies Prisma.UserAccountInclude;

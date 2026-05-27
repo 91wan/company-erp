@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const REQUIRED_EXTERNAL_ROLE = "external_project_site";
+const REQUIRED_PROJECT_SITE_ROLE = "project_site";
 
 function usage() {
   return `Usage: npm run access:review-check -- --export <outside-git-path>/user-accounts-export.json
@@ -115,6 +116,17 @@ export function evaluateAccessReview(payload) {
         const current = externalByProjectSite.get(projectSiteId) ?? [];
         current.push(username);
         externalByProjectSite.set(projectSiteId, current);
+      }
+    }
+
+    if (roles.includes(REQUIRED_PROJECT_SITE_ROLE)) {
+      if (roles.length !== 1) {
+        blockers.push(`project_site account must have only one role: ${username}.`);
+      }
+
+      const projectSiteIds = projectSiteIdsOf(user);
+      if (projectSiteIds.length < 1) {
+        blockers.push(`project_site account must map to at least one project site: ${username}.`);
       }
     }
 
