@@ -264,7 +264,11 @@ describe("audit logs API", () => {
           beforeJson: null,
           afterJson: {
             fileName: "receipt,\n\"signed\".pdf",
+            passwordHash: "TEST-PASSWORD-HASH-SHOULD-REDACT",
+            token: "TEST-TOKEN-SHOULD-REDACT",
             identityNo: "TEST-IDENTITY-NO-SHOULD-REDACT",
+            identityNoEncrypted: "TEST-IDENTITY-ENCRYPTED-SHOULD-REDACT",
+            AUTH_SESSION_SECRET: "TEST-AUTH-SESSION-SECRET-SHOULD-REDACT",
             cookie: "TEST-COOKIE-SHOULD-REDACT",
             note: "+formula",
           },
@@ -291,7 +295,17 @@ describe("audit logs API", () => {
     expect(exported.body).toContain("receipt,\\n");
     expect(exported.body).toContain("\\\"\"signed\\\"\".pdf");
     expect(exported.body).toContain("[redacted]");
+    expect(exported.body).not.toContain("passwordHash");
+    expect(exported.body).not.toContain("token");
+    expect(exported.body).not.toContain("cookie");
+    expect(exported.body).not.toContain("identityNo");
+    expect(exported.body).not.toContain("identityNoEncrypted");
+    expect(exported.body).not.toContain("AUTH_SESSION_SECRET");
+    expect(exported.body).not.toContain("TEST-PASSWORD-HASH-SHOULD-REDACT");
+    expect(exported.body).not.toContain("TEST-TOKEN-SHOULD-REDACT");
     expect(exported.body).not.toContain("TEST-IDENTITY-NO-SHOULD-REDACT");
+    expect(exported.body).not.toContain("TEST-IDENTITY-ENCRYPTED-SHOULD-REDACT");
+    expect(exported.body).not.toContain("TEST-AUTH-SESSION-SECRET-SHOULD-REDACT");
     expect(exported.body).not.toContain("TEST-COOKIE-SHOULD-REDACT");
   });
 

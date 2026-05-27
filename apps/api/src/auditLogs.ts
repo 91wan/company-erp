@@ -84,15 +84,18 @@ export function normalizeAuditLogFilters(query: Record<string, unknown>): AuditL
   return filters;
 }
 
-const sensitiveKeyPattern = /password|secret|cookie|token|identityno|identitynoencrypted/i;
+const sensitiveKeyPattern =
+  /password|secret|cookie|token|identityno|identitynoencrypted|storage\s*key|storagekey|authorization|database_url/i;
 
 export function redactAuditJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => redactAuditJson(item));
   if (!value || typeof value !== "object") return value;
+  let redactedFieldIndex = 0;
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
-      key,
-      sensitiveKeyPattern.test(key) ? "[redacted]" : redactAuditJson(nestedValue),
-    ]),
+    Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => {
+      if (!sensitiveKeyPattern.test(key)) return [key, redactAuditJson(nestedValue)];
+      redactedFieldIndex += 1;
+      return [`redactedField${redactedFieldIndex}`, "[redacted]"];
+    }),
   );
 }
