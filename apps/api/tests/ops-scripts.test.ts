@@ -110,10 +110,25 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
     "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
     "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
     "production-cutover-checklist.md":
-      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\ngo/no-go: go\nfinishedAt: 2026-05-25T09:59:00.000Z\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
     "production-cutover-check.txt": "PRODUCTION_CUTOVER_CHECK_PASS\n",
     "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
     "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
+    "production-migration-plan.md":
+      `# Production Migration Plan\n\n` +
+      `数据库迁移一旦执行，不能只回滚代码。\n\n` +
+      `releaseCommitSha: ${releaseCommitSha}\n` +
+      `previousCommitSha: ${"b".repeat(40)}\n` +
+      `migration directories: database/migrations\n` +
+      `是否包含 schema change: 否\n` +
+      `是否包含 data backfill: 否\n` +
+      `是否可逆: 是\n` +
+      `restore point: 不适用\n` +
+      `迁移前数据库备份: backup-2026-05-25\n` +
+      `迁移后验证 SQL 或验证步骤: npm run production:health-check\n` +
+      `migration output: /tmp/migration-output.log\n` +
+      `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
+    "production-migration-plan-check.txt": "PRODUCTION_MIGRATION_PLAN_PASS\n",
     "app-version.json": `${JSON.stringify({
       commitSha: releaseCommitSha,
       buildTime: "2026-05-25T09:00:00.000Z",
@@ -1339,6 +1354,7 @@ describe("NAS trial deploy notification readiness gate", () => {
         "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
         "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
         "production:cutover-check": "node scripts/production-cutover-check.mjs",
+        "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs",
         "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
         "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
@@ -1360,6 +1376,9 @@ describe("NAS trial deploy notification readiness gate", () => {
           return "最后一次导入时间 导入批次 ID 不直接删数据库";
         }
         if (path === "docs/operations/release-and-rollback-runbook.md") {
+          return "数据库迁移一旦执行，不能只回滚代码";
+        }
+        if (path === "docs/operations/production-migration-plan-runbook.md") {
           return "数据库迁移一旦执行，不能只回滚代码";
         }
         return "ok";

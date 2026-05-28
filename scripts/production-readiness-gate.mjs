@@ -108,6 +108,12 @@ export function evaluateProductionReadiness({
     requireScript({
       blockers,
       packageScripts,
+      name: "production:migration-plan-check",
+      command: "node scripts/production-migration-plan-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
       name: "production:post-go-live-24h-check",
       command: "node scripts/post-go-live-24h-check.mjs",
     }),
@@ -159,6 +165,13 @@ export function evaluateProductionReadiness({
   ]) {
     requireText({ blockers, readText, path, markers: [] });
   }
+
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/production-migration-plan-runbook.md",
+    markers: ["数据库迁移一旦执行，不能只回滚代码"],
+  });
 
   requireText({
     blockers,

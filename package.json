@@ -35,7 +35,8 @@
     "production:evidence-template": "node scripts/create-go-live-evidence-template.mjs",
     "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
     "production:cutover-check": "node scripts/production-cutover-check.mjs",
-    "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs"
+    "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
+    "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

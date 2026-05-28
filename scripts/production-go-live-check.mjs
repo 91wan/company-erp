@@ -6,6 +6,8 @@ import { checkAttachmentProductionReadiness } from "./attachment-production-chec
 import { evaluateAccessReview } from "./access-review-check.mjs";
 import { checkProductionRestoreDrillEvidence } from "./production-restore-drill-check.mjs";
 import { evaluateProductionHealth } from "./production-health-check.mjs";
+import { parseProductionCutoverChecklist, evaluateProductionCutoverChecklist } from "./production-cutover-check.mjs";
+import { evaluateProductionMigrationPlan } from "./production-migration-plan-check.mjs";
 
 const READY = "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE";
 const BLOCKED = "BLOCKED";
@@ -34,6 +36,8 @@ export const requiredGoLiveEvidenceFiles = [
   "release-signoff.md",
   "production-cutover-checklist.md",
   "production-cutover-check.txt",
+  "production-migration-plan.md",
+  "production-migration-plan-check.txt",
   "docker-compose-ps.txt",
   "health-check.txt",
   "app-version.json",
@@ -243,6 +247,16 @@ function checkSensitiveText(text, blockers, path) {
     /\bpasswordHash\b/i,
     /\btokenHash\b/i,
     /\bcsrfTokenHash\b/i,
+    /\bcsrfToken\b/i,
+    /\bsessionSecret\b/i,
+    /\bidentityNoEncrypted\b/i,
+    /\bprivateKey\b/i,
+    /-----BEGIN PRIVATE KEY-----/,
+    /-----BEGIN RSA PRIVATE KEY-----/,
+    /\bpassword\s*=\s*\S+/i,
+    /\bCookie\s*:/i,
+    /\bX-CSRF-Token\s*:/i,
+    /\bX-Auth-Token\s*:/i,
   ];
   if (sensitivePatterns.some((pattern) => pattern.test(text))) {
     blockers.push(`sensitive value detected in ${path}`);
@@ -345,12 +359,6 @@ function checkAccessReviewEvidence({ exportJson, checkText, blockers }) {
   }
 }
 
-function extractChecklistField(text, field) {
-  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = text.match(new RegExp(`^\\s*${escaped}\\s*[:：]\\s*(.+?)\\s*$`, "im"));
-  return match?.[1]?.trim() ?? "";
-}
-
 function checkCutoverEvidence({ checklist, checkText, manifest, releaseSignoff, blockers }) {
   checkTextContains({
     blockers,
@@ -358,48 +366,60 @@ function checkCutoverEvidence({ checklist, checkText, manifest, releaseSignoff, 
     path: "production-cutover-check.txt",
     marker: "PRODUCTION_CUTOVER_CHECK_PASS",
   });
-  for (const marker of [
-    "previousCommitSha",
-    "releaseCommitSha",
-    "operator",
-    "approver",
-    "go/no-go",
-    "migration 已执行时不能只回滚代码",
-    "production:health-check",
-    "docker compose ps",
-  ]) {
-    checkTextContains({ blockers, text: checklist, path: "production-cutover-checklist.md", marker });
-  }
-  if (/<[^>]+>/.test(checklist)) {
-    blockers.push("production-cutover-checklist.md must replace template placeholder values");
-  }
-  if (/go\/no-go\s*[:：]\s*no-go/i.test(checklist)) {
-    blockers.push("production-cutover-checklist.md go/no-go must not be no-go");
+
+  const cutoverResult = evaluateProductionCutoverChecklist({ text: checklist });
+  if (cutoverResult.status !== "PRODUCTION_CUTOVER_CHECK_PASS") {
+    for (const blocker of cutoverResult.blockers) blockers.push(blocker);
   }
 
   if (!manifest) return;
-  const releaseCommitSha = extractChecklistField(checklist, "releaseCommitSha");
-  const previousCommitSha = extractChecklistField(checklist, "previousCommitSha");
-  const operator = extractChecklistField(checklist, "operator");
-  const approver = extractChecklistField(checklist, "approver");
-  const finishedAt = extractChecklistField(checklist, "finishedAt");
+  const parsed = parseProductionCutoverChecklist(checklist);
 
-  if (releaseCommitSha && manifest.releaseCommitSha && releaseCommitSha !== manifest.releaseCommitSha) {
+  if (parsed.releaseCommitSha && manifest.releaseCommitSha && parsed.releaseCommitSha !== manifest.releaseCommitSha) {
     blockers.push("cutover releaseCommitSha must match production-go-live-manifest.json releaseCommitSha");
   }
-  if (previousCommitSha && manifest.previousCommitSha && previousCommitSha !== manifest.previousCommitSha) {
+  if (parsed.previousCommitSha && manifest.previousCommitSha && parsed.previousCommitSha !== manifest.previousCommitSha) {
     blockers.push("cutover previousCommitSha must match production-go-live-manifest.json previousCommitSha");
   }
-  if (operator && manifest.operator && operator !== manifest.operator && !releaseSignoff.includes("代理操作人")) {
-    blockers.push("cutover operator must match manifest operator or release-signoff.md must explain 代理操作人");
+  if (parsed.operator && manifest.operator && parsed.operator !== manifest.operator && !releaseSignoff.includes("代理操作人已接受")) {
+    blockers.push("cutover operator must match manifest operator or release-signoff.md must contain 代理操作人已接受");
   }
-  if (approver && manifest.approver && approver !== manifest.approver) {
+  if (parsed.approver && manifest.approver && parsed.approver !== manifest.approver) {
     blockers.push("cutover approver must match manifest approver");
   }
-  if (finishedAt && isValidIsoDateTime(finishedAt) && isValidIsoDateTime(manifest.goLiveAt)) {
-    if (Date.parse(manifest.goLiveAt) < Date.parse(finishedAt)) {
+  if (parsed.finishedAt && isValidIsoDateTime(parsed.finishedAt) && isValidIsoDateTime(manifest.goLiveAt)) {
+    if (Date.parse(manifest.goLiveAt) < Date.parse(parsed.finishedAt)) {
       blockers.push("production-go-live-manifest.json goLiveAt must not be earlier than cutover finishedAt");
     }
+  }
+}
+
+function checkMigrationPlanEvidence({ migrationPlan, migrationPlanCheck, manifest, releaseSignoff, blockers }) {
+  checkTextContains({
+    blockers,
+    text: migrationPlanCheck,
+    path: "production-migration-plan-check.txt",
+    marker: "PRODUCTION_MIGRATION_PLAN_PASS",
+  });
+  if (!migrationPlan) return;
+
+  const migrationResult = evaluateProductionMigrationPlan({ text: migrationPlan });
+  if (migrationResult.status !== "PRODUCTION_MIGRATION_PLAN_PASS") {
+    for (const blocker of migrationResult.blockers) blockers.push(blocker);
+  }
+
+  if (!manifest) return;
+  if (migrationResult.releaseCommitSha && manifest.releaseCommitSha && migrationResult.releaseCommitSha !== manifest.releaseCommitSha) {
+    blockers.push("migration plan releaseCommitSha must match production-go-live-manifest.json releaseCommitSha");
+  }
+  if (migrationResult.previousCommitSha && manifest.previousCommitSha && migrationResult.previousCommitSha !== manifest.previousCommitSha) {
+    blockers.push("migration plan previousCommitSha must match production-go-live-manifest.json previousCommitSha");
+  }
+  if (/^否$/i.test(migrationResult.isReversible ?? "") && !releaseSignoff.includes("不可逆迁移风险已接受")) {
+    blockers.push("release-signoff.md must contain 不可逆迁移风险已接受 when migration is not reversible");
+  }
+  if (/^是$/i.test(migrationResult.hasDataBackfill ?? "") && !releaseSignoff.includes("数据回填结果已复核")) {
+    blockers.push("release-signoff.md must contain 数据回填结果已复核 when migration includes data backfill");
   }
 }
 
@@ -465,6 +485,8 @@ export async function evaluateGoLiveEvidence({
   const releaseSignoff = readText(absoluteEvidenceDir, "release-signoff.md", blockers);
   const cutoverChecklist = readText(absoluteEvidenceDir, "production-cutover-checklist.md", blockers);
   const cutoverCheck = readText(absoluteEvidenceDir, "production-cutover-check.txt", blockers);
+  const migrationPlan = readText(absoluteEvidenceDir, "production-migration-plan.md", blockers);
+  const migrationPlanCheck = readText(absoluteEvidenceDir, "production-migration-plan-check.txt", blockers);
   const dockerComposePs = readText(absoluteEvidenceDir, "docker-compose-ps.txt", blockers);
   const healthCheck = readText(absoluteEvidenceDir, "health-check.txt", blockers);
   const restoreHealthCheck = readText(absoluteEvidenceDir, "restore-drill/health-check.txt", blockers);
@@ -492,6 +514,7 @@ export async function evaluateGoLiveEvidence({
   checkReleaseSignoff(releaseSignoff, blockers);
   checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, warnings });
   checkCutoverEvidence({ checklist: cutoverChecklist, checkText: cutoverCheck, manifest, releaseSignoff, blockers });
+  checkMigrationPlanEvidence({ migrationPlan, migrationPlanCheck, manifest, releaseSignoff, blockers });
   checkDockerComposeEvidence(dockerComposePs, blockers);
   if (!healthCheck.includes("PRODUCTION_HEALTH_PASS") && !healthCheck.includes("/health 200")) {
     blockers.push("health-check.txt must contain PRODUCTION_HEALTH_PASS or /health 200");

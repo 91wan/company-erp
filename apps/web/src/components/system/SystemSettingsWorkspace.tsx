@@ -54,7 +54,7 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
   },
   {
     title: "证据包",
-    description: "证据目录必须在 Git 仓库外；正式上线前运行证据包校验。",
+    description: "证据目录必须在 Git 仓库外。运行时证据由 evidence-collect 命令收集，go-live-check 是正式上线前的证据包门禁，通过后才允许进入公司内网正式上线审批。",
     commands: [
       "npm run production:evidence-template -- --output <outside-git-path>",
       "npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
@@ -90,8 +90,9 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
   },
   {
     title: "切换与上线后复核",
-    description: "切换当天和上线后 24 小时复核都必须留下 Git 外证据。",
+    description: "migration-plan-check 是 schema/data 变更门禁，cutover-check 是切换当天 go/no-go 证据，post-go-live 24h check 是上线后 24 小时复核，不作为上线前阻断。",
     commands: [
+      "npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md",
       "npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md",
       "npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h",
     ],

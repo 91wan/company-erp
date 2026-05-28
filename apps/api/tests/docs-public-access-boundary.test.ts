@@ -31,6 +31,7 @@ describe("documentation public access boundary", () => {
       "直接公网暴露 API",
       "建议路由器端口转发",
       "正式公网方案",
+      "production:ready 通过即可正式上线",
     ];
     const docs = listMarkdownDocs();
     const combined = docs
@@ -38,10 +39,12 @@ describe("documentation public access boundary", () => {
       .join("\n");
 
     for (const forbidden of forbiddenPatterns) {
-      expect(combined).not.toContain(forbidden);
+      expect(combined, `docs must not contain: ${forbidden}`).not.toContain(forbidden);
     }
 
     expect(combined).toContain("不公网暴露 API/PostgreSQL");
+    expect(combined).toContain("公司内网正式上线");
+    expect(combined).toContain("production:go-live-check");
     expect(readFileSync(join(repoRoot, "docs", "deployment", "nas-docker.md"), "utf8")).toContain(
       "Future Public Access Boundary"
     );

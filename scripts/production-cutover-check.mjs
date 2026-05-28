@@ -8,7 +8,7 @@ const BLOCKED = "BLOCKED";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function usage() {
-  console.log(`Usage: npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
+  console.log(`Usage: npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md [--json]
 
 Validates the internal production cutover checklist before the evidence package is accepted.`);
 }
@@ -20,10 +20,14 @@ function sanitize(value) {
 }
 
 function parseArgs(argv) {
-  const options = { checklist: "" };
+  const options = { checklist: "", json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") return { help: true, ...options };
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
     if (arg === "--checklist") {
       options.checklist = argv[index + 1] ?? "";
       index += 1;
@@ -38,6 +42,30 @@ function isInside(parent, child) {
   const parentPath = resolve(parent);
   const childPath = resolve(child);
   return childPath === parentPath || childPath.startsWith(parentPath + sep);
+}
+
+function isValidIsoDateTime(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  return Number.isFinite(Date.parse(text));
+}
+
+function extractField(text, field) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`^\\s*${escaped}\\s*[:：]\\s*(.+?)\\s*$`, "im"));
+  return match?.[1]?.trim() ?? "";
+}
+
+export function parseProductionCutoverChecklist(text) {
+  return {
+    releaseCommitSha: extractField(text, "releaseCommitSha"),
+    previousCommitSha: extractField(text, "previousCommitSha"),
+    operator: extractField(text, "operator"),
+    approver: extractField(text, "approver"),
+    startAt: extractField(text, "startAt"),
+    finishedAt: extractField(text, "finishedAt"),
+    goNoGo: extractField(text, "go/no-go"),
+  };
 }
 
 export function evaluateProductionCutoverChecklist({ checklistPath, text = "" } = {}) {
@@ -72,7 +100,48 @@ export function evaluateProductionCutoverChecklist({ checklistPath, text = "" } 
   if (/<[^>]+>/.test(checklist)) blockers.push("checklist must not contain template placeholder values");
   if (/go\/no-go\s*[:：]\s*no-go/i.test(checklist)) blockers.push("go/no-go is no-go");
 
-  return { status: blockers.length === 0 ? PASS : BLOCKED, blockers: blockers.map(sanitize) };
+  const parsed = parseProductionCutoverChecklist(checklist);
+
+  if (parsed.operator === "") blockers.push("checklist operator must not be empty");
+  if (parsed.approver === "") blockers.push("checklist approver must not be empty");
+  if (parsed.releaseCommitSha === "") blockers.push("checklist releaseCommitSha must not be empty");
+  if (parsed.previousCommitSha === "") blockers.push("checklist previousCommitSha must not be empty");
+
+  if (!parsed.startAt) {
+    blockers.push("checklist startAt must not be empty");
+  } else if (!isValidIsoDateTime(parsed.startAt)) {
+    blockers.push("checklist startAt must be a valid ISO datetime");
+  }
+  if (!parsed.finishedAt) {
+    blockers.push("checklist finishedAt must not be empty");
+  } else if (!isValidIsoDateTime(parsed.finishedAt)) {
+    blockers.push("checklist finishedAt must be a valid ISO datetime");
+  }
+  if (
+    parsed.startAt &&
+    parsed.finishedAt &&
+    isValidIsoDateTime(parsed.startAt) &&
+    isValidIsoDateTime(parsed.finishedAt) &&
+    Date.parse(parsed.finishedAt) < Date.parse(parsed.startAt)
+  ) {
+    blockers.push("checklist finishedAt must not be earlier than startAt");
+  }
+  if (parsed.releaseCommitSha && parsed.releaseCommitSha.length < 7) {
+    blockers.push("checklist releaseCommitSha must be at least 7 characters");
+  }
+
+  const status = blockers.length === 0 ? PASS : BLOCKED;
+  return {
+    status,
+    blockers: blockers.map(sanitize),
+    releaseCommitSha: parsed.releaseCommitSha,
+    previousCommitSha: parsed.previousCommitSha,
+    operator: parsed.operator,
+    approver: parsed.approver,
+    startAt: parsed.startAt,
+    finishedAt: parsed.finishedAt,
+    goNoGo: parsed.goNoGo,
+  };
 }
 
 function main() {
@@ -82,11 +151,19 @@ function main() {
     return 0;
   }
   if (args.errors) {
+    if (args.json) {
+      console.log(JSON.stringify({ status: BLOCKED, blockers: args.errors.map(sanitize) }, null, 2));
+      return 1;
+    }
     console.error(BLOCKED);
     for (const error of args.errors) console.error(`- ${sanitize(error)}`);
     return 1;
   }
   const result = evaluateProductionCutoverChecklist({ checklistPath: args.checklist });
+  if (args.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return result.status === PASS ? 0 : 1;
+  }
   if (result.status === PASS) {
     console.log(PASS);
     console.log("Production cutover checklist is ready for evidence package review.");
