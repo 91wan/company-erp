@@ -38,21 +38,19 @@ DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci 
 
 ### 主要角色
 
-1. **本地直接开发** — 直接读写代码文件、运行验证命令，适合需要跨多文件修改的任务
-2. **安全审查** — 使用 `/security-review` 在 PR 合并前做安全检查
-3. **代码 Review** — 使用 `/review` 对 Codex 提交的 PR 做独立 review
-4. **复杂调试** — 跨文件追踪 bug、schema drift、权限漏洞等
-5. **架构决策** — 新模块设计、API 结构、数据库 schema 讨论
+**核心编码**：所有功能开发、bug 修复、重构、脚本编写均由 Claude 直接实施。
 
 ### 与其他 AI 的协作分工
 
 | 任务类型 | 负责方 |
 |---------|--------|
-| 日常功能开发 | Codex |
-| PR 代码审查 | GPT-5.5 Pro + Claude |
+| 核心编码（功能开发、bug 修复、重构、脚本） | Claude |
+| 架构决策 / 技术选型 | GPT-5.5 Pro |
+| PR 代码审查 | GPT-5.5 Pro |
+| 验证与质量把关 | GPT-5.5 Pro |
 | 安全审查 | Claude (`/security-review`) |
-| 本地调试 / 跨文件重构 | Claude |
-| 架构 / 技术选型讨论 | Claude |
+
+**注意**：Claude 收到编码任务后直接实施，不转派给 Codex 或其他 agent，除非 user 明确指示。
 
 ### 工作原则
 

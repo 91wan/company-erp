@@ -120,6 +120,24 @@ export function evaluateProductionReadiness({
     requireScript({
       blockers,
       packageScripts,
+      name: "production:data-quality-check",
+      command: "node scripts/production-data-quality-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:business-acceptance-check",
+      command: "node scripts/production-business-acceptance-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "production:evidence-seal",
+      command: "node scripts/production-evidence-seal.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
       name: "attachments:production-check",
       command: "node scripts/attachment-production-check.mjs",
     }),
@@ -171,6 +189,27 @@ export function evaluateProductionReadiness({
     readText,
     path: "docs/operations/production-migration-plan-runbook.md",
     markers: ["数据库迁移一旦执行，不能只回滚代码"],
+  });
+
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/production-data-quality-runbook.md",
+    markers: ["不输出敏感字段"],
+  });
+
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/business-acceptance-runbook.md",
+    markers: ["批准进入公司内网正式上线"],
+  });
+
+  requireText({
+    blockers,
+    readText,
+    path: "docs/operations/evidence-sealing-runbook.md",
+    markers: ["修改证据后必须重新 seal"],
   });
 
   requireText({

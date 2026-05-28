@@ -111,6 +111,15 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
       `migration output: /tmp/migration-output.log\n` +
       `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
     "production-migration-plan-check.txt": "PRODUCTION_MIGRATION_PLAN_PASS\n",
+    "data-quality-report.json": `${JSON.stringify({ status: "PRODUCTION_DATA_QUALITY_PASS", blockers: [], warnings: [], adminCount: 1 })}\n`,
+    "data-quality-check.txt": "PRODUCTION_DATA_QUALITY_PASS\nadmins: 1\n",
+    "business-acceptance.md":
+      "- 业务负责人: 张三\n- 验收日期: 2026-05-25\n" +
+      "- Dashboard: 通过\n- 项目点风险台账: 通过\n- 项目点现场人员: 通过\n" +
+      "- 健康证: 通过\n- 合同到期提醒: 通过\n- 库存流水: 通过\n" +
+      "- Excel 导入试点复核: 通过\n- 权限复核: 通过\n" +
+      "- P0 未解决问题数量: 0\n批准进入公司内网正式上线\n",
+    "business-acceptance-check.txt": "PRODUCTION_BUSINESS_ACCEPTANCE_PASS\n",
     "app-version.json": `${JSON.stringify({
       commitSha: releaseCommitSha,
       buildTime: "2026-05-25T09:00:00.000Z",
@@ -872,6 +881,120 @@ describe("production-go-live-check fixture gate", () => {
       expect(irreversibleWithSignoff.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when data-quality-report.json is missing", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-dq-"));
+    try {
+      writeFixture(tempDir, { "data-quality-report.json": null });
+      const result = await evaluateGoLiveEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("data-quality-report.json");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when data quality check txt has failed status in report", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-dq-fail-"));
+    try {
+      writeFixture(tempDir, {
+        "data-quality-report.json": JSON.stringify({ status: "BLOCKED", blockers: ["no active admin found"], warnings: [] }) + "\n",
+      });
+      const result = await evaluateGoLiveEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("data quality");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when business-acceptance.md is missing", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-ba-"));
+    try {
+      writeFixture(tempDir, { "business-acceptance.md": null });
+      const result = await evaluateGoLiveEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("business-acceptance.md");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when business-acceptance.md is missing approval marker", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-ba-fail-"));
+    try {
+      writeFixture(tempDir, {
+        "business-acceptance.md":
+          "- 业务负责人: 张三\n- 验收日期: 2026-05-25\n" +
+          "- Dashboard: 通过\n- P0 未解决问题数量: 0\n",
+        "business-acceptance-check.txt": "PRODUCTION_BUSINESS_ACCEPTANCE_PASS\n",
+      });
+      const result = await evaluateGoLiveEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("批准进入公司内网正式上线");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("emits WARNING (not BLOCKED) when seal is missing without --require-seal", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-noseal-"));
+    try {
+      writeFixture(tempDir);
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+        evaluateGoLiveEvidence: (opts: { evidenceDir: string; requireSeal?: boolean }) => Promise<{ status: string; blockers: string[]; warnings: string[] }>;
+      };
+      const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir, requireSeal: false });
+      expect(result.status).toBe("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+      expect(result.warnings.join("\n")).toContain("evidence-sha256-manifest");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when --require-seal is set but seal is missing", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-requireseal-"));
+    try {
+      writeFixture(tempDir);
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+        evaluateGoLiveEvidence: (opts: { evidenceDir: string; requireSeal?: boolean }) => Promise<{ status: string; blockers: string[] }>;
+      };
+      const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir, requireSeal: true });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("--require-seal");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when seal manifest exists but a file has been modified", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "go-live-sealmod-"));
+    try {
+      writeFixture(tempDir);
+      // Create a minimal valid seal manifest
+      const sealManifest = {
+        sealedAt: new Date().toISOString(),
+        fileCount: 1,
+        files: [
+          {
+            path: "pilot-ready.txt",
+            sha256: "0000000000000000000000000000000000000000000000000000000000000000",
+            sizeBytes: 100,
+          },
+        ],
+      };
+      writeFileSync(join(tempDir, "evidence-sha256-manifest.json"), JSON.stringify(sealManifest) + "\n");
+
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+        evaluateGoLiveEvidence: (opts: { evidenceDir: string }) => Promise<{ status: string; blockers: string[] }>;
+      };
+      const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("hash mismatch");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });

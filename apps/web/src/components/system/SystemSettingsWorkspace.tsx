@@ -97,6 +97,16 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
       "npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h",
     ],
   },
+  {
+    title: "最终正式上线审批",
+    description: "data-quality-check 是只读数据质量门禁（需设置 DATABASE_URL 环境变量），business-acceptance-check 是业务负责人签收门禁，evidence-seal 用于证据包防篡改，go-live-check --require-seal 是最终正式上线审批命令。",
+    commands: [
+      "npm run production:data-quality-check -- --json --output <outside-git-path>/data-quality-report.json",
+      "npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md",
+      "npm run production:evidence-seal -- --evidence-dir <outside-git-path>",
+      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal",
+    ],
+  },
 ];
 
 const goLiveEvidenceDocs = [

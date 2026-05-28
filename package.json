@@ -36,7 +36,10 @@
     "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
     "production:cutover-check": "node scripts/production-cutover-check.mjs",
     "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
-    "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs"
+    "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs",
+    "production:data-quality-check": "node scripts/production-data-quality-check.mjs",
+    "production:business-acceptance-check": "node scripts/production-business-acceptance-check.mjs",
+    "production:evidence-seal": "node scripts/production-evidence-seal.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

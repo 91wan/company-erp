@@ -7,19 +7,7 @@ const PASS = "PRODUCTION_MIGRATION_PLAN_PASS";
 const BLOCKED = "BLOCKED";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const REQUIRED_MARKERS = [
-  "releaseCommitSha",
-  "previousCommitSha",
-  "migration directories",
-  "是否包含 schema change",
-  "是否包含 data backfill",
-  "是否可逆",
-  "迁移前数据库备份",
-  "迁移后验证 SQL 或验证步骤",
-  "migration output",
-  "rollback strategy",
-  "数据库迁移一旦执行，不能只回滚代码",
-];
+const BACKUP_KEYWORDS = ["backup", "备份", "snapshot", "dump"];
 
 function usage() {
   console.log(`Usage: npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md [--json]
@@ -60,8 +48,28 @@ function isInside(parent, child) {
 
 function extractField(text, field) {
   const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = text.match(new RegExp(`^\\s*-?\\s*${escaped}\\s*[:：]\\s*(.*?)\\s*$`, "im"));
+  const match = text.match(new RegExp(`^[ \\t]*-?[ \\t]*${escaped}[ \\t]*[:：][ \\t]*(.*?)[ \\t]*$`, "im"));
   return match?.[1]?.trim() ?? "";
+}
+
+function isPlaceholder(value) {
+  return /^<[^>]+>$/.test(String(value ?? "").trim());
+}
+
+export function parseProductionMigrationPlan(text) {
+  return {
+    releaseCommitSha: extractField(text, "releaseCommitSha"),
+    previousCommitSha: extractField(text, "previousCommitSha"),
+    migrationDirectories: extractField(text, "migration directories"),
+    hasSchemaChange: extractField(text, "是否包含 schema change"),
+    hasDataBackfill: extractField(text, "是否包含 data backfill"),
+    isReversible: extractField(text, "是否可逆"),
+    restorePoint: extractField(text, "restore point"),
+    preMigrationBackup: extractField(text, "迁移前数据库备份"),
+    postMigrationVerification: extractField(text, "迁移后验证 SQL 或验证步骤"),
+    migrationOutput: extractField(text, "migration output"),
+    rollbackStrategy: extractField(text, "rollback strategy"),
+  };
 }
 
 export function evaluateProductionMigrationPlan({ planPath, text = "" } = {}) {
@@ -81,41 +89,111 @@ export function evaluateProductionMigrationPlan({ planPath, text = "" } = {}) {
     plan = readFileSync(absolute, "utf8");
   }
 
-  for (const marker of REQUIRED_MARKERS) {
-    if (!plan.includes(marker)) blockers.push(`migration plan must contain ${marker}`);
+  if (!plan.includes("数据库迁移一旦执行，不能只回滚代码")) {
+    blockers.push("migration plan must contain 数据库迁移一旦执行，不能只回滚代码");
   }
   if (/<[^>]+>/.test(plan)) blockers.push("migration plan must not contain template placeholder values");
 
-  const releaseCommitSha = extractField(plan, "releaseCommitSha");
-  const previousCommitSha = extractField(plan, "previousCommitSha");
-  const isReversible = extractField(plan, "是否可逆");
-  const hasDataBackfill = extractField(plan, "是否包含 data backfill");
-  const restorePoint = extractField(plan, "restore point");
-  const rollbackStrategy = extractField(plan, "rollback strategy");
-  const migrationOutput = extractField(plan, "migration output");
+  const parsed = parseProductionMigrationPlan(plan);
+  const {
+    releaseCommitSha,
+    previousCommitSha,
+    migrationDirectories,
+    hasSchemaChange,
+    hasDataBackfill,
+    isReversible,
+    restorePoint,
+    preMigrationBackup,
+    postMigrationVerification,
+    migrationOutput,
+    rollbackStrategy,
+  } = parsed;
 
-  if (releaseCommitSha && releaseCommitSha.length < 7) {
+  // CommitSha: required, ≥7 chars, not placeholder
+  if (!releaseCommitSha) {
+    blockers.push("migration plan releaseCommitSha is required");
+  } else if (isPlaceholder(releaseCommitSha)) {
+    blockers.push("migration plan releaseCommitSha must not be a placeholder");
+  } else if (releaseCommitSha.length < 7) {
     blockers.push("migration plan releaseCommitSha must be at least 7 characters");
   }
-  if (previousCommitSha && previousCommitSha.length < 7) {
+
+  if (!previousCommitSha) {
+    blockers.push("migration plan previousCommitSha is required");
+  } else if (isPlaceholder(previousCommitSha)) {
+    blockers.push("migration plan previousCommitSha must not be a placeholder");
+  } else if (previousCommitSha.length < 7) {
     blockers.push("migration plan previousCommitSha must be at least 7 characters");
   }
-  if (/^否$/i.test(isReversible) && !restorePoint) {
+
+  // migrationDirectories: required; "无" is allowed only with "本次无数据库迁移"
+  if (!migrationDirectories) {
+    blockers.push("migration plan migration directories is required");
+  } else if (/^无$/i.test(migrationDirectories) && !plan.includes("本次无数据库迁移")) {
+    blockers.push('migration plan migration directories is "无" but plan does not contain 本次无数据库迁移');
+  }
+
+  // Boolean fields: must be 是 or 否
+  if (!hasSchemaChange) {
+    blockers.push("migration plan 是否包含 schema change is required");
+  } else if (!/^[是否]$/.test(hasSchemaChange)) {
+    blockers.push("migration plan 是否包含 schema change must be 是 or 否");
+  }
+
+  if (!hasDataBackfill) {
+    blockers.push("migration plan 是否包含 data backfill is required");
+  } else if (!/^[是否]$/.test(hasDataBackfill)) {
+    blockers.push("migration plan 是否包含 data backfill must be 是 or 否");
+  }
+
+  if (!isReversible) {
+    blockers.push("migration plan 是否可逆 is required");
+  } else if (!/^[是否]$/.test(isReversible)) {
+    blockers.push("migration plan 是否可逆 must be 是 or 否");
+  }
+
+  // isReversible=否 → restorePoint required
+  if (/^否$/.test(isReversible) && !restorePoint) {
     blockers.push("migration plan must include restore point when migration is not reversible");
   }
-  if (/^是$/i.test(hasDataBackfill) && !plan.includes("迁移后验证 SQL 或验证步骤")) {
-    blockers.push("migration plan must include 迁移后验证 SQL 或验证步骤 when migration includes data backfill");
+
+  // preMigrationBackup: required + keyword check
+  if (!preMigrationBackup) {
+    blockers.push("migration plan 迁移前数据库备份 is required");
+  } else if (!BACKUP_KEYWORDS.some((kw) => preMigrationBackup.toLowerCase().includes(kw))) {
+    blockers.push("migration plan 迁移前数据库备份 must mention backup, 备份, snapshot, or dump");
   }
-  if (!rollbackStrategy) blockers.push("migration plan rollback strategy must not be empty");
-  if (!migrationOutput) blockers.push("migration plan migration output must not be empty");
+
+  // dataBackfill=是 → postMigrationVerification required and non-trivial
+  if (/^是$/.test(hasDataBackfill)) {
+    if (!postMigrationVerification) {
+      blockers.push("migration plan 迁移后验证 SQL 或验证步骤 is required when migration includes data backfill");
+    }
+  }
+
+  // migrationOutput: required, not placeholder
+  if (!migrationOutput) {
+    blockers.push("migration plan migration output is required");
+  } else if (isPlaceholder(migrationOutput)) {
+    blockers.push("migration plan migration output must not be a placeholder");
+  }
+
+  // rollbackStrategy: required, not placeholder
+  if (!rollbackStrategy) {
+    blockers.push("migration plan rollback strategy is required");
+  } else if (isPlaceholder(rollbackStrategy)) {
+    blockers.push("migration plan rollback strategy must not be a placeholder");
+  }
 
   return {
     status: blockers.length === 0 ? PASS : BLOCKED,
     blockers: blockers.map(sanitize),
     releaseCommitSha,
     previousCommitSha,
-    isReversible,
+    hasSchemaChange,
     hasDataBackfill,
+    isReversible,
+    migrationDirectories,
   };
 }
 

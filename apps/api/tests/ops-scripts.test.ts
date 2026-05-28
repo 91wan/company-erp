@@ -129,6 +129,15 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
       `migration output: /tmp/migration-output.log\n` +
       `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
     "production-migration-plan-check.txt": "PRODUCTION_MIGRATION_PLAN_PASS\n",
+    "data-quality-report.json": `${JSON.stringify({ status: "PRODUCTION_DATA_QUALITY_PASS", blockers: [], warnings: [], adminCount: 1 })}\n`,
+    "data-quality-check.txt": "PRODUCTION_DATA_QUALITY_PASS\nadmins: 1\n",
+    "business-acceptance.md":
+      "- 业务负责人: 张三\n- 验收日期: 2026-05-25\n" +
+      "- Dashboard: 通过\n- 项目点风险台账: 通过\n- 项目点现场人员: 通过\n" +
+      "- 健康证: 通过\n- 合同到期提醒: 通过\n- 库存流水: 通过\n" +
+      "- Excel 导入试点复核: 通过\n- 权限复核: 通过\n" +
+      "- P0 未解决问题数量: 0\n批准进入公司内网正式上线\n",
+    "business-acceptance-check.txt": "PRODUCTION_BUSINESS_ACCEPTANCE_PASS\n",
     "app-version.json": `${JSON.stringify({
       commitSha: releaseCommitSha,
       buildTime: "2026-05-25T09:00:00.000Z",
@@ -1356,6 +1365,9 @@ describe("NAS trial deploy notification readiness gate", () => {
         "production:cutover-check": "node scripts/production-cutover-check.mjs",
         "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs",
         "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
+        "production:data-quality-check": "node scripts/production-data-quality-check.mjs",
+        "production:business-acceptance-check": "node scripts/production-business-acceptance-check.mjs",
+        "production:evidence-seal": "node scripts/production-evidence-seal.mjs",
         "attachments:production-check": "node scripts/attachment-production-check.mjs",
       },
       readText: (path) => {
@@ -1380,6 +1392,15 @@ describe("NAS trial deploy notification readiness gate", () => {
         }
         if (path === "docs/operations/production-migration-plan-runbook.md") {
           return "数据库迁移一旦执行，不能只回滚代码";
+        }
+        if (path === "docs/operations/production-data-quality-runbook.md") {
+          return "不输出敏感字段";
+        }
+        if (path === "docs/operations/business-acceptance-runbook.md") {
+          return "批准进入公司内网正式上线";
+        }
+        if (path === "docs/operations/evidence-sealing-runbook.md") {
+          return "修改证据后必须重新 seal";
         }
         return "ok";
       },

@@ -254,23 +254,35 @@ not start production containers or read real NAS attachment roots; it runs local
 verification, browser E2E, Excel import gates, and the NAS readiness gate. A
 browser-capable environment is required for `npm run test:e2e -w @company-erp/web`.
 
-Before company-internal formal go-live approval, run both the static local gate
-and the Git 外 evidence directory gate:
+Before company-internal formal go-live approval, follow the six-stage lifecycle:
+
+| Stage | Command | Purpose |
+|-------|---------|---------|
+| 1. pilot:ready | `npm run pilot:ready` | Code, import, NAS trial gate |
+| 2. production:ready | `npm run production:ready` | Static code and backup/restore gate |
+| 3. migration-plan-check | `npm run production:migration-plan-check` | Schema/data change field validation |
+| 4. cutover + evidence | `npm run production:cutover-check` + `npm run production:go-live-check` | Cutover go/no-go + evidence package |
+| 5. data quality + acceptance + seal | `production:data-quality-check` + `production:business-acceptance-check` + `production:evidence-seal` + `production:go-live-check --require-seal` | Final go-live approval |
+| 6. post go-live 24h | `npm run production:post-go-live-24h-check` | Post-cutover review (not a pre-go-live blocker) |
 
 ```bash
 npm run production:ready
 npm run production:evidence-template -- --output <outside-git-path>
 npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
 npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
-npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+DATABASE_URL=postgresql://... npm run production:data-quality-check -- --json --output <outside-git-path>/data-quality-report.json
+npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md
+npm run production:evidence-seal -- --evidence-dir <outside-git-path>
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal
 npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
-For a single operator command, use:
-
-```bash
-npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
-```
+`production:go-live-check --require-seal` is the final go-live approval command.
+`production:ready` is not the final go-live authorization.
+`production:data-quality-check` is read-only and does not modify data.
+Business acceptance is a human sign-off; no script can substitute for it.
+Company-internal go-live only — do not expose to the public internet.
 
 `production:ready` can run in CI or a local workstation without production
 evidence, but it requires a working Docker daemon because it must execute

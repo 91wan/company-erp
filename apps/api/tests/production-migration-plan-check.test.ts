@@ -31,6 +31,21 @@ async function importMigrationPlanCheck() {
       previousCommitSha: string;
       isReversible: string;
       hasDataBackfill: string;
+      hasSchemaChange: string;
+      migrationDirectories: string;
+    };
+    parseProductionMigrationPlan: (text: string) => {
+      releaseCommitSha: string;
+      previousCommitSha: string;
+      migrationDirectories: string;
+      hasSchemaChange: string;
+      hasDataBackfill: string;
+      isReversible: string;
+      restorePoint: string;
+      preMigrationBackup: string;
+      postMigrationVerification: string;
+      migrationOutput: string;
+      rollbackStrategy: string;
     };
   };
   return module;
@@ -98,6 +113,90 @@ describe("production-migration-plan-check fixture gate", () => {
 
     expect(result.status).toBe("BLOCKED");
     expect(result.blockers.join("\n")).toContain("数据库迁移一旦执行，不能只回滚代码");
+  });
+
+  it("blocks empty releaseCommitSha", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace(`releaseCommitSha: ${"a".repeat(40)}`, "releaseCommitSha:");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("releaseCommitSha is required");
+  });
+
+  it("blocks empty previousCommitSha", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace(`previousCommitSha: ${"b".repeat(40)}`, "previousCommitSha:");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("previousCommitSha is required");
+  });
+
+  it("blocks schema change value that is not 是/否", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace("是否包含 schema change: 否", "是否包含 schema change: maybe");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("schema change must be 是 or 否");
+  });
+
+  it("blocks data backfill value that is not 是/否", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace("是否包含 data backfill: 否", "是否包含 data backfill: tbd");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("data backfill must be 是 or 否");
+  });
+
+  it("blocks 是否可逆 value that is not 是/否", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace("是否可逆: 是", "是否可逆: unknown");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("是否可逆 must be 是 or 否");
+  });
+
+  it("blocks empty migration directories", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace("migration directories: database/migrations", "migration directories:");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("migration directories is required");
+  });
+
+  it("blocks rollback strategy placeholder", async () => {
+    const { evaluateProductionMigrationPlan } = await importMigrationPlanCheck();
+    const plan = validPlan.replace("rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复", "rollback strategy: <回滚步骤>");
+
+    const result = evaluateProductionMigrationPlan({ text: plan });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("placeholder");
+  });
+
+  it("parseProductionMigrationPlan returns all fields", async () => {
+    const { parseProductionMigrationPlan } = await importMigrationPlanCheck();
+    const parsed = parseProductionMigrationPlan(validPlan);
+
+    expect(parsed.releaseCommitSha).toBe("a".repeat(40));
+    expect(parsed.previousCommitSha).toBe("b".repeat(40));
+    expect(parsed.migrationDirectories).toBe("database/migrations");
+    expect(parsed.hasSchemaChange).toBe("否");
+    expect(parsed.hasDataBackfill).toBe("否");
+    expect(parsed.isReversible).toBe("是");
+    expect(parsed.preMigrationBackup).toBe("backup-2026-05-25");
+    expect(parsed.rollbackStrategy).toContain("previousCommitSha");
   });
 
   it("--json outputs parseable JSON for blocked case", () => {

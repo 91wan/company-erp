@@ -8,15 +8,35 @@
 npm run production:evidence-template -- --output <outside-git-path>
 ```
 
+## 六阶段上线生命周期
+
+| 阶段 | 命令 | 说明 |
+|------|------|------|
+| 1. 试点就绪 | `npm run pilot:ready` | 代码、导入和 NAS 试点门禁 |
+| 2. 正式构建门禁 | `npm run production:ready` | 静态代码和 backup/restore 门禁 |
+| 3. 迁移计划门禁 | `npm run production:migration-plan-check` | schema/data 变更字段值强校验 |
+| 4. 切换与证据收集 | `npm run production:cutover-check` + `npm run production:go-live-check` | 切换当天 go/no-go + 证据包校验 |
+| 5. 数据质量 + 业务验收 + 封存 | `production:data-quality-check` + `production:business-acceptance-check` + `production:evidence-seal` + `production:go-live-check --require-seal` | 最终正式上线审批命令 |
+| 6. 上线后 24h 复核 | `npm run production:post-go-live-24h-check` | 上线后复核，不阻断上线前审批 |
+
+`production:go-live-check --require-seal` 是最终正式上线审批命令；`production:ready` 仍不是最终上线许可。
+
+正式上线仍是**公司内网**，不是公网发布。
+
 正式上线证据面板、证据模板和本清单使用同一组关键命令：
 
 ```bash
 npm run production:ready
 npm run production:readiness-gate
 npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
 npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
+DATABASE_URL=postgresql://... npm run production:data-quality-check -- --json --output <outside-git-path>/data-quality-report.json
+npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md
+npm run production:evidence-seal -- --evidence-dir <outside-git-path>
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
 npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json
+npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal
 npm run production:health-check -- --base-url http://<nas>:8080
 npm run production:restore-drill-check -- --evidence-dir <outside-git-path>/restore-drill
 npm run attachments:production-check -- --legacy-report <outside-git-path>/attachment-legacy-report.json
@@ -39,6 +59,9 @@ npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/p
 | P0 阻断 | access review signoff | 包含账号导出 hash、复核人、异常处理结果。 |
 | P0 阻断 | data freeze signoff | 包含最后一次导入时间和导入批次 ID。 |
 | P0 阻断 | production cutover checklist + check output | 保存 `production-cutover-checklist.md` 和 `production-cutover-check.txt`，且 go/no-go 必须为 go。 |
+| P0 阻断 | data-quality-report.json + data-quality-check.txt | 只读数据质量门禁，不输出敏感字段。`data-quality-check.txt` 必须包含 `PRODUCTION_DATA_QUALITY_PASS`。 |
+| P0 阻断 | business-acceptance.md + business-acceptance-check.txt | 业务负责人签收，P0 未解决问题数量必须为 0，包含"批准进入公司内网正式上线"。 |
+| P0 阻断 | evidence-sha256-manifest.json (--require-seal) | `production:evidence-seal` 生成的防篡改封存；`go-live-check --require-seal` 时必须存在且 hash 一致。 |
 | P0 阻断 | release commit sha | 记录上线 commit。 |
 | P0 阻断 | .deploy-revision.json | 保存部署元数据副本。 |
 | P0 阻断 | /health 输出 | 记录部署后健康检查。 |
@@ -90,6 +113,22 @@ backup/restore gate，也不要用静态检查替代 production:ready。
 - `production:go-live-check` 会交叉校验 cutover checklist 与 manifest 的 release/previous commit、operator 和 approver。
 - 上线后 24 小时复核不阻断 go-live 前审批，但上线后必须补齐 `post-go-live-24h` 证据并运行 `production:post-go-live-24h-check`。
 
+## 数据质量与业务验收
+
+- `production:data-quality-check` 是只读数据质量门禁，不修改任何数据。
+- `production:business-acceptance-check` 是业务负责人签收门禁，不是技术脚本能替代的人工验收。
+- 两者都是正式上线 P0 证据，缺失时 `production:go-live-check` BLOCKED。
+
+## Evidence Collect 与 Cutover
+
+- `production:evidence-collect` 只收集 health-check、app-version、docker compose ps 可用证据和 draft manifest；它不读取 `.env`、数据库 dump、附件原件、合同扫描件、健康证图片或工资表。
+- `production:evidence-collect` 不会生成最终 `production-go-live-manifest.json`，只生成 `production-go-live-manifest.draft.json`。
+- `production-cutover-checklist.md` 必须记录 `previousCommitSha`、`releaseCommitSha`、operator、approver、startAt`（必填）`、finishedAt`（必填）`和 `go/no-go`。
+- `production:go-live-check` 会交叉校验 cutover checklist 与 manifest 的 release/previous commit、operator 和 approver。
+- 上线后 24 小时复核不阻断 go-live 前审批，但上线后必须补齐 `post-go-live-24h` 证据并运行 `production:post-go-live-24h-check`。
+
 ## 审批结论
 
-正式上线审批要求 production:ready + production:go-live-check 都通过；其中 production:ready 是代码与静态门禁，production:go-live-check 是 Git 外证据包门禁。只有 P0 阻断项全部齐全，才能进入公司内网正式上线审批。P1 建议项缺失不一定阻断，但必须记录缺失原因和补齐计划。
+正式上线审批要求 production:ready + production:go-live-check --require-seal 都通过；其中 production:ready 是代码与静态门禁，production:go-live-check 是 Git 外证据包门禁（含数据质量、业务验收和证据封存）。只有 P0 阻断项全部齐全，才能进入公司内网正式上线审批。P1 建议项缺失不一定阻断，但必须记录缺失原因和补齐计划。
+
+正式上线仍是公司内网，不是公网发布。`production:go-live-check --require-seal` 是最终正式上线审批命令。

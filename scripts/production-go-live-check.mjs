@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,10 @@ export const requiredGoLiveEvidenceFiles = [
   "production-cutover-check.txt",
   "production-migration-plan.md",
   "production-migration-plan-check.txt",
+  "data-quality-report.json",
+  "data-quality-check.txt",
+  "business-acceptance.md",
+  "business-acceptance-check.txt",
   "docker-compose-ps.txt",
   "health-check.txt",
   "app-version.json",
@@ -70,7 +75,7 @@ export const requiredGoLiveManifestFields = [
 const appVersionFields = ["commitSha", "buildTime", "deployedAt", "packageVersion", "environment"];
 
 function usage() {
-  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--fail-on-warnings] [--json]
+  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--fail-on-warnings] [--require-seal] [--json]
        node scripts/production-go-live-check.mjs --evidence-dir <outside-git-path>
 
 Checks the Git-external evidence package required before internal production go-live approval.
@@ -86,7 +91,7 @@ function sanitize(value) {
 }
 
 function parseArgs(argv) {
-  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", failOnWarnings: false, json: false };
+  const options = { evidenceDir: "", baseUrl: "", expectedCommit: "", failOnWarnings: false, requireSeal: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") return { help: true, ...options };
@@ -96,6 +101,10 @@ function parseArgs(argv) {
     }
     if (arg === "--fail-on-warnings") {
       options.failOnWarnings = true;
+      continue;
+    }
+    if (arg === "--require-seal") {
+      options.requireSeal = true;
       continue;
     }
     if (arg === "--evidence-dir") {
@@ -423,6 +432,72 @@ function checkMigrationPlanEvidence({ migrationPlan, migrationPlanCheck, manifes
   }
 }
 
+function checkSealEvidence({ evidenceDir, sealManifestJson, requireSeal, blockers, warnings }) {
+  if (!sealManifestJson) {
+    if (requireSeal) {
+      blockers.push("evidence-sha256-manifest.json is required when --require-seal is set");
+    } else {
+      warnings.push("evidence-sha256-manifest.json not found — run production:evidence-seal before final go-live approval; use --require-seal to enforce");
+    }
+    return;
+  }
+  if (!Array.isArray(sealManifestJson.files) || sealManifestJson.files.length === 0) {
+    blockers.push("evidence-sha256-manifest.json has no files");
+    return;
+  }
+  const root = resolve(evidenceDir);
+  for (const entry of sealManifestJson.files) {
+    const absolute = resolve(root, entry.path);
+    if (!isInside(root, absolute)) {
+      blockers.push(`unsafe seal entry path: ${entry.path}`);
+      continue;
+    }
+    if (!existsSync(absolute)) {
+      blockers.push(`sealed file missing: ${entry.path}`);
+      continue;
+    }
+    const actual = createHash("sha256").update(readFileSync(absolute)).digest("hex");
+    if (actual !== entry.sha256) {
+      blockers.push(`evidence seal hash mismatch for ${entry.path} — file was modified after sealing`);
+    }
+  }
+}
+
+function checkDataQualityEvidence({ dataQualityReport, dataQualityCheck, blockers, warnings }) {
+  checkTextContains({
+    blockers,
+    text: dataQualityCheck,
+    path: "data-quality-check.txt",
+    marker: "PRODUCTION_DATA_QUALITY_PASS",
+  });
+  if (!dataQualityReport) return;
+  if (dataQualityReport.status && dataQualityReport.status !== "PRODUCTION_DATA_QUALITY_PASS") {
+    blockers.push("data-quality-report.json status is not PRODUCTION_DATA_QUALITY_PASS");
+  }
+  if (Array.isArray(dataQualityReport.blockers) && dataQualityReport.blockers.length > 0) {
+    for (const b of dataQualityReport.blockers) blockers.push(`data quality: ${b}`);
+  }
+  if (Array.isArray(dataQualityReport.warnings) && dataQualityReport.warnings.length > 0) {
+    for (const w of dataQualityReport.warnings) warnings.push(`data quality warning: ${w}`);
+  }
+}
+
+function checkBusinessAcceptanceEvidence({ acceptanceDoc, acceptanceCheck, blockers }) {
+  checkTextContains({
+    blockers,
+    text: acceptanceCheck,
+    path: "business-acceptance-check.txt",
+    marker: "PRODUCTION_BUSINESS_ACCEPTANCE_PASS",
+  });
+  if (!acceptanceDoc) return;
+  checkTextContains({
+    blockers,
+    text: acceptanceDoc,
+    path: "business-acceptance.md",
+    marker: "批准进入公司内网正式上线",
+  });
+}
+
 async function checkLiveHealth({ baseUrl, blockers }) {
   if (!baseUrl) return;
   const result = await evaluateProductionHealth({ baseUrl });
@@ -436,6 +511,7 @@ export async function evaluateGoLiveEvidence({
   baseUrl = "",
   expectedCommit = "",
   failOnWarnings = false,
+  requireSeal = false,
   exists = existsSync,
 } = {}) {
   const blockers = [];
@@ -487,6 +563,15 @@ export async function evaluateGoLiveEvidence({
   const cutoverCheck = readText(absoluteEvidenceDir, "production-cutover-check.txt", blockers);
   const migrationPlan = readText(absoluteEvidenceDir, "production-migration-plan.md", blockers);
   const migrationPlanCheck = readText(absoluteEvidenceDir, "production-migration-plan-check.txt", blockers);
+  const dataQualityReport = readJson(absoluteEvidenceDir, "data-quality-report.json", blockers);
+  const dataQualityCheck = readText(absoluteEvidenceDir, "data-quality-check.txt", blockers);
+  const businessAcceptanceDoc = readText(absoluteEvidenceDir, "business-acceptance.md", blockers);
+  const businessAcceptanceCheck = readText(absoluteEvidenceDir, "business-acceptance-check.txt", blockers);
+  const sealManifestJson = (() => {
+    const p = filePath(absoluteEvidenceDir, "evidence-sha256-manifest.json");
+    if (!exists(p)) return null;
+    try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; }
+  })();
   const dockerComposePs = readText(absoluteEvidenceDir, "docker-compose-ps.txt", blockers);
   const healthCheck = readText(absoluteEvidenceDir, "health-check.txt", blockers);
   const restoreHealthCheck = readText(absoluteEvidenceDir, "restore-drill/health-check.txt", blockers);
@@ -515,6 +600,9 @@ export async function evaluateGoLiveEvidence({
   checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, warnings });
   checkCutoverEvidence({ checklist: cutoverChecklist, checkText: cutoverCheck, manifest, releaseSignoff, blockers });
   checkMigrationPlanEvidence({ migrationPlan, migrationPlanCheck, manifest, releaseSignoff, blockers });
+  checkDataQualityEvidence({ dataQualityReport, dataQualityCheck, blockers, warnings });
+  checkBusinessAcceptanceEvidence({ acceptanceDoc: businessAcceptanceDoc, acceptanceCheck: businessAcceptanceCheck, blockers });
+  checkSealEvidence({ evidenceDir: absoluteEvidenceDir, sealManifestJson, requireSeal, blockers, warnings });
   checkDockerComposeEvidence(dockerComposePs, blockers);
   if (!healthCheck.includes("PRODUCTION_HEALTH_PASS") && !healthCheck.includes("/health 200")) {
     blockers.push("health-check.txt must contain PRODUCTION_HEALTH_PASS or /health 200");

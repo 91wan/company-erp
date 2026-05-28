@@ -28,6 +28,10 @@ test("admin can use the production go-live evidence panel without exposing secre
   await expect(page.getByText(/production:cutover-check/)).toBeVisible();
   await expect(page.getByText(/production:post-go-live-24h-check/)).toBeVisible();
   await expect(page.getByText(/production:health-check/)).toBeVisible();
+  await expect(page.getByText(/production:data-quality-check/)).toBeVisible();
+  await expect(page.getByText(/production:business-acceptance-check/)).toBeVisible();
+  await expect(page.getByText(/production:evidence-seal/)).toBeVisible();
+  await expect(page.locator("code", { hasText: /--require-seal/ })).toBeVisible();
   await expect(page.getByText("docs/operations/post-go-live-24h-checklist.md")).toBeVisible();
 
   const accessExportRequest = page.waitForRequest(
