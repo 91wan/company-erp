@@ -97,8 +97,13 @@ const uploadMimeExtensions = new Map([
   ["image/png", "png"],
 ]);
 
+function attachmentDownloadRateLimitMax(): number {
+  const configured = Number(process.env.ATTACHMENT_DOWNLOAD_RATE_LIMIT_MAX_PER_IP ?? 60);
+  return Number.isFinite(configured) && configured > 0 ? configured : 60;
+}
+
 const attachmentContentIpRateLimit = {
-  max: 30,
+  max: attachmentDownloadRateLimitMax(),
   timeWindow: "1 minute",
   keyGenerator: (request: FastifyRequest) => `attachment-content:${request.ip}`,
 };
@@ -398,7 +403,17 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
     try {
-      const attachmentDownload = redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment));
+      const isPublicInternet = process.env.PUBLIC_INTERNET_ENABLED === "true";
+      let attachmentDownload;
+      if (isPublicInternet) {
+        attachmentDownload = {
+          id: attachment.id,
+          url: `/api/attachments/${attachment.id}/content`,
+          expiresAt: null,
+        };
+      } else {
+        attachmentDownload = redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment));
+      }
       await writeAuditLog(request, options, {
         action: "attachment.download_url",
         entityType: "attachment",

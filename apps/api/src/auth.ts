@@ -127,6 +127,7 @@ export type AuthRepository = {
   findUnusedMfaRecoveryCode?(userAccountId: string, codeHash: string): Promise<MfaRecoveryCodeRecord | null>;
   useMfaRecoveryCode?(id: string, at: Date): Promise<void>;
   findMfaFactorById?(id: string): Promise<MfaFactorRecord | null>;
+  findPendingMfaFactor?(userAccountId: string): Promise<MfaFactorRecord | null>;
 };
 
 export type AuthOptions = {
@@ -750,6 +751,18 @@ export function registerAuth(
       return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
     }
 
+    // Prevent: active MFA already exists
+    if ((await authRepository.hasActiveMfaFactor?.(userAccountId)) === true) {
+      return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
+    }
+    // Prevent accumulation of pending factors: disable existing pending if any
+    if (authRepository.findPendingMfaFactor && authRepository.disableMfaFactor) {
+      const existing = await authRepository.findPendingMfaFactor(userAccountId);
+      if (existing) {
+        await authRepository.disableMfaFactor(existing.id, new Date());
+      }
+    }
+
     const totpSecret = generateTotpSecret();
     const secretEncrypted = encryptMfaSecret(totpSecret);
     const factor = await authRepository.createMfaFactor({
@@ -797,6 +810,11 @@ export function registerAuth(
     const account = await authRepository.findById(userAccountId);
     if (!account || !accountCanLogin(account)) {
       return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+    }
+
+    // Reject if user already has an active factor (unless activating the same pending)
+    if ((await authRepository.hasActiveMfaFactor?.(userAccountId)) === true) {
+      return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
 
     const factor = await authRepository.findMfaFactorById(factorId);

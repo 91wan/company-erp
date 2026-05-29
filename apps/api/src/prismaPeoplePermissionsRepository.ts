@@ -983,5 +983,72 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       });
       return new Map(rows.map((row) => [row.userAccountId, row._count.id]));
     },
+    async findActiveMfaFactor(userAccountId: string) {
+      const factor = await prisma.userMfaFactor.findFirst({
+        where: { userAccountId, status: "active" },
+        select: { id: true, userAccountId: true, type: true, secretEncrypted: true, status: true, createdAt: true, activatedAt: true, disabledAt: true },
+      });
+      if (!factor) return null;
+      return { ...factor, createdAt: factor.createdAt.toISOString(), activatedAt: factor.activatedAt?.toISOString() ?? null, disabledAt: factor.disabledAt?.toISOString() ?? null };
+    },
+    async hasActiveMfaFactor(userAccountId: string) {
+      const count = await prisma.userMfaFactor.count({ where: { userAccountId, status: "active" } });
+      return count > 0;
+    },
+    async createMfaFactor(input: { userAccountId: string; type: string; secretEncrypted: string }) {
+      const factor = await prisma.userMfaFactor.create({
+        data: { userAccountId: input.userAccountId, type: input.type, secretEncrypted: input.secretEncrypted, status: "pending" },
+        select: { id: true, userAccountId: true, type: true, secretEncrypted: true, status: true, createdAt: true, activatedAt: true, disabledAt: true },
+      });
+      return { ...factor, createdAt: factor.createdAt.toISOString(), activatedAt: factor.activatedAt?.toISOString() ?? null, disabledAt: factor.disabledAt?.toISOString() ?? null };
+    },
+    async activateMfaFactor(id: string, at: Date) {
+      await prisma.userMfaFactor.updateMany({
+        where: { id, status: "pending" },
+        data: { status: "active", activatedAt: at },
+      });
+    },
+    async disableMfaFactor(id: string, at: Date) {
+      await prisma.userMfaFactor.updateMany({
+        where: { id },
+        data: { status: "disabled", disabledAt: at },
+      });
+    },
+    async createMfaRecoveryCodes(mfaFactorId: string, userAccountId: string, codeHashes: string[]) {
+      await prisma.userMfaRecoveryCode.createMany({
+        data: codeHashes.map((codeHash) => ({ mfaFactorId, userAccountId, codeHash })),
+      });
+    },
+    async findUnusedMfaRecoveryCode(userAccountId: string, codeHash: string) {
+      const code = await prisma.userMfaRecoveryCode.findFirst({
+        where: { userAccountId, codeHash, usedAt: null },
+        select: { id: true, userAccountId: true, mfaFactorId: true, codeHash: true, usedAt: true, createdAt: true },
+      });
+      if (!code) return null;
+      return { ...code, createdAt: code.createdAt.toISOString(), usedAt: code.usedAt?.toISOString() ?? null };
+    },
+    async useMfaRecoveryCode(id: string, at: Date) {
+      await prisma.userMfaRecoveryCode.updateMany({
+        where: { id, usedAt: null },
+        data: { usedAt: at },
+      });
+    },
+    async findMfaFactorById(id: string) {
+      const factor = await prisma.userMfaFactor.findUnique({
+        where: { id },
+        select: { id: true, userAccountId: true, type: true, secretEncrypted: true, status: true, createdAt: true, activatedAt: true, disabledAt: true },
+      });
+      if (!factor) return null;
+      return { ...factor, createdAt: factor.createdAt.toISOString(), activatedAt: factor.activatedAt?.toISOString() ?? null, disabledAt: factor.disabledAt?.toISOString() ?? null };
+    },
+    async findPendingMfaFactor(userAccountId: string) {
+      const factor = await prisma.userMfaFactor.findFirst({
+        where: { userAccountId, status: "pending" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, userAccountId: true, type: true, secretEncrypted: true, status: true, createdAt: true, activatedAt: true, disabledAt: true },
+      });
+      if (!factor) return null;
+      return { ...factor, createdAt: factor.createdAt.toISOString(), activatedAt: factor.activatedAt?.toISOString() ?? null, disabledAt: factor.disabledAt?.toISOString() ?? null };
+    },
   };
 }

@@ -17,16 +17,21 @@ import { getAppVersion } from "./appVersion.js";
 export function registerAppCoreRoutes(app: FastifyInstance, options: BuildAppOptions = {}) {
   const appConfigRepository = options.appConfigRepository ?? createMemoryAppConfigRepository();
 
-  app.get("/health", async () => ({
-    status: "ok",
-    service: "company-erp-api",
-    database: {
-      configured: Boolean(process.env.DATABASE_URL),
-    },
-    version: {
-      shortCommitSha: getAppVersion().shortCommitSha,
-    },
-  }));
+  app.get("/health", async (_request, reply) => {
+    const isPublic = process.env.PUBLIC_INTERNET_ENABLED === "true";
+    if (isPublic) {
+      if (process.env.PUBLIC_HEALTH_PUBLIC === "true") {
+        return { status: "ok" };
+      }
+      return reply.status(401).send({ error: "UNAUTHORIZED" });
+    }
+    return {
+      status: "ok",
+      service: "company-erp-api",
+      database: { configured: Boolean(process.env.DATABASE_URL) },
+      version: { shortCommitSha: getAppVersion().shortCommitSha },
+    };
+  });
 
   app.get("/api/app-version", async () => {
     const version = getAppVersion();

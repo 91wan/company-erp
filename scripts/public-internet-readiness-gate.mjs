@@ -205,6 +205,31 @@ export function evaluatePublicInternetReadiness({
   } catch {
     mfaBlockers.push("apps/api/tests/public-internet-auth-mfa-flow.test.ts: missing MFA flow integration test");
   }
+  // Prisma repository must implement MFA methods
+  requireText({ blockers: mfaBlockers, readText,
+    path: "apps/api/src/prismaPeoplePermissionsRepository.ts",
+    markers: [
+      "createMfaFactor",
+      "activateMfaFactor",
+      "disableMfaFactor",
+      "findActiveMfaFactor",
+      "hasActiveMfaFactor",
+      "createMfaRecoveryCodes",
+      "findUnusedMfaRecoveryCode",
+      "useMfaRecoveryCode",
+      "findMfaFactorById",
+    ]
+  });
+  // Prisma MFA integration test must exist
+  try {
+    readText("apps/api/tests/prisma-mfa-repository.test.ts");
+    requireText({ blockers: mfaBlockers, readText,
+      path: "apps/api/tests/prisma-mfa-repository.test.ts",
+      markers: ["createMfaFactor", "findActiveMfaFactor", "useMfaRecoveryCode"],
+    });
+  } catch {
+    mfaBlockers.push("apps/api/tests/prisma-mfa-repository.test.ts: missing Prisma MFA integration test");
+  }
   // Merge MFA blockers into main blockers list
   for (const b of mfaBlockers) blockers.push(b);
 

@@ -82,6 +82,12 @@ function parseAllowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
   return env.CORS_ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [];
 }
 
+function parseTrustedProxyCidrs(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = env.TRUSTED_PROXY_CIDRS?.trim();
+  if (!raw) return ["127.0.0.1", "::1", "172.16.0.0/12"];
+  return raw.split(",").map((x) => x.trim()).filter(Boolean);
+}
+
 function isTruthy(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
@@ -100,6 +106,10 @@ const PRIVATE_IP_PATTERNS = [
   /^10\./,
   /^192\.168\./,
   /^172\.(1[6-9]|2\d|3[01])\./,
+  /^0\.0\.0\.0$/,
+  /^\[::1\]$/,
+  /^\[fc00:/i,
+  /^\[fe80:/i,
 ];
 
 function isPrivateOrLocalHost(hostname: string): boolean {
@@ -181,6 +191,11 @@ export function validateRuntimeSecurityEnvironment(env: NodeJS.ProcessEnv = proc
 
     const origins = parseAllowedOrigins(env);
     for (const origin of origins) {
+      if (origin === "*") {
+        throw new Error(
+          `CORS_ALLOWED_ORIGINS must not include wildcard "*" when PUBLIC_INTERNET_ENABLED=true`,
+        );
+      }
       let parsed: URL;
       try {
         parsed = new URL(origin);
@@ -237,10 +252,29 @@ export function validateRuntimeSecurityEnvironment(env: NodeJS.ProcessEnv = proc
           "COOKIE_DOMAIN must be a specific domain or subdomain (not a TLD) when PUBLIC_INTERNET_ENABLED=true",
         );
       }
+      const COMMON_TLDS = new Set([".com", ".cn", ".net", ".org", ".local", "com", "cn", "net", "org", "local"]);
+      if (COMMON_TLDS.has(cookieDomain)) {
+        throw new Error(
+          "COOKIE_DOMAIN must not be a bare TLD when PUBLIC_INTERNET_ENABLED=true",
+        );
+      }
+      // COOKIE_DOMAIN must be a suffix of the PUBLIC_APP_BASE_URL hostname
+      const normalizedCookieDomain = cookieDomain.startsWith(".") ? cookieDomain.slice(1) : cookieDomain;
+      if (publicBaseHost && !publicBaseHost.endsWith(normalizedCookieDomain) && publicBaseHost !== normalizedCookieDomain) {
+        throw new Error(
+          `COOKIE_DOMAIN "${cookieDomain}" must be a suffix of PUBLIC_APP_BASE_URL host "${publicBaseHost}" when PUBLIC_INTERNET_ENABLED=true`,
+        );
+      }
     }
 
     if (!env.TRUSTED_PROXY_CIDRS?.trim()) {
       throw new Error("TRUSTED_PROXY_CIDRS is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    // Disallow 0.0.0.0/0 or ::/0 in TRUSTED_PROXY_CIDRS
+    const proxyCidrs = parseTrustedProxyCidrs(env);
+    const dangerousCidrs = proxyCidrs.filter(c => c === "0.0.0.0/0" || c === "::/0" || c === "0.0.0.0");
+    if (dangerousCidrs.length > 0) {
+      throw new Error(`TRUSTED_PROXY_CIDRS must not contain open CIDR: ${dangerousCidrs.join(", ")}`);
     }
     if (env.PUBLIC_SECURITY_HEADERS_ENABLED !== "true") {
       throw new Error("PUBLIC_SECURITY_HEADERS_ENABLED=true is required when PUBLIC_INTERNET_ENABLED=true");
@@ -306,7 +340,7 @@ function isAllowedUnsafeRequestOrigin(headers: { origin?: unknown; referer?: unk
 export async function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: buildLoggerOptions(),
-    trustProxy: ["127.0.0.1", "::1", "172.16.0.0/12"],
+    trustProxy: parseTrustedProxyCidrs(),
   });
 
   const corsOrigins = parseAllowedOrigins();

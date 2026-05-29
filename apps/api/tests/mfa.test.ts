@@ -88,7 +88,8 @@ describe("recovery codes", () => {
     const codes = generateRecoveryCodes();
     expect(codes).toHaveLength(10);
     for (const code of codes) {
-      expect(code).toMatch(/^[0-9a-f]{10}$/);
+      expect(code).toMatch(/^[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}$/);
+      expect(code).toHaveLength(35);
     }
   });
 
@@ -98,7 +99,7 @@ describe("recovery codes", () => {
   });
 
   it("hashes codes consistently and is case-insensitive", () => {
-    const code = "abcdef1234";
+    const code = "abcdef12-34567890-abcdef12-34567890";
     const h1 = hashRecoveryCode(code);
     const h2 = hashRecoveryCode(code.toUpperCase());
     const h3 = hashRecoveryCode(`  ${code}  `);
