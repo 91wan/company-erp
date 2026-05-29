@@ -1477,7 +1477,7 @@ describe("attachments API", () => {
     try {
       const cookie = await loginCookie(app);
       let lastStatus = 0;
-      for (let i = 0; i < 31; i += 1) {
+      for (let i = 0; i < 61; i += 1) {
         const response = await app.inject({
           method: "GET",
           url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
