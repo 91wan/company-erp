@@ -116,15 +116,32 @@ describe("auth gate with PUBLIC_INTERNET_ENABLED=true", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("still returns 200 for /health in internet mode", async () => {
+  it("returns 401 for /health in internet mode when PUBLIC_HEALTH_PUBLIC is not set", async () => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
+    delete process.env.PUBLIC_HEALTH_PUBLIC;
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "public-internet-path-test-secret-long-enough" },
       authRepository: createFakeAuthRepository(),
     });
     const res = await app.inject({ method: "GET", url: "/health" });
     await app.close();
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns 200 for /health in internet mode when PUBLIC_HEALTH_PUBLIC=true", async () => {
+    process.env.PUBLIC_INTERNET_ENABLED = "true";
+    process.env.PUBLIC_HEALTH_PUBLIC = "true";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "public-internet-path-test-secret-long-enough" },
+      authRepository: createFakeAuthRepository(),
+    });
+    const res = await app.inject({ method: "GET", url: "/health" });
+    await app.close();
+    process.env.PUBLIC_HEALTH_PUBLIC = "";
     expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: "ok" });
+    expect(res.json()).not.toHaveProperty("database");
+    expect(res.json()).not.toHaveProperty("version");
   });
 
   it("still returns 200 for /api/app-version in internet mode (commitSha omitted)", async () => {

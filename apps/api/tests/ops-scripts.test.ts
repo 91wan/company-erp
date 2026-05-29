@@ -2729,6 +2729,12 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") {
           return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
         }
+        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") {
+          return "createMfaFactor activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById";
+        }
+        if (path === "apps/api/tests/prisma-mfa-repository.test.ts") {
+          return "createMfaFactor findActiveMfaFactor useMfaRecoveryCode";
+        }
         if (path === "apps/api/tests/security-hardening.test.ts") {
           return "rate limit login";
         }
