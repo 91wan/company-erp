@@ -93,6 +93,7 @@ describe("fetch metadata protection (Sec-Fetch-Site)", () => {
 
   it("does not block GET requests regardless of Sec-Fetch-Site", async () => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
+    process.env.PUBLIC_HEALTH_PUBLIC = "true";
     const app = await buildApp({});
     const res = await app.inject({
       method: "GET",
@@ -100,6 +101,7 @@ describe("fetch metadata protection (Sec-Fetch-Site)", () => {
       headers: { "sec-fetch-site": "cross-site" },
     });
     await app.close();
+    process.env.PUBLIC_HEALTH_PUBLIC = "";
     expect(res.statusCode).toBe(200);
   });
 });
