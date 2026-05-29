@@ -4,12 +4,17 @@ import { resolve } from "node:path";
 
 const REQUIRED_EXTERNAL_ROLE = "external_project_site";
 const REQUIRED_PROJECT_SITE_ROLE = "project_site";
+const HIGH_PRIVILEGE_ROLES_FOR_MFA = new Set(["admin", "systemSettings.manage", "userAccounts.manage", "auditLogs.read"]);
 
 function usage() {
-  return `Usage: npm run access:review-check -- --export <outside-git-path>/user-accounts-export.json
+  return `Usage: npm run access:review-check -- --export <outside-git-path>/user-accounts-export.json [--public-internet]
 
 Checks a production access review export before internal go-live approval.
-This script is read-only. It does not read .env, connect to the database, or inspect NAS files.`;
+This script is read-only. It does not read .env, connect to the database, or inspect NAS files.
+
+Options:
+  --public-internet   Also check that all mfaRequiredForPublicInternet accounts have MFA enabled.
+                      BLOCKED if any active high-privilege account has mfaEnabled=false.`;
 }
 
 function sanitize(value) {
@@ -30,7 +35,10 @@ function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
   const exportIndex = argv.indexOf("--export");
   if (exportIndex < 0 || !argv[exportIndex + 1]) return { errors: ["Missing --export <user-accounts-export.json>."] };
-  return { exportPath: resolve(argv[exportIndex + 1]) };
+  return {
+    exportPath: resolve(argv[exportIndex + 1]),
+    publicInternet: argv.includes("--public-internet"),
+  };
 }
 
 function normalizeUsers(payload) {
@@ -95,7 +103,7 @@ function viewerCanManage(user) {
   return false;
 }
 
-export function evaluateAccessReview(payload) {
+export function evaluateAccessReview(payload, options = {}) {
   const users = normalizeUsers(payload);
   if (!users) return { ok: false, blockers: ["Export JSON must contain users, accounts, or userAccounts array."] };
 
@@ -170,7 +178,25 @@ export function evaluateAccessReview(payload) {
     }
   }
 
-  return { ok: blockers.length === 0, blockers, userCount: users.length };
+  // --public-internet: enforce MFA for all mfaRequiredForPublicInternet accounts
+  if (options.publicInternet) {
+    for (const user of activeUsers) {
+      const username = usernameOf(user);
+      // Use mfaRequiredForPublicInternet field if available; fall back to role-based check
+      const mfaRequired = user.mfaRequiredForPublicInternet === true
+        || rolesOf(user).some((r) => HIGH_PRIVILEGE_ROLES_FOR_MFA.has(r));
+      if (mfaRequired && !isMfaEnabled(user)) {
+        blockers.push(
+          `Public internet: account with required MFA must have mfaEnabled=true: ${username}.`,
+        );
+      }
+    }
+  }
+
+  const notes = [];
+  if (options.publicInternet) notes.push("Public internet MFA enforcement checked.");
+
+  return { ok: blockers.length === 0, blockers, userCount: users.length, notes };
 }
 
 async function main() {
@@ -192,7 +218,7 @@ async function main() {
     return;
   }
 
-  const result = evaluateAccessReview(payload);
+  const result = evaluateAccessReview(payload, { publicInternet: args.publicInternet });
   if (!result.ok) {
     fail(result.blockers);
     return;
@@ -200,6 +226,7 @@ async function main() {
 
   console.log("ACCESS_REVIEW_PASS");
   console.log(`Checked ${result.userCount} exported user accounts.`);
+  for (const note of result.notes ?? []) console.log(note);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

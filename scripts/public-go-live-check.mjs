@@ -255,19 +255,61 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
       blockers.push("dependency-audit.txt: contains unresolved critical vulnerabilities — run npm audit fix before public go-live");
     }
     if (/high.*vuln|"high"\s*:\s*[1-9]/i.test(depAudit)) {
-      warnings.push("dependency-audit.txt: contains high severity vulnerabilities — review and remediate");
+      blockers.push("dependency-audit.txt: contains unresolved high severity vulnerabilities — must be remediated before public go-live");
     }
-    passed.push("dependency-audit.txt");
+    if (!blockers.some((b) => b.includes("dependency-audit"))) {
+      passed.push("dependency-audit.txt");
+    }
   }
 
-  // --- mfa-enforcement-evidence.txt ---
+  // --- mfa-enforcement-evidence.txt (all four high-privilege role types must be mentioned) ---
   const mfaEvidence = readEvidenceText(evidenceDir, "mfa-enforcement-evidence.txt", blockers);
   if (mfaEvidence) {
     checkTextContains({ blockers, text: mfaEvidence, path: "mfa-enforcement-evidence.txt", markers: [
-      "admin",
-      "MFA",
+      "MFA enforced for admin",
+      "MFA enforced for systemSettings.manage",
+      "MFA enforced for userAccounts.manage",
+      "MFA enforced for auditLogs.read",
+      "ACCESS_REVIEW_PASS",
+      "Public internet MFA enforcement checked",
     ]});
-    passed.push("mfa-enforcement-evidence.txt");
+    // Evidence must not contain secrets
+    if (/otpauth:\/\//.test(mfaEvidence)) {
+      blockers.push("mfa-enforcement-evidence.txt: must not contain TOTP otpauth URI (TOTP secret exposure)");
+    }
+    if (/recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(mfaEvidence)) {
+      blockers.push("mfa-enforcement-evidence.txt: must not contain recovery code plaintext");
+    }
+    if (!blockers.some((b) => b.includes("mfa-enforcement-evidence"))) {
+      passed.push("mfa-enforcement-evidence.txt");
+    }
+  }
+
+  // --- access-review-export.json (optional — check mfaEnabled for required accounts) ---
+  const accessReviewExportPath = resolve(evidenceDir, "access-review-export.json");
+  if (existsSync(accessReviewExportPath)) {
+    const accessReviewExport = readEvidenceJson(evidenceDir, "access-review-export.json", blockers);
+    if (accessReviewExport) {
+      const exportUsers = Array.isArray(accessReviewExport.users) ? accessReviewExport.users : [];
+      for (const user of exportUsers) {
+        const isActive = !user.status || user.status === "active";
+        if (isActive && user.mfaRequiredForPublicInternet === true && user.mfaEnabled !== true) {
+          blockers.push(
+            `access-review-export.json: active user "${user.username ?? user.id}" has mfaRequiredForPublicInternet=true but mfaEnabled=false`,
+          );
+        }
+      }
+      // Must not contain MFA secrets
+      const exportText = JSON.stringify(accessReviewExport);
+      if (/secretEncrypted|otpauth:\/\/|recovery.*code.*[0-9a-f]{10}/i.test(exportText)) {
+        blockers.push("access-review-export.json: must not contain MFA secret or recovery code plaintext");
+      }
+      if (!blockers.some((b) => b.includes("access-review-export"))) {
+        passed.push("access-review-export.json");
+      }
+    }
+  } else {
+    warnings.push("access-review-export.json: not present in evidence dir — consider including it as P0 MFA evidence");
   }
 
   // --- access-review-check.txt ---

@@ -96,6 +96,9 @@ function checkDependencyAudit(text, path, blockers) {
   if (/critical.*vuln|"critical"\s*:\s*[1-9]/i.test(text)) {
     blockers.push(`${path}: contains unresolved critical dependency vulnerabilities — run npm audit fix`);
   }
+  if (/high.*vuln|"high"\s*:\s*[1-9]/i.test(text)) {
+    blockers.push(`${path}: contains unresolved high severity dependency vulnerabilities — must be remediated before public go-live`);
+  }
 }
 
 function checkSecurityHeaders(text, path, blockers) {
@@ -104,6 +107,7 @@ function checkSecurityHeaders(text, path, blockers) {
     "Strict-Transport-Security",
     "Content-Security-Policy",
     "X-Content-Type-Options",
+    "Referrer-Policy",
   ];
   for (const header of required) {
     if (!text.includes(header)) {
@@ -115,17 +119,39 @@ function checkSecurityHeaders(text, path, blockers) {
   }
 }
 
+function containsSensitiveEvidence(text) {
+  if (!text) return false;
+  return (
+    /otpauth:\/\//.test(text) ||
+    /recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(text) ||
+    /\bAuthorization\s*:\s*Bearer\s+\S{8,}/i.test(text) ||
+    /Set-Cookie\s*:/i.test(text) ||
+    /company_erp_session/.test(text) ||
+    /AUTH_SESSION_SECRET=\S+/.test(text) ||
+    /IDENTITY_ENCRYPTION_SECRET=\S+/.test(text)
+  );
+}
+
 function checkMfaEnforcement(text, path, blockers) {
   if (!text) return;
   if (!text.toLowerCase().includes("mfa")) {
     blockers.push(`${path}: must mention MFA enforcement`);
     return;
   }
-  // Check that at least one high-privilege role is mentioned
-  const textLower = text.toLowerCase();
-  const mentionedRoles = HIGH_PRIVILEGE_ROLES.filter((role) => textLower.includes(role.toLowerCase()));
-  if (mentionedRoles.length === 0) {
-    blockers.push(`${path}: must confirm MFA for high-privilege accounts (admin, systemSettings.manage, userAccounts.manage)`);
+  // All four high-privilege role types must be confirmed
+  const requiredMentions = [
+    "MFA enforced for admin",
+    "MFA enforced for systemSettings.manage",
+    "MFA enforced for userAccounts.manage",
+    "MFA enforced for auditLogs.read",
+  ];
+  for (const required of requiredMentions) {
+    if (!text.includes(required)) {
+      blockers.push(`${path}: missing "${required}"`);
+    }
+  }
+  if (containsSensitiveEvidence(text)) {
+    blockers.push(`${path}: contains sensitive data (TOTP secret, recovery code, session token, or Authorization header)`);
   }
 }
 

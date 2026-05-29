@@ -8,7 +8,22 @@ import {
 } from "@company-erp/shared";
 import type { AuthenticatedRequest } from "./auth.js";
 import { runWithAuditTransaction, writeAuditLog, type BuildAppOptions } from "./appRouteContext.js";
+import { requiresMfa } from "./mfa.js";
 import { DepartmentConflictError, DepartmentValidationError, EmployeeConflictError, EmployeeProjectSiteAssignmentConflictError, EmployeeProjectSiteAssignmentValidationError, EmployeeValidationError, ExternalProjectSiteAccountConflictError, ExternalProjectSiteAccountValidationError, UserAccountConflictError, UserAccountValidationError, normalizeDepartmentFilters, normalizeDepartmentInput, normalizeEmployeeFilters, normalizeEmployeeInput, normalizeExternalProjectSiteAccountFilters, normalizeExternalProjectSiteAccountInput, normalizeProjectSiteAssignmentFilters, normalizeProjectSiteAssignmentInput, normalizeUserAccountFilters, normalizeUserAccountInput } from "./peoplePermissions.js";
+
+function isTruthy(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}
+
+function mfaRequiredForPublicInternet(roles: readonly MvpRoleCode[]): boolean {
+  if (requiresMfa(roles as readonly string[])) return true;
+  if (
+    isTruthy(process.env.PUBLIC_EXTERNAL_PROJECT_SITE_MFA_REQUIRED) &&
+    roles.includes("external_project_site")
+  )
+    return true;
+  return false;
+}
 
 function readableAreas(roles: readonly MvpRoleCode[]): PermissionAreaCode[] {
   return (Object.entries(MVP_PERMISSION_MATRIX) as Array<[PermissionAreaCode, { read: readonly MvpRoleCode[] }]>)
@@ -50,6 +65,7 @@ function buildAccessReviewExport(
       projectSiteIds: projectSiteIdsForAccessReview(account),
       activeSessionCount: activeSessionCounts.get(account.id) ?? 0,
       mfaEnabled: mfaEnabledSet.has(account.id),
+      mfaRequiredForPublicInternet: mfaRequiredForPublicInternet(account.roles),
       permissions: {
         read: readableAreas(account.roles),
         manage: manageableAreas(account.roles),

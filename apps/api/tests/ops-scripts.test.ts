@@ -1153,9 +1153,9 @@ describe("public security evidence check", () => {
       writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found. Scan complete.");
       writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
       writeFileSync(join(tempDir, "security-headers.txt"),
-        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY");
+        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nReferrer-Policy: strict-origin-when-cross-origin");
       writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
-        "admin: MFA TOTP enabled. systemSettings.manage: MFA enabled. userAccounts.manage: MFA enabled.");
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
 
       const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
       expect(result.status).toBe("PUBLIC_SECURITY_EVIDENCE_PASS");
@@ -1170,13 +1170,15 @@ describe("public security evidence check", () => {
       pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
     )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
 
+    const cleanMfaEvidence = "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked";
+    const cleanHeaders = "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nReferrer-Policy: strict-origin\nX-Frame-Options: DENY";
+
     const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
     try {
       writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "2 critical vulnerabilities found in libssl");
       writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
-      writeFileSync(join(tempDir, "security-headers.txt"),
-        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff");
-      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled.");
+      writeFileSync(join(tempDir, "security-headers.txt"), cleanHeaders);
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), cleanMfaEvidence);
 
       const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
       expect(result.status).toBe("BLOCKED");
@@ -1191,12 +1193,14 @@ describe("public security evidence check", () => {
       pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
     )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
 
+    const cleanMfaEvidence = "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked";
+
     const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
     try {
       writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities.");
       writeFileSync(join(tempDir, "dependency-audit.txt"), "0 vulnerabilities");
-      writeFileSync(join(tempDir, "security-headers.txt"), "Content-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff");
-      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled.");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Content-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nReferrer-Policy: strict-origin");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), cleanMfaEvidence);
 
       const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
       expect(result.status).toBe("BLOCKED");
@@ -2708,22 +2712,28 @@ describe("public internet readiness gate", () => {
           return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
         }
         if (path === "apps/api/src/mfa.ts") {
-          return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken requiresMfa";
+          return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa";
         }
         if (path === "apps/api/src/auth.ts") {
-          return "MFA_REQUIRED /api/auth/mfa/verify-login";
+          return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        }
+        if (path === "apps/api/src/routePermission.ts") {
+          return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+        }
+        if (path === "database/prisma/schema.prisma") {
+          return "UserMfaFactor UserMfaRecoveryCode AuthSession";
         }
         if (path === "apps/api/tests/mfa.test.ts") {
           return "generateTotpSecret verifyTotp createPendingMfaToken";
+        }
+        if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") {
+          return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
         }
         if (path === "apps/api/tests/security-hardening.test.ts") {
           return "rate limit login";
         }
         if (path === "apps/api/src/attachmentRoutes.ts") {
           return "private, no-store Content-Disposition";
-        }
-        if (path === "apps/api/src/routePermission.ts") {
-          return "isPublicInternetPath isPublicPath";
         }
         if (path === "apps/api/tests/attachments-routes.test.ts") {
           return "content-disposition attachment test content";
@@ -2763,11 +2773,13 @@ describe("public internet readiness gate", () => {
       if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED";
       if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
       if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
-      if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED /api/auth/mfa/verify-login";
+      if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+      if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+      if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode";
       if (path === "apps/api/tests/mfa.test.ts") throw new Error(`missing ${path}`);
+      if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
       if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
       if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
-      if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath";
       if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
       if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
       if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
@@ -2828,8 +2840,9 @@ describe("public internet go-live check", () => {
       writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
       writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
       writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
-      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin user: MFA TOTP enabled and confirmed");
-      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 3 accounts");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 3 accounts\nPublic internet MFA enforcement checked");
       writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
       writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
 

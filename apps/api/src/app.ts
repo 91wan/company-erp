@@ -343,7 +343,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
     });
   }
 
-  registerAuth(app, options.authRepository, options.auth);
+  registerAuth(app, options.authRepository, {
+    ...options.auth,
+    auditLogRepository: options.auditLogRepository,
+  });
   registerAppCoreRoutes(app, options);
   registerDashboardRoutes(app, options);
   registerAuditLogRoutes(app, options);

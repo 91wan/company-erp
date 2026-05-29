@@ -137,13 +137,15 @@ export function evaluatePublicInternetReadiness({
     "cross-site",
   ]});
 
-  // P0-4: MFA implementation must exist — tracked separately for BLOCKED_MFA_NOT_IMPLEMENTED output
+  // P0-4 / P0-5: MFA implementation must exist — tracked separately for BLOCKED_MFA_NOT_IMPLEMENTED output
   requireText({ blockers: mfaBlockers, readText, path: "apps/api/src/mfa.ts", markers: [
     "generateTotpSecret",
     "verifyTotp",
     "encryptMfaSecret",
     "createPendingMfaToken",
     "verifyPendingMfaToken",
+    "createMfaSetupToken",
+    "verifyMfaSetupToken",
     "requiresMfa",
   ]});
   requireSourceMarker({
@@ -155,14 +157,54 @@ export function evaluatePublicInternetReadiness({
   requireSourceMarker({
     blockers: mfaBlockers, readText,
     path: "apps/api/src/auth.ts",
+    marker: "MFA_SETUP_REQUIRED",
+    description: "MFA_SETUP_REQUIRED first-time setup flow",
+  });
+  requireSourceMarker({
+    blockers: mfaBlockers, readText,
+    path: "apps/api/src/auth.ts",
     marker: "/api/auth/mfa/verify-login",
     description: "MFA verify-login route",
   });
+  requireSourceMarker({
+    blockers: mfaBlockers, readText,
+    path: "apps/api/src/auth.ts",
+    marker: "/api/auth/mfa/setup-challenge",
+    description: "MFA setup-challenge route (first-time setup without session)",
+  });
+  requireSourceMarker({
+    blockers: mfaBlockers, readText,
+    path: "apps/api/src/auth.ts",
+    marker: "/api/auth/mfa/activate-challenge",
+    description: "MFA activate-challenge route",
+  });
+  requireSourceMarker({
+    blockers: mfaBlockers, readText,
+    path: "apps/api/src/routePermission.ts",
+    marker: "isAuthenticatedAuthSelfServicePath",
+    description: "isAuthenticatedAuthSelfServicePath to allow MFA self-service without PERMISSION_NOT_MAPPED",
+  });
+  // Prisma schema must have MFA models
+  requireText({ blockers: mfaBlockers, readText, path: "database/prisma/schema.prisma", markers: [
+    "UserMfaFactor",
+    "UserMfaRecoveryCode",
+  ]});
   requireText({ blockers: mfaBlockers, readText, path: "apps/api/tests/mfa.test.ts", markers: [
     "generateTotpSecret",
     "verifyTotp",
     "createPendingMfaToken",
   ]});
+  // MFA flow integration test must exist
+  try {
+    readText("apps/api/tests/public-internet-auth-mfa-flow.test.ts");
+    // File must contain the key flow markers
+    requireText({ blockers: mfaBlockers, readText,
+      path: "apps/api/tests/public-internet-auth-mfa-flow.test.ts",
+      markers: ["MFA_SETUP_REQUIRED", "setup-challenge", "activate-challenge"],
+    });
+  } catch {
+    mfaBlockers.push("apps/api/tests/public-internet-auth-mfa-flow.test.ts: missing MFA flow integration test");
+  }
   // Merge MFA blockers into main blockers list
   for (const b of mfaBlockers) blockers.push(b);
 
