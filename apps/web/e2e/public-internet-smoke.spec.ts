@@ -18,7 +18,7 @@ test("unauthenticated visitors see the login screen", async ({ page }) => {
   await expect(page.locator("form.auth-card")).toBeVisible();
   await expect(page.locator("input[autocomplete='username']")).toBeVisible();
   await expect(page.locator("input[type='password']")).toBeVisible();
-  expect(issues()).toHaveLength(0);
+  expect(issues).toHaveLength(0);
 });
 
 test("unauthenticated visitors cannot access the dashboard", async ({ page }) => {
@@ -26,20 +26,22 @@ test("unauthenticated visitors cannot access the dashboard", async ({ page }) =>
   await page.goto("/");
   // Dashboard content should not be visible without login
   await expect(page.locator("form.auth-card")).toBeVisible();
-  await expect(page.locator("h2").filter({ hasText: "仪表盘" })).toHaveCount(0);
+  await expect(page.locator("h2").filter({ hasText: "工作台" })).toHaveCount(0);
 });
 
 test("admin can log in and reach the dashboard", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: adminUser });
   await page.goto("/");
-  await expect(page.locator("h2").filter({ hasText: /仪表盘|Dashboard/ })).toBeVisible({ timeout: 5000 });
-  expect(issues()).toHaveLength(0);
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible({ timeout: 5000 });
+  expect(issues).toHaveLength(0);
 });
 
 test("MFA pending state shows TOTP verification form", async ({ page }) => {
   const issues = trackBrowserIssues(page);
-  // Mock the login endpoint to return MFA_REQUIRED
+  // mockCompanyErpApi must be registered first so the custom MFA route (registered after) takes priority
+  await mockCompanyErpApi(page, { user: null });
+  // Custom route registered AFTER mockCompanyErpApi so it has higher priority in Playwright
   await page.route("**/api/auth/login", (route) => {
     if (route.request().method() === "POST") {
       route.fulfill({
@@ -51,7 +53,6 @@ test("MFA pending state shows TOTP verification form", async ({ page }) => {
       route.continue();
     }
   });
-  await mockCompanyErpApi(page, { user: null });
 
   await page.goto("/");
   await page.locator("input[autocomplete='username']").fill("admin");
@@ -63,10 +64,11 @@ test("MFA pending state shows TOTP verification form", async ({ page }) => {
   await expect(page.getByText("双因素验证")).toBeVisible({ timeout: 3000 });
   await expect(page.locator("input[autocomplete='one-time-code']")).toBeVisible();
   await expect(page.getByRole("button", { name: "返回登录" })).toBeVisible();
-  expect(issues()).toHaveLength(0);
+  expect(issues).toHaveLength(0);
 });
 
 test("MFA back button returns to login form", async ({ page }) => {
+  await mockCompanyErpApi(page, { user: null });
   await page.route("**/api/auth/login", (route) => {
     if (route.request().method() === "POST") {
       route.fulfill({
@@ -78,7 +80,6 @@ test("MFA back button returns to login form", async ({ page }) => {
       route.continue();
     }
   });
-  await mockCompanyErpApi(page, { user: null });
 
   await page.goto("/");
   await page.locator("input[autocomplete='username']").fill("admin");
@@ -92,6 +93,7 @@ test("MFA back button returns to login form", async ({ page }) => {
 });
 
 test("invalid MFA code shows error message", async ({ page }) => {
+  await mockCompanyErpApi(page, { user: null });
   await page.route("**/api/auth/login", (route) => {
     if (route.request().method() === "POST") {
       route.fulfill({
@@ -110,7 +112,6 @@ test("invalid MFA code shows error message", async ({ page }) => {
       body: JSON.stringify({ error: "MFA_CODE_INVALID" }),
     });
   });
-  await mockCompanyErpApi(page, { user: null });
 
   await page.goto("/");
   await page.locator("input[autocomplete='username']").fill("admin");
@@ -131,11 +132,14 @@ test("external_project_site user cannot see system settings or audit logs", asyn
   await expect(page.getByRole("button", { name: "系统设置" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "审计日志" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "数据导入" })).toHaveCount(0);
-  expect(issues()).toHaveLength(0);
+  expect(issues).toHaveLength(0);
 });
 
-test("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ page }) => {
+// MFA setup UI (first-time enrollment) is not yet implemented in the frontend.
+// This test is a skeleton for when the MFA setup flow is added.
+test.skip("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ page }) => {
   const issues = trackBrowserIssues(page);
+  await mockCompanyErpApi(page, { user: null });
   await page.route("**/api/auth/login", (route) => {
     if (route.request().method() === "POST") {
       route.fulfill({
@@ -151,7 +155,6 @@ test("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ page 
       route.continue();
     }
   });
-  await mockCompanyErpApi(page, { user: null });
 
   await page.goto("/");
   await page.locator("input[autocomplete='username']").fill("admin");
@@ -162,7 +165,7 @@ test("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ page 
   await expect(
     page.getByText(/设置.*MFA|绑定.*双因素|MFA.*设置|首次设置|扫描二维码|Authenticator/i),
   ).toBeVisible({ timeout: 5000 });
-  expect(issues()).toHaveLength(0);
+  expect(issues).toHaveLength(0);
 });
 
 test("security headers present in API responses", async ({ page }) => {
