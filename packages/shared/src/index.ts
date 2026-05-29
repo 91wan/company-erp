@@ -612,10 +612,25 @@ export type AccessReviewUserAccountExportDto = {
   roles: readonly MvpRoleCode[];
   projectSiteIds: readonly string[];
   activeSessionCount: number;
+  mfaEnabled: boolean;
   permissions?: {
     read: readonly PermissionAreaCode[];
     manage: readonly PermissionAreaCode[];
   };
+};
+
+export type MfaFactorStatusCode = "pending" | "active" | "disabled";
+
+export type MfaSetupResponseDto = {
+  factorId: string;
+  totpUri: string;
+  recoveryCodes: readonly string[];
+};
+
+export type MfaStatusDto = {
+  enabled: boolean;
+  factorId?: string | null;
+  activatedAt?: string | null;
 };
 
 export type AccessReviewExportDto = {

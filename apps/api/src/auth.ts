@@ -1,5 +1,18 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { MfaStatusDto } from "@company-erp/shared";
+import {
+  buildTotpUri,
+  createPendingMfaToken,
+  decryptMfaSecret,
+  encryptMfaSecret,
+  generateRecoveryCodes,
+  generateTotpSecret,
+  hashRecoveryCode,
+  requiresMfa,
+  verifyPendingMfaToken,
+  verifyTotp,
+} from "./mfa.js";
 import {
   canManage,
   canRead,
@@ -10,7 +23,7 @@ import {
   type UserAccountStatusCode,
 } from "@company-erp/shared";
 import { verifyPassword } from "./password.js";
-import { isPublicPath, routePermission } from "./routePermission.js";
+import { isPublicInternetPath, isPublicPath, routePermission } from "./routePermission.js";
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -26,6 +39,33 @@ function loginRateLimitWindowMs(): number {
   return Number.isFinite(configured) && configured > 0 ? configured : 60 * 1000;
 }
 
+function isTruthy(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}
+
+function publicInternetEnabled(): boolean {
+  return isTruthy(process.env.PUBLIC_INTERNET_ENABLED);
+}
+
+function publicRateLimitEnabled(): boolean {
+  return publicInternetEnabled() || isTruthy(process.env.PUBLIC_RATE_LIMIT_ENABLED);
+}
+
+function loginRateLimitMaxPerIp(): number {
+  const defaultMax = publicRateLimitEnabled() ? 5 : 10;
+  const configured = Number(process.env.AUTH_LOGIN_RATE_LIMIT_MAX_PER_IP ?? defaultMax);
+  return Number.isFinite(configured) && configured > 0 ? configured : defaultMax;
+}
+
+function loginRateLimitMaxPerUsername(): number {
+  const configured = Number(process.env.AUTH_LOGIN_RATE_LIMIT_MAX_PER_USERNAME ?? 5);
+  return Number.isFinite(configured) && configured > 0 ? configured : 5;
+}
+
+function publicMfaRequired(): boolean {
+  return isTruthy(process.env.PUBLIC_MFA_REQUIRED);
+}
+
 export type AuthAccountRecord = AuthenticatedUserDto & {
   passwordHash: string;
   status: UserAccountStatusCode;
@@ -34,6 +74,26 @@ export type AuthAccountRecord = AuthenticatedUserDto & {
   passwordChangedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type MfaFactorRecord = {
+  id: string;
+  userAccountId: string;
+  type: string;
+  secretEncrypted: string;
+  status: string;
+  createdAt: string;
+  activatedAt?: string | null;
+  disabledAt?: string | null;
+};
+
+export type MfaRecoveryCodeRecord = {
+  id: string;
+  userAccountId: string;
+  mfaFactorId: string;
+  codeHash: string;
+  usedAt?: string | null;
+  createdAt: string;
 };
 
 export type AuthRepository = {
@@ -50,6 +110,20 @@ export type AuthRepository = {
     userAccountIds: readonly string[],
     at?: Date,
   ): Promise<Map<string, number>>;
+  // MFA
+  findActiveMfaFactor?(userAccountId: string): Promise<MfaFactorRecord | null>;
+  hasActiveMfaFactor?(userAccountId: string): Promise<boolean>;
+  createMfaFactor?(input: {
+    userAccountId: string;
+    type: string;
+    secretEncrypted: string;
+  }): Promise<MfaFactorRecord>;
+  activateMfaFactor?(id: string, at: Date): Promise<void>;
+  disableMfaFactor?(id: string, at: Date): Promise<void>;
+  createMfaRecoveryCodes?(mfaFactorId: string, userAccountId: string, codeHashes: string[]): Promise<void>;
+  findUnusedMfaRecoveryCode?(userAccountId: string, codeHash: string): Promise<MfaRecoveryCodeRecord | null>;
+  useMfaRecoveryCode?(id: string, at: Date): Promise<void>;
+  findMfaFactorById?(id: string): Promise<MfaFactorRecord | null>;
 };
 
 export type AuthOptions = {
@@ -360,9 +434,31 @@ export function registerAuth(
   const secure = authOptions?.cookieSecure ?? false;
   const sessionStore = authRepository ? createSessionStore(authRepository) : null;
 
+  // Per-username rate limit store (in-memory, per app instance)
+  const usernameAttempts = new Map<string, { count: number; windowStart: number }>();
+
+  function checkAndRecordUsernameAttempt(username: string): boolean {
+    if (!publicRateLimitEnabled()) return true;
+    const windowMs = loginRateLimitWindowMs();
+    const max = loginRateLimitMaxPerUsername();
+    const key = username.toLowerCase().slice(0, 100);
+    const now = Date.now();
+    const entry = usernameAttempts.get(key);
+    if (!entry || now - entry.windowStart > windowMs) {
+      usernameAttempts.set(key, { count: 1, windowStart: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= max;
+  }
+
   app.addHook("preHandler", async (request, reply) => {
     const pathname = new URL(request.url, "http://company-erp.local").pathname;
-    if (isPublicPath(pathname, request.method)) return;
+    // Use stricter public path in public internet mode; fallback to standard check for intranet
+    const allowUnauthenticated = publicInternetEnabled()
+      ? isPublicInternetPath(pathname, request.method)
+      : isPublicPath(pathname, request.method);
+    if (allowUnauthenticated) return;
 
     if (!authRepository) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
@@ -410,9 +506,9 @@ export function registerAuth(
     {
       config: {
         rateLimit: {
-          max: 10,
+          max: loginRateLimitMaxPerIp(),
           timeWindow: loginRateLimitWindowMs(),
-          keyGenerator: (request: FastifyRequest) => `login:${request.ip}`,
+          keyGenerator: (request: FastifyRequest) => `login:ip:${request.ip}`,
         },
       },
     },
@@ -424,10 +520,27 @@ export function registerAuth(
         return reply.status(400).send({ error: "LOGIN_VALIDATION_FAILED", issues: normalized.issues });
       }
 
+      // Per-username rate limit (always count, even for invalid credentials)
+      if (!checkAndRecordUsernameAttempt(normalized.username)) {
+        return reply.status(429).send({ error: "TOO_MANY_LOGIN_ATTEMPTS" });
+      }
+
       const account = await authRepository.findByUsername(normalized.username);
       const validPassword = account ? await verifyPassword(normalized.password, account.passwordHash) : false;
       if (!account || !validPassword || !accountCanLogin(account)) {
         return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+      }
+
+      // MFA check: required if PUBLIC_MFA_REQUIRED=true and account is high-privilege,
+      // OR if account has an active MFA factor
+      const mfaRequired =
+        (publicMfaRequired() && requiresMfa(account.roles)) ||
+        (await authRepository.hasActiveMfaFactor?.(account.id)) === true;
+
+      if (mfaRequired) {
+        const secret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+        const pendingMfaToken = createPendingMfaToken(account.id, secret);
+        return { status: "MFA_REQUIRED", pendingMfaToken };
       }
 
       await authRepository.updateLastLogin(account.id, new Date());
@@ -458,6 +571,177 @@ export function registerAuth(
       return { user, csrfToken };
     },
   );
+
+  // MFA verify-login: complete login after TOTP/recovery-code check
+  app.post(
+    "/api/auth/mfa/verify-login",
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: loginRateLimitWindowMs(),
+          keyGenerator: (request: FastifyRequest) => `mfa-verify:${request.ip}`,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!authRepository || !sessionStore) {
+        return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+      }
+      const body = request.body as { pendingMfaToken?: unknown; code?: unknown };
+      const pendingMfaToken = typeof body.pendingMfaToken === "string" ? body.pendingMfaToken : "";
+      const code = typeof body.code === "string" ? body.code.trim() : "";
+      if (!pendingMfaToken || !code) {
+        return reply.status(400).send({ error: "MFA_VERIFY_VALIDATION_FAILED" });
+      }
+
+      const secret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+      const userAccountId = verifyPendingMfaToken(pendingMfaToken, secret);
+      if (!userAccountId) {
+        return reply.status(401).send({ error: "MFA_TOKEN_INVALID_OR_EXPIRED" });
+      }
+
+      const account = await authRepository.findById(userAccountId);
+      if (!account || !accountCanLogin(account)) {
+        return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+      }
+
+      // Try TOTP first, then recovery code
+      const factor = await authRepository.findActiveMfaFactor?.(userAccountId);
+      let mfaOk = false;
+
+      if (factor) {
+        const totpSecret = decryptMfaSecret(factor.secretEncrypted);
+        if (await verifyTotp(code, totpSecret)) {
+          mfaOk = true;
+        } else if (authRepository.findUnusedMfaRecoveryCode && authRepository.useMfaRecoveryCode) {
+          // Try as recovery code
+          const codeHash = hashRecoveryCode(code);
+          const recoveryCode = await authRepository.findUnusedMfaRecoveryCode(userAccountId, codeHash);
+          if (recoveryCode) {
+            await authRepository.useMfaRecoveryCode(recoveryCode.id, new Date());
+            mfaOk = true;
+          }
+        }
+      }
+
+      if (!mfaOk) {
+        return reply.status(401).send({ error: "MFA_CODE_INVALID" });
+      }
+
+      await authRepository.updateLastLogin(account.id, new Date());
+      const refreshed = await authRepository.findById(account.id);
+      const user = toAuthenticatedUser(refreshed ?? account);
+      const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
+      const token = createOpaqueSessionToken();
+      const csrfToken = createCsrfToken();
+      await sessionStore.createSession({
+        userAccountId: account.id,
+        tokenHash: hashSessionToken(token),
+        csrfTokenHash: hashCsrfToken(csrfToken),
+        expiresAt: new Date(issuedAt.getTime() + ttlSeconds * 1000),
+        createdAt: issuedAt,
+        ip: request.ip ?? null,
+        userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+      });
+      reply.header(
+        "Set-Cookie",
+        serializeCookie(AUTH_COOKIE_NAME, token, {
+          maxAge: ttlSeconds,
+          httpOnly: true,
+          sameSite: "Lax",
+          secure,
+        }),
+      );
+      return { user, csrfToken };
+    },
+  );
+
+  // MFA setup: initiate TOTP setup for the current user
+  app.post("/api/auth/mfa/setup", async (request, reply) => {
+    if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    const user = (request as AuthenticatedRequest).currentUser;
+    if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
+    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes) {
+      return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+
+    const totpSecret = generateTotpSecret();
+    const secretEncrypted = encryptMfaSecret(totpSecret);
+    const factor = await authRepository.createMfaFactor({
+      userAccountId: user.id,
+      type: "totp",
+      secretEncrypted,
+    });
+
+    const recoveryCodes = generateRecoveryCodes();
+    const codeHashes = recoveryCodes.map(hashRecoveryCode);
+    await authRepository.createMfaRecoveryCodes(factor.id, user.id, codeHashes);
+
+    const totpUri = buildTotpUri(totpSecret, user.username);
+    return { factorId: factor.id, totpUri, recoveryCodes };
+  });
+
+  // MFA activate: confirm TOTP code to activate the factor
+  app.post("/api/auth/mfa/activate", async (request, reply) => {
+    if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    const user = (request as AuthenticatedRequest).currentUser;
+    if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
+    const body = request.body as { factorId?: unknown; code?: unknown };
+    const factorId = typeof body.factorId === "string" ? body.factorId : "";
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    if (!factorId || !code) return reply.status(400).send({ error: "MFA_ACTIVATE_VALIDATION_FAILED" });
+    if (!authRepository.findActiveMfaFactor || !authRepository.activateMfaFactor) {
+      return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+
+    const factor = await authRepository.findMfaFactorById?.(factorId) ?? null;
+    if (!factor || factor.userAccountId !== user.id || factor.status !== "pending") {
+      return reply.status(400).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
+    }
+
+    const totpSecret = decryptMfaSecret(factor.secretEncrypted);
+    if (!(await verifyTotp(code, totpSecret))) {
+      return reply.status(401).send({ error: "MFA_CODE_INVALID" });
+    }
+
+    await authRepository.activateMfaFactor(factor.id, new Date());
+    return { ok: true };
+  });
+
+  // MFA disable
+  app.post("/api/auth/mfa/disable", async (request, reply) => {
+    if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    const user = (request as AuthenticatedRequest).currentUser;
+    if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
+    if (!authRepository.findActiveMfaFactor || !authRepository.disableMfaFactor) {
+      return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+
+    const factor = await authRepository.findActiveMfaFactor(user.id);
+    if (!factor) return reply.status(400).send({ error: "MFA_NOT_ENABLED" });
+
+    await authRepository.disableMfaFactor(factor.id, new Date());
+    return { ok: true };
+  });
+
+  // MFA status for current user
+  app.get("/api/auth/mfa/status", async (request, reply) => {
+    if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    const user = (request as AuthenticatedRequest).currentUser;
+    if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
+    if (!authRepository.findActiveMfaFactor) {
+      const status: MfaStatusDto = { enabled: false };
+      return { mfaStatus: status };
+    }
+    const factor = await authRepository.findActiveMfaFactor(user.id);
+    const status: MfaStatusDto = {
+      enabled: Boolean(factor),
+      factorId: factor?.id ?? null,
+      activatedAt: factor?.activatedAt ?? null,
+    };
+    return { mfaStatus: status };
+  });
 
   app.get("/api/auth/me", async (request, reply) => {
     if (!authRepository || !sessionStore) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });

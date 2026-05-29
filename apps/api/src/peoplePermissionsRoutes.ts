@@ -36,6 +36,7 @@ function buildAccessReviewExport(
   userAccounts: readonly UserAccountDto[],
   exportedBy: string,
   activeSessionCounts: ReadonlyMap<string, number>,
+  mfaEnabledSet: ReadonlySet<string>,
   exportedAt = new Date().toISOString(),
 ): AccessReviewExportDto {
   return {
@@ -48,6 +49,7 @@ function buildAccessReviewExport(
       roles: account.roles,
       projectSiteIds: projectSiteIdsForAccessReview(account),
       activeSessionCount: activeSessionCounts.get(account.id) ?? 0,
+      mfaEnabled: mfaEnabledSet.has(account.id),
       permissions: {
         read: readableAreas(account.roles),
         manage: manageableAreas(account.roles),
@@ -255,9 +257,24 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
       userAccounts.map((account) => account.id),
       new Date(),
     );
+    // Collect MFA status for all user accounts
+    const mfaEnabledSet = new Set<string>();
+    if (options.authRepository.hasActiveMfaFactor) {
+      for (const account of userAccounts) {
+        if (await options.authRepository.hasActiveMfaFactor(account.id)) {
+          mfaEnabledSet.add(account.id);
+        }
+      }
+    }
     const exportedBy = (request as AuthenticatedRequest).currentUser?.username ?? "unknown";
     const exportedAt = new Date().toISOString();
-    const accessReviewExport = buildAccessReviewExport(userAccounts, exportedBy, activeSessionCounts, exportedAt);
+    const accessReviewExport = buildAccessReviewExport(
+      userAccounts,
+      exportedBy,
+      activeSessionCounts,
+      mfaEnabledSet,
+      exportedAt,
+    );
     await writeAuditLog(request, options, {
       action: "access_review.export",
       entityType: "user_account",

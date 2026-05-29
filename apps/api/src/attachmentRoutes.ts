@@ -356,6 +356,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       reply.header("Content-Disposition", `attachment; filename="${contentDispositionFileName(attachment)}"`);
       reply.header("Content-Length", contentStats.size);
       reply.header("X-Content-Type-Options", "nosniff");
+      reply.header("Cache-Control", "private, no-store");
       await writeAuditLog(request, options, {
         action: "attachment.content_read",
         entityType: "attachment",

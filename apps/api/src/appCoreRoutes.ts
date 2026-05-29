@@ -28,8 +28,29 @@ export function registerAppCoreRoutes(app: FastifyInstance, options: BuildAppOpt
     },
   }));
 
-  app.get("/api/app-version", async () => ({
+  app.get("/api/app-version", async () => {
+    const version = getAppVersion();
+    const isPublicInternet = process.env.PUBLIC_INTERNET_ENABLED === "true";
+    const exposeCommitSha = process.env.PUBLIC_EXPOSE_COMMIT_SHA !== "false";
+    if (isPublicInternet && !exposeCommitSha) {
+      const { commitSha: _commitSha, ...rest } = version;
+      return { appVersion: rest };
+    }
+    return { appVersion: version };
+  });
+
+  // Protected endpoint returning full app-version including commitSha.
+  // Requires systemSettings.read — mapped in routePermission.ts.
+  app.get("/api/internal/app-version", async () => ({
     appVersion: getAppVersion(),
+  }));
+
+  // Protected meta endpoints for public internet mode where /api/meta/* is restricted.
+  // Requires systemSettings.read — mapped in routePermission.ts.
+  app.get("/api/internal/meta/permissions", async () => ({
+    roles: MVP_ROLES,
+    permissionMatrix: MVP_PERMISSION_MATRIX,
+    assignmentPolicy: USER_ROLE_ASSIGNMENT_POLICY,
   }));
 
   app.get("/api/meta/roles", async () => ({

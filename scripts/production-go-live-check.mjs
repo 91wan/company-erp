@@ -223,8 +223,16 @@ function checkAttachmentScopeAcceptance({ manifest, releaseSignoff, blockers, wa
   }
 }
 
-function checkAppVersion(appVersion, blockers, { manifest, expectedCommit }) {
-  if (!appVersion) return;
+// app-version.json may be saved as the raw /api/app-version response: { appVersion: {...} }
+// or as the flat inner object. Normalise both.
+function normalizeAppVersionJson(raw) {
+  if (raw?.appVersion && typeof raw.appVersion === "object") return raw.appVersion;
+  return raw;
+}
+
+function checkAppVersion(appVersionRaw, blockers, { manifest, expectedCommit }) {
+  if (!appVersionRaw) return;
+  const appVersion = normalizeAppVersionJson(appVersionRaw);
   for (const field of appVersionFields) {
     if (!appVersion[field]) blockers.push(`app-version.json missing ${field}`);
   }

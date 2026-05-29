@@ -46,13 +46,20 @@ async function readText(url, accept = "text/plain") {
   return { response, text };
 }
 
+// /api/app-version returns { appVersion: {...} }. Normalise both nested and flat shapes.
+function normalizeAppVersionBody(body) {
+  if (body?.appVersion && typeof body.appVersion === "object") return body.appVersion;
+  return body;
+}
+
 function validateAppVersion(body) {
+  const version = normalizeAppVersionBody(body);
   const blockers = [];
   for (const field of ["commitSha", "buildTime", "deployedAt", "packageVersion", "environment"]) {
-    if (!body?.[field]) blockers.push(`/api/app-version missing ${field}.`);
+    if (!version?.[field]) blockers.push(`/api/app-version missing ${field}.`);
   }
-  if (body?.environment && !["nas", "production"].includes(body.environment)) {
-    blockers.push(`/api/app-version environment must be nas or production, got ${body.environment}.`);
+  if (version?.environment && !["nas", "production"].includes(version.environment)) {
+    blockers.push(`/api/app-version environment must be nas or production, got ${version.environment}.`);
   }
   return blockers;
 }

@@ -776,6 +776,42 @@ describe("access review production gate", () => {
     expect(pass.stdout).toContain("ACCESS_REVIEW_PASS");
   });
 
+  it("blocks when a high-privilege account does not have MFA enabled (when another account has MFA active)", async () => {
+    const { evaluateAccessReview } = await import(pathToFileURL(join(repoRoot, "scripts/access-review-check.mjs")).href);
+
+    // admin-no-mfa is missing MFA, but another account has mfaEnabled:true so the system has MFA deployed
+    const adminMissingMfa = {
+      users: [
+        { username: "admin-no-mfa", status: "active", roles: ["admin"], mfaEnabled: false },
+        { username: "viewer1", status: "active", roles: ["viewer"], mfaEnabled: true },
+      ],
+    };
+    // All admins have MFA — should pass
+    const allAdminsMfaEnabled = {
+      users: [
+        { username: "admin-with-mfa", status: "active", roles: ["admin"], mfaEnabled: true },
+        { username: "viewer1", status: "active", roles: ["viewer"] },
+      ],
+    };
+    // No account has mfaEnabled:true — MFA check skipped (system may not have MFA deployed)
+    const allMfaFalse = {
+      users: [
+        { username: "admin", status: "active", roles: ["admin"], mfaEnabled: false },
+        { username: "viewer1", status: "active", roles: ["viewer"], mfaEnabled: false },
+      ],
+    };
+
+    const blockedResult = evaluateAccessReview(adminMissingMfa);
+    const passResult = evaluateAccessReview(allAdminsMfaEnabled);
+    const skipResult = evaluateAccessReview(allMfaFalse);
+
+    expect(blockedResult.ok).toBe(false);
+    expect(blockedResult.blockers.join("\n")).toContain("MFA");
+    expect(passResult.ok).toBe(true);
+    // When no account has mfaEnabled:true, MFA enforcement is not triggered
+    expect(skipResult.ok).toBe(true);
+  });
+
   it("documents the production access review runbook and external account boundaries", () => {
     const doc = readFile(join(repoRoot, "docs", "operations", "access-review-runbook.md"));
 
@@ -1020,6 +1056,154 @@ describe("production monitoring health check", () => {
     expect(doc).toContain("磁盘满");
     expect(doc).toContain("回到上一个 git commit");
     expect(doc).toContain("人工巡检");
+  });
+});
+
+describe("production health check normalizes nested app-version response", () => {
+  it("accepts { appVersion: {...} } envelope (real API response shape)", async () => {
+    await withMockHttpServer((request, response) => {
+      if (request.url === "/") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end('<div id="root"></div><script src="/assets/app.js"></script>');
+        return;
+      }
+      if (request.url === "/assets/app.js") {
+        response.writeHead(200, { "content-type": "application/javascript" });
+        response.end("console.log('Company ERP');");
+        return;
+      }
+      if (request.url === "/health") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ status: "ok" }));
+        return;
+      }
+      if (request.url === "/api/app-version") {
+        // Real API returns nested { appVersion: {...} }
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({
+          appVersion: {
+            commitSha: "a".repeat(40),
+            shortCommitSha: "aaaaaaa",
+            buildTime: "2026-05-25T00:00:00.000Z",
+            deployedAt: "2026-05-25T00:00:00.000Z",
+            packageVersion: "0.1.0",
+            environment: "nas",
+          },
+        }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    }, async (baseUrl) => {
+      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("PRODUCTION_HEALTH_PASS");
+    });
+  });
+
+  it("blocks when nested appVersion is missing commitSha", async () => {
+    await withMockHttpServer((request, response) => {
+      if (request.url === "/") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end('<div id="root"></div><script src="/assets/app.js"></script>');
+        return;
+      }
+      if (request.url === "/assets/app.js") {
+        response.writeHead(200, { "content-type": "application/javascript" });
+        response.end("console.log('Company ERP');");
+        return;
+      }
+      if (request.url === "/health") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ status: "ok" }));
+        return;
+      }
+      if (request.url === "/api/app-version") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({
+          appVersion: {
+            // commitSha intentionally omitted (simulates PUBLIC_EXPOSE_COMMIT_SHA=false)
+            buildTime: "2026-05-25T00:00:00.000Z",
+            deployedAt: "2026-05-25T00:00:00.000Z",
+            packageVersion: "0.1.0",
+            environment: "nas",
+          },
+        }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    }, async (baseUrl) => {
+      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("BLOCKED");
+      expect(result.stderr).toContain("commitSha");
+    });
+  });
+});
+
+describe("public security evidence check", () => {
+  it("passes when all evidence files are clean", async () => {
+    const { evaluatePublicSecurityEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
+    )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
+    try {
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found. Scan complete.");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "security-headers.txt"),
+        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "admin: MFA TOTP enabled. systemSettings.manage: MFA enabled. userAccounts.manage: MFA enabled.");
+
+      const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("PUBLIC_SECURITY_EVIDENCE_PASS");
+      expect(result.blockers).toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when vulnerability scan has critical issues", async () => {
+    const { evaluatePublicSecurityEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
+    )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
+    try {
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "2 critical vulnerabilities found in libssl");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "security-headers.txt"),
+        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled.");
+
+      const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("critical");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when HSTS header is missing from security-headers.txt", async () => {
+    const { evaluatePublicSecurityEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
+    )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
+    try {
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities.");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "0 vulnerabilities");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Content-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled.");
+
+      const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("Strict-Transport-Security");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -1369,6 +1553,9 @@ describe("NAS trial deploy notification readiness gate", () => {
         "production:business-acceptance-check": "node scripts/production-business-acceptance-check.mjs",
         "production:evidence-seal": "node scripts/production-evidence-seal.mjs",
         "attachments:production-check": "node scripts/attachment-production-check.mjs",
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
       },
       readText: (path) => {
         if (path === "scripts/production-ready.sh") {
@@ -2493,6 +2680,299 @@ describe("attachment legacy migration readiness report", () => {
     rmSync(tempRoot, { recursive: true, force: true });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("--output cannot be used with --dry-run");
+  });
+});
+
+describe("public internet readiness gate", () => {
+  it("passes when all public internet prerequisites are present", async () => {
+    const { evaluatePublicInternetReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-internet-readiness-gate.mjs")).href
+    )) as { evaluatePublicInternetReadiness: (opts?: { readText?: (p: string) => string; packageScripts?: Record<string, string> }) => { status: string; blockers: string[]; passed: string[] } };
+
+    const result = evaluatePublicInternetReadiness({
+      packageScripts: {
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+      },
+      readText: (path) => {
+        if (path === "apps/api/src/app.ts") {
+          return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED";
+        }
+        if (path === "apps/api/src/securityHeaders.ts") {
+          return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+        }
+        if (path === "apps/api/src/fetchMetadataProtection.ts") {
+          return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+        }
+        if (path === "apps/api/src/mfa.ts") {
+          return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken requiresMfa";
+        }
+        if (path === "apps/api/src/auth.ts") {
+          return "MFA_REQUIRED /api/auth/mfa/verify-login";
+        }
+        if (path === "apps/api/tests/mfa.test.ts") {
+          return "generateTotpSecret verifyTotp createPendingMfaToken";
+        }
+        if (path === "apps/api/tests/security-hardening.test.ts") {
+          return "rate limit login";
+        }
+        if (path === "apps/api/src/attachmentRoutes.ts") {
+          return "private, no-store Content-Disposition";
+        }
+        if (path === "apps/api/src/routePermission.ts") {
+          return "isPublicInternetPath isPublicPath";
+        }
+        if (path === "apps/api/tests/attachments-routes.test.ts") {
+          return "content-disposition attachment test content";
+        }
+        if (path === "apps/api/tests/docs-public-access-boundary.test.ts") {
+          return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test content";
+        }
+        if (path === "scripts/public-go-live-check.mjs") {
+          return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
+        }
+        if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
+        if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
+        if (path === "docs/security/public-data-exposure-boundary.md") return "external_project_site storageKey commitSha";
+        if (path === "docs/security/public-internet-security-headers.md") return "Strict-Transport-Security Content-Security-Policy X-Content-Type-Options";
+        if (path === "docs/security/public-internet-go-live-runbook.md") return "PUBLIC_INTERNET_ENABLED MFA WAF";
+        if (path === "docs/security/public-mfa-requirement.md") return "PUBLIC_MFA_REQUIRED recovery code TOTP";
+        if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
+        if (path === "apps/api/tests/security-headers.test.ts") return "security headers test content";
+        if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test content";
+        if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test content";
+        return "ok";
+      },
+    });
+
+    expect(result.status).toBe("READY_FOR_PUBLIC_INTERNET_REVIEW");
+    expect(result.blockers).toEqual([]);
+  });
+
+  it("blocks when MFA implementation is missing", async () => {
+    const { evaluatePublicInternetReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-internet-readiness-gate.mjs")).href
+    )) as { evaluatePublicInternetReadiness: (opts?: { readText?: (p: string) => string; packageScripts?: Record<string, string> }) => { status: string; blockers: string[]; mfaBlockers: string[] } };
+
+    // Provide proper mock content for all non-MFA paths; throw only for mfa.ts
+    const fullPassReadText = (path: string): string => {
+      if (path === "apps/api/src/mfa.ts") throw new Error(`missing ${path}`);
+      if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED";
+      if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+      if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+      if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED /api/auth/mfa/verify-login";
+      if (path === "apps/api/tests/mfa.test.ts") throw new Error(`missing ${path}`);
+      if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
+      if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+      if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath";
+      if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
+      if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
+      if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
+      if (path === "docs/security/public-data-exposure-boundary.md") return "external_project_site storageKey commitSha";
+      if (path === "docs/security/public-internet-security-headers.md") return "Strict-Transport-Security Content-Security-Policy X-Content-Type-Options";
+      if (path === "docs/security/public-internet-go-live-runbook.md") return "PUBLIC_INTERNET_ENABLED MFA WAF";
+      if (path === "docs/security/public-mfa-requirement.md") return "PUBLIC_MFA_REQUIRED recovery code TOTP";
+      if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
+      if (path === "apps/api/tests/security-headers.test.ts") return "security headers test";
+      if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
+      if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test";
+      if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
+      if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
+      return "ok";
+    };
+
+    const result = evaluatePublicInternetReadiness({
+      packageScripts: {
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+      },
+      readText: fullPassReadText,
+    });
+
+    expect(result.status).toBe("BLOCKED_MFA_NOT_IMPLEMENTED");
+    expect(result.mfaBlockers.join("\n")).toContain("mfa.ts");
+  });
+});
+
+describe("public internet go-live check", () => {
+  it("passes with complete valid evidence package", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string; expectedCommit?: string }) => { status: string; blockers: string[]; passed: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc1234567890",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "Let's Encrypt",
+        mfaRequired: true,
+        publicDataExposureAccepted: false,
+        operator: "ops@example.com",
+        approver: "cto@example.com",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin user: MFA TOTP enabled and confirmed");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 3 accounts");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("READY_FOR_PUBLIC_INTERNET_GO_LIVE");
+      expect(result.blockers).toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when mfaRequired is false in manifest", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc123",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "LE",
+        mfaRequired: false, // Should block
+        publicDataExposureAccepted: false,
+        operator: "ops",
+        approver: "cto",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE" }));
+      for (const f of ["tls-certificate.txt", "dns-records.txt", "reverse-proxy-config.redacted.txt",
+        "waf-config.redacted.txt", "public-health-check.txt", "vulnerability-scan-summary.txt",
+        "dependency-audit.txt", "access-review-check.txt", "incident-response-signoff.md",
+        "public-data-exposure-signoff.md"]) {
+        writeFileSync(join(tempDir, f), "ok");
+      }
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("mfaRequired");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when security headers are missing HSTS", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet", domainName: "erp.example.com", releaseCommitSha: "abc",
+        wafProvider: "CF", tlsCertificateIssuer: "LE", mfaRequired: true, publicDataExposureAccepted: false,
+        operator: "ops", approver: "cto",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE" }));
+      for (const f of ["tls-certificate.txt", "dns-records.txt", "reverse-proxy-config.redacted.txt",
+        "waf-config.redacted.txt", "public-health-check.txt", "vulnerability-scan-summary.txt",
+        "dependency-audit.txt", "incident-response-signoff.md", "public-data-exposure-signoff.md"]) {
+        writeFileSync(join(tempDir, f), "ok");
+      }
+      writeFileSync(join(tempDir, "security-headers.txt"), "Content-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("Strict-Transport-Security");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when internal production go-live check did not pass", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet", domainName: "erp.example.com", releaseCommitSha: "abc",
+        wafProvider: "CF", tlsCertificateIssuer: "LE", mfaRequired: true, publicDataExposureAccepted: false,
+        operator: "ops", approver: "cto",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "BLOCKED", blockers: ["something missing"] }));
+      for (const f of ["tls-certificate.txt", "dns-records.txt", "reverse-proxy-config.redacted.txt",
+        "waf-config.redacted.txt", "public-health-check.txt", "vulnerability-scan-summary.txt",
+        "dependency-audit.txt", "incident-response-signoff.md", "public-data-exposure-signoff.md"]) {
+        writeFileSync(join(tempDir, f), "ok");
+      }
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA enabled");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("READY_FOR_INTERNAL_PRODUCTION_GO_LIVE");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when evidence file contains Authorization Bearer token", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet", domainName: "erp.example.com", releaseCommitSha: "abc",
+        wafProvider: "CF", tlsCertificateIssuer: "LE", mfaRequired: true, publicDataExposureAccepted: false,
+        operator: "ops", approver: "cto",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE" }));
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"),
+        "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities.");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"), "admin: MFA TOTP enabled");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "Confirmed.");
+      // This file contains a sensitive Authorization header — should BLOCK
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"),
+        "Confirmed.\nAuthorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.sensitive");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("sensitive data");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

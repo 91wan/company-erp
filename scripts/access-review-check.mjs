@@ -71,6 +71,15 @@ function projectSiteIdsOf(user) {
   return [];
 }
 
+const HIGH_PRIVILEGE_ROLES = new Set(["admin"]);
+
+function isMfaEnabled(user) {
+  if (user.mfaEnabled === true) return true;
+  if (user.mfa?.enabled === true) return true;
+  if (user.mfaStatus?.enabled === true) return true;
+  return false;
+}
+
 function hasActiveSession(user) {
   if (user.hasActiveSession === true) return true;
   if (typeof user.activeSessionCount === "number" && user.activeSessionCount > 0) return true;
@@ -144,6 +153,20 @@ export function evaluateAccessReview(payload) {
       blockers.push(
         `Only one active external_project_site account per project site is allowed: ${projectSiteId} (${usernames.join(", ")}).`,
       );
+    }
+  }
+
+  // PUBLIC_MFA_REQUIRED: high-privilege accounts must have MFA enabled.
+  // Only enforced when the export shows at least one account with MFA enabled,
+  // meaning the system has MFA deployed (not just the field present but all false).
+  const mfaDeployed = users.some((u) => isMfaEnabled(u));
+  if (mfaDeployed) {
+    for (const user of activeUsers) {
+      const roles = rolesOf(user);
+      const username = usernameOf(user);
+      if (roles.some((r) => HIGH_PRIVILEGE_ROLES.has(r)) && !isMfaEnabled(user)) {
+        blockers.push(`High-privilege account must have MFA enabled (PUBLIC_MFA_REQUIRED): ${username}.`);
+      }
     }
   }
 

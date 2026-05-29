@@ -17,6 +17,8 @@ import { registerPeoplePermissionsRoutes } from "./peoplePermissionsRoutes.js";
 import { registerProjectSiteRoutes } from "./projectSiteRoutes.js";
 import { registerPurchaseRoutes } from "./purchaseRoutes.js";
 import type { BuildAppOptions } from "./appRouteContext.js";
+import { registerFetchMetadataProtection } from "./fetchMetadataProtection.js";
+import { registerSecurityHeaders, securityHeadersEnabled } from "./securityHeaders.js";
 
 const sensitiveLogKeys = new Set(["password", "passwordHash"]);
 const MIN_PRODUCTION_PASSWORD_LENGTH = 16;
@@ -88,6 +90,22 @@ function publicAccessEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return isTruthy(env.PUBLIC_ACCESS_ENABLED);
 }
 
+function publicInternetEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isTruthy(env.PUBLIC_INTERNET_ENABLED);
+}
+
+const PRIVATE_IP_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+];
+
+function isPrivateOrLocalHost(hostname: string): boolean {
+  return PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
 function isProductionLike(env: NodeJS.ProcessEnv = process.env): boolean {
   const appEnvironment = env.APP_ENVIRONMENT?.trim() || "local";
   return appEnvironment !== "local" || env.NODE_ENV === "production";
@@ -146,6 +164,103 @@ export function validateRuntimeSecurityEnvironment(env: NodeJS.ProcessEnv = proc
     });
     if (insecureOrigin) {
       throw new Error("CORS_ALLOWED_ORIGINS must only include HTTPS origins when PUBLIC_ACCESS_ENABLED=true");
+    }
+  }
+
+  if (publicInternetEnabled(env)) {
+    if (!publicAccessEnabled(env)) {
+      throw new Error("PUBLIC_ACCESS_ENABLED=true is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    const appEnvironment = env.APP_ENVIRONMENT?.trim() || "local";
+    if (appEnvironment !== "production") {
+      throw new Error("APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    if (env.AUTH_COOKIE_SECURE !== "true") {
+      throw new Error("AUTH_COOKIE_SECURE=true is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+
+    const origins = parseAllowedOrigins(env);
+    for (const origin of origins) {
+      let parsed: URL;
+      try {
+        parsed = new URL(origin);
+      } catch {
+        throw new Error(`CORS_ALLOWED_ORIGINS contains invalid origin when PUBLIC_INTERNET_ENABLED=true: ${origin}`);
+      }
+      if (parsed.protocol !== "https:") {
+        throw new Error(
+          `CORS_ALLOWED_ORIGINS must only include HTTPS origins when PUBLIC_INTERNET_ENABLED=true: ${origin}`,
+        );
+      }
+      if (isPrivateOrLocalHost(parsed.hostname)) {
+        throw new Error(
+          `CORS_ALLOWED_ORIGINS must not include private/local hosts when PUBLIC_INTERNET_ENABLED=true: ${origin}`,
+        );
+      }
+      if (parsed.hostname === "*" || parsed.hostname.startsWith("*.")) {
+        throw new Error(
+          `CORS_ALLOWED_ORIGINS must not include wildcards when PUBLIC_INTERNET_ENABLED=true: ${origin}`,
+        );
+      }
+    }
+
+    const publicBaseUrl = env.PUBLIC_APP_BASE_URL?.trim();
+    if (!publicBaseUrl) {
+      throw new Error("PUBLIC_APP_BASE_URL is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    let publicBaseHost = "";
+    try {
+      const parsed = new URL(publicBaseUrl);
+      if (parsed.protocol !== "https:") {
+        throw new Error("PUBLIC_APP_BASE_URL must be an HTTPS URL when PUBLIC_INTERNET_ENABLED=true");
+      }
+      publicBaseHost = parsed.host;
+    } catch (e) {
+      if ((e as Error).message.includes("PUBLIC_APP_BASE_URL")) throw e;
+      throw new Error("PUBLIC_APP_BASE_URL must be a valid HTTPS URL when PUBLIC_INTERNET_ENABLED=true");
+    }
+    // Rule 7: PUBLIC_APP_BASE_URL host must be in CORS_ALLOWED_ORIGINS
+    const originsForBaseCheck = parseAllowedOrigins(env);
+    const baseHostInCors = originsForBaseCheck.some((origin) => {
+      try { return new URL(origin).host === publicBaseHost; } catch { return false; }
+    });
+    if (!baseHostInCors) {
+      throw new Error(`PUBLIC_APP_BASE_URL host "${publicBaseHost}" must be present in CORS_ALLOWED_ORIGINS when PUBLIC_INTERNET_ENABLED=true`);
+    }
+
+    const cookieDomain = env.COOKIE_DOMAIN?.trim();
+    if (cookieDomain) {
+      // Reject top-level domain wildcards like ".com" or bare TLDs
+      const parts = cookieDomain.replace(/^\./, "").split(".");
+      if (parts.length < 2 || parts.some((p) => p === "")) {
+        throw new Error(
+          "COOKIE_DOMAIN must be a specific domain or subdomain (not a TLD) when PUBLIC_INTERNET_ENABLED=true",
+        );
+      }
+    }
+
+    if (!env.TRUSTED_PROXY_CIDRS?.trim()) {
+      throw new Error("TRUSTED_PROXY_CIDRS is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    if (env.PUBLIC_SECURITY_HEADERS_ENABLED !== "true") {
+      throw new Error("PUBLIC_SECURITY_HEADERS_ENABLED=true is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    if (env.PUBLIC_RATE_LIMIT_ENABLED !== "true") {
+      throw new Error("PUBLIC_RATE_LIMIT_ENABLED=true is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    if (env.PUBLIC_MFA_REQUIRED !== "true") {
+      throw new Error("PUBLIC_MFA_REQUIRED=true is required when PUBLIC_INTERNET_ENABLED=true");
+    }
+    // Rule 9: PUBLIC_EXPOSE_COMMIT_SHA must be explicitly set to false for public internet
+    if (env.PUBLIC_EXPOSE_COMMIT_SHA !== "false") {
+      throw new Error("PUBLIC_EXPOSE_COMMIT_SHA=false is required when PUBLIC_INTERNET_ENABLED=true (set explicitly to suppress commit SHA in public responses)");
+    }
+    // WAF and TLS are mandatory edge components for public internet exposure
+    if (env.PUBLIC_EDGE_WAF_REQUIRED !== "true") {
+      throw new Error("PUBLIC_EDGE_WAF_REQUIRED=true is required when PUBLIC_INTERNET_ENABLED=true (a WAF must be in front of the API on the public internet)");
+    }
+    if (env.PUBLIC_TLS_REQUIRED !== "true") {
+      throw new Error("PUBLIC_TLS_REQUIRED=true is required when PUBLIC_INTERNET_ENABLED=true (TLS/HTTPS must terminate at the edge)");
     }
   }
 }
@@ -213,6 +328,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
     }
     return reply.send(error);
   });
+
+  if (securityHeadersEnabled()) {
+    registerSecurityHeaders(app);
+  }
+
+  registerFetchMetadataProtection(app);
 
   if ((options.auth?.enabled ?? false) && publicAccessEnabled()) {
     app.addHook("preHandler", async (request, reply) => {
