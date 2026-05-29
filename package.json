@@ -39,7 +39,10 @@
     "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs",
     "production:data-quality-check": "node scripts/production-data-quality-check.mjs",
     "production:business-acceptance-check": "node scripts/production-business-acceptance-check.mjs",
-    "production:evidence-seal": "node scripts/production-evidence-seal.mjs"
+    "production:evidence-seal": "node scripts/production-evidence-seal.mjs",
+    "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+    "public:go-live-check": "node scripts/public-go-live-check.mjs",
+    "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

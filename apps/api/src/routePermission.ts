@@ -17,6 +17,8 @@ function startsWith(prefix: string): RoutePermissionRule["test"] {
 }
 
 export const ROUTE_PERMISSION_TABLE: readonly RoutePermissionRule[] = [
+  { test: startsWith("/api/internal/app-version"), area: "systemSettings", requiredLevel: "read" },
+  { test: startsWith("/api/internal/meta/"), area: "systemSettings", requiredLevel: "read" },
   { test: startsWith("/api/audit-logs"), area: "auditLogs", requiredLevel: levelForMethod },
   { test: startsWith("/api/attachments"), area: "attachments", requiredLevel: levelForMethod },
   { test: startsWith("/api/project-site-attachment-uploads"), area: "certificates", requiredLevel: "manage" },
@@ -106,4 +108,22 @@ export function isPublicPath(pathname: string, method: string): boolean {
     pathname === "/api/app-version" ||
     (pathname === "/api/app-config" && (method === "GET" || method === "HEAD"))
   );
+}
+
+/**
+ * Stricter public path check for PUBLIC_INTERNET_ENABLED=true.
+ *
+ * Compared with isPublicPath, this excludes:
+ * - /api/meta/* (roles, permissions, dictionaries, inventory — internal ERP metadata)
+ * - GET /api/app-config (may contain business config)
+ *
+ * Only the minimum required for login + app bootstrap is allowed unauthenticated.
+ */
+export function isPublicInternetPath(pathname: string, method: string): boolean {
+  if (pathname === "/health") return true;
+  if (pathname === "/api/app-version") return true;
+  // Auth routes: login, MFA verify-login. Other /api/auth/* (me, logout, mfa/setup etc.) require auth.
+  if (pathname === "/api/auth/login" && method === "POST") return true;
+  if (pathname === "/api/auth/mfa/verify-login" && method === "POST") return true;
+  return false;
 }

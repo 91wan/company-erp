@@ -336,11 +336,32 @@ export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppC
   return payload.appConfig;
 }
 
-export async function login(input: LoginInput): Promise<AuthenticatedUserDto> {
-  const payload = await requestJson<{ user: AuthenticatedUserDto; csrfToken?: string }>(`${apiBaseUrl}/api/auth/login`, {
+export async function login(
+  input: LoginInput,
+): Promise<AuthenticatedUserDto | { pendingMfaToken: string }> {
+  const payload = await requestJson<
+    | { user: AuthenticatedUserDto; csrfToken?: string }
+    | { status: "MFA_REQUIRED"; pendingMfaToken: string }
+  >(`${apiBaseUrl}/api/auth/login`, {
     method: "POST",
     body: JSON.stringify(input),
   });
+  if ("status" in payload && payload.status === "MFA_REQUIRED") {
+    return { pendingMfaToken: payload.pendingMfaToken };
+  }
+  const typed = payload as { user: AuthenticatedUserDto; csrfToken?: string };
+  rememberCsrfToken(typed.csrfToken);
+  return typed.user;
+}
+
+export async function verifyMfaLogin(input: {
+  pendingMfaToken: string;
+  code: string;
+}): Promise<AuthenticatedUserDto> {
+  const payload = await requestJson<{ user: AuthenticatedUserDto; csrfToken?: string }>(
+    `${apiBaseUrl}/api/auth/mfa/verify-login`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
   rememberCsrfToken(payload.csrfToken);
   return payload.user;
 }

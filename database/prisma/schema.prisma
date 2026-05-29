@@ -675,6 +675,8 @@ model UserAccount {
   assignedRoleChanges UserRoleAssignment[]  @relation("AssignedUserRoles")
   externalProjectSiteAccount ExternalProjectSiteAccount?
   authSessions        AuthSession[]
+  mfaFactors          UserMfaFactor[]
+  mfaRecoveryCodes    UserMfaRecoveryCode[]
 
   @@index([status])
   @@map("user_accounts")
@@ -700,6 +702,39 @@ model AuthSession {
   @@index([expiresAt])
   @@index([revokedAt])
   @@map("auth_sessions")
+}
+
+model UserMfaFactor {
+  id              String    @id @default(uuid()) @db.Uuid
+  userAccountId   String    @map("user_account_id") @db.Uuid
+  type            String    // "totp"
+  secretEncrypted String    @map("secret_encrypted")
+  status          String    @default("pending") // pending | active | disabled
+  createdAt       DateTime  @default(now()) @map("created_at")
+  activatedAt     DateTime? @map("activated_at")
+  disabledAt      DateTime? @map("disabled_at")
+
+  userAccount   UserAccount           @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  recoveryCodes UserMfaRecoveryCode[]
+
+  @@index([userAccountId, status])
+  @@map("user_mfa_factors")
+}
+
+model UserMfaRecoveryCode {
+  id            String    @id @default(uuid()) @db.Uuid
+  userAccountId String    @map("user_account_id") @db.Uuid
+  mfaFactorId   String    @map("mfa_factor_id") @db.Uuid
+  codeHash      String    @map("code_hash")
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  userAccount UserAccount   @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  mfaFactor   UserMfaFactor @relation(fields: [mfaFactorId], references: [id], onDelete: Cascade)
+
+  @@index([userAccountId])
+  @@index([mfaFactorId])
+  @@map("user_mfa_recovery_codes")
 }
 
 model UserRoleAssignment {

@@ -141,6 +141,24 @@ export function evaluateProductionReadiness({
       name: "attachments:production-check",
       command: "node scripts/attachment-production-check.mjs",
     }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "public:readiness-gate",
+      command: "node scripts/public-internet-readiness-gate.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "public:go-live-check",
+      command: "node scripts/public-go-live-check.mjs",
+    }),
+    requireScript({
+      blockers,
+      packageScripts,
+      name: "public:security-evidence-check",
+      command: "node scripts/public-security-evidence-check.mjs",
+    }),
   ]) {
     if (scriptName) {
       passed.push(`${scriptName} script`);
@@ -180,6 +198,22 @@ export function evaluateProductionReadiness({
     "docs/security/csrf-origin-production-policy.md",
     "apps/api/tests/audit-coverage.test.ts",
     "docs/import/import-module-stop-line.md",
+    "apps/api/src/securityHeaders.ts",
+    "apps/api/src/fetchMetadataProtection.ts",
+    "apps/api/src/mfa.ts",
+    "apps/api/tests/mfa.test.ts",
+    "apps/api/tests/security-headers.test.ts",
+    "apps/api/tests/fetch-metadata-protection.test.ts",
+    "apps/api/tests/public-internet-env.test.ts",
+    "scripts/public-internet-readiness-gate.mjs",
+    "scripts/public-go-live-check.mjs",
+    "scripts/public-security-evidence-check.mjs",
+    "docs/security/public-edge-runbook.md",
+    "docs/security/public-incident-response-runbook.md",
+    "docs/security/public-data-exposure-boundary.md",
+    "docs/security/public-internet-security-headers.md",
+    "docs/security/public-internet-go-live-runbook.md",
+    "docs/security/public-mfa-requirement.md",
   ]) {
     requireText({ blockers, readText, path, markers: [] });
   }

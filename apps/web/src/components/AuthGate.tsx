@@ -1,7 +1,7 @@
-import { LockKeyhole, LogIn, RefreshCw } from "lucide-react";
+import { LockKeyhole, LogIn, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { AppConfigDto, AuthenticatedUserDto } from "@company-erp/shared";
-import { getAppConfig, getCurrentUser, login } from "../apiClient";
+import { getAppConfig, getCurrentUser, login, verifyMfaLogin } from "../apiClient";
 
 type AuthGateProps = {
   children: (
@@ -68,6 +68,7 @@ export function AuthGate({ children }: AuthGateProps) {
     return <LoginPanel companyName={appConfig.companyName} onLogin={handleUserChange} />;
   }
 
+
   return children(user, handleUserChange, appConfig, setAppConfig);
 }
 
@@ -75,17 +76,76 @@ function LoginPanel({ companyName, onLogin }: { companyName: string; onLogin: (u
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [pendingMfaToken, setPendingMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaStatus, setMfaStatus] = useState<"idle" | "saving" | "error">("idle");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus("saving");
-
     try {
-      const user = await login({ username, password });
-      onLogin(user);
+      const result = await login({ username, password });
+      if ("pendingMfaToken" in result) {
+        setPendingMfaToken(result.pendingMfaToken);
+        setStatus("idle");
+      } else {
+        onLogin(result);
+      }
     } catch {
       setStatus("error");
     }
+  }
+
+  async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pendingMfaToken) return;
+    setMfaStatus("saving");
+    try {
+      const user = await verifyMfaLogin({ pendingMfaToken, code: mfaCode });
+      onLogin(user);
+    } catch {
+      setMfaStatus("error");
+    }
+  }
+
+  if (pendingMfaToken) {
+    return (
+      <main className="auth-screen">
+        <form className="auth-card" onSubmit={handleMfaSubmit}>
+          <span className="auth-icon">
+            <ShieldCheck aria-hidden="true" size={24} />
+          </span>
+          <div>
+            <h1>{companyName}</h1>
+            <p>双因素验证</p>
+          </div>
+          <label>
+            <span>验证码</span>
+            <input
+              value={mfaCode}
+              onChange={(event) => setMfaCode(event.target.value)}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              maxLength={10}
+              required
+              placeholder="6 位 TOTP 码或恢复码"
+            />
+          </label>
+          <button type="submit" disabled={mfaStatus === "saving"}>
+            <ShieldCheck aria-hidden="true" size={17} />
+            {mfaStatus === "saving" ? "验证中" : "验证"}
+          </button>
+          {mfaStatus === "error" ? <p className="form-error">验证码无效，请重试。</p> : null}
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => { setPendingMfaToken(null); setMfaCode(""); setMfaStatus("idle"); }}
+          >
+            返回登录
+          </button>
+        </form>
+      </main>
+    );
   }
 
   return (
