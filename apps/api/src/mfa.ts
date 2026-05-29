@@ -3,7 +3,7 @@ import { canManage, canRead, type MvpRoleCode } from "@company-erp/shared";
 
 const PENDING_MFA_TOKEN_TTL_SECONDS = 300; // 5 minutes
 const RECOVERY_CODE_COUNT = 10;
-const RECOVERY_CODE_BYTES = 5; // 10 hex chars per code
+const RECOVERY_CODE_BYTES = 16; // 128-bit entropy per code
 
 // TOTP constants (RFC 6238 / RFC 4226)
 const TOTP_PERIOD = 30;
@@ -118,13 +118,15 @@ export function verifyTotp(token: string, secret: string): boolean {
 }
 
 export function generateRecoveryCodes(): string[] {
-  return Array.from({ length: RECOVERY_CODE_COUNT }, () =>
-    randomBytes(RECOVERY_CODE_BYTES).toString("hex"),
-  );
+  return Array.from({ length: RECOVERY_CODE_COUNT }, () => {
+    const hex = randomBytes(RECOVERY_CODE_BYTES).toString("hex"); // 32 hex chars
+    return `${hex.slice(0, 8)}-${hex.slice(8, 16)}-${hex.slice(16, 24)}-${hex.slice(24, 32)}`;
+  });
 }
 
 export function hashRecoveryCode(code: string): string {
-  return createHash("sha256").update(code.toLowerCase().trim()).digest("hex");
+  const pepper = process.env.RECOVERY_CODE_PEPPER?.trim() || process.env.AUTH_SESSION_SECRET?.trim() || "company-erp-local-dev-session-secret-change-me";
+  return createHmac("sha256", pepper).update(code.toLowerCase().replace(/-/g, "").trim()).digest("hex");
 }
 
 function sessionSecretFromEnv(): string {

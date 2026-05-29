@@ -9,6 +9,7 @@ export function publicInternetEnabled(env: NodeJS.ProcessEnv = process.env): boo
 }
 
 const UNSAFE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const ALLOWED_FETCH_SITE_VALUES = new Set(["cross-site", "same-origin", "same-site", "none"]);
 
 function logSecurityEvent(event: {
   blockedReason: string;
@@ -44,6 +45,18 @@ export function registerFetchMetadataProtection(app: FastifyInstance): void {
     if (secFetchSite === "cross-site") {
       logSecurityEvent({
         blockedReason: "sec-fetch-site=cross-site",
+        ip: request.ip,
+        userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : undefined,
+        path: request.url,
+        method: request.method,
+        secFetchSite,
+      });
+      return reply.status(403).send({ error: "FETCH_METADATA_BLOCKED" });
+    }
+
+    if (!ALLOWED_FETCH_SITE_VALUES.has(secFetchSite)) {
+      logSecurityEvent({
+        blockedReason: `sec-fetch-site=unknown:${secFetchSite}`,
         ip: request.ip,
         userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : undefined,
         path: request.url,

@@ -280,6 +280,12 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
     if (/recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(mfaEvidence)) {
       blockers.push("mfa-enforcement-evidence.txt: must not contain recovery code plaintext");
     }
+    if (/TOTP secret/i.test(mfaEvidence)) {
+      blockers.push("mfa-enforcement-evidence.txt: contains sensitive data matching TOTP secret");
+    }
+    if (/secretEncrypted/.test(mfaEvidence)) {
+      blockers.push("mfa-enforcement-evidence.txt: contains sensitive data matching secretEncrypted");
+    }
     if (!blockers.some((b) => b.includes("mfa-enforcement-evidence"))) {
       passed.push("mfa-enforcement-evidence.txt");
     }

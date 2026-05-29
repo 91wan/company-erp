@@ -128,7 +128,8 @@ function containsSensitiveEvidence(text) {
     /Set-Cookie\s*:/i.test(text) ||
     /company_erp_session/.test(text) ||
     /AUTH_SESSION_SECRET=\S+/.test(text) ||
-    /IDENTITY_ENCRYPTION_SECRET=\S+/.test(text)
+    /IDENTITY_ENCRYPTION_SECRET=\S+/.test(text) ||
+    /secretEncrypted/.test(text)
   );
 }
 
