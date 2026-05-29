@@ -42,7 +42,8 @@
     "production:evidence-seal": "node scripts/production-evidence-seal.mjs",
     "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
     "public:go-live-check": "node scripts/public-go-live-check.mjs",
-    "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs"
+    "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
+    "auth:revoke-all-sessions": "node scripts/revoke-all-sessions.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

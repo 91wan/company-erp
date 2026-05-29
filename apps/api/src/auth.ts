@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { MfaStatusDto } from "@company-erp/shared";
 import {
   buildTotpUri,
+  createMfaSetupToken,
   createPendingMfaToken,
   decryptMfaSecret,
   encryptMfaSecret,
@@ -10,6 +11,7 @@ import {
   generateTotpSecret,
   hashRecoveryCode,
   requiresMfa,
+  verifyMfaSetupToken,
   verifyPendingMfaToken,
   verifyTotp,
 } from "./mfa.js";
@@ -23,7 +25,8 @@ import {
   type UserAccountStatusCode,
 } from "@company-erp/shared";
 import { verifyPassword } from "./password.js";
-import { isPublicInternetPath, isPublicPath, routePermission } from "./routePermission.js";
+import type { AuditLogRepository } from "./auditLogs.js";
+import { isAuthenticatedAuthSelfServicePath, isPublicInternetPath, isPublicPath, routePermission } from "./routePermission.js";
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -131,6 +134,7 @@ export type AuthOptions = {
   sessionSecret?: string;
   cookieSecure?: boolean;
   sessionTtlSeconds?: number;
+  auditLogRepository?: AuditLogRepository;
 };
 
 export type AuthenticatedRequest = FastifyRequest & {
@@ -433,6 +437,29 @@ export function registerAuth(
   const ttlSeconds = authOptions?.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
   const secure = authOptions?.cookieSecure ?? false;
   const sessionStore = authRepository ? createSessionStore(authRepository) : null;
+  const auditLogRepository = authOptions?.auditLogRepository;
+
+  async function writeAuthAudit(
+    request: FastifyRequest,
+    action: string,
+    entityType: string,
+    entityId: string | null,
+    afterJson: Record<string, unknown> | null,
+  ): Promise<void> {
+    if (!auditLogRepository) return;
+    const user = (request as AuthenticatedRequest).currentUser;
+    await auditLogRepository.create({
+      actorUserId: user?.id ?? null,
+      actorUsername: user?.username ?? null,
+      action,
+      entityType,
+      entityId,
+      beforeJson: null,
+      afterJson,
+      ip: request.ip ?? null,
+      userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+    });
+  }
 
   // Per-username rate limit store (in-memory, per app instance)
   const usernameAttempts = new Map<string, { count: number; windowStart: number }>();
@@ -480,6 +507,10 @@ export function registerAuth(
         return reply.status(403).send({ error: "CSRF_TOKEN_INVALID" });
       }
     }
+
+    // Auth self-service routes (me, logout, mfa/setup, etc.) are allowed for any authenticated user
+    // without a routePermission mapping — these are per-user operations, not area-gated.
+    if (isAuthenticatedAuthSelfServicePath(pathname, request.method)) return;
 
     // Unmapped routes are fail-closed: authenticated but unknown API paths are forbidden
     const permission = routePermission(pathname, request.method);
@@ -531,14 +562,28 @@ export function registerAuth(
         return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
       }
 
-      // MFA check: required if PUBLIC_MFA_REQUIRED=true and account is high-privilege,
-      // OR if account has an active MFA factor
-      const mfaRequired =
-        (publicMfaRequired() && requiresMfa(account.roles)) ||
-        (await authRepository.hasActiveMfaFactor?.(account.id)) === true;
+      const secret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+      const hasActiveFactor = (await authRepository.hasActiveMfaFactor?.(account.id)) === true;
 
-      if (mfaRequired) {
-        const secret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+      // Public internet + high-privilege + no active MFA factor → force first-time setup
+      if (publicMfaRequired() && requiresMfa(account.roles) && !hasActiveFactor) {
+        const mfaSetupToken = createMfaSetupToken(account.id, secret);
+        await writeAuthAudit(request, "mfa.setup_challenge_created", "auth", account.id, {
+          userAccountId: account.id,
+          username: account.username,
+        });
+        return {
+          status: "MFA_SETUP_REQUIRED",
+          mfaSetupToken,
+          user: { id: account.id, username: account.username },
+        };
+      }
+
+      // MFA verify required if account has an active factor, or public mode + high-privilege with factor
+      const mfaVerifyRequired =
+        hasActiveFactor || (publicMfaRequired() && requiresMfa(account.roles) && hasActiveFactor);
+
+      if (mfaVerifyRequired) {
         const pendingMfaToken = createPendingMfaToken(account.id, secret);
         return { status: "MFA_REQUIRED", pendingMfaToken };
       }
@@ -609,11 +654,13 @@ export function registerAuth(
       // Try TOTP first, then recovery code
       const factor = await authRepository.findActiveMfaFactor?.(userAccountId);
       let mfaOk = false;
+      let mfaMethod: "totp" | "recovery_code" = "totp";
 
       if (factor) {
         const totpSecret = decryptMfaSecret(factor.secretEncrypted);
         if (await verifyTotp(code, totpSecret)) {
           mfaOk = true;
+          mfaMethod = "totp";
         } else if (authRepository.findUnusedMfaRecoveryCode && authRepository.useMfaRecoveryCode) {
           // Try as recovery code
           const codeHash = hashRecoveryCode(code);
@@ -621,13 +668,34 @@ export function registerAuth(
           if (recoveryCode) {
             await authRepository.useMfaRecoveryCode(recoveryCode.id, new Date());
             mfaOk = true;
+            mfaMethod = "recovery_code";
           }
         }
       }
 
       if (!mfaOk) {
+        await writeAuthAudit(request, "mfa.login_failed", "auth", account.id, {
+          userAccountId: account.id,
+          username: account.username,
+        });
         return reply.status(401).send({ error: "MFA_CODE_INVALID" });
       }
+
+      if (mfaMethod === "recovery_code") {
+        await writeAuthAudit(request, "mfa.recovery_code_used", "user_mfa_factor", factor?.id ?? account.id, {
+          userAccountId: account.id,
+          username: account.username,
+          factorId: factor?.id ?? null,
+          method: "recovery_code",
+        });
+      }
+
+      await writeAuthAudit(request, "mfa.login_verified", "user_mfa_factor", factor?.id ?? account.id, {
+        userAccountId: account.id,
+        username: account.username,
+        factorId: factor?.id ?? null,
+        method: mfaMethod,
+      });
 
       await authRepository.updateLastLogin(account.id, new Date());
       const refreshed = await authRepository.findById(account.id);
@@ -657,7 +725,126 @@ export function registerAuth(
     },
   );
 
-  // MFA setup: initiate TOTP setup for the current user
+  // MFA setup-challenge: initiate TOTP setup using mfaSetupToken (no session cookie required)
+  app.post("/api/auth/mfa/setup-challenge", async (request, reply) => {
+    if (!authRepository || !sessionStore) {
+      return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    }
+    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes) {
+      return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+    const body = request.body as { mfaSetupToken?: unknown };
+    const mfaSetupToken = typeof body.mfaSetupToken === "string" ? body.mfaSetupToken : "";
+    if (!mfaSetupToken) {
+      return reply.status(400).send({ error: "MFA_SETUP_TOKEN_REQUIRED" });
+    }
+
+    const tokenSecret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+    const userAccountId = verifyMfaSetupToken(mfaSetupToken, tokenSecret);
+    if (!userAccountId) {
+      return reply.status(401).send({ error: "MFA_SETUP_TOKEN_INVALID_OR_EXPIRED" });
+    }
+
+    const account = await authRepository.findById(userAccountId);
+    if (!account || !accountCanLogin(account)) {
+      return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+    }
+
+    const totpSecret = generateTotpSecret();
+    const secretEncrypted = encryptMfaSecret(totpSecret);
+    const factor = await authRepository.createMfaFactor({
+      userAccountId: account.id,
+      type: "totp",
+      secretEncrypted,
+    });
+
+    const recoveryCodes = generateRecoveryCodes();
+    const codeHashes = recoveryCodes.map(hashRecoveryCode);
+    await authRepository.createMfaRecoveryCodes(factor.id, account.id, codeHashes);
+
+    const totpUri = buildTotpUri(totpSecret, account.username);
+    await writeAuthAudit(request, "mfa.setup", "user_mfa_factor", factor.id, {
+      userAccountId: account.id,
+      username: account.username,
+      factorId: factor.id,
+      status: "pending",
+    });
+    return { factorId: factor.id, totpUri, recoveryCodes };
+  });
+
+  // MFA activate-challenge: confirm TOTP code, activate factor, issue session (no prior session needed)
+  app.post("/api/auth/mfa/activate-challenge", async (request, reply) => {
+    if (!authRepository || !sessionStore) {
+      return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
+    }
+    if (!authRepository.activateMfaFactor || !authRepository.findMfaFactorById) {
+      return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+    const body = request.body as { mfaSetupToken?: unknown; factorId?: unknown; code?: unknown };
+    const mfaSetupToken = typeof body.mfaSetupToken === "string" ? body.mfaSetupToken : "";
+    const factorId = typeof body.factorId === "string" ? body.factorId : "";
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    if (!mfaSetupToken || !factorId || !code) {
+      return reply.status(400).send({ error: "MFA_ACTIVATE_CHALLENGE_VALIDATION_FAILED" });
+    }
+
+    const tokenSecret = authOptions?.sessionSecret?.trim() ?? process.env.AUTH_SESSION_SECRET?.trim();
+    const userAccountId = verifyMfaSetupToken(mfaSetupToken, tokenSecret);
+    if (!userAccountId) {
+      return reply.status(401).send({ error: "MFA_SETUP_TOKEN_INVALID_OR_EXPIRED" });
+    }
+
+    const account = await authRepository.findById(userAccountId);
+    if (!account || !accountCanLogin(account)) {
+      return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
+    }
+
+    const factor = await authRepository.findMfaFactorById(factorId);
+    if (!factor || factor.userAccountId !== account.id || factor.status !== "pending") {
+      return reply.status(400).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
+    }
+
+    const totpSecret = decryptMfaSecret(factor.secretEncrypted);
+    if (!(await verifyTotp(code, totpSecret))) {
+      return reply.status(401).send({ error: "MFA_CODE_INVALID" });
+    }
+
+    await authRepository.activateMfaFactor(factor.id, new Date());
+    await writeAuthAudit(request, "mfa.activate", "user_mfa_factor", factor.id, {
+      userAccountId: account.id,
+      username: account.username,
+      factorId: factor.id,
+      status: "active",
+    });
+
+    await authRepository.updateLastLogin(account.id, new Date());
+    const refreshed = await authRepository.findById(account.id);
+    const user = toAuthenticatedUser(refreshed ?? account);
+    const issuedAt = new Date(Math.max(Date.now(), getSessionIssuedAtForAccount(refreshed ?? account) * 1000));
+    const token = createOpaqueSessionToken();
+    const csrfToken = createCsrfToken();
+    await sessionStore.createSession({
+      userAccountId: account.id,
+      tokenHash: hashSessionToken(token),
+      csrfTokenHash: hashCsrfToken(csrfToken),
+      expiresAt: new Date(issuedAt.getTime() + ttlSeconds * 1000),
+      createdAt: issuedAt,
+      ip: request.ip ?? null,
+      userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+    });
+    reply.header(
+      "Set-Cookie",
+      serializeCookie(AUTH_COOKIE_NAME, token, {
+        maxAge: ttlSeconds,
+        httpOnly: true,
+        sameSite: "Lax",
+        secure,
+      }),
+    );
+    return { user, csrfToken };
+  });
+
+  // MFA setup: initiate TOTP setup for the current user (requires active session)
   app.post("/api/auth/mfa/setup", async (request, reply) => {
     if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     const user = (request as AuthenticatedRequest).currentUser;
@@ -679,6 +866,12 @@ export function registerAuth(
     await authRepository.createMfaRecoveryCodes(factor.id, user.id, codeHashes);
 
     const totpUri = buildTotpUri(totpSecret, user.username);
+    await writeAuthAudit(request, "mfa.setup", "user_mfa_factor", factor.id, {
+      userAccountId: user.id,
+      username: user.username,
+      factorId: factor.id,
+      status: "pending",
+    });
     return { factorId: factor.id, totpUri, recoveryCodes };
   });
 
@@ -706,6 +899,12 @@ export function registerAuth(
     }
 
     await authRepository.activateMfaFactor(factor.id, new Date());
+    await writeAuthAudit(request, "mfa.activate", "user_mfa_factor", factor.id, {
+      userAccountId: user.id,
+      username: user.username,
+      factorId: factor.id,
+      status: "active",
+    });
     return { ok: true };
   });
 
@@ -722,6 +921,12 @@ export function registerAuth(
     if (!factor) return reply.status(400).send({ error: "MFA_NOT_ENABLED" });
 
     await authRepository.disableMfaFactor(factor.id, new Date());
+    await writeAuthAudit(request, "mfa.disable", "user_mfa_factor", factor.id, {
+      userAccountId: user.id,
+      username: user.username,
+      factorId: factor.id,
+      status: "disabled",
+    });
     return { ok: true };
   });
 

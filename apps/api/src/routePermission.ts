@@ -122,8 +122,26 @@ export function isPublicPath(pathname: string, method: string): boolean {
 export function isPublicInternetPath(pathname: string, method: string): boolean {
   if (pathname === "/health") return true;
   if (pathname === "/api/app-version") return true;
-  // Auth routes: login, MFA verify-login. Other /api/auth/* (me, logout, mfa/setup etc.) require auth.
+  // Auth routes: login, MFA verify-login, MFA first-time setup (no session cookie yet).
   if (pathname === "/api/auth/login" && method === "POST") return true;
   if (pathname === "/api/auth/mfa/verify-login" && method === "POST") return true;
+  if (pathname === "/api/auth/mfa/setup-challenge" && method === "POST") return true;
+  if (pathname === "/api/auth/mfa/activate-challenge" && method === "POST") return true;
   return false;
+}
+
+/**
+ * Auth self-service paths that are allowed for any authenticated session
+ * without a routePermission mapping.  CSRF still applies for unsafe methods.
+ */
+export function isAuthenticatedAuthSelfServicePath(pathname: string, method: string): boolean {
+  return (
+    (pathname === "/api/auth/me" && method === "GET") ||
+    (pathname === "/api/auth/logout" && method === "POST") ||
+    (pathname === "/api/auth/mfa/status" && method === "GET") ||
+    (pathname === "/api/auth/mfa/setup" && method === "POST") ||
+    (pathname === "/api/auth/mfa/activate" && method === "POST") ||
+    (pathname === "/api/auth/mfa/disable" && method === "POST") ||
+    (pathname === "/api/auth/mfa/recovery-code" && method === "POST")
+  );
 }

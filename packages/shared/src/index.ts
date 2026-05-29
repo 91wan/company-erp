@@ -613,6 +613,7 @@ export type AccessReviewUserAccountExportDto = {
   projectSiteIds: readonly string[];
   activeSessionCount: number;
   mfaEnabled: boolean;
+  mfaRequiredForPublicInternet: boolean;
   permissions?: {
     read: readonly PermissionAreaCode[];
     manage: readonly PermissionAreaCode[];

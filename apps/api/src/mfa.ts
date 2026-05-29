@@ -170,6 +170,45 @@ export function generateTotpToken(secret: string): string {
   return hotpCode(keyBuf, totpCounter());
 }
 
+const MFA_SETUP_TOKEN_TTL_SECONDS = 300; // 5 minutes
+
+export function createMfaSetupToken(userAccountId: string, sessionSecret?: string): string {
+  const secret = sessionSecret ?? sessionSecretFromEnv();
+  const expiresAt = Math.floor(Date.now() / 1000) + MFA_SETUP_TOKEN_TTL_SECONDS;
+  const nonce = randomBytes(16).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({ userAccountId, expiresAt, nonce, purpose: "mfa_setup" }),
+  ).toString("base64url");
+  const signature = createHmac("sha256", secret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyMfaSetupToken(token: string, sessionSecret?: string): string | null {
+  const secret = sessionSecret ?? sessionSecretFromEnv();
+  const dotIndex = token.lastIndexOf(".");
+  if (dotIndex < 0) return null;
+  const payload = token.slice(0, dotIndex);
+  const signature = token.slice(dotIndex + 1);
+  if (!payload || !signature) return null;
+
+  try {
+    const expectedSig = createHmac("sha256", secret).update(payload).digest("base64url");
+    const sigBuf = Buffer.from(signature, "base64url");
+    const expectedBuf = Buffer.from(expectedSig, "base64url");
+    if (sigBuf.length !== expectedBuf.length) return null;
+    if (!timingSafeEqual(sigBuf, expectedBuf)) return null;
+
+    const parsed = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as { userAccountId: string; expiresAt: number; purpose?: string };
+    if (parsed.purpose !== "mfa_setup") return null;
+    if (Math.floor(Date.now() / 1000) > parsed.expiresAt) return null;
+    return parsed.userAccountId;
+  } catch {
+    return null;
+  }
+}
+
 // MFA is required for accounts with access to high-privilege areas:
 // systemSettings (any access), auditLogs (any access), userAccounts (manage).
 // Uses the permission matrix for forward compatibility — adding a new role to
