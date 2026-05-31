@@ -30,6 +30,7 @@ import { isAuthenticatedAuthSelfServicePath, isPublicInternetPath, isPublicPath,
 
 export const AUTH_COOKIE_NAME = "company_erp_session";
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const DEFAULT_MFA_PENDING_FACTOR_TTL_SECONDS = 10 * 60;
 const unsafeMethods = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const INSECURE_SESSION_SECRET_PLACEHOLDERS = new Set([
   "company-erp-local-dev-session-secret-change-me",
@@ -67,6 +68,20 @@ function loginRateLimitMaxPerUsername(): number {
 
 function publicMfaRequired(): boolean {
   return isTruthy(process.env.PUBLIC_MFA_REQUIRED);
+}
+
+function mfaPendingFactorTtlSeconds(): number {
+  const configured = Number(process.env.MFA_PENDING_FACTOR_TTL_SECONDS ?? DEFAULT_MFA_PENDING_FACTOR_TTL_SECONDS);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MFA_PENDING_FACTOR_TTL_SECONDS;
+}
+
+function pendingMfaFactorExpiresBefore(now: Date): Date {
+  return new Date(now.getTime() - mfaPendingFactorTtlSeconds() * 1000);
+}
+
+function isPendingMfaFactorExpired(factor: MfaFactorRecord, now: Date): boolean {
+  const createdAt = Date.parse(factor.createdAt);
+  return Number.isFinite(createdAt) && createdAt <= pendingMfaFactorExpiresBefore(now).getTime();
 }
 
 export type AuthAccountRecord = AuthenticatedUserDto & {
@@ -126,9 +141,12 @@ export type AuthRepository = {
     type: string;
     secretEncrypted: string;
     codeHashes: readonly string[];
+    pendingExpiresBefore?: Date;
+    now?: Date;
   }): Promise<MfaFactorRecord | null>;
   activateMfaFactor?(id: string, at: Date): Promise<boolean>;
   disableMfaFactor?(id: string, at: Date): Promise<boolean>;
+  cleanupExpiredPendingMfaFactors?(userAccountId: string, expiresBefore: Date, at: Date): Promise<number>;
   createMfaRecoveryCodes?(mfaFactorId: string, userAccountId: string, codeHashes: string[]): Promise<void>;
   findUnusedMfaRecoveryCode?(
     userAccountId: string,
@@ -472,6 +490,28 @@ export function registerAuth(
     });
   }
 
+  async function cleanupExpiredPendingMfaSetup(
+    request: FastifyRequest,
+    account: Pick<AuthAccountRecord, "id" | "username">,
+    factor: MfaFactorRecord,
+    at: Date,
+  ): Promise<boolean> {
+    if (!isPendingMfaFactorExpired(factor, at)) return false;
+    if (authRepository?.cleanupExpiredPendingMfaFactors) {
+      await authRepository.cleanupExpiredPendingMfaFactors(account.id, pendingMfaFactorExpiresBefore(at), at);
+    } else {
+      await authRepository?.disableMfaFactor?.(factor.id, at);
+    }
+    await writeAuthAudit(request, "mfa.setup_expired_cleaned", "user_mfa_factor", factor.id, {
+      userAccountId: account.id,
+      username: account.username,
+      factorId: factor.id,
+      status: "disabled",
+      reason: "pending_setup_expired",
+    });
+    return true;
+  }
+
   // Per-username rate limit store (in-memory, per app instance)
   const usernameAttempts = new Map<string, { count: number; windowStart: number }>();
 
@@ -772,8 +812,11 @@ export function registerAuth(
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
     // Do not allow a setup token to be replayed to mint additional recovery-code batches.
+    const setupNow = new Date();
     const existing = await authRepository.findPendingMfaFactor?.(userAccountId);
-    if (!hasTransactionalMfaSetup && existing) {
+    if (existing && await cleanupExpiredPendingMfaSetup(request, account, existing, setupNow)) {
+      // Expired pending setup was disabled; continue and create a fresh factor.
+    } else if (!hasTransactionalMfaSetup && existing) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
@@ -787,6 +830,8 @@ export function registerAuth(
           type: "totp",
           secretEncrypted,
           codeHashes,
+          pendingExpiresBefore: pendingMfaFactorExpiresBefore(setupNow),
+          now: setupNow,
         })
       : await authRepository.createMfaFactor!({
           userAccountId: account.id,
@@ -846,13 +891,17 @@ export function registerAuth(
     if (!factor || factor.userAccountId !== account.id || factor.status !== "pending") {
       return reply.status(400).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
     }
+    const activateNow = new Date();
+    if (await cleanupExpiredPendingMfaSetup(request, account, factor, activateNow)) {
+      return reply.status(409).send({ error: "MFA_SETUP_EXPIRED" });
+    }
 
     const totpSecret = decryptMfaSecret(factor.secretEncrypted);
     if (!(await verifyTotp(code, totpSecret))) {
       return reply.status(401).send({ error: "MFA_CODE_INVALID" });
     }
 
-    const activated = await authRepository.activateMfaFactor(factor.id, new Date());
+    const activated = await authRepository.activateMfaFactor(factor.id, activateNow);
     if (!activated) {
       return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
     }
@@ -906,7 +955,11 @@ export function registerAuth(
     if ((await authRepository.hasActiveMfaFactor?.(user.id)) === true) {
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
-    if (!hasTransactionalMfaSetup && await authRepository.findPendingMfaFactor!(user.id)) {
+    const setupNow = new Date();
+    const existing = await authRepository.findPendingMfaFactor?.(user.id);
+    if (existing && await cleanupExpiredPendingMfaSetup(request, user, existing, setupNow)) {
+      // Expired pending setup was disabled; continue and create a fresh factor.
+    } else if (!hasTransactionalMfaSetup && existing) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
@@ -920,6 +973,8 @@ export function registerAuth(
           type: "totp",
           secretEncrypted,
           codeHashes,
+          pendingExpiresBefore: pendingMfaFactorExpiresBefore(setupNow),
+          now: setupNow,
         })
       : await authRepository.createMfaFactor!({
           userAccountId: user.id,
@@ -960,13 +1015,17 @@ export function registerAuth(
     if (!factor || factor.userAccountId !== user.id || factor.status !== "pending") {
       return reply.status(400).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
     }
+    const activateNow = new Date();
+    if (await cleanupExpiredPendingMfaSetup(request, user, factor, activateNow)) {
+      return reply.status(409).send({ error: "MFA_SETUP_EXPIRED" });
+    }
 
     const totpSecret = decryptMfaSecret(factor.secretEncrypted);
     if (!(await verifyTotp(code, totpSecret))) {
       return reply.status(401).send({ error: "MFA_CODE_INVALID" });
     }
 
-    const activated = await authRepository.activateMfaFactor(factor.id, new Date());
+    const activated = await authRepository.activateMfaFactor(factor.id, activateNow);
     if (!activated) {
       return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
     }
@@ -987,19 +1046,49 @@ export function registerAuth(
     if (!authRepository.findActiveMfaFactor || !authRepository.disableMfaFactor) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
+    const body = request.body as { code?: unknown };
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    if (!code) return reply.status(400).send({ error: "MFA_DISABLE_CODE_REQUIRED" });
 
     const factor = await authRepository.findActiveMfaFactor(user.id);
     if (!factor) return reply.status(400).send({ error: "MFA_NOT_ENABLED" });
 
+    let method: "totp" | "recovery_code" | null = null;
+    let recoveryCodeId: string | null = null;
+    const totpSecret = decryptMfaSecret(factor.secretEncrypted);
+    if (await verifyTotp(code, totpSecret)) {
+      method = "totp";
+    } else if (authRepository.findUnusedMfaRecoveryCode && authRepository.useMfaRecoveryCode) {
+      const codeHash = hashRecoveryCode(code);
+      const recoveryCode = await authRepository.findUnusedMfaRecoveryCode(user.id, factor.id, codeHash);
+      if (recoveryCode) {
+        const used = await authRepository.useMfaRecoveryCode(recoveryCode.id, new Date());
+        if (used) {
+          method = "recovery_code";
+          recoveryCodeId = recoveryCode.id;
+        }
+      }
+    }
+    if (!method) return reply.status(401).send({ error: "MFA_CODE_INVALID" });
+
     const disabled = await authRepository.disableMfaFactor(factor.id, new Date());
     if (!disabled) {
       return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_DISABLED" });
+    }
+    if (method === "recovery_code" && recoveryCodeId) {
+      await writeAuthAudit(request, "mfa.recovery_code_used", "user_mfa_recovery_code", recoveryCodeId, {
+        userAccountId: user.id,
+        username: user.username,
+        factorId: factor.id,
+        method: "disable_mfa",
+      });
     }
     await writeAuthAudit(request, "mfa.disable", "user_mfa_factor", factor.id, {
       userAccountId: user.id,
       username: user.username,
       factorId: factor.id,
       status: "disabled",
+      method,
     });
     return { ok: true };
   });

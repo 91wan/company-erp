@@ -11,6 +11,7 @@ Internet → CDN / WAF / Reverse Proxy (HTTPS 443) → Company ERP Web/API
 - The reverse proxy terminates TLS and forwards requests to the internal API over the internal network.
 - PostgreSQL is **never** exposed to the public internet — only the API container communicates with it.
 - `NAS_ATTACHMENTS_ROOT` is **never** exposed to the public internet — attachments are served exclusively through authenticated API endpoints.
+- NAS root folders, SMB/WebDAV shares, and raw attachment paths must not be published through the reverse proxy or CDN.
 - The API container must **never** be accessible via a direct public IP:port.
 
 ## TLS Requirements
@@ -80,6 +81,7 @@ If the ERP is only used by headquarters staff, consider IP allowlisting at the W
 - 路由器端口转发直连 API/PostgreSQL（不允许）
 - 公网直接暴露 PostgreSQL 端口（不允许）
 - 公网直接暴露 NAS_ATTACHMENTS_ROOT（不允许）
+- 通过 CDN、Nginx alias、静态目录或 NAS 分享链接暴露附件根目录（不允许）
 - HTTP 明文传输业务数据（不允许）
 - 绕过 HTTPS（不允许）
 

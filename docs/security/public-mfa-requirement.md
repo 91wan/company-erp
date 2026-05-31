@@ -31,6 +31,18 @@ In the current permission matrix, `admin` is the only role with access to `syste
    - Invalid code → `401 MFA_CODE_INVALID`
    - Expired pending token (5 min TTL) → `401 MFA_TOKEN_INVALID_OR_EXPIRED`
 
+3. `POST /api/auth/mfa/setup-challenge` / `POST /api/auth/mfa/activate-challenge` — first-time setup for accounts that must enroll before a session is issued
+   - Pending setup factor and recovery-code hashes are created in one transaction
+   - Abandoned pending setup expires after `MFA_PENDING_FACTOR_TTL_SECONDS` (default 10 minutes)
+   - Expired pending setup returns `409 MFA_SETUP_EXPIRED` on activation, burns unused pending recovery codes, and allows a later setup retry
+   - A second unexpired setup attempt returns `409 MFA_SETUP_ALREADY_PENDING` instead of minting another recovery-code batch
+
+4. `POST /api/auth/mfa/disable` — disabling an active factor
+   - Requires step-up verification with the current TOTP code or an unused recovery code
+   - Missing code → `400 MFA_DISABLE_CODE_REQUIRED`
+   - Invalid code → `401 MFA_CODE_INVALID`
+   - Successful recovery-code disable consumes that recovery code and records the method in audit metadata without logging the plaintext code
+
 ## MFA Technology
 
 - **TOTP** (Time-based One-Time Password, RFC 6238), 6 digits, 30-second period
@@ -62,9 +74,10 @@ Set to `true` if external subcontractor accounts are exposed to the public inter
 - **Recovery codes** are only returned once at setup time; they are hashed immediately and the plaintext is not stored
 - Recovery code lookup is scoped to the current active MFA factor; recovery codes from disabled or pending factors cannot be used
 - MFA setup creates the pending factor and recovery-code hashes in a single transaction; the database enforces at most one pending and one active factor per user
+- Pending MFA setup is self-healing: expired pending factors are cleaned up before a retry, so an interrupted setup cannot permanently block the account
 - MFA secret must not appear in application logs, audit logs, or error messages
 - The `pendingMfaToken` is HMAC-SHA256 signed with a 5-minute TTL; it does not grant any session access
-- The logged-in user menu exposes MFA settings for viewing status, enabling MFA, one-time recovery code display, and disabling MFA only after a second confirmation
+- The logged-in user menu exposes MFA settings for viewing status, enabling MFA, one-time recovery code display, and disabling MFA only after step-up verification
 - The user accounts table shows MFA status and the `公网 MFA 必需` flag so access review can identify high-privilege accounts without active MFA
 
 ## Audit Log Events
@@ -72,8 +85,9 @@ Set to `true` if external subcontractor accounts are exposed to the public inter
 | Action | When |
 |--------|------|
 | `mfa.setup` | User initiates MFA setup (pending factor created) |
+| `mfa.setup_expired_cleaned` | Expired pending setup was cleaned before retry or activation |
 | `mfa.activate` | User confirms first valid TOTP code |
-| `mfa.disable` | User or admin disables MFA |
+| `mfa.disable` | User disables MFA after TOTP or recovery-code step-up |
 | `mfa.recovery_code_used` | Recovery code consumed |
 | `mfa.login_verified` | MFA verify-login succeeded |
 

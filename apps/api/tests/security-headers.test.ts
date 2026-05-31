@@ -47,9 +47,20 @@ describe("security headers middleware", () => {
     const app = await buildApp({});
     const res = await app.inject({ method: "GET", url: "/health" });
     await app.close();
+    expect(res.json().status).toBe("ok");
     expect(res.headers["content-security-policy"]).toContain("default-src 'self'");
     expect(res.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(res.headers["content-security-policy"]).toContain("object-src 'none'");
+  });
+
+  it("keeps JSON response payloads intact and marks API responses no-store", async () => {
+    process.env.PUBLIC_SECURITY_HEADERS_ENABLED = "true";
+    const app = await buildApp({});
+    const res = await app.inject({ method: "GET", url: "/api/app-version" });
+    await app.close();
+    expect(res.statusCode).toBe(200);
+    expect(res.json().appVersion.packageVersion).toBeTruthy();
+    expect(String(res.headers["cache-control"])).toContain("no-store");
   });
 
   it("sets X-Content-Type-Options: nosniff", async () => {

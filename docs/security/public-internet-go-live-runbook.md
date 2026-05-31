@@ -9,6 +9,8 @@ Before starting this runbook, confirm:
 - [ ] `npm run public:readiness-gate` passes
 - [ ] `npm run public:security-evidence-check -- --evidence-dir <outside-git-path>` passes
 - [ ] All high-privilege accounts (admin, systemSettings.manage, userAccounts.manage) have MFA enabled
+- [ ] No unresolved critical or high severity findings remain in dependency audit, container scan, or WAF/security review evidence
+- [ ] PostgreSQL and `NAS_ATTACHMENTS_ROOT` are not directly reachable from the public internet
 - [ ] Any schema migration in the release has a completed internal production migration plan (`npm run production:migration-plan-check`)
 
 ## Step 1: DNS and TLS
@@ -59,6 +61,8 @@ Restart the API: `docker compose restart api`
 3. Save recovery codes to a secure location (they are shown only once).
 4. Save evidence: `mfa-enforcement-evidence.txt` (list of accounts, MFA status confirmed)
 5. Confirm setup replay protection: a second setup attempt returns `MFA_SETUP_ALREADY_PENDING` and does not mint another recovery-code batch.
+6. Confirm abandoned setup recovery: a pending MFA setup expires after the configured setup TTL (default 10 minutes), expired pending factors are cleaned, and the user can retry setup without operator database edits.
+7. Confirm disabling MFA requires step-up verification with the current TOTP code or an unused recovery code. Do not accept a simple confirmation click as sufficient evidence.
 
 ## Step 5: Security Headers Verification
 
@@ -97,6 +101,7 @@ trivy image company-erp-api > /evidence/vulnerability-scan-summary.txt 2>&1
 ```
 
 Resolve all critical and high severity findings before continuing.
+The final `public:go-live-check` blocks evidence files that contain failure markers such as `BLOCKED`, `ERROR`, `FAIL`, or unresolved critical/high vulnerability counts. Do not paste stale failed output into the evidence directory.
 
 ## Step 8: Access Review
 
@@ -124,6 +129,10 @@ npm run public:security-evidence-check -- \
   --evidence-dir /evidence/public-go-live-$(date +%Y%m%d) \
   > /evidence/public-go-live-$(date +%Y%m%d)/public-security-evidence-check.txt
 ```
+
+`public-readiness-gate.txt` must contain `READY_FOR_PUBLIC_INTERNET_REVIEW`.
+`public-security-evidence-check.txt` must contain `PUBLIC_SECURITY_EVIDENCE_PASS`.
+Both files must be redacted: no `Authorization`, `Set-Cookie`, secrets, passwords, session cookies, recovery codes, or stale failure output.
 
 ```bash
 npm run public:go-live-check -- \

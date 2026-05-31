@@ -949,6 +949,29 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
     return callback(prisma as unknown as PrismaTransactionClient);
   }
 
+  async function cleanupExpiredPendingMfaFactorsForUser(
+    tx: PrismaTransactionClient,
+    userAccountId: string,
+    expiresBefore: Date,
+    at: Date,
+  ): Promise<number> {
+    const expiredFactors = await tx.userMfaFactor.findMany({
+      where: { userAccountId, status: "pending", createdAt: { lte: expiresBefore } },
+      select: { id: true },
+    });
+    const expiredIds = expiredFactors.map((factor) => factor.id);
+    if (expiredIds.length === 0) return 0;
+    await tx.userMfaFactor.updateMany({
+      where: { id: { in: expiredIds }, status: "pending" },
+      data: { status: "disabled", disabledAt: at },
+    });
+    await tx.userMfaRecoveryCode.updateMany({
+      where: { mfaFactorId: { in: expiredIds }, usedAt: null },
+      data: { usedAt: at },
+    });
+    return expiredIds.length;
+  }
+
   return {
     async findByUsername(username: string) {
       const account = await prisma.userAccount.findUnique({ where: { username }, include });
@@ -1044,9 +1067,19 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       type: string;
       secretEncrypted: string;
       codeHashes: readonly string[];
+      pendingExpiresBefore?: Date;
+      now?: Date;
     }) {
       try {
         return await runTransaction(async (tx) => {
+          if (input.pendingExpiresBefore) {
+            await cleanupExpiredPendingMfaFactorsForUser(
+              tx,
+              input.userAccountId,
+              input.pendingExpiresBefore,
+              input.now ?? new Date(),
+            );
+          }
           const existingCount = await tx.userMfaFactor.count({
             where: { userAccountId: input.userAccountId, status: { in: ["pending", "active"] } },
           });
@@ -1121,6 +1154,9 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
         });
       }
       return result.count > 0;
+    },
+    async cleanupExpiredPendingMfaFactors(userAccountId: string, expiresBefore: Date, at: Date) {
+      return runTransaction((tx) => cleanupExpiredPendingMfaFactorsForUser(tx, userAccountId, expiresBefore, at));
     },
     async createMfaRecoveryCodes(mfaFactorId: string, userAccountId: string, codeHashes: string[]) {
       await prisma.userMfaRecoveryCode.createMany({

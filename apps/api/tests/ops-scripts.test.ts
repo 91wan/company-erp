@@ -2785,6 +2785,7 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test content";
         if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test content RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
         if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
+        if (path === "apps/api/tests/public-internet-api-smoke.test.ts") return "PUBLIC_INTERNET_ENABLED PUBLIC_ACCESS_ENABLED PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/internal/app-version /api/contracts commitSha";
         return "ok";
       },
     });
@@ -2824,6 +2825,7 @@ describe("public internet readiness gate", () => {
       if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
       if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
       if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
+      if (path === "apps/api/tests/public-internet-api-smoke.test.ts") return "PUBLIC_INTERNET_ENABLED PUBLIC_ACCESS_ENABLED PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/internal/app-version /api/contracts commitSha";
       if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
       if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
       return "ok";
@@ -2886,6 +2888,7 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
         if (path === "apps/api/tests/public-internet-env.test.ts") return "RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
         if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
+        if (path === "apps/api/tests/public-internet-api-smoke.test.ts") return "PUBLIC_INTERNET_ENABLED PUBLIC_ACCESS_ENABLED PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/internal/app-version /api/contracts commitSha";
         return "ok";
       },
     });
@@ -3040,6 +3043,55 @@ describe("public internet go-live check", () => {
         users: [
           { id: "u1", username: "admin", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: true },
         ],
+      }));
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 1 accounts\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("public-readiness-gate.txt");
+      expect(result.blockers.join("\n")).toContain("public-security-evidence-check.txt");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks public readiness/security evidence files that contain failure markers or sensitive headers", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc1234567890",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "Let's Encrypt",
+        mfaRequired: true,
+        publicDataExposureAccepted: false,
+        operator: "ops@example.com",
+        approver: "cto@example.com",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "public-readiness-gate.txt"), "READY_FOR_PUBLIC_INTERNET_REVIEW\nBLOCKED: stale failure\n");
+      writeFileSync(join(tempDir, "public-security-evidence-check.txt"), "PUBLIC_SECURITY_EVIDENCE_PASS\nAuthorization: Bearer abcdef123456\n");
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "access-review-export.json"), JSON.stringify({
+        exportedAt: "2026-05-31T08:00:00.000Z",
+        exportedBy: "admin",
+        users: [{ id: "u1", username: "admin", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: true }],
       }));
       writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 1 accounts\nPublic internet MFA enforcement checked");
       writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
