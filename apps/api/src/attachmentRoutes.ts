@@ -103,7 +103,7 @@ function attachmentDownloadRateLimitMax(): number {
 }
 
 const attachmentContentIpRateLimit = {
-  max: attachmentDownloadRateLimitMax(),
+  max: () => attachmentDownloadRateLimitMax(),
   timeWindow: "1 minute",
   keyGenerator: (request: FastifyRequest) => `attachment-content:${request.ip}`,
 };

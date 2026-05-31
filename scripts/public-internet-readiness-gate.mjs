@@ -218,6 +218,8 @@ export function evaluatePublicInternetReadiness({
       "findUnusedMfaRecoveryCode",
       "useMfaRecoveryCode",
       "findMfaFactorById",
+      "findPendingMfaFactor",
+      "mfaFactorId",
     ]
   });
   // Prisma MFA integration test must exist
@@ -225,7 +227,7 @@ export function evaluatePublicInternetReadiness({
     readText("apps/api/tests/prisma-mfa-repository.test.ts");
     requireText({ blockers: mfaBlockers, readText,
       path: "apps/api/tests/prisma-mfa-repository.test.ts",
-      markers: ["createMfaFactor", "findActiveMfaFactor", "useMfaRecoveryCode"],
+      markers: ["createMfaFactor", "findActiveMfaFactor", "useMfaRecoveryCode", "mfaFactorId"],
     });
   } catch {
     mfaBlockers.push("apps/api/tests/prisma-mfa-repository.test.ts: missing Prisma MFA integration test");

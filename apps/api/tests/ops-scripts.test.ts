@@ -1209,6 +1209,27 @@ describe("public security evidence check", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("blocks when public security evidence includes recovery codes or cookies", async () => {
+    const { evaluatePublicSecurityEvidence } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-security-evidence-check.mjs")).href
+    )) as { evaluatePublicSecurityEvidence: (opts: { evidenceDir: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-sec-evidence-"));
+    try {
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities.");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "0 vulnerabilities");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nReferrer-Policy: strict-origin\nX-Frame-Options: DENY");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked\nrecoveryCodes: abcdef123456\nSet-Cookie: company_erp_session=abc");
+
+      const result = evaluatePublicSecurityEvidence({ evidenceDir: tempDir });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("sensitive data");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("operator runbook command smoke", () => {
@@ -2730,10 +2751,10 @@ describe("public internet readiness gate", () => {
           return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
         }
         if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") {
-          return "createMfaFactor activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById";
+          return "createMfaFactor activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         }
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") {
-          return "createMfaFactor findActiveMfaFactor useMfaRecoveryCode";
+          return "createMfaFactor findActiveMfaFactor useMfaRecoveryCode mfaFactorId";
         }
         if (path === "apps/api/tests/security-hardening.test.ts") {
           return "rate limit login";
@@ -2848,6 +2869,15 @@ describe("public internet go-live check", () => {
       writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
       writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
         "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "access-review-export.json"), JSON.stringify({
+        exportedAt: "2026-05-31T08:00:00.000Z",
+        exportedBy: "admin",
+        users: [
+          { id: "u1", username: "admin", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: true },
+          { id: "u2", username: "settings", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: true },
+          { id: "u3", username: "viewer", status: "active", roles: ["viewer"], mfaRequiredForPublicInternet: false, mfaEnabled: false },
+        ],
+      }));
       writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 3 accounts\nPublic internet MFA enforcement checked");
       writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
       writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
@@ -2855,6 +2885,98 @@ describe("public internet go-live check", () => {
       const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
       expect(result.status).toBe("READY_FOR_PUBLIC_INTERNET_GO_LIVE");
       expect(result.blockers).toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when access-review-export.json is missing from public evidence", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc1234567890",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "Let's Encrypt",
+        mfaRequired: true,
+        publicDataExposureAccepted: false,
+        operator: "ops@example.com",
+        approver: "cto@example.com",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 3 accounts\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("access-review-export.json");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks when public MFA evidence or access-review output is incomplete or sensitive", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc1234567890",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "Let's Encrypt",
+        mfaRequired: true,
+        publicDataExposureAccepted: false,
+        operator: "ops@example.com",
+        approver: "cto@example.com",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked\nrecoveryCodes: abcdef123456");
+      writeFileSync(join(tempDir, "access-review-export.json"), JSON.stringify({
+        exportedAt: "2026-05-31T08:00:00.000Z",
+        exportedBy: "admin",
+        users: [
+          { id: "u1", username: "admin", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: false },
+        ],
+      }));
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 1 accounts");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("MFA enforced for auditLogs.read");
+      expect(result.blockers.join("\n")).toContain("recovery");
+      expect(result.blockers.join("\n")).toContain("mfaRequiredForPublicInternet=true but mfaEnabled=false");
+      expect(result.blockers.join("\n")).toContain("Public internet MFA enforcement checked");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

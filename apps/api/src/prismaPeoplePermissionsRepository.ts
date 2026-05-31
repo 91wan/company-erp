@@ -1003,35 +1003,44 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       return { ...factor, createdAt: factor.createdAt.toISOString(), activatedAt: factor.activatedAt?.toISOString() ?? null, disabledAt: factor.disabledAt?.toISOString() ?? null };
     },
     async activateMfaFactor(id: string, at: Date) {
-      await prisma.userMfaFactor.updateMany({
+      const result = await prisma.userMfaFactor.updateMany({
         where: { id, status: "pending" },
         data: { status: "active", activatedAt: at },
       });
+      return result.count > 0;
     },
     async disableMfaFactor(id: string, at: Date) {
-      await prisma.userMfaFactor.updateMany({
-        where: { id },
+      const result = await prisma.userMfaFactor.updateMany({
+        where: { id, status: { not: "disabled" } },
         data: { status: "disabled", disabledAt: at },
       });
+      if (result.count > 0) {
+        await prisma.userMfaRecoveryCode.updateMany({
+          where: { mfaFactorId: id, usedAt: null },
+          data: { usedAt: at },
+        });
+      }
+      return result.count > 0;
     },
     async createMfaRecoveryCodes(mfaFactorId: string, userAccountId: string, codeHashes: string[]) {
       await prisma.userMfaRecoveryCode.createMany({
         data: codeHashes.map((codeHash) => ({ mfaFactorId, userAccountId, codeHash })),
       });
     },
-    async findUnusedMfaRecoveryCode(userAccountId: string, codeHash: string) {
+    async findUnusedMfaRecoveryCode(userAccountId: string, mfaFactorId: string, codeHash: string) {
       const code = await prisma.userMfaRecoveryCode.findFirst({
-        where: { userAccountId, codeHash, usedAt: null },
+        where: { userAccountId, mfaFactorId, codeHash, usedAt: null },
         select: { id: true, userAccountId: true, mfaFactorId: true, codeHash: true, usedAt: true, createdAt: true },
       });
       if (!code) return null;
       return { ...code, createdAt: code.createdAt.toISOString(), usedAt: code.usedAt?.toISOString() ?? null };
     },
     async useMfaRecoveryCode(id: string, at: Date) {
-      await prisma.userMfaRecoveryCode.updateMany({
+      const result = await prisma.userMfaRecoveryCode.updateMany({
         where: { id, usedAt: null },
         data: { usedAt: at },
       });
+      return result.count > 0;
     },
     async findMfaFactorById(id: string) {
       const factor = await prisma.userMfaFactor.findUnique({

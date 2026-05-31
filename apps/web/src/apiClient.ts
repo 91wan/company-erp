@@ -338,10 +338,11 @@ export async function updateAppConfig(input: UpdateAppConfigInput): Promise<AppC
 
 export async function login(
   input: LoginInput,
-): Promise<AuthenticatedUserDto | { pendingMfaToken: string }> {
+): Promise<AuthenticatedUserDto | { pendingMfaToken: string } | { mfaSetupToken: string; setupUser: { id: string; username: string } }> {
   const payload = await requestJson<
     | { user: AuthenticatedUserDto; csrfToken?: string }
     | { status: "MFA_REQUIRED"; pendingMfaToken: string }
+    | { status: "MFA_SETUP_REQUIRED"; mfaSetupToken: string; user: { id: string; username: string } }
   >(`${apiBaseUrl}/api/auth/login`, {
     method: "POST",
     body: JSON.stringify(input),
@@ -349,9 +350,36 @@ export async function login(
   if ("status" in payload && payload.status === "MFA_REQUIRED") {
     return { pendingMfaToken: payload.pendingMfaToken };
   }
+  if ("status" in payload && payload.status === "MFA_SETUP_REQUIRED") {
+    return { mfaSetupToken: payload.mfaSetupToken, setupUser: payload.user };
+  }
   const typed = payload as { user: AuthenticatedUserDto; csrfToken?: string };
   rememberCsrfToken(typed.csrfToken);
   return typed.user;
+}
+
+export async function createMfaSetupChallenge(input: { mfaSetupToken: string }): Promise<{
+  factorId: string;
+  totpUri: string;
+  recoveryCodes: readonly string[];
+}> {
+  return requestJson(`${apiBaseUrl}/api/auth/mfa/setup-challenge`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function activateMfaSetupChallenge(input: {
+  mfaSetupToken: string;
+  factorId: string;
+  code: string;
+}): Promise<AuthenticatedUserDto> {
+  const payload = await requestJson<{ user: AuthenticatedUserDto; csrfToken?: string }>(
+    `${apiBaseUrl}/api/auth/mfa/activate-challenge`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  rememberCsrfToken(payload.csrfToken);
+  return payload.user;
 }
 
 export async function verifyMfaLogin(input: {

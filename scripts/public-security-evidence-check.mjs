@@ -123,6 +123,7 @@ function containsSensitiveEvidence(text) {
   if (!text) return false;
   return (
     /otpauth:\/\//.test(text) ||
+    /recoveryCodes?/i.test(text) ||
     /recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(text) ||
     /\bAuthorization\s*:\s*Bearer\s+\S{8,}/i.test(text) ||
     /Set-Cookie\s*:/i.test(text) ||

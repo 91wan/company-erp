@@ -98,6 +98,17 @@ describe("PUBLIC_INTERNET_ENABLED validation", () => {
     expect(() => validateRuntimeSecurityEnvironment(env)).toThrow(/TRUSTED_PROXY_CIDRS/);
   });
 
+  it("rejects open trusted proxy CIDRs", () => {
+    for (const cidr of ["0.0.0.0/0", "::/0", "0.0.0.0"]) {
+      expect(() =>
+        validateRuntimeSecurityEnvironment({
+          ...basePublicInternetEnv,
+          TRUSTED_PROXY_CIDRS: cidr,
+        }),
+      ).toThrow(/TRUSTED_PROXY_CIDRS/);
+    }
+  });
+
   it("rejects when PUBLIC_SECURITY_HEADERS_ENABLED is not true", () => {
     expect(() =>
       validateRuntimeSecurityEnvironment({
