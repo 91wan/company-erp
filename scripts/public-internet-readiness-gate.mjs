@@ -114,6 +114,12 @@ export function evaluatePublicInternetReadiness({
     marker: "PUBLIC_TLS_REQUIRED",
     description: "TLS required check for public internet mode",
   });
+  requireSourceMarker({
+    blockers, readText,
+    path: "apps/api/src/app.ts",
+    marker: "RECOVERY_CODE_PEPPER",
+    description: "RECOVERY_CODE_PEPPER validation for public internet mode",
+  });
   // P0-3: stricter public path function must exist
   requireSourceMarker({
     blockers, readText,
@@ -147,6 +153,7 @@ export function evaluatePublicInternetReadiness({
     "createMfaSetupToken",
     "verifyMfaSetupToken",
     "requiresMfa",
+    "RECOVERY_CODE_PEPPER",
   ]});
   requireSourceMarker({
     blockers: mfaBlockers, readText,
@@ -188,6 +195,16 @@ export function evaluatePublicInternetReadiness({
   requireText({ blockers: mfaBlockers, readText, path: "database/prisma/schema.prisma", markers: [
     "UserMfaFactor",
     "UserMfaRecoveryCode",
+    "user_mfa_factors_type_check",
+    "user_mfa_factors_status_check",
+    "user_mfa_factors_one_pending_per_user_idx",
+    "user_mfa_factors_one_active_per_user_idx",
+  ]});
+  requireText({ blockers: mfaBlockers, readText, path: "database/migrations/20260531183000_mfa_factor_constraints/migration.sql", markers: [
+    "user_mfa_factors_type_check",
+    "user_mfa_factors_status_check",
+    "user_mfa_factors_one_pending_per_user_idx",
+    "user_mfa_factors_one_active_per_user_idx",
   ]});
   requireText({ blockers: mfaBlockers, readText, path: "apps/api/tests/mfa.test.ts", markers: [
     "generateTotpSecret",
@@ -200,7 +217,18 @@ export function evaluatePublicInternetReadiness({
     // File must contain the key flow markers
     requireText({ blockers: mfaBlockers, readText,
       path: "apps/api/tests/public-internet-auth-mfa-flow.test.ts",
-      markers: ["MFA_SETUP_REQUIRED", "setup-challenge", "activate-challenge"],
+      markers: [
+        "MFA_SETUP_REQUIRED",
+        "no session cookie",
+        "setup-challenge",
+        "MFA_SETUP_ALREADY_PENDING",
+        "not.toContain(\"recoveryCodes\")",
+        "activate-challenge",
+        "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE",
+        "MFA_CODE_INVALID",
+        "not.toContain(\"otpauth://\")",
+        "mfaSetupToken",
+      ],
     });
   } catch {
     mfaBlockers.push("apps/api/tests/public-internet-auth-mfa-flow.test.ts: missing MFA flow integration test");
@@ -210,6 +238,7 @@ export function evaluatePublicInternetReadiness({
     path: "apps/api/src/prismaPeoplePermissionsRepository.ts",
     markers: [
       "createMfaFactor",
+      "createMfaFactorWithRecoveryCodes",
       "activateMfaFactor",
       "disableMfaFactor",
       "findActiveMfaFactor",
@@ -227,7 +256,15 @@ export function evaluatePublicInternetReadiness({
     readText("apps/api/tests/prisma-mfa-repository.test.ts");
     requireText({ blockers: mfaBlockers, readText,
       path: "apps/api/tests/prisma-mfa-repository.test.ts",
-      markers: ["createMfaFactor", "findActiveMfaFactor", "useMfaRecoveryCode", "mfaFactorId"],
+      markers: [
+        "createMfaFactor",
+        "createMfaFactorWithRecoveryCodes",
+        "findActiveMfaFactor",
+        "useMfaRecoveryCode",
+        "resolves.toBe(false)",
+        "disabled",
+        "mfaFactorId",
+      ],
     });
   } catch {
     mfaBlockers.push("apps/api/tests/prisma-mfa-repository.test.ts: missing Prisma MFA integration test");
@@ -327,12 +364,24 @@ export function evaluatePublicInternetReadiness({
     "apps/api/tests/security-headers.test.ts",
     "apps/api/tests/fetch-metadata-protection.test.ts",
     "apps/api/tests/public-internet-env.test.ts",
+    "apps/api/tests/public-internet-path-guard.test.ts",
   ]) {
     requireText({ blockers, readText, path: testPath, markers: [] });
     if (!blockers.some((b) => b.includes(testPath))) {
       passed.push(testPath);
     }
   }
+
+  requireText({ blockers, readText, path: "apps/api/tests/public-internet-env.test.ts", markers: [
+    "RECOVERY_CODE_PEPPER",
+    "TRUSTED_PROXY_CIDRS",
+  ]});
+  requireText({ blockers, readText, path: "apps/api/tests/public-internet-path-guard.test.ts", markers: [
+    "PUBLIC_HEALTH_PUBLIC",
+    "Sec-Fetch-Site",
+    "/api/contracts",
+    "commitSha",
+  ]});
 
   // If the only blockers are MFA-related, emit a distinct status so callers know why
   const nonMfaBlockers = blockers.filter((b) => !mfaBlockers.includes(b));

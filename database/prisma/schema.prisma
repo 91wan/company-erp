@@ -707,8 +707,12 @@ model AuthSession {
 model UserMfaFactor {
   id              String    @id @default(uuid()) @db.Uuid
   userAccountId   String    @map("user_account_id") @db.Uuid
-  type            String    // "totp"
+  /// DB CHECK user_mfa_factors_type_check: type must be 'totp'.
+  type            String    @default("totp")
   secretEncrypted String    @map("secret_encrypted")
+  /// DB CHECK user_mfa_factors_status_check: status must be pending, active, or disabled.
+  /// Partial unique indexes user_mfa_factors_one_pending_per_user_idx and
+  /// user_mfa_factors_one_active_per_user_idx enforce at most one pending and one active MFA factor per user.
   status          String    @default("pending") // pending | active | disabled
   createdAt       DateTime  @default(now()) @map("created_at")
   activatedAt     DateTime? @map("activated_at")

@@ -41,7 +41,8 @@ In the current permission matrix, `admin` is the only role with access to `syste
 
 - 10 recovery codes generated at MFA setup, each 10 hex characters
 - **Shown only once** — user must save them before closing the setup dialog
-- Stored as SHA-256 hashes in the database
+- Stored as HMAC-SHA256 hashes in the database
+- Public internet mode requires a dedicated `RECOVERY_CODE_PEPPER`; `AUTH_SESSION_SECRET` may only be reused when `RECOVERY_CODE_PEPPER_ALLOW_AUTH_SESSION_SECRET=true` is explicitly set for a reviewed emergency exception
 - Each code can only be used once; used codes are marked with `usedAt`
 - Use of a recovery code is audit-logged (`mfa.recovery_code_used`)
 
@@ -59,8 +60,12 @@ Set to `true` if external subcontractor accounts are exposed to the public inter
 
 - **TOTP secret is never returned** in any API response after initial setup (only the `otpauth://` URI is returned during setup, which contains the secret — store it securely)
 - **Recovery codes** are only returned once at setup time; they are hashed immediately and the plaintext is not stored
+- Recovery code lookup is scoped to the current active MFA factor; recovery codes from disabled or pending factors cannot be used
+- MFA setup creates the pending factor and recovery-code hashes in a single transaction; the database enforces at most one pending and one active factor per user
 - MFA secret must not appear in application logs, audit logs, or error messages
 - The `pendingMfaToken` is HMAC-SHA256 signed with a 5-minute TTL; it does not grant any session access
+- The logged-in user menu exposes MFA settings for viewing status, enabling MFA, one-time recovery code display, and disabling MFA only after a second confirmation
+- The user accounts table shows MFA status and the `公网 MFA 必需` flag so access review can identify high-privilege accounts without active MFA
 
 ## Audit Log Events
 
@@ -76,6 +81,7 @@ Set to `true` if external subcontractor accounts are exposed to the public inter
 
 - `npm run public:readiness-gate` checks that MFA API, schema, and tests exist
 - If MFA is not implemented, the gate outputs `BLOCKED` with a clear message about `MFA_NOT_IMPLEMENTED`
+- `npm run public:security-evidence-check -- --evidence-dir <outside-git-path>` must pass and its output must be saved as `public-security-evidence-check.txt`
 - `npm run public:go-live-check` requires `mfa-enforcement-evidence.txt` containing confirmation that MFA is enforced for all high-privilege accounts
 
 ## Access Review
@@ -89,3 +95,4 @@ The access review export includes a `mfaEnabled` field per user account. When MF
 - [ ] MFA enforcement tested end-to-end (login returns `MFA_REQUIRED`, TOTP succeeds, wrong code fails)
 - [ ] `mfa-enforcement-evidence.txt` prepared for go-live evidence package
 - [ ] `PUBLIC_MFA_REQUIRED=true` set in production `.env`
+- [ ] `RECOVERY_CODE_PEPPER` set to a strong non-placeholder value in production `.env`

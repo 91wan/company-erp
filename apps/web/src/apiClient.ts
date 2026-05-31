@@ -7,6 +7,8 @@ import type {
   CreateAttachmentRecordInput,
   DashboardSummaryDto,
   LoginInput,
+  MfaSetupResponseDto,
+  MfaStatusDto,
   UpdateAppConfigInput,
 } from "@company-erp/shared";
 
@@ -392,6 +394,32 @@ export async function verifyMfaLogin(input: {
   );
   rememberCsrfToken(payload.csrfToken);
   return payload.user;
+}
+
+export async function getCurrentUserMfaStatus(): Promise<MfaStatusDto> {
+  const payload = await requestJson<{ mfaStatus: MfaStatusDto }>(`${apiBaseUrl}/api/auth/mfa/status`);
+  return payload.mfaStatus;
+}
+
+export async function setupCurrentUserMfa(): Promise<MfaSetupResponseDto> {
+  return requestJson<MfaSetupResponseDto>(`${apiBaseUrl}/api/auth/mfa/setup`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function activateCurrentUserMfa(input: { factorId: string; code: string }): Promise<{ ok: true }> {
+  return requestJson<{ ok: true }>(`${apiBaseUrl}/api/auth/mfa/activate`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function disableCurrentUserMfa(): Promise<{ ok: true }> {
+  return requestJson<{ ok: true }>(`${apiBaseUrl}/api/auth/mfa/disable`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function logout(): Promise<void> {

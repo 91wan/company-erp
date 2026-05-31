@@ -76,11 +76,69 @@ describe("Prisma MFA repository", () => {
     expect(created[0]).toMatchObject({ status: "pending" });
   });
 
+  it("creates a pending MFA factor and recovery codes in one transaction", async () => {
+    const operations: string[] = [];
+    const tx = {
+      userMfaFactor: {
+        async count(args: unknown) {
+          operations.push(`factor.count:${JSON.stringify(args)}`);
+          return 0;
+        },
+        async create(args: { data: unknown }) {
+          operations.push(`factor.create:${JSON.stringify(args)}`);
+          return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null };
+        },
+      },
+      userMfaRecoveryCode: {
+        async createMany(args: unknown) {
+          operations.push(`recovery.createMany:${JSON.stringify(args)}`);
+          return { count: 2 };
+        },
+      },
+    };
+    const prisma = {
+      async $transaction<T>(callback: (client: typeof tx) => Promise<T>) {
+        operations.push("transaction");
+        return callback(tx);
+      },
+      userMfaFactor: {
+        async findFirst() { return null; },
+        async count() { return 0; },
+        async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null }; },
+        async updateMany() { return { count: 1 }; },
+        async findUnique() { return null; },
+      },
+      userMfaRecoveryCode: {
+        async createMany() { return { count: 10 }; },
+        async findFirst() { return null; },
+        async updateMany() { return { count: 1 }; },
+      },
+      authSession: { async groupBy() { return []; } },
+      userAccount: { async findUnique() { return null; }, async update() { return null; } },
+    };
+
+    const repo = createPrismaAuthRepository(prisma as never);
+    const factor = await repo.createMfaFactorWithRecoveryCodes!({
+      userAccountId: "u1",
+      type: "totp",
+      secretEncrypted: "enc",
+      codeHashes: ["h1", "h2"],
+    });
+
+    expect(factor?.id).toBe("f1");
+    expect(operations[0]).toBe("transaction");
+    expect(operations.join("\n")).toContain("factor.create");
+    expect(operations.join("\n")).toContain("recovery.createMany");
+  });
+
   it("activateMfaFactor uses updateMany with status=pending filter", async () => {
     const calls: unknown[] = [];
     const prisma = {
       userMfaFactor: {
-        async findFirst() { return null; },
+        async findFirst() {
+          return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null };
+        },
+        async findMany() { return []; },
         async count() { return 1; },
         async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "active", createdAt: new Date(), activatedAt: new Date(), disabledAt: null }; },
         async updateMany(args: unknown) { calls.push(args); return { count: 1 }; },
@@ -120,6 +178,58 @@ describe("Prisma MFA repository", () => {
     };
     const repo = createPrismaAuthRepository(prisma as never);
     await expect(repo.activateMfaFactor!("f1", new Date())).resolves.toBe(false);
+  });
+
+  it("activateMfaFactor disables other pending factors and their recovery codes for the same user", async () => {
+    const factorUpdates: unknown[] = [];
+    const recoveryUpdates: unknown[] = [];
+    const tx = {
+      userMfaFactor: {
+        async findFirst() {
+          return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null };
+        },
+        async updateMany(args: unknown) {
+          factorUpdates.push(args);
+          return { count: 1 };
+        },
+        async findMany() {
+          return [{ id: "old-pending" }];
+        },
+      },
+      userMfaRecoveryCode: {
+        async updateMany(args: unknown) {
+          recoveryUpdates.push(args);
+          return { count: 2 };
+        },
+      },
+    };
+    const prisma = {
+      async $transaction<T>(callback: (client: typeof tx) => Promise<T>) {
+        return callback(tx);
+      },
+      userMfaFactor: {
+        async findFirst() { return null; },
+        async count() { return 0; },
+        async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null }; },
+        async updateMany() { return { count: 1 }; },
+        async findUnique() { return null; },
+      },
+      userMfaRecoveryCode: {
+        async createMany() { return { count: 10 }; },
+        async findFirst() { return null; },
+        async updateMany() { return { count: 1 }; },
+      },
+      authSession: { async groupBy() { return []; } },
+      userAccount: { async findUnique() { return null; }, async update() { return null; } },
+    };
+
+    const repo = createPrismaAuthRepository(prisma as never);
+    const at = new Date();
+    await expect(repo.activateMfaFactor!("f1", at)).resolves.toBe(true);
+
+    expect(factorUpdates[0]).toMatchObject({ where: { id: "f1", status: "pending" }, data: { status: "active", activatedAt: at } });
+    expect(factorUpdates[1]).toMatchObject({ where: { id: { in: ["old-pending"] }, status: "pending" }, data: { status: "disabled", disabledAt: at } });
+    expect(recoveryUpdates[0]).toMatchObject({ where: { mfaFactorId: { in: ["old-pending"] }, usedAt: null }, data: { usedAt: at } });
   });
 
   it("disableMfaFactor disables unused recovery codes for that factor", async () => {

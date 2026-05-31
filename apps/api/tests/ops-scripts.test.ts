@@ -2724,7 +2724,7 @@ describe("public internet readiness gate", () => {
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") {
-          return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED";
+          return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
         }
         if (path === "apps/api/src/securityHeaders.ts") {
           return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
@@ -2733,7 +2733,7 @@ describe("public internet readiness gate", () => {
           return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
         }
         if (path === "apps/api/src/mfa.ts") {
-          return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa";
+          return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
         }
         if (path === "apps/api/src/auth.ts") {
           return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
@@ -2742,19 +2742,22 @@ describe("public internet readiness gate", () => {
           return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         }
         if (path === "database/prisma/schema.prisma") {
-          return "UserMfaFactor UserMfaRecoveryCode AuthSession";
+          return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+        }
+        if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") {
+          return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         }
         if (path === "apps/api/tests/mfa.test.ts") {
           return "generateTotpSecret verifyTotp createPendingMfaToken";
         }
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") {
-          return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
+          return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
         }
         if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") {
-          return "createMfaFactor activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+          return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         }
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") {
-          return "createMfaFactor findActiveMfaFactor useMfaRecoveryCode mfaFactorId";
+          return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
         }
         if (path === "apps/api/tests/security-hardening.test.ts") {
           return "rate limit login";
@@ -2780,7 +2783,8 @@ describe("public internet readiness gate", () => {
         if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
         if (path === "apps/api/tests/security-headers.test.ts") return "security headers test content";
         if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test content";
-        if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test content";
+        if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test content RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
+        if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
         return "ok";
       },
     });
@@ -2797,14 +2801,15 @@ describe("public internet readiness gate", () => {
     // Provide proper mock content for all non-MFA paths; throw only for mfa.ts
     const fullPassReadText = (path: string): string => {
       if (path === "apps/api/src/mfa.ts") throw new Error(`missing ${path}`);
-      if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED";
+      if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
       if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
       if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
       if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
       if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
-      if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode";
+      if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+      if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
       if (path === "apps/api/tests/mfa.test.ts") throw new Error(`missing ${path}`);
-      if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
+      if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
       if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
       if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
       if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
@@ -2817,7 +2822,8 @@ describe("public internet readiness gate", () => {
       if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
       if (path === "apps/api/tests/security-headers.test.ts") return "security headers test";
       if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
-      if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test";
+      if (path === "apps/api/tests/public-internet-env.test.ts") return "public internet env test RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
+      if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
       if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
       if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
       return "ok";
@@ -2837,13 +2843,116 @@ describe("public internet readiness gate", () => {
     expect(result.status).toBe("BLOCKED_MFA_NOT_IMPLEMENTED");
     expect(result.mfaBlockers.join("\n")).toContain("mfa.ts");
   });
+
+  it("blocks when public MFA behavior tests are missing replay and recovery-code assertions", async () => {
+    const { evaluatePublicInternetReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-internet-readiness-gate.mjs")).href
+    )) as { evaluatePublicInternetReadiness: (opts?: { readText?: (p: string) => string; packageScripts?: Record<string, string> }) => { status: string; blockers: string[]; mfaBlockers: string[] } };
+
+    const result = evaluatePublicInternetReadiness({
+      packageScripts: {
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+      },
+      readText: (path) => {
+        if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+        if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+        if (path === "apps/api/src/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+        if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+        if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+        if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
+        if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
+        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
+        if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
+        if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+        if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
+        if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
+        if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
+        if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
+        if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
+        if (path === "docs/security/public-data-exposure-boundary.md") return "external_project_site storageKey commitSha";
+        if (path === "docs/security/public-internet-security-headers.md") return "Strict-Transport-Security Content-Security-Policy X-Content-Type-Options";
+        if (path === "docs/security/public-internet-go-live-runbook.md") return "PUBLIC_INTERNET_ENABLED MFA WAF";
+        if (path === "docs/security/public-mfa-requirement.md") return "PUBLIC_MFA_REQUIRED recovery code TOTP";
+        if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
+        if (path === "apps/api/tests/security-headers.test.ts") return "security headers test";
+        if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
+        if (path === "apps/api/tests/public-internet-env.test.ts") return "RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
+        if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC Sec-Fetch-Site /api/contracts commitSha";
+        return "ok";
+      },
+    });
+
+    expect(result.status).toBe("BLOCKED_MFA_NOT_IMPLEMENTED");
+    expect(result.mfaBlockers.join("\n")).toContain("MFA_SETUP_ALREADY_PENDING");
+    expect(result.mfaBlockers.join("\n")).toContain("MFA_CODE_INVALID");
+  });
+
+  it("blocks when public API contract smoke omits business API, fetch metadata, or app-version assertions", async () => {
+    const { evaluatePublicInternetReadiness } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-internet-readiness-gate.mjs")).href
+    )) as { evaluatePublicInternetReadiness: (opts?: { readText?: (p: string) => string; packageScripts?: Record<string, string> }) => { status: string; blockers: string[] } };
+
+    const result = evaluatePublicInternetReadiness({
+      packageScripts: {
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
+        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+      },
+      readText: (path) => {
+        if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+        if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+        if (path === "apps/api/src/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+        if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+        if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
+        if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
+        if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
+        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
+        if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
+        if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+        if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
+        if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
+        if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
+        if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
+        if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
+        if (path === "docs/security/public-data-exposure-boundary.md") return "external_project_site storageKey commitSha";
+        if (path === "docs/security/public-internet-security-headers.md") return "Strict-Transport-Security Content-Security-Policy X-Content-Type-Options";
+        if (path === "docs/security/public-internet-go-live-runbook.md") return "PUBLIC_INTERNET_ENABLED MFA WAF";
+        if (path === "docs/security/public-mfa-requirement.md") return "PUBLIC_MFA_REQUIRED recovery code TOTP";
+        if (path === "docs/deployment/nas-docker.md") return "不公网暴露 API/PostgreSQL";
+        if (path === "apps/api/tests/security-headers.test.ts") return "security headers test";
+        if (path === "apps/api/tests/fetch-metadata-protection.test.ts") return "fetch metadata test";
+        if (path === "apps/api/tests/public-internet-env.test.ts") return "RECOVERY_CODE_PEPPER TRUSTED_PROXY_CIDRS";
+        if (path === "apps/api/tests/public-internet-path-guard.test.ts") return "PUBLIC_HEALTH_PUBLIC";
+        return "ok";
+      },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers.join("\n")).toContain("Sec-Fetch-Site");
+    expect(result.blockers.join("\n")).toContain("/api/contracts");
+    expect(result.blockers.join("\n")).toContain("commitSha");
+  });
 });
 
 describe("public internet go-live check", () => {
   it("passes with complete valid evidence package", async () => {
     const { evaluatePublicGoLive } = (await import(
       pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
-    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string; expectedCommit?: string }) => { status: string; blockers: string[]; passed: string[] } };
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string; expectedCommit?: string }) => { status: string; blockers: string[]; passed: string[]; publicReadinessStatus?: string; publicSecurityEvidenceStatus?: string } };
 
     const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
     try {
@@ -2859,6 +2968,8 @@ describe("public internet go-live check", () => {
         approver: "cto@example.com",
       }));
       writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "public-readiness-gate.txt"), "READY_FOR_PUBLIC_INTERNET_REVIEW\n");
+      writeFileSync(join(tempDir, "public-security-evidence-check.txt"), "PUBLIC_SECURITY_EVIDENCE_PASS\n");
       writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
       writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
       writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
@@ -2885,6 +2996,59 @@ describe("public internet go-live check", () => {
       const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
       expect(result.status).toBe("READY_FOR_PUBLIC_INTERNET_GO_LIVE");
       expect(result.blockers).toEqual([]);
+      expect(result.publicReadinessStatus).toBe("READY_FOR_PUBLIC_INTERNET_REVIEW");
+      expect(result.publicSecurityEvidenceStatus).toBe("PUBLIC_SECURITY_EVIDENCE_PASS");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks without public readiness and security evidence command output", async () => {
+    const { evaluatePublicGoLive } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/public-go-live-check.mjs")).href
+    )) as { evaluatePublicGoLive: (opts: { evidenceDir: string; domain: string }) => { status: string; blockers: string[] } };
+
+    const tempDir = mkdtempSync(join(tmpdir(), "company-erp-public-go-live-"));
+    try {
+      writeFileSync(join(tempDir, "public-go-live-manifest.json"), JSON.stringify({
+        publicAccessMode: "public_internet",
+        domainName: "erp.example.com",
+        releaseCommitSha: "abc1234567890",
+        wafProvider: "Cloudflare",
+        tlsCertificateIssuer: "Let's Encrypt",
+        mfaRequired: true,
+        publicDataExposureAccepted: false,
+        operator: "ops@example.com",
+        approver: "cto@example.com",
+      }));
+      writeFileSync(join(tempDir, "production-go-live-check.json"), JSON.stringify({ status: "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", blockers: [] }));
+      writeFileSync(join(tempDir, "public-readiness-gate.txt"), "BLOCKED\n");
+      writeFileSync(join(tempDir, "public-security-evidence-check.txt"), "BLOCKED\n");
+      writeFileSync(join(tempDir, "tls-certificate.txt"), "issuer: Let's Encrypt, valid until 2027-01-01");
+      writeFileSync(join(tempDir, "dns-records.txt"), "A erp.example.com 1.2.3.4");
+      writeFileSync(join(tempDir, "reverse-proxy-config.redacted.txt"), "proxy_pass http://api:3001");
+      writeFileSync(join(tempDir, "waf-config.redacted.txt"), "WAF rules enabled");
+      writeFileSync(join(tempDir, "security-headers.txt"), "Strict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src 'self'\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nframe-ancestors 'none'");
+      writeFileSync(join(tempDir, "public-health-check.txt"), "HTTP/1.1 200 OK");
+      writeFileSync(join(tempDir, "vulnerability-scan-summary.txt"), "No critical vulnerabilities found");
+      writeFileSync(join(tempDir, "dependency-audit.txt"), "found 0 vulnerabilities");
+      writeFileSync(join(tempDir, "mfa-enforcement-evidence.txt"),
+        "MFA enforced for admin\nMFA enforced for systemSettings.manage\nMFA enforced for userAccounts.manage\nMFA enforced for auditLogs.read\nACCESS_REVIEW_PASS\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "access-review-export.json"), JSON.stringify({
+        exportedAt: "2026-05-31T08:00:00.000Z",
+        exportedBy: "admin",
+        users: [
+          { id: "u1", username: "admin", status: "active", roles: ["admin"], mfaRequiredForPublicInternet: true, mfaEnabled: true },
+        ],
+      }));
+      writeFileSync(join(tempDir, "access-review-check.txt"), "ACCESS_REVIEW_PASS\nChecked 1 accounts\nPublic internet MFA enforcement checked");
+      writeFileSync(join(tempDir, "incident-response-signoff.md"), "# Incident Response Signoff\nConfirmed.");
+      writeFileSync(join(tempDir, "public-data-exposure-signoff.md"), "# Data Exposure Signoff\nConfirmed.");
+
+      const result = evaluatePublicGoLive({ evidenceDir: tempDir, domain: "https://erp.example.com" });
+      expect(result.status).toBe("BLOCKED");
+      expect(result.blockers.join("\n")).toContain("public-readiness-gate.txt");
+      expect(result.blockers.join("\n")).toContain("public-security-evidence-check.txt");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

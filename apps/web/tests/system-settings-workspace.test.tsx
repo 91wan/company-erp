@@ -299,7 +299,9 @@ describe("SystemSettingsWorkspace", () => {
     expect(screen.getByText(/production:health-check/)).toBeInTheDocument();
     expect(screen.getByText(/production:restore-drill-check/)).toBeInTheDocument();
     expect(screen.getByText(/attachments:production-check/)).toBeInTheDocument();
-    expect(screen.getByText(/access:review-check/)).toBeInTheDocument();
+    expect(screen.getAllByText(/access:review-check/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/--public-internet/)).toBeInTheDocument();
+    expect(screen.getByText(/高权限账号必须 mfaEnabled=true/)).toBeInTheDocument();
     expect(screen.getByText(/audit:verify-export/)).toBeInTheDocument();
     expect(screen.getAllByText(/证据目录必须在 Git 仓库外/).length).toBeGreaterThan(0);
     expect(screen.getByText(/不保存 \.env、数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git/)).toBeInTheDocument();

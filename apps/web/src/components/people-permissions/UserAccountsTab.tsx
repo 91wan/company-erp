@@ -86,6 +86,8 @@ function UserAccountsTable({ userAccounts }: { userAccounts: UserAccountDto[] })
             <th>员工</th>
             <th>角色</th>
             <th>状态</th>
+            <th>MFA</th>
+            <th>公网要求</th>
             <th>改密时间</th>
           </tr>
         </thead>
@@ -105,6 +107,18 @@ function UserAccountsTable({ userAccounts }: { userAccounts: UserAccountDto[] })
                 <StatusBadge tone={account.status === "active" ? "success" : "disabled"}>
                   {accountStatusLabel.get(account.status)}
                 </StatusBadge>
+              </td>
+              <td>
+                <StatusBadge tone={account.mfaEnabled ? "success" : account.mfaRequiredForPublicInternet ? "danger" : "warning"}>
+                  {account.mfaEnabled ? "MFA 已启用" : "MFA 未启用"}
+                </StatusBadge>
+              </td>
+              <td>
+                {account.mfaRequiredForPublicInternet ? (
+                  <StatusBadge tone={account.mfaEnabled ? "success" : "danger"}>公网 MFA 必需</StatusBadge>
+                ) : (
+                  <StatusBadge tone="neutral">非必需</StatusBadge>
+                )}
               </td>
               <td>{account.passwordChangedAt ? formatDateTime(account.passwordChangedAt) : "-"}</td>
             </tr>

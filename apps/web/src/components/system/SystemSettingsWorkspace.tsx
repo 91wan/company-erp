@@ -65,10 +65,11 @@ const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
   },
   {
     title: "权限复核",
-    description: "下载权限复核 JSON 后保存到证据目录，再运行 access review gate。",
+    description: "下载权限复核 JSON 后保存到证据目录，再运行 access review gate。公网审查时，高权限账号必须 mfaEnabled=true。",
     commands: [
       "GET /api/user-accounts/export-access-review",
       "npm run access:review-check -- --export <file>",
+      "npm run access:review-check -- --export <file> --public-internet",
     ],
   },
   {

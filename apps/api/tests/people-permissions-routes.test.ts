@@ -160,9 +160,14 @@ function makeAuthAccount(overrides: Partial<AuthAccountRecord> = {}): AuthAccoun
 
 function createFakeAuthRepository(
   seed: AuthAccountRecord[],
-  options: { activeSessionCounts?: Record<string, number>; includeSessionCounter?: boolean } = {},
+  options: {
+    activeSessionCounts?: Record<string, number>;
+    activeMfaUserIds?: readonly string[];
+    includeSessionCounter?: boolean;
+  } = {},
 ): AuthRepository {
   const accounts = [...seed];
+  const activeMfaUserIds = new Set(options.activeMfaUserIds ?? []);
   const repository: AuthRepository = {
     async findByUsername(username) {
       return accounts.find((account) => account.username === username) ?? null;
@@ -173,6 +178,9 @@ function createFakeAuthRepository(
     async updateLastLogin(id, at) {
       const account = accounts.find((item) => item.id === id);
       if (account) account.lastLoginAt = at.toISOString();
+    },
+    async hasActiveMfaFactor(userAccountId) {
+      return activeMfaUserIds.has(userAccountId);
     },
   };
   if (options.includeSessionCounter !== false) {
@@ -653,13 +661,44 @@ describe("user accounts API", () => {
       payload: { roles: ["admin"], resetPassword: "ResetMe123!" },
     });
     await app.close();
-    expect(listResponse.json()).toEqual({ userAccounts: [makeUserAccount()] });
-    expect(detailResponse.json()).toEqual({ userAccount: makeUserAccount() });
+    expect(listResponse.json()).toEqual({
+      userAccounts: [{ ...makeUserAccount(), mfaEnabled: false, mfaRequiredForPublicInternet: false }],
+    });
+    expect(detailResponse.json()).toEqual({
+      userAccount: { ...makeUserAccount(), mfaEnabled: false, mfaRequiredForPublicInternet: false },
+    });
     expect(createResponse.statusCode).toBe(201);
     expect(createResponse.json()).toMatchObject({ userAccount: { username: "lisi", roles: ["viewer"] } });
     expect(JSON.stringify(createResponse.json())).not.toContain("passwordHash");
     expect(updateResponse.json()).toMatchObject({ userAccount: { roles: ["admin"] } });
     expect(JSON.stringify(updateResponse.json())).not.toContain("passwordHash");
+  });
+
+  it("decorates user account list with MFA status and public internet MFA requirement", async () => {
+    const app = await buildApp({
+      userAccountRepository: createFakeUserAccountRepository([
+        makeUserAccount({ id: "admin-user", username: "admin", roles: ["admin"] }),
+        makeUserAccount({ id: "viewer-user", username: "viewer", roles: ["viewer"] }),
+      ]),
+      authRepository: createFakeAuthRepository([], { activeMfaUserIds: ["viewer-user"] }),
+    });
+    const response = await app.inject({ method: "GET", url: "/api/user-accounts" });
+    await app.close();
+
+    expect(response.json()).toMatchObject({
+      userAccounts: [
+        {
+          username: "admin",
+          mfaEnabled: false,
+          mfaRequiredForPublicInternet: true,
+        },
+        {
+          username: "viewer",
+          mfaEnabled: true,
+          mfaRequiredForPublicInternet: false,
+        },
+      ],
+    });
   });
 
   it("reports user account validation and conflict errors", async () => {

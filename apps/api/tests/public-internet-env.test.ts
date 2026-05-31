@@ -19,6 +19,7 @@ const basePublicInternetEnv = {
   PUBLIC_EXPOSE_COMMIT_SHA: "false",
   PUBLIC_EDGE_WAF_REQUIRED: "true",
   PUBLIC_TLS_REQUIRED: "true",
+  RECOVERY_CODE_PEPPER: "long-random-recovery-code-pepper-for-public-tests",
 };
 
 describe("PUBLIC_INTERNET_ENABLED validation", () => {
@@ -204,6 +205,30 @@ describe("PUBLIC_INTERNET_ENABLED validation", () => {
         PUBLIC_TLS_REQUIRED: "false",
       }),
     ).toThrow(/PUBLIC_TLS_REQUIRED/);
+  });
+
+  it("requires a dedicated recovery code pepper in public internet mode", () => {
+    const { RECOVERY_CODE_PEPPER: _unused, ...env } = basePublicInternetEnv;
+    expect(() => validateRuntimeSecurityEnvironment(env)).toThrow(/RECOVERY_CODE_PEPPER/);
+  });
+
+  it("rejects a short recovery code pepper in public internet mode", () => {
+    expect(() =>
+      validateRuntimeSecurityEnvironment({
+        ...basePublicInternetEnv,
+        RECOVERY_CODE_PEPPER: "too-short",
+      }),
+    ).toThrow(/RECOVERY_CODE_PEPPER/);
+  });
+
+  it("allows AUTH_SESSION_SECRET as recovery code pepper only with explicit public override", () => {
+    const { RECOVERY_CODE_PEPPER: _unused, ...env } = basePublicInternetEnv;
+    expect(() =>
+      validateRuntimeSecurityEnvironment({
+        ...env,
+        RECOVERY_CODE_PEPPER_ALLOW_AUTH_SESSION_SECRET: "true",
+      }),
+    ).not.toThrow();
   });
 
   it("does not affect internal NAS config that omits PUBLIC_INTERNET_ENABLED", () => {

@@ -16,6 +16,47 @@ function renderWorkspace(canManage = true) {
   );
 }
 
+function renderWorkspaceWithAccounts() {
+  return render(
+    <PeoplePermissionsWorkspace
+      canManage
+      loadDepartments={() => Promise.resolve([])}
+      loadEmployees={() => Promise.resolve([])}
+      loadUserAccounts={() => Promise.resolve([
+        {
+          id: "admin-1",
+          employeeId: null,
+          employeeNo: null,
+          employeeName: "总部管理员",
+          username: "admin",
+          status: "active",
+          roles: ["admin"],
+          mfaEnabled: false,
+          mfaRequiredForPublicInternet: true,
+          createdAt: "2026-05-31T00:00:00.000Z",
+          updatedAt: "2026-05-31T00:00:00.000Z",
+        },
+        {
+          id: "viewer-1",
+          employeeId: null,
+          employeeNo: null,
+          employeeName: "只读用户",
+          username: "viewer",
+          status: "active",
+          roles: ["viewer"],
+          mfaEnabled: true,
+          mfaRequiredForPublicInternet: false,
+          createdAt: "2026-05-31T00:00:00.000Z",
+          updatedAt: "2026-05-31T00:00:00.000Z",
+        },
+      ])}
+      loadExternalProjectSiteAccounts={() => Promise.resolve([])}
+      loadProjectSites={() => Promise.resolve([])}
+      loadProjectSiteAssignments={() => Promise.resolve([])}
+    />,
+  );
+}
+
 describe("PeoplePermissions access-review export", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -77,5 +118,15 @@ describe("PeoplePermissions access-review export", () => {
     fireEvent.click(await screen.findByRole("button", { name: "导出权限复核 JSON" }));
 
     expect(await screen.findByText("权限复核 JSON 导出失败，请稍后重试或联系管理员。")).toBeInTheDocument();
+  });
+
+  it("shows MFA status and public internet MFA requirement in user accounts table", async () => {
+    renderWorkspaceWithAccounts();
+
+    fireEvent.click(await screen.findByRole("tab", { name: "用户账号" }));
+
+    expect(await screen.findByText("MFA 未启用")).toBeInTheDocument();
+    expect(screen.getByText("公网 MFA 必需")).toBeInTheDocument();
+    expect(screen.getByText("MFA 已启用")).toBeInTheDocument();
   });
 });

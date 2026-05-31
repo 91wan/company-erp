@@ -121,6 +121,12 @@ export type AuthRepository = {
     type: string;
     secretEncrypted: string;
   }): Promise<MfaFactorRecord>;
+  createMfaFactorWithRecoveryCodes?(input: {
+    userAccountId: string;
+    type: string;
+    secretEncrypted: string;
+    codeHashes: readonly string[];
+  }): Promise<MfaFactorRecord | null>;
   activateMfaFactor?(id: string, at: Date): Promise<boolean>;
   disableMfaFactor?(id: string, at: Date): Promise<boolean>;
   createMfaRecoveryCodes?(mfaFactorId: string, userAccountId: string, codeHashes: string[]): Promise<void>;
@@ -737,7 +743,11 @@ export function registerAuth(
     if (!authRepository || !sessionStore) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     }
-    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor) {
+    const hasTransactionalMfaSetup = typeof authRepository.createMfaFactorWithRecoveryCodes === "function";
+    if (
+      !hasTransactionalMfaSetup &&
+      (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor)
+    ) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
     const body = request.body as { mfaSetupToken?: unknown };
@@ -762,22 +772,33 @@ export function registerAuth(
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
     // Do not allow a setup token to be replayed to mint additional recovery-code batches.
-    const existing = await authRepository.findPendingMfaFactor(userAccountId);
-    if (existing) {
+    const existing = await authRepository.findPendingMfaFactor?.(userAccountId);
+    if (!hasTransactionalMfaSetup && existing) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
     const secretEncrypted = encryptMfaSecret(totpSecret);
-    const factor = await authRepository.createMfaFactor({
-      userAccountId: account.id,
-      type: "totp",
-      secretEncrypted,
-    });
-
     const recoveryCodes = generateRecoveryCodes();
     const codeHashes = recoveryCodes.map(hashRecoveryCode);
-    await authRepository.createMfaRecoveryCodes(factor.id, account.id, codeHashes);
+    const factor = hasTransactionalMfaSetup
+      ? await authRepository.createMfaFactorWithRecoveryCodes!({
+          userAccountId: account.id,
+          type: "totp",
+          secretEncrypted,
+          codeHashes,
+        })
+      : await authRepository.createMfaFactor!({
+          userAccountId: account.id,
+          type: "totp",
+          secretEncrypted,
+        });
+    if (!factor) {
+      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
+    }
+    if (!hasTransactionalMfaSetup) {
+      await authRepository.createMfaRecoveryCodes!(factor.id, account.id, codeHashes);
+    }
 
     const totpUri = buildTotpUri(totpSecret, account.username);
     await writeAuthAudit(request, "mfa.setup", "user_mfa_factor", factor.id, {
@@ -874,28 +895,43 @@ export function registerAuth(
     if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     const user = (request as AuthenticatedRequest).currentUser;
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
-    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor) {
+    const hasTransactionalMfaSetup = typeof authRepository.createMfaFactorWithRecoveryCodes === "function";
+    if (
+      !hasTransactionalMfaSetup &&
+      (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor)
+    ) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
 
     if ((await authRepository.hasActiveMfaFactor?.(user.id)) === true) {
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
-    if (await authRepository.findPendingMfaFactor(user.id)) {
+    if (!hasTransactionalMfaSetup && await authRepository.findPendingMfaFactor!(user.id)) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
     const secretEncrypted = encryptMfaSecret(totpSecret);
-    const factor = await authRepository.createMfaFactor({
-      userAccountId: user.id,
-      type: "totp",
-      secretEncrypted,
-    });
-
     const recoveryCodes = generateRecoveryCodes();
     const codeHashes = recoveryCodes.map(hashRecoveryCode);
-    await authRepository.createMfaRecoveryCodes(factor.id, user.id, codeHashes);
+    const factor = hasTransactionalMfaSetup
+      ? await authRepository.createMfaFactorWithRecoveryCodes!({
+          userAccountId: user.id,
+          type: "totp",
+          secretEncrypted,
+          codeHashes,
+        })
+      : await authRepository.createMfaFactor!({
+          userAccountId: user.id,
+          type: "totp",
+          secretEncrypted,
+        });
+    if (!factor) {
+      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
+    }
+    if (!hasTransactionalMfaSetup) {
+      await authRepository.createMfaRecoveryCodes!(factor.id, user.id, codeHashes);
+    }
 
     const totpUri = buildTotpUri(totpSecret, user.username);
     await writeAuthAudit(request, "mfa.setup", "user_mfa_factor", factor.id, {
