@@ -285,6 +285,13 @@ export function validateRuntimeSecurityEnvironment(env: NodeJS.ProcessEnv = proc
     if (env.PUBLIC_MFA_REQUIRED !== "true") {
       throw new Error("PUBLIC_MFA_REQUIRED=true is required when PUBLIC_INTERNET_ENABLED=true");
     }
+    const recoveryCodePepper = env.RECOVERY_CODE_PEPPER?.trim() ?? "";
+    const allowSessionSecretPepper = env.RECOVERY_CODE_PEPPER_ALLOW_AUTH_SESSION_SECRET === "true";
+    if (!allowSessionSecretPepper && isWeakProductionValue(recoveryCodePepper, MIN_PRODUCTION_SECRET_LENGTH)) {
+      throw new Error(
+        "RECOVERY_CODE_PEPPER must be set to a strong non-placeholder value when PUBLIC_INTERNET_ENABLED=true",
+      );
+    }
     // Rule 9: PUBLIC_EXPOSE_COMMIT_SHA must be explicitly set to false for public internet
     if (env.PUBLIC_EXPOSE_COMMIT_SHA !== "false") {
       throw new Error("PUBLIC_EXPOSE_COMMIT_SHA=false is required when PUBLIC_INTERNET_ENABLED=true (set explicitly to suppress commit SHA in public responses)");

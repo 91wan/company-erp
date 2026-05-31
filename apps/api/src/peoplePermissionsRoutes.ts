@@ -74,6 +74,25 @@ function buildAccessReviewExport(
   };
 }
 
+async function decorateUserAccountsWithMfaStatus(
+  accounts: readonly UserAccountDto[],
+  options: BuildAppOptions,
+): Promise<UserAccountDto[]> {
+  const mfaEnabledSet = new Set<string>();
+  if (options.authRepository?.hasActiveMfaFactor) {
+    for (const account of accounts) {
+      if (await options.authRepository.hasActiveMfaFactor(account.id)) {
+        mfaEnabledSet.add(account.id);
+      }
+    }
+  }
+  return accounts.map((account) => ({
+    ...account,
+    mfaEnabled: mfaEnabledSet.has(account.id),
+    mfaRequiredForPublicInternet: mfaRequiredForPublicInternet(account.roles),
+  }));
+}
+
 export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/departments", async (request, reply) => {
     if (!options.departmentRepository) {
@@ -251,7 +270,7 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     try {
       const filters = normalizeUserAccountFilters(request.query as Record<string, unknown>);
       const userAccounts = await options.userAccountRepository.list(filters);
-      return { userAccounts };
+      return { userAccounts: await decorateUserAccountsWithMfaStatus(userAccounts, options) };
     } catch (error) {
       if (error instanceof UserAccountValidationError) {
         return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
@@ -314,7 +333,8 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
     const { id } = request.params as { id: string };
     const userAccount = await options.userAccountRepository.getById(id);
     if (!userAccount) return reply.status(404).send({ error: "USER_ACCOUNT_NOT_FOUND" });
-    return { userAccount };
+    const [decorated] = await decorateUserAccountsWithMfaStatus([userAccount], options);
+    return { userAccount: decorated };
   });
 
   app.get("/api/project-site-assignments", async (request, reply) => {
@@ -418,7 +438,8 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
         }, { tx: txOptions });
         return created;
       });
-      return reply.status(201).send({ userAccount });
+      const [decorated] = await decorateUserAccountsWithMfaStatus([userAccount], options);
+      return reply.status(201).send({ userAccount: decorated });
     } catch (error) {
       if (error instanceof UserAccountValidationError) {
         return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });
@@ -452,7 +473,8 @@ export function registerPeoplePermissionsRoutes(app: FastifyInstance, options: B
         return updated;
       });
       if (!userAccount) return reply.status(404).send({ error: "USER_ACCOUNT_NOT_FOUND" });
-      return { userAccount };
+      const [decorated] = await decorateUserAccountsWithMfaStatus([userAccount], options);
+      return { userAccount: decorated };
     } catch (error) {
       if (error instanceof UserAccountValidationError) {
         return reply.status(400).send({ error: "USER_ACCOUNT_VALIDATION_FAILED", issues: error.issues });

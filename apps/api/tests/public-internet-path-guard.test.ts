@@ -76,10 +76,17 @@ describe("isPublicInternetPath (internet mode — strict)", () => {
 // ---- Integration tests: auth gate behavior with PUBLIC_INTERNET_ENABLED ----
 
 describe("auth gate with PUBLIC_INTERNET_ENABLED=true", () => {
-  const savedEnv = process.env.PUBLIC_INTERNET_ENABLED;
+  const savedEnv = {
+    PUBLIC_INTERNET_ENABLED: process.env.PUBLIC_INTERNET_ENABLED,
+    PUBLIC_HEALTH_PUBLIC: process.env.PUBLIC_HEALTH_PUBLIC,
+    PUBLIC_EXPOSE_COMMIT_SHA: process.env.PUBLIC_EXPOSE_COMMIT_SHA,
+    APP_COMMIT_SHA: process.env.APP_COMMIT_SHA,
+  };
   afterEach(() => {
-    if (savedEnv === undefined) delete process.env.PUBLIC_INTERNET_ENABLED;
-    else process.env.PUBLIC_INTERNET_ENABLED = savedEnv;
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it("returns 401 for unauthenticated GET /api/meta/roles in internet mode", async () => {
@@ -116,6 +123,34 @@ describe("auth gate with PUBLIC_INTERNET_ENABLED=true", () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it("returns 401 for unauthenticated business API in internet mode", async () => {
+    process.env.PUBLIC_INTERNET_ENABLED = "true";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "public-internet-business-api-test-secret-long-enough" },
+      authRepository: createFakeAuthRepository(),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/contracts" });
+    await app.close();
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("blocks Sec-Fetch-Site cross-site POST before auth in internet mode", async () => {
+    process.env.PUBLIC_INTERNET_ENABLED = "true";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "public-internet-fetch-metadata-test-secret-long-enough" },
+      authRepository: createFakeAuthRepository(),
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "nobody", password: "wrong" },
+      headers: { "sec-fetch-site": "cross-site" },
+    });
+    await app.close();
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "FETCH_METADATA_BLOCKED" });
+  });
+
   it("returns 401 for /health in internet mode when PUBLIC_HEALTH_PUBLIC is not set", async () => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
     delete process.env.PUBLIC_HEALTH_PUBLIC;
@@ -146,6 +181,8 @@ describe("auth gate with PUBLIC_INTERNET_ENABLED=true", () => {
 
   it("still returns 200 for /api/app-version in internet mode (commitSha omitted)", async () => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
+    process.env.PUBLIC_EXPOSE_COMMIT_SHA = "false";
+    process.env.APP_COMMIT_SHA = "abcdef1234567890";
     const app = await buildApp({
       auth: { enabled: true, sessionSecret: "public-internet-path-test-secret-long-enough" },
       authRepository: createFakeAuthRepository(),
@@ -153,6 +190,8 @@ describe("auth gate with PUBLIC_INTERNET_ENABLED=true", () => {
     const res = await app.inject({ method: "GET", url: "/api/app-version" });
     await app.close();
     expect(res.statusCode).toBe(200);
+    expect(res.json().appVersion).not.toHaveProperty("commitSha");
+    expect(res.json().appVersion.shortCommitSha).toBe("abcdef1");
   });
 
   it("allows /api/auth/login POST in internet mode (login flow start)", async () => {

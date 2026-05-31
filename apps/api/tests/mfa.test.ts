@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildTotpUri,
@@ -106,6 +107,19 @@ describe("recovery codes", () => {
     expect(h1).toBe(h2);
     expect(h1).toBe(h3);
     expect(h1).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("hashes recovery codes with HMAC pepper instead of plain SHA256", () => {
+    const savedPepper = process.env.RECOVERY_CODE_PEPPER;
+    try {
+      process.env.RECOVERY_CODE_PEPPER = "unit-test-recovery-code-pepper-with-enough-length";
+      const code = "abcdef12-34567890-abcdef12-34567890";
+      const normalized = code.toLowerCase().replace(/-/g, "").trim();
+      expect(hashRecoveryCode(code)).not.toBe(createHash("sha256").update(normalized).digest("hex"));
+    } finally {
+      if (savedPepper === undefined) delete process.env.RECOVERY_CODE_PEPPER;
+      else process.env.RECOVERY_CODE_PEPPER = savedPepper;
+    }
   });
 });
 

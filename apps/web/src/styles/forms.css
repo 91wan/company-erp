@@ -54,6 +54,12 @@
   font-weight: 720;
 }
 
+.secondary-action.danger {
+  border-color: rgb(220 38 38 / 35%);
+  color: #b42318;
+  background: #fff5f5;
+}
+
 .primary-action {
   display: inline-flex;
   align-items: center;

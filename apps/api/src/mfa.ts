@@ -124,8 +124,20 @@ export function generateRecoveryCodes(): string[] {
   });
 }
 
+function recoveryCodePepperFromEnv(): string {
+  const explicitPepper = process.env.RECOVERY_CODE_PEPPER?.trim();
+  if (explicitPepper) return explicitPepper;
+  if (process.env.RECOVERY_CODE_PEPPER_ALLOW_AUTH_SESSION_SECRET === "true") {
+    return process.env.AUTH_SESSION_SECRET?.trim() || "company-erp-local-dev-session-secret-change-me";
+  }
+  if (process.env.PUBLIC_INTERNET_ENABLED === "true") {
+    throw new Error("RECOVERY_CODE_PEPPER is required when PUBLIC_INTERNET_ENABLED=true");
+  }
+  return process.env.AUTH_SESSION_SECRET?.trim() || "company-erp-local-dev-session-secret-change-me";
+}
+
 export function hashRecoveryCode(code: string): string {
-  const pepper = process.env.RECOVERY_CODE_PEPPER?.trim() || process.env.AUTH_SESSION_SECRET?.trim() || "company-erp-local-dev-session-secret-change-me";
+  const pepper = recoveryCodePepperFromEnv();
   return createHmac("sha256", pepper).update(code.toLowerCase().replace(/-/g, "").trim()).digest("hex");
 }
 

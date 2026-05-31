@@ -599,6 +599,8 @@ export type UserAccountDto = {
   username: string;
   status: UserAccountStatusCode;
   roles: readonly MvpRoleCode[];
+  mfaEnabled?: boolean;
+  mfaRequiredForPublicInternet?: boolean;
   lastLoginAt?: string | null;
   passwordChangedAt?: string | null;
   createdAt: string;

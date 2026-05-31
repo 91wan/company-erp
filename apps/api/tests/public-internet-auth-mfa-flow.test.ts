@@ -200,12 +200,14 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     PUBLIC_INTERNET_ENABLED: process.env.PUBLIC_INTERNET_ENABLED,
     PUBLIC_MFA_REQUIRED: process.env.PUBLIC_MFA_REQUIRED,
     IDENTITY_ENCRYPTION_SECRET: process.env.IDENTITY_ENCRYPTION_SECRET,
+    RECOVERY_CODE_PEPPER: process.env.RECOVERY_CODE_PEPPER,
   };
 
   beforeEach(() => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
     process.env.PUBLIC_MFA_REQUIRED = "true";
     process.env.IDENTITY_ENCRYPTION_SECRET = "mfa-flow-test-encrypt-secret-long-enough-here";
+    process.env.RECOVERY_CODE_PEPPER = "mfa-flow-recovery-code-pepper-long-enough";
   });
 
   afterEach(() => {
@@ -729,11 +731,13 @@ describe("P0-2: auth self-service routes not blocked by PERMISSION_NOT_MAPPED", 
   const savedEnv = {
     PUBLIC_INTERNET_ENABLED: process.env.PUBLIC_INTERNET_ENABLED,
     IDENTITY_ENCRYPTION_SECRET: process.env.IDENTITY_ENCRYPTION_SECRET,
+    RECOVERY_CODE_PEPPER: process.env.RECOVERY_CODE_PEPPER,
   };
 
   beforeEach(() => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
     process.env.IDENTITY_ENCRYPTION_SECRET = "mfa-flow-test-encrypt-secret-long-enough-here";
+    process.env.RECOVERY_CODE_PEPPER = "mfa-flow-recovery-code-pepper-long-enough";
   });
 
   afterEach(() => {
@@ -856,12 +860,14 @@ describe("P0-3: MFA audit logs do not contain TOTP secret or recovery code plain
     PUBLIC_INTERNET_ENABLED: process.env.PUBLIC_INTERNET_ENABLED,
     PUBLIC_MFA_REQUIRED: process.env.PUBLIC_MFA_REQUIRED,
     IDENTITY_ENCRYPTION_SECRET: process.env.IDENTITY_ENCRYPTION_SECRET,
+    RECOVERY_CODE_PEPPER: process.env.RECOVERY_CODE_PEPPER,
   };
 
   beforeEach(() => {
     process.env.PUBLIC_INTERNET_ENABLED = "true";
     process.env.PUBLIC_MFA_REQUIRED = "true";
     process.env.IDENTITY_ENCRYPTION_SECRET = "mfa-flow-test-encrypt-secret-long-enough-here";
+    process.env.RECOVERY_CODE_PEPPER = "mfa-flow-recovery-code-pepper-long-enough";
   });
 
   afterEach(() => {

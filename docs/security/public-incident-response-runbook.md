@@ -13,8 +13,11 @@ For any confirmed or suspected security incident:
    ```
 2. **Revoke all active sessions** (if session compromise is suspected):
    ```bash
-   # Use the admin user management UI or direct DB call to revoke all sessions
-   # Audit log will record this action
+   # Dry run first. This uses Prisma AuthSession fields and does not print token hashes.
+   DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --all
+
+   # Then execute after operator approval.
+   DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --all --confirm
    ```
 3. **Force password reset for all high-privilege accounts** (admin, systemSettings.manage, userAccounts.manage).
 4. **Export audit logs immediately**:
@@ -32,7 +35,10 @@ Symptoms: Unauthorized login, impossible travel in audit log, dark web exposure.
 
 Actions:
 1. Disable the affected account immediately.
-2. Revoke all sessions for that account.
+2. Revoke all sessions for that account:
+   ```bash
+   DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --user-account-id <user-account-id> --confirm
+   ```
 3. Force password reset + new MFA secret.
 4. Check audit log for actions taken under that account.
 5. Review if any data was exported during the unauthorized session.
@@ -108,6 +114,8 @@ Do not re-enable `PUBLIC_INTERNET_ENABLED=true` until all of the following are c
 - [ ] Affected credentials rotated
 - [ ] Audit log exported and preserved
 - [ ] Reverse proxy / WAF logs preserved
+- [ ] `npm run public:readiness-gate` passes after the fix
+- [ ] `npm run public:security-evidence-check -- --evidence-dir <outside-git-path>` passes with updated evidence
 - [ ] `npm run public:go-live-check` passes with updated evidence
 - [ ] Responsible person sign-off on recovery
 

@@ -27,6 +27,8 @@ Required evidence files in --evidence-dir:
   mfa-enforcement-evidence.txt       Evidence that admin MFA is enforced
   access-review-export.json          Access review export with public MFA status
   access-review-check.txt            Access review check result
+  public-readiness-gate.txt          Output from npm run public:readiness-gate
+  public-security-evidence-check.txt Output from npm run public:security-evidence-check
   incident-response-signoff.md       Incident response runbook accepted
   public-data-exposure-signoff.md    Data exposure boundary accepted`);
 }
@@ -136,6 +138,8 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
   const blockers = [];
   const warnings = [];
   const passed = [];
+  let publicReadinessStatus = "missing";
+  let publicSecurityEvidenceStatus = "missing";
 
   // Domain must be HTTPS
   let domainHostname = "";
@@ -190,6 +194,32 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
       blockers.push(`production-go-live-check.json: status must be "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE", got "${internalGoLive.status}"`);
     } else {
       passed.push("production-go-live-check.json");
+    }
+  }
+
+  // --- public-readiness-gate.txt ---
+  const publicReadiness = readEvidenceText(evidenceDir, "public-readiness-gate.txt", blockers);
+  if (publicReadiness) {
+    publicReadinessStatus = publicReadiness.includes("READY_FOR_PUBLIC_INTERNET_REVIEW")
+      ? "READY_FOR_PUBLIC_INTERNET_REVIEW"
+      : "BLOCKED";
+    if (publicReadinessStatus !== "READY_FOR_PUBLIC_INTERNET_REVIEW") {
+      blockers.push("public-readiness-gate.txt: must contain READY_FOR_PUBLIC_INTERNET_REVIEW");
+    } else {
+      passed.push("public-readiness-gate.txt");
+    }
+  }
+
+  // --- public-security-evidence-check.txt ---
+  const publicSecurityEvidence = readEvidenceText(evidenceDir, "public-security-evidence-check.txt", blockers);
+  if (publicSecurityEvidence) {
+    publicSecurityEvidenceStatus = publicSecurityEvidence.includes("PUBLIC_SECURITY_EVIDENCE_PASS")
+      ? "PUBLIC_SECURITY_EVIDENCE_PASS"
+      : "BLOCKED";
+    if (publicSecurityEvidenceStatus !== "PUBLIC_SECURITY_EVIDENCE_PASS") {
+      blockers.push("public-security-evidence-check.txt: must contain PUBLIC_SECURITY_EVIDENCE_PASS");
+    } else {
+      passed.push("public-security-evidence-check.txt");
     }
   }
 
@@ -348,6 +378,8 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
 
   return {
     status: blockers.length === 0 ? READY : BLOCKED,
+    publicReadinessStatus,
+    publicSecurityEvidenceStatus,
     blockers: blockers.map(sanitize),
     warnings: warnings.map(sanitize),
     passed,

@@ -1,6 +1,7 @@
 import { Database, LogOut } from "lucide-react";
 import { MVP_ROLES, type AuthenticatedUserDto } from "@company-erp/shared";
 import { ApiStatus } from "../ApiStatus";
+import { CurrentUserMfaSettings } from "./CurrentUserMfaSettings";
 
 const roleLabel = new Map(MVP_ROLES.map((role) => [role.code, role.label]));
 
@@ -35,6 +36,7 @@ export function TopBar({ currentUser, onLogout }: TopBarProps) {
               <small>{currentUser.assignedProjectSiteIds.length} 个项目点</small>
             ) : null}
           </div>
+          <CurrentUserMfaSettings currentUser={currentUser} />
           <button className="logout-button" type="button" onClick={onLogout}>
             <LogOut aria-hidden="true" size={15} />
             退出登录

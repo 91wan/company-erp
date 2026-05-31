@@ -7,7 +7,9 @@ This runbook describes the steps to take the Company ERP live on the public inte
 Before starting this runbook, confirm:
 - [ ] Internal production go-live is complete (`npm run production:go-live-check` passes)
 - [ ] `npm run public:readiness-gate` passes
+- [ ] `npm run public:security-evidence-check -- --evidence-dir <outside-git-path>` passes
 - [ ] All high-privilege accounts (admin, systemSettings.manage, userAccounts.manage) have MFA enabled
+- [ ] Any schema migration in the release has a completed internal production migration plan (`npm run production:migration-plan-check`)
 
 ## Step 1: DNS and TLS
 
@@ -41,6 +43,7 @@ AUTH_COOKIE_SECURE=true
 PUBLIC_SECURITY_HEADERS_ENABLED=true
 PUBLIC_RATE_LIMIT_ENABLED=true
 PUBLIC_MFA_REQUIRED=true
+RECOVERY_CODE_PEPPER=<strong-random-public-recovery-code-pepper>
 PUBLIC_EXPOSE_COMMIT_SHA=false
 TRUSTED_PROXY_CIDRS=<reverse-proxy-cidr>
 PUBLIC_APP_BASE_URL=https://erp.example.com
@@ -55,6 +58,7 @@ Restart the API: `docker compose restart api`
 2. Navigate to user settings → Enable MFA → Scan QR code → Confirm TOTP.
 3. Save recovery codes to a secure location (they are shown only once).
 4. Save evidence: `mfa-enforcement-evidence.txt` (list of accounts, MFA status confirmed)
+5. Confirm setup replay protection: a second setup attempt returns `MFA_SETUP_ALREADY_PENDING` and does not mint another recovery-code batch.
 
 ## Step 5: Security Headers Verification
 
@@ -111,6 +115,15 @@ Prepare and obtain signatures on:
 - `public-go-live-manifest.json` — Completed with operator and approver
 
 ## Step 10: Final Go-Live Check
+
+Save the static and security evidence command outputs in the public evidence directory before the final check:
+
+```bash
+npm run public:readiness-gate > /evidence/public-go-live-$(date +%Y%m%d)/public-readiness-gate.txt
+npm run public:security-evidence-check -- \
+  --evidence-dir /evidence/public-go-live-$(date +%Y%m%d) \
+  > /evidence/public-go-live-$(date +%Y%m%d)/public-security-evidence-check.txt
+```
 
 ```bash
 npm run public:go-live-check -- \
