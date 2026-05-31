@@ -121,11 +121,15 @@ export type AuthRepository = {
     type: string;
     secretEncrypted: string;
   }): Promise<MfaFactorRecord>;
-  activateMfaFactor?(id: string, at: Date): Promise<void>;
-  disableMfaFactor?(id: string, at: Date): Promise<void>;
+  activateMfaFactor?(id: string, at: Date): Promise<boolean>;
+  disableMfaFactor?(id: string, at: Date): Promise<boolean>;
   createMfaRecoveryCodes?(mfaFactorId: string, userAccountId: string, codeHashes: string[]): Promise<void>;
-  findUnusedMfaRecoveryCode?(userAccountId: string, codeHash: string): Promise<MfaRecoveryCodeRecord | null>;
-  useMfaRecoveryCode?(id: string, at: Date): Promise<void>;
+  findUnusedMfaRecoveryCode?(
+    userAccountId: string,
+    mfaFactorId: string,
+    codeHash: string,
+  ): Promise<MfaRecoveryCodeRecord | null>;
+  useMfaRecoveryCode?(id: string, at: Date): Promise<boolean>;
   findMfaFactorById?(id: string): Promise<MfaFactorRecord | null>;
   findPendingMfaFactor?(userAccountId: string): Promise<MfaFactorRecord | null>;
 };
@@ -665,11 +669,13 @@ export function registerAuth(
         } else if (authRepository.findUnusedMfaRecoveryCode && authRepository.useMfaRecoveryCode) {
           // Try as recovery code
           const codeHash = hashRecoveryCode(code);
-          const recoveryCode = await authRepository.findUnusedMfaRecoveryCode(userAccountId, codeHash);
+          const recoveryCode = await authRepository.findUnusedMfaRecoveryCode(userAccountId, factor.id, codeHash);
           if (recoveryCode) {
-            await authRepository.useMfaRecoveryCode(recoveryCode.id, new Date());
-            mfaOk = true;
-            mfaMethod = "recovery_code";
+            const used = await authRepository.useMfaRecoveryCode(recoveryCode.id, new Date());
+            if (used) {
+              mfaOk = true;
+              mfaMethod = "recovery_code";
+            }
           }
         }
       }
@@ -731,7 +737,7 @@ export function registerAuth(
     if (!authRepository || !sessionStore) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     }
-    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes) {
+    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
     const body = request.body as { mfaSetupToken?: unknown };
@@ -755,12 +761,10 @@ export function registerAuth(
     if ((await authRepository.hasActiveMfaFactor?.(userAccountId)) === true) {
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
-    // Prevent accumulation of pending factors: disable existing pending if any
-    if (authRepository.findPendingMfaFactor && authRepository.disableMfaFactor) {
-      const existing = await authRepository.findPendingMfaFactor(userAccountId);
-      if (existing) {
-        await authRepository.disableMfaFactor(existing.id, new Date());
-      }
+    // Do not allow a setup token to be replayed to mint additional recovery-code batches.
+    const existing = await authRepository.findPendingMfaFactor(userAccountId);
+    if (existing) {
+      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
@@ -827,7 +831,10 @@ export function registerAuth(
       return reply.status(401).send({ error: "MFA_CODE_INVALID" });
     }
 
-    await authRepository.activateMfaFactor(factor.id, new Date());
+    const activated = await authRepository.activateMfaFactor(factor.id, new Date());
+    if (!activated) {
+      return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
+    }
     await writeAuthAudit(request, "mfa.activate", "user_mfa_factor", factor.id, {
       userAccountId: account.id,
       username: account.username,
@@ -867,8 +874,15 @@ export function registerAuth(
     if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     const user = (request as AuthenticatedRequest).currentUser;
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
-    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes) {
+    if (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+    }
+
+    if ((await authRepository.hasActiveMfaFactor?.(user.id)) === true) {
+      return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
+    }
+    if (await authRepository.findPendingMfaFactor(user.id)) {
+      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
@@ -916,7 +930,10 @@ export function registerAuth(
       return reply.status(401).send({ error: "MFA_CODE_INVALID" });
     }
 
-    await authRepository.activateMfaFactor(factor.id, new Date());
+    const activated = await authRepository.activateMfaFactor(factor.id, new Date());
+    if (!activated) {
+      return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
+    }
     await writeAuthAudit(request, "mfa.activate", "user_mfa_factor", factor.id, {
       userAccountId: user.id,
       username: user.username,
@@ -938,7 +955,10 @@ export function registerAuth(
     const factor = await authRepository.findActiveMfaFactor(user.id);
     if (!factor) return reply.status(400).send({ error: "MFA_NOT_ENABLED" });
 
-    await authRepository.disableMfaFactor(factor.id, new Date());
+    const disabled = await authRepository.disableMfaFactor(factor.id, new Date());
+    if (!disabled) {
+      return reply.status(409).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_DISABLED" });
+    }
     await writeAuthAudit(request, "mfa.disable", "user_mfa_factor", factor.id, {
       userAccountId: user.id,
       username: user.username,

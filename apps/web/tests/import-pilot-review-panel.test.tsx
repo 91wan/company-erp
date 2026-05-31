@@ -3,6 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 import type { ImportJobDto, ImportJobRowDto, ImportJobSummaryDto } from "@company-erp/shared";
 import { ExcelImportWorkspace } from "../src/components/excel-import/ExcelImportWorkspace";
 
+const dayMs = 24 * 60 * 60 * 1000;
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * dayMs).toISOString();
+}
+
+function dateDaysAgo(days: number): string {
+  return daysAgo(days).slice(0, 10);
+}
+
+function dateDaysFromNow(days: number): string {
+  return new Date(Date.now() + days * dayMs).toISOString().slice(0, 10);
+}
+
 const baseRow: ImportJobRowDto = {
   id: "row-1",
   rowNumber: 2,
@@ -12,8 +26,8 @@ const baseRow: ImportJobRowDto = {
   status: "imported",
   targetRecordType: null,
   targetRecordId: null,
-  createdAt: "2026-05-23T00:00:00.000Z",
-  updatedAt: "2026-05-23T00:00:00.000Z",
+  createdAt: daysAgo(1),
+  updatedAt: daysAgo(1),
 };
 
 function job(overrides: Partial<ImportJobDto>): ImportJobDto {
@@ -30,8 +44,8 @@ function job(overrides: Partial<ImportJobDto>): ImportJobDto {
     errorRows: overrides.errorRows ?? 0,
     skippedRows: overrides.skippedRows ?? 0,
     importedRows: overrides.importedRows ?? rows.length,
-    createdAt: overrides.createdAt ?? "2026-05-23T00:00:00.000Z",
-    confirmedAt: overrides.confirmedAt ?? "2026-05-23T00:05:00.000Z",
+    createdAt: overrides.createdAt ?? daysAgo(1),
+    confirmedAt: overrides.confirmedAt ?? daysAgo(1),
     rows,
   };
 }
@@ -47,14 +61,14 @@ describe("ImportPilotReviewPanel", () => {
       id: "health-job",
       templateType: "health_certificates",
       rows: [
-        { ...baseRow, id: "health-site", targetRecordType: "certificate", targetRecordId: "cert-site", normalizedData: { healthCertificateOwnerTypeLabel: "项目点健康证", expiryDate: "2026-05-25" } },
-        { ...baseRow, id: "health-employee", targetRecordType: "certificate", targetRecordId: "cert-emp", normalizedData: { healthCertificateOwnerTypeLabel: "公司健康证", expiryDate: "2026-04-01" } },
+        { ...baseRow, id: "health-site", targetRecordType: "certificate", targetRecordId: "cert-site", normalizedData: { healthCertificateOwnerTypeLabel: "项目点健康证", expiryDate: dateDaysFromNow(10) } },
+        { ...baseRow, id: "health-employee", targetRecordType: "certificate", targetRecordId: "cert-emp", normalizedData: { healthCertificateOwnerTypeLabel: "公司健康证", expiryDate: dateDaysAgo(2) } },
       ],
     });
     const contractJob = job({
       id: "contract-job",
       templateType: "contracts",
-      rows: [{ ...baseRow, id: "contract-row", targetRecordType: "contract", targetRecordId: "contract-1", normalizedData: { endDate: "2026-05-20" } }],
+      rows: [{ ...baseRow, id: "contract-row", targetRecordType: "contract", targetRecordId: "contract-1", normalizedData: { endDate: dateDaysAgo(3) } }],
     });
     const errorJob = job({
       id: "error-job",
@@ -114,8 +128,9 @@ describe("ImportPilotReviewPanel", () => {
     const jobs = Array.from({ length: 30 }, (_, index) => job({
       id: `job-${index}`,
       templateType: "health_certificates",
-      createdAt: `2026-05-${String((index % 20) + 1).padStart(2, "0")}T00:00:00.000Z`,
-      rows: [{ ...baseRow, id: `row-${index}`, normalizedData: { healthCertificateOwnerTypeLabel: "项目点健康证", expiryDate: "2026-05-25" } }],
+      createdAt: daysAgo(index % 6),
+      confirmedAt: daysAgo(index % 6),
+      rows: [{ ...baseRow, id: `row-${index}`, normalizedData: { healthCertificateOwnerTypeLabel: "项目点健康证", expiryDate: dateDaysFromNow(10) } }],
     }));
     const loadDetail = vi.fn((id: string) => Promise.resolve(jobs.find((item) => item.id === id)!));
     const { rerender } = render(

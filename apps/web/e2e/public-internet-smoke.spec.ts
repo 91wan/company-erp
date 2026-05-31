@@ -134,11 +134,35 @@ test("external_project_site user cannot see system settings or audit logs", asyn
   expect(issues).toHaveLength(0);
 });
 
-// MFA setup UI (first-time enrollment) is not yet implemented in the frontend.
-// This test is a skeleton for when the MFA setup flow is added.
-test.skip("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ page }) => {
+test("MFA_SETUP_REQUIRED completes first-time MFA setup without storing recovery codes", async ({ page }) => {
   const issues = trackBrowserIssues(page);
   await mockCompanyErpApi(page, { user: null });
+  await page.route("**/api/auth/mfa/setup-challenge", (route) => {
+    if (route.request().method() === "POST") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          factorId: "factor-1",
+          totpUri: "otpauth://totp/Company%20ERP:admin?secret=ABCDEF&issuer=Company+ERP",
+          recoveryCodes: ["abcd1234-abcd1234-abcd1234-abcd1234"],
+        }),
+      });
+    } else {
+      route.continue();
+    }
+  });
+  await page.route("**/api/auth/mfa/activate-challenge", (route) => {
+    if (route.request().method() === "POST") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: adminUser, csrfToken: "csrf-after-mfa-setup" }),
+      });
+    } else {
+      route.continue();
+    }
+  });
   await page.route("**/api/auth/login", (route) => {
     if (route.request().method() === "POST") {
       route.fulfill({
@@ -160,10 +184,14 @@ test.skip("MFA_SETUP_REQUIRED shows first-time MFA setup entry point", async ({ 
   await page.locator("input[type='password']").fill("password");
   await page.locator("button[type='submit']").click();
 
-  // Should show MFA setup form — either a dedicated setup screen or a setup prompt
-  await expect(
-    page.getByText(/设置.*MFA|绑定.*双因素|MFA.*设置|首次设置|扫描二维码|Authenticator/i),
-  ).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("首次设置双因素验证")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("textarea")).toHaveValue(/otpauth:\/\/totp\/Company%20ERP:admin/);
+  await expect(page.getByText("abcd1234-abcd1234-abcd1234-abcd1234")).toBeVisible();
+  await page.locator("input[autocomplete='one-time-code']").fill("123456");
+  await page.getByRole("button", { name: /完成设置并登录|处理中/ }).click();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible({ timeout: 5000 });
+  const localStorageText = await page.evaluate(() => JSON.stringify(window.localStorage));
+  expect(localStorageText).not.toContain("abcd1234-abcd1234-abcd1234-abcd1234");
   expect(issues).toHaveLength(0);
 });
 

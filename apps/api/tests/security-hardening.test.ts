@@ -162,6 +162,34 @@ describe("login rate limit (integration)", () => {
     expect(otherClient.statusCode).toBe(401);
   });
 
+  it("does not trust X-Forwarded-For from untrusted proxies", async () => {
+    const savedTrustedProxyCidrs = process.env.TRUSTED_PROXY_CIDRS;
+    process.env.TRUSTED_PROXY_CIDRS = "10.0.0.0/8";
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "rate-limit-untrusted-forwarded-test-secret-long-enough" },
+      authRepository: createFakeAuthRepository([]),
+    });
+
+    try {
+      let lastStatus = 0;
+      for (let i = 0; i < 11; i += 1) {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username: "nobody", password: "wrong" },
+          remoteAddress: "127.0.0.1",
+          headers: { "x-forwarded-for": `203.0.113.${10 + i}` },
+        });
+        lastStatus = res.statusCode;
+      }
+      expect(lastStatus).toBe(429);
+    } finally {
+      await app.close();
+      if (savedTrustedProxyCidrs === undefined) delete process.env.TRUSTED_PROXY_CIDRS;
+      else process.env.TRUSTED_PROXY_CIDRS = savedTrustedProxyCidrs;
+    }
+  });
+
   it("allows login attempts again after the rate-limit time window expires", async () => {
     const savedWindow = process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS;
     process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS = "250";

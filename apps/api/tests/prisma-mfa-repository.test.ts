@@ -96,8 +96,56 @@ describe("Prisma MFA repository", () => {
     };
     const repo = createPrismaAuthRepository(prisma as never);
     const at = new Date();
-    await repo.activateMfaFactor!("f1", at);
+    const activated = await repo.activateMfaFactor!("f1", at);
+    expect(activated).toBe(true);
     expect(calls[0]).toMatchObject({ where: { id: "f1", status: "pending" }, data: { status: "active" } });
+  });
+
+  it("activateMfaFactor returns false when no pending row is updated", async () => {
+    const prisma = {
+      userMfaFactor: {
+        async findFirst() { return null; },
+        async count() { return 0; },
+        async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "active", createdAt: new Date(), activatedAt: new Date(), disabledAt: null }; },
+        async updateMany() { return { count: 0 }; },
+        async findUnique() { return null; },
+      },
+      userMfaRecoveryCode: {
+        async createMany() { return { count: 10 }; },
+        async findFirst() { return null; },
+        async updateMany() { return { count: 0 }; },
+      },
+      authSession: { async groupBy() { return []; } },
+      userAccount: { async findUnique() { return null; }, async update() { return null; } },
+    };
+    const repo = createPrismaAuthRepository(prisma as never);
+    await expect(repo.activateMfaFactor!("f1", new Date())).resolves.toBe(false);
+  });
+
+  it("disableMfaFactor disables unused recovery codes for that factor", async () => {
+    const factorCalls: unknown[] = [];
+    const recoveryCalls: unknown[] = [];
+    const prisma = {
+      userMfaFactor: {
+        async findFirst() { return null; },
+        async count() { return 1; },
+        async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "active", createdAt: new Date(), activatedAt: new Date(), disabledAt: null }; },
+        async updateMany(args: unknown) { factorCalls.push(args); return { count: 1 }; },
+        async findUnique() { return null; },
+      },
+      userMfaRecoveryCode: {
+        async createMany() { return { count: 10 }; },
+        async findFirst() { return null; },
+        async updateMany(args: unknown) { recoveryCalls.push(args); return { count: 2 }; },
+      },
+      authSession: { async groupBy() { return []; } },
+      userAccount: { async findUnique() { return null; }, async update() { return null; } },
+    };
+    const repo = createPrismaAuthRepository(prisma as never);
+    const at = new Date();
+    await expect(repo.disableMfaFactor!("f1", at)).resolves.toBe(true);
+    expect(factorCalls[0]).toMatchObject({ where: { id: "f1" }, data: { status: "disabled", disabledAt: at } });
+    expect(recoveryCalls[0]).toMatchObject({ where: { mfaFactorId: "f1", usedAt: null }, data: { usedAt: at } });
   });
 
   it("useMfaRecoveryCode marks as used and subsequent findUnused returns null", async () => {
@@ -123,10 +171,42 @@ describe("Prisma MFA repository", () => {
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
     const repo = createPrismaAuthRepository(prisma as never);
-    const code1 = await repo.findUnusedMfaRecoveryCode!("u1", "h1");
+    const code1 = await repo.findUnusedMfaRecoveryCode!("u1", "f1", "h1");
     expect(code1).not.toBeNull();
-    await repo.useMfaRecoveryCode!(code1!.id, new Date());
-    const code2 = await repo.findUnusedMfaRecoveryCode!("u1", "h1");
+    await expect(repo.useMfaRecoveryCode!(code1!.id, new Date())).resolves.toBe(true);
+    const code2 = await repo.findUnusedMfaRecoveryCode!("u1", "f1", "h1");
     expect(code2).toBeNull();
+  });
+
+  it("findUnusedMfaRecoveryCode scopes lookup to the active factor id and use returns false on races", async () => {
+    let updateCount = 0;
+    const calls: unknown[] = [];
+    const prisma = {
+      userMfaFactor: {
+        async findFirst() { return null; },
+        async count() { return 0; },
+        async create(_args: { data: unknown }) { return { id: "f1", userAccountId: "u1", type: "totp", secretEncrypted: "enc", status: "pending", createdAt: new Date(), activatedAt: null, disabledAt: null }; },
+        async updateMany() { return { count: 1 }; },
+        async findUnique() { return null; },
+      },
+      userMfaRecoveryCode: {
+        async createMany() { return { count: 10 }; },
+        async findFirst(args: unknown) {
+          calls.push(args);
+          return { id: "rc1", userAccountId: "u1", mfaFactorId: "active-factor", codeHash: "h1", usedAt: null, createdAt: new Date() };
+        },
+        async updateMany() {
+          updateCount += 1;
+          return { count: updateCount === 1 ? 1 : 0 };
+        },
+      },
+      authSession: { async groupBy() { return []; } },
+      userAccount: { async findUnique() { return null; }, async update() { return null; } },
+    };
+    const repo = createPrismaAuthRepository(prisma as never);
+    await repo.findUnusedMfaRecoveryCode!("u1", "active-factor", "h1");
+    expect(calls[0]).toMatchObject({ where: { userAccountId: "u1", mfaFactorId: "active-factor", codeHash: "h1", usedAt: null } });
+    await expect(repo.useMfaRecoveryCode!("rc1", new Date())).resolves.toBe(true);
+    await expect(repo.useMfaRecoveryCode!("rc1", new Date())).resolves.toBe(false);
   });
 });

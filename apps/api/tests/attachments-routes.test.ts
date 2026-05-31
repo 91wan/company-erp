@@ -1494,6 +1494,52 @@ describe("attachments API", () => {
     }
   });
 
+  it("uses ATTACHMENT_DOWNLOAD_RATE_LIMIT_MAX_PER_IP for public attachment content reads", async () => {
+    const root = await mkdtemp(join(tmpdir(), "company-erp-attachments-public-limit-"));
+    await mkdir(join(root, "project-sites"), { recursive: true });
+    await writeFile(join(root, "project-sites", "site-license.txt"), "DEMO attachment content");
+    vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);
+    vi.stubEnv("PUBLIC_INTERNET_ENABLED", "true");
+    vi.stubEnv("ATTACHMENT_DOWNLOAD_RATE_LIMIT_MAX_PER_IP", "2");
+
+    const passwordHash = await hashPassword("ChangeMe123!");
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: "test-secret" },
+      authRepository: createFakeAuthRepository([makeAuthAccount({ username: "admin", passwordHash, roles: ["admin"] })]),
+      attachmentRepository: createFakeAttachmentRepository([
+        makeAttachment({
+          id: "33333333-3333-4333-8333-333333333333",
+          storageKey: "project-sites/site-license.txt",
+          originalFileName: "site-license.txt",
+          fileType: "text/plain",
+          ownerModule: "project_sites",
+          ownerEntityType: "project_site",
+          ownerEntityId: assignedProjectSiteId,
+        }),
+      ]),
+      auditLogRepository: createFakeAuditLogRepository(),
+    });
+
+    try {
+      const cookie = await loginCookie(app);
+      const statuses: number[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const response = await app.inject({
+          method: "GET",
+          url: "/api/attachments/33333333-3333-4333-8333-333333333333/content",
+          cookies: { company_erp_session: cookie },
+          remoteAddress: "192.168.88.12",
+        });
+        statuses.push(response.statusCode);
+      }
+
+      expect(statuses).toEqual([200, 200, 429]);
+    } finally {
+      await app.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rate limits direct attachment uploads by client IP", async () => {
     const root = await mkdtemp(join(tmpdir(), "company-erp-upload-limit-"));
     vi.stubEnv("NAS_ATTACHMENTS_ROOT", root);

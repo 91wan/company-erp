@@ -16,7 +16,7 @@ import {
   type MfaFactorRecord,
   type MfaRecoveryCodeRecord,
 } from "../src/auth";
-import { generateTotpToken, verifyMfaSetupToken } from "../src/mfa";
+import { encryptMfaSecret, generateTotpSecret, generateTotpToken, verifyMfaSetupToken } from "../src/mfa";
 import { hashPassword } from "../src/password";
 import type { CreateAuditLogInput } from "../src/auditLogs";
 
@@ -132,12 +132,28 @@ function createMfaAuthRepository(seed: AuthAccountRecord[], opts: { hasMfa?: boo
       return factor;
     },
     async activateMfaFactor(id, at) {
-      const f = mfaFactors.find((x) => x.id === id);
-      if (f) { f.status = "active"; f.activatedAt = at.toISOString(); }
+      const f = mfaFactors.find((x) => x.id === id && x.status === "pending");
+      if (!f) return false;
+      f.status = "active";
+      f.activatedAt = at.toISOString();
+      return true;
     },
     async disableMfaFactor(id, at) {
-      const f = mfaFactors.find((x) => x.id === id);
-      if (f) { f.status = "disabled"; f.disabledAt = at.toISOString(); }
+      const f = mfaFactors.find((x) => x.id === id && x.status !== "disabled");
+      if (!f) return false;
+      f.status = "disabled";
+      f.disabledAt = at.toISOString();
+      for (const code of recoveryCodes) {
+        if (code.mfaFactorId === id && !code.usedAt) code.usedAt = at.toISOString();
+      }
+      return true;
+    },
+    async findPendingMfaFactor(userAccountId) {
+      for (let index = mfaFactors.length - 1; index >= 0; index -= 1) {
+        const factor = mfaFactors[index];
+        if (factor.userAccountId === userAccountId && factor.status === "pending") return factor;
+      }
+      return null;
     },
     async createMfaRecoveryCodes(mfaFactorId, userAccountId, codeHashes) {
       for (const codeHash of codeHashes) {
@@ -151,14 +167,16 @@ function createMfaAuthRepository(seed: AuthAccountRecord[], opts: { hasMfa?: boo
         });
       }
     },
-    async findUnusedMfaRecoveryCode(userAccountId, codeHash) {
+    async findUnusedMfaRecoveryCode(userAccountId, mfaFactorId, codeHash) {
       return recoveryCodes.find(
-        (rc) => rc.userAccountId === userAccountId && rc.codeHash === codeHash && !rc.usedAt,
+        (rc) => rc.userAccountId === userAccountId && rc.mfaFactorId === mfaFactorId && rc.codeHash === codeHash && !rc.usedAt,
       ) ?? null;
     },
     async useMfaRecoveryCode(id, at) {
       const rc = recoveryCodes.find((x) => x.id === id);
-      if (rc) rc.usedAt = at.toISOString();
+      if (!rc || rc.usedAt) return false;
+      rc.usedAt = at.toISOString();
+      return true;
     },
   };
 
@@ -280,6 +298,39 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     expect(sessions).toHaveLength(0);
   });
 
+  it("rejects replayed setup token instead of issuing a second recovery code batch", async () => {
+    const { repo, recoveryCodes, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: repo,
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+
+    const firstSetup = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const secondSetup = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    await app.close();
+
+    expect(firstSetup.statusCode).toBe(200);
+    expect(secondSetup.statusCode).toBe(409);
+    expect(secondSetup.json().error).toBe("MFA_SETUP_ALREADY_PENDING");
+    expect(JSON.stringify(secondSetup.json())).not.toContain("recoveryCodes");
+    expect(recoveryCodes).toHaveLength(10);
+  });
+
   it("setup-challenge response does not expose TOTP secret outside the otpauth URI", async () => {
     const { repo, auditLogRepository } = createMfaAuthRepository([
       { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
@@ -347,6 +398,46 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     expect(String(setCookie)).toContain("company_erp_session");
     // Factor must now be active
     expect(mfaFactors.find((f) => f.id === factorId)?.status).toBe("active");
+  });
+
+  it("does not issue a session if factor activation update loses the race", async () => {
+    const { repo, sessions, mfaFactors, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: {
+        ...repo,
+        async activateMfaFactor() {
+          return false;
+        },
+      },
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const { factorId } = setupRes.json();
+    const factor = mfaFactors.find((f) => f.id === factorId)!;
+    const { decryptMfaSecret } = await import("../src/mfa");
+    const totpCode = generateTotpToken(decryptMfaSecret(factor.secretEncrypted));
+
+    const activateRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: totpCode },
+    });
+    await app.close();
+
+    expect(activateRes.statusCode).toBe(409);
+    expect(activateRes.json().error).toBe("MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE");
+    expect(sessions).toHaveLength(0);
   });
 
   it("activate-challenge with wrong TOTP returns 401 and no session", async () => {
@@ -437,6 +528,200 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
 
     expect(loginRes2.json().status).toBe("MFA_REQUIRED");
     expect(typeof loginRes2.json().pendingMfaToken).toBe("string");
+  });
+
+  it("rejects setup and activate replay after the factor has been activated", async () => {
+    const { repo, mfaFactors, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: repo,
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const { factorId } = setupRes.json();
+    const factor = mfaFactors.find((f) => f.id === factorId)!;
+    const { decryptMfaSecret } = await import("../src/mfa");
+    const totpCode = generateTotpToken(decryptMfaSecret(factor.secretEncrypted));
+
+    const activateRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: totpCode },
+    });
+    const replaySetupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const replayActivateRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: totpCode },
+    });
+    await app.close();
+
+    expect(activateRes.statusCode).toBe(200);
+    expect(replaySetupRes.statusCode).toBe(409);
+    expect(replaySetupRes.json().error).toBe("MFA_ALREADY_ENABLED");
+    expect(replayActivateRes.statusCode).toBe(409);
+    expect(replayActivateRes.json().error).toBe("MFA_ALREADY_ENABLED");
+  });
+
+  it("allows an active factor recovery code once and rejects reuse", async () => {
+    const { repo, mfaFactors, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: repo,
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const { factorId } = setupRes.json();
+    const recoveryCode = (setupRes.json().recoveryCodes as string[])[0];
+    const factor = mfaFactors.find((f) => f.id === factorId)!;
+    const { decryptMfaSecret } = await import("../src/mfa");
+    await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
+    });
+
+    const firstLogin = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const firstVerify = await app.inject({
+      method: "POST", url: "/api/auth/mfa/verify-login",
+      payload: { pendingMfaToken: firstLogin.json().pendingMfaToken, code: recoveryCode },
+    });
+    const secondLogin = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const secondVerify = await app.inject({
+      method: "POST", url: "/api/auth/mfa/verify-login",
+      payload: { pendingMfaToken: secondLogin.json().pendingMfaToken, code: recoveryCode },
+    });
+    await app.close();
+
+    expect(firstVerify.statusCode).toBe(200);
+    expect(secondVerify.statusCode).toBe(401);
+    expect(secondVerify.json().error).toBe("MFA_CODE_INVALID");
+  });
+
+  it("does not issue a session if recovery code use update loses the race", async () => {
+    const { repo, mfaFactors, sessions, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: {
+        ...repo,
+        async useMfaRecoveryCode() {
+          return false;
+        },
+      },
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const { factorId } = setupRes.json();
+    const recoveryCode = (setupRes.json().recoveryCodes as string[])[0];
+    const factor = mfaFactors.find((f) => f.id === factorId)!;
+    const { decryptMfaSecret } = await import("../src/mfa");
+    await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
+    });
+
+    const secondLogin = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const verifyRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/verify-login",
+      payload: { pendingMfaToken: secondLogin.json().pendingMfaToken, code: recoveryCode },
+    });
+    await app.close();
+
+    expect(verifyRes.statusCode).toBe(401);
+    expect(verifyRes.json().error).toBe("MFA_CODE_INVALID");
+    expect(sessions).toHaveLength(1);
+  });
+
+  it("rejects recovery codes that belong to a disabled non-active factor", async () => {
+    const { repo, mfaFactors, sessions, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: repo,
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = loginRes.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const oldRecoveryCode = (setupRes.json().recoveryCodes as string[])[0];
+    const oldFactor = mfaFactors.find((factor) => factor.id === setupRes.json().factorId)!;
+    oldFactor.status = "disabled";
+    oldFactor.disabledAt = new Date().toISOString();
+
+    mfaFactors.push({
+      id: "active-factor",
+      userAccountId: ADMIN_ID,
+      type: "totp",
+      secretEncrypted: encryptMfaSecret(generateTotpSecret()),
+      status: "active",
+      createdAt: new Date().toISOString(),
+      activatedAt: new Date().toISOString(),
+      disabledAt: null,
+    });
+
+    const secondLogin = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const verifyRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/verify-login",
+      payload: { pendingMfaToken: secondLogin.json().pendingMfaToken, code: oldRecoveryCode },
+    });
+    await app.close();
+
+    expect(verifyRes.statusCode).toBe(401);
+    expect(verifyRes.json().error).toBe("MFA_CODE_INVALID");
+    expect(sessions).toHaveLength(0);
   });
 });
 

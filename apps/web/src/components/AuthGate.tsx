@@ -1,7 +1,7 @@
 import { LockKeyhole, LogIn, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { AppConfigDto, AuthenticatedUserDto } from "@company-erp/shared";
-import { getAppConfig, getCurrentUser, login, verifyMfaLogin } from "../apiClient";
+import { activateMfaSetupChallenge, createMfaSetupChallenge, getAppConfig, getCurrentUser, login, verifyMfaLogin } from "../apiClient";
 
 type AuthGateProps = {
   children: (
@@ -79,6 +79,10 @@ function LoginPanel({ companyName, onLogin }: { companyName: string; onLogin: (u
   const [pendingMfaToken, setPendingMfaToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStatus, setMfaStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [mfaSetupToken, setMfaSetupToken] = useState<string | null>(null);
+  const [mfaSetup, setMfaSetup] = useState<{ factorId: string; totpUri: string; recoveryCodes: readonly string[] } | null>(null);
+  const [mfaSetupCode, setMfaSetupCode] = useState("");
+  const [mfaSetupStatus, setMfaSetupStatus] = useState<"idle" | "saving" | "error">("idle");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +92,17 @@ function LoginPanel({ companyName, onLogin }: { companyName: string; onLogin: (u
       if ("pendingMfaToken" in result) {
         setPendingMfaToken(result.pendingMfaToken);
         setStatus("idle");
+      } else if ("mfaSetupToken" in result) {
+        setMfaSetupToken(result.mfaSetupToken);
+        setStatus("idle");
+        setMfaSetupStatus("saving");
+        try {
+          const setup = await createMfaSetupChallenge({ mfaSetupToken: result.mfaSetupToken });
+          setMfaSetup(setup);
+          setMfaSetupStatus("idle");
+        } catch {
+          setMfaSetupStatus("error");
+        }
       } else {
         onLogin(result);
       }
@@ -106,6 +121,82 @@ function LoginPanel({ companyName, onLogin }: { companyName: string; onLogin: (u
     } catch {
       setMfaStatus("error");
     }
+  }
+
+  async function handleMfaSetupSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!mfaSetupToken || !mfaSetup) return;
+    setMfaSetupStatus("saving");
+    try {
+      const user = await activateMfaSetupChallenge({
+        mfaSetupToken,
+        factorId: mfaSetup.factorId,
+        code: mfaSetupCode,
+      });
+      onLogin(user);
+    } catch {
+      setMfaSetupStatus("error");
+    }
+  }
+
+  if (mfaSetupToken) {
+    return (
+      <main className="auth-screen">
+        <form className="auth-card" onSubmit={handleMfaSetupSubmit}>
+          <span className="auth-icon">
+            <ShieldCheck aria-hidden="true" size={24} />
+          </span>
+          <div>
+            <h1>{companyName}</h1>
+            <p>首次设置双因素验证</p>
+          </div>
+          {mfaSetup ? (
+            <>
+              <label>
+                <span>Authenticator URI</span>
+                <textarea value={mfaSetup.totpUri} readOnly rows={3} />
+              </label>
+              <div className="auth-recovery-codes" aria-label="恢复码">
+                {mfaSetup.recoveryCodes.map((code) => (
+                  <code key={code}>{code}</code>
+                ))}
+              </div>
+              <label>
+                <span>验证码</span>
+                <input
+                  value={mfaSetupCode}
+                  onChange={(event) => setMfaSetupCode(event.target.value)}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={10}
+                  required
+                  placeholder="输入 Authenticator 6 位验证码"
+                />
+              </label>
+            </>
+          ) : (
+            <p>{mfaSetupStatus === "error" ? "MFA 设置初始化失败，请重新登录。" : "正在创建 MFA 设置..."}</p>
+          )}
+          <button type="submit" disabled={!mfaSetup || mfaSetupStatus === "saving"}>
+            <ShieldCheck aria-hidden="true" size={17} />
+            {mfaSetupStatus === "saving" ? "处理中" : "完成设置并登录"}
+          </button>
+          {mfaSetupStatus === "error" && mfaSetup ? <p className="form-error">MFA 设置失败，请检查验证码后重试。</p> : null}
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => {
+              setMfaSetupToken(null);
+              setMfaSetup(null);
+              setMfaSetupCode("");
+              setMfaSetupStatus("idle");
+            }}
+          >
+            返回登录
+          </button>
+        </form>
+      </main>
+    );
   }
 
   if (pendingMfaToken) {

@@ -25,6 +25,7 @@ Required evidence files in --evidence-dir:
   vulnerability-scan-summary.txt     Vulnerability scan results
   dependency-audit.txt               npm audit output
   mfa-enforcement-evidence.txt       Evidence that admin MFA is enforced
+  access-review-export.json          Access review export with public MFA status
   access-review-check.txt            Access review check result
   incident-response-signoff.md       Incident response runbook accepted
   public-data-exposure-signoff.md    Data exposure boundary accepted`);
@@ -46,6 +47,11 @@ function containsSensitiveData(text) {
     /\bAuthorization\s*:\s*\S+\s+\S{8,}/i.test(text) ||
     /AUTH_SESSION_SECRET=\S+/.test(text) ||
     /IDENTITY_ENCRYPTION_SECRET=\S+/.test(text) ||
+    /company_erp_session/i.test(text) ||
+    /Set-Cookie\s*:/i.test(text) ||
+    /otpauth:\/\//i.test(text) ||
+    /secretEncrypted/i.test(text) ||
+    /recoveryCodes?/i.test(text) ||
     /postgres(?:ql)?:\/\/[^@\s]+:[^@\s]+@/.test(text)
   );
 }
@@ -277,7 +283,7 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
     if (/otpauth:\/\//.test(mfaEvidence)) {
       blockers.push("mfa-enforcement-evidence.txt: must not contain TOTP otpauth URI (TOTP secret exposure)");
     }
-    if (/recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(mfaEvidence)) {
+    if (/recoveryCodes?|recovery.code\s*[:=]\s*[0-9a-f]{10}/i.test(mfaEvidence)) {
       blockers.push("mfa-enforcement-evidence.txt: must not contain recovery code plaintext");
     }
     if (/TOTP secret/i.test(mfaEvidence)) {
@@ -291,31 +297,25 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
     }
   }
 
-  // --- access-review-export.json (optional — check mfaEnabled for required accounts) ---
-  const accessReviewExportPath = resolve(evidenceDir, "access-review-export.json");
-  if (existsSync(accessReviewExportPath)) {
-    const accessReviewExport = readEvidenceJson(evidenceDir, "access-review-export.json", blockers);
-    if (accessReviewExport) {
-      const exportUsers = Array.isArray(accessReviewExport.users) ? accessReviewExport.users : [];
-      for (const user of exportUsers) {
-        const isActive = !user.status || user.status === "active";
-        if (isActive && user.mfaRequiredForPublicInternet === true && user.mfaEnabled !== true) {
-          blockers.push(
-            `access-review-export.json: active user "${user.username ?? user.id}" has mfaRequiredForPublicInternet=true but mfaEnabled=false`,
-          );
-        }
-      }
-      // Must not contain MFA secrets
-      const exportText = JSON.stringify(accessReviewExport);
-      if (/secretEncrypted|otpauth:\/\/|recovery.*code.*[0-9a-f]{10}/i.test(exportText)) {
-        blockers.push("access-review-export.json: must not contain MFA secret or recovery code plaintext");
-      }
-      if (!blockers.some((b) => b.includes("access-review-export"))) {
-        passed.push("access-review-export.json");
+  // --- access-review-export.json (P0 — cross-check mfaEnabled for required accounts) ---
+  const accessReviewExport = readEvidenceJson(evidenceDir, "access-review-export.json", blockers);
+  if (accessReviewExport) {
+    const exportUsers = Array.isArray(accessReviewExport.users) ? accessReviewExport.users : [];
+    for (const user of exportUsers) {
+      const isActive = !user.status || user.status === "active";
+      if (isActive && user.mfaRequiredForPublicInternet === true && user.mfaEnabled !== true) {
+        blockers.push(
+          `access-review-export.json: active user "${user.username ?? user.id}" has mfaRequiredForPublicInternet=true but mfaEnabled=false`,
+        );
       }
     }
-  } else {
-    warnings.push("access-review-export.json: not present in evidence dir — consider including it as P0 MFA evidence");
+    const exportText = JSON.stringify(accessReviewExport);
+    if (/secretEncrypted|otpauth:\/\/|recoveryCodes?|recovery.*code.*[0-9a-f]{10}|company_erp_session|Set-Cookie|Authorization|Bearer/i.test(exportText)) {
+      blockers.push("access-review-export.json: must not contain MFA secret, recovery code plaintext, session, or Authorization material");
+    }
+    if (!blockers.some((b) => b.includes("access-review-export"))) {
+      passed.push("access-review-export.json");
+    }
   }
 
   // --- access-review-check.txt ---
@@ -323,7 +323,11 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
   if (accessReview) {
     if (!accessReview.includes("ACCESS_REVIEW_PASS") && !accessReview.includes("PASS")) {
       blockers.push("access-review-check.txt: must contain ACCESS_REVIEW_PASS or PASS");
-    } else {
+    }
+    if (!accessReview.includes("Public internet MFA enforcement checked")) {
+      blockers.push('access-review-check.txt: missing "Public internet MFA enforcement checked"');
+    }
+    if (!blockers.some((b) => b.includes("access-review-check"))) {
       passed.push("access-review-check.txt");
     }
   }
