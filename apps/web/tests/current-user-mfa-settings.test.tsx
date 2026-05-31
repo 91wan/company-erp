@@ -81,9 +81,10 @@ describe("Current user MFA settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "禁用 MFA" }));
     expect(disableCurrentUserMfa).not.toHaveBeenCalled();
 
+    fireEvent.change(await screen.findByLabelText("当前 MFA 或恢复码"), { target: { value: "654321" } });
     fireEvent.click(await screen.findByRole("button", { name: "确认禁用 MFA" }));
     await waitFor(() => {
-      expect(disableCurrentUserMfa).toHaveBeenCalledTimes(1);
+      expect(disableCurrentUserMfa).toHaveBeenCalledWith({ code: "654321" });
     });
   });
 });

@@ -365,6 +365,7 @@ export function evaluatePublicInternetReadiness({
     "apps/api/tests/fetch-metadata-protection.test.ts",
     "apps/api/tests/public-internet-env.test.ts",
     "apps/api/tests/public-internet-path-guard.test.ts",
+    "apps/api/tests/public-internet-api-smoke.test.ts",
   ]) {
     requireText({ blockers, readText, path: testPath, markers: [] });
     if (!blockers.some((b) => b.includes(testPath))) {
@@ -379,6 +380,15 @@ export function evaluatePublicInternetReadiness({
   requireText({ blockers, readText, path: "apps/api/tests/public-internet-path-guard.test.ts", markers: [
     "PUBLIC_HEALTH_PUBLIC",
     "Sec-Fetch-Site",
+    "/api/contracts",
+    "commitSha",
+  ]});
+  requireText({ blockers, readText, path: "apps/api/tests/public-internet-api-smoke.test.ts", markers: [
+    "PUBLIC_INTERNET_ENABLED",
+    "PUBLIC_ACCESS_ENABLED",
+    "PUBLIC_HEALTH_PUBLIC",
+    "Sec-Fetch-Site",
+    "/api/internal/app-version",
     "/api/contracts",
     "commitSha",
   ]});

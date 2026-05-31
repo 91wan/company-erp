@@ -76,9 +76,12 @@ Content-Disposition: attachment
 - `Cache-Control: private, no-store` — prevents proxy caching of sensitive documents
 - `Content-Disposition: attachment` — forces download, prevents inline execution in browser
 
+## API JSON Cache Policy
+
+All `/api/*` responses receive `Cache-Control: no-store` by default when a route has not already set a more specific cache policy. This prevents browser, proxy, and shared-cache persistence of authenticated JSON payloads. Attachment content keeps its stricter `private, no-store` response header.
+
 ## What Is NOT Set
 
-- `Cache-Control` on API JSON responses: intentionally not set here; set per-route as needed
 - `Vary` headers: set by the CORS plugin
 - `Access-Control-*`: managed by `@fastify/cors`
 

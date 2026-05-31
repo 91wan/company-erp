@@ -118,6 +118,12 @@ function checkNoSensitiveData({ blockers, text, path }) {
   }
 }
 
+function checkNoFailureMarkers({ blockers, text, path }) {
+  if (/\b(BLOCKED|ERROR|FAILED|FAILURE|FAIL)\b/i.test(text)) {
+    blockers.push(`${path}: contains failure marker BLOCKED/ERROR/FAIL`);
+  }
+}
+
 function checkVulnerabilityStatus({ blockers, text, path }) {
   if (!text) return;
   // Match patterns like "3 critical", "critical: 2", "severity: critical" with a non-zero count
@@ -200,6 +206,8 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
   // --- public-readiness-gate.txt ---
   const publicReadiness = readEvidenceText(evidenceDir, "public-readiness-gate.txt", blockers);
   if (publicReadiness) {
+    checkNoFailureMarkers({ blockers, text: publicReadiness, path: "public-readiness-gate.txt" });
+    checkNoSensitiveData({ blockers, text: publicReadiness, path: "public-readiness-gate.txt" });
     publicReadinessStatus = publicReadiness.includes("READY_FOR_PUBLIC_INTERNET_REVIEW")
       ? "READY_FOR_PUBLIC_INTERNET_REVIEW"
       : "BLOCKED";
@@ -213,6 +221,8 @@ export function evaluatePublicGoLive({ evidenceDir, domain, expectedCommit = "" 
   // --- public-security-evidence-check.txt ---
   const publicSecurityEvidence = readEvidenceText(evidenceDir, "public-security-evidence-check.txt", blockers);
   if (publicSecurityEvidence) {
+    checkNoFailureMarkers({ blockers, text: publicSecurityEvidence, path: "public-security-evidence-check.txt" });
+    checkNoSensitiveData({ blockers, text: publicSecurityEvidence, path: "public-security-evidence-check.txt" });
     publicSecurityEvidenceStatus = publicSecurityEvidence.includes("PUBLIC_SECURITY_EVIDENCE_PASS")
       ? "PUBLIC_SECURITY_EVIDENCE_PASS"
       : "BLOCKED";

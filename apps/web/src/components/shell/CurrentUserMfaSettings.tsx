@@ -25,6 +25,7 @@ export function CurrentUserMfaSettings({ currentUser }: CurrentUserMfaSettingsPr
   const [status, setStatus] = useState<MfaStatusDto | null>(null);
   const [setup, setSetup] = useState<MfaSetupResponseDto | null>(null);
   const [code, setCode] = useState("");
+  const [disableCode, setDisableCode] = useState("");
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [state, setState] = useState<LoadState>("idle");
 
@@ -53,6 +54,7 @@ export function CurrentUserMfaSettings({ currentUser }: CurrentUserMfaSettingsPr
       const nextSetup = await setupCurrentUserMfa();
       setSetup(nextSetup);
       setCode("");
+      setDisableCode("");
       setConfirmDisable(false);
       setState("idle");
     } catch {
@@ -68,6 +70,7 @@ export function CurrentUserMfaSettings({ currentUser }: CurrentUserMfaSettingsPr
       setStatus({ enabled: true, factorId: setup.factorId });
       setSetup(null);
       setCode("");
+      setDisableCode("");
       setState("idle");
     } catch {
       setState("error");
@@ -75,11 +78,13 @@ export function CurrentUserMfaSettings({ currentUser }: CurrentUserMfaSettingsPr
   }
 
   async function handleDisable() {
+    if (!disableCode.trim()) return;
     setState("saving");
     try {
-      await disableCurrentUserMfa();
+      await disableCurrentUserMfa({ code: disableCode.trim() });
       setStatus({ enabled: false });
       setConfirmDisable(false);
+      setDisableCode("");
       setSetup(null);
       setState("idle");
     } catch {
@@ -164,15 +169,23 @@ export function CurrentUserMfaSettings({ currentUser }: CurrentUserMfaSettingsPr
               ) : (
                 <>
                   <p className="form-hint">禁用 MFA 需要二次确认。</p>
+                  <label>
+                    当前 MFA 或恢复码
+                    <input
+                      value={disableCode}
+                      autoComplete="one-time-code"
+                      onChange={(event) => setDisableCode(event.target.value)}
+                    />
+                  </label>
                   <button
                     type="button"
                     className="secondary-action danger"
-                    disabled={state === "saving"}
+                    disabled={state === "saving" || !disableCode.trim()}
                     onClick={handleDisable}
                   >
                     确认禁用 MFA
                   </button>
-                  <button type="button" className="table-action" onClick={() => setConfirmDisable(false)}>
+                  <button type="button" className="table-action" onClick={() => { setConfirmDisable(false); setDisableCode(""); }}>
                     取消
                   </button>
                 </>

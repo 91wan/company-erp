@@ -56,6 +56,7 @@ The following are never accessible regardless of authentication level:
 |----------|--------|
 | PostgreSQL port | Not reachable from internet (internal network only) |
 | `NAS_ATTACHMENTS_ROOT` direct path | Not served directly; only via authenticated API |
+| NAS root shares or reverse-proxy aliases | Never mapped to public URL paths |
 | `storageKey` | Never returned in any API response |
 | Raw NAS file paths | Never returned in any API response |
 | Employee `passwordHash` | Never returned in any API response |
@@ -68,6 +69,7 @@ The following are never accessible regardless of authentication level:
 - All attachments are served via `/api/attachments/:id/content` and `/api/attachments/:id/download-url`.
 - Both endpoints require authentication.
 - `external_project_site` accounts can only access attachments scoped to their project site.
+- Public reverse proxy/CDN configuration must never map `NAS_ATTACHMENTS_ROOT` directly; attachment bytes must flow through scoped API authorization.
 - Attachment responses always include:
   - `Cache-Control: private, no-store`
   - `X-Content-Type-Options: nosniff`

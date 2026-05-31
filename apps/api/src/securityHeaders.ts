@@ -28,7 +28,7 @@ const CSP = [
 const PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
 
 export function registerSecurityHeaders(app: FastifyInstance): void {
-  app.addHook("onSend", async (_request, reply) => {
+  app.addHook("onSend", async (request, reply, payload) => {
     reply.header("Content-Security-Policy", CSP);
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -39,5 +39,9 @@ export function registerSecurityHeaders(app: FastifyInstance): void {
     if (publicInternetEnabled()) {
       reply.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
     }
+    if (request.url.startsWith("/api/") && !reply.hasHeader("Cache-Control")) {
+      reply.header("Cache-Control", "no-store");
+    }
+    return payload;
   });
 }

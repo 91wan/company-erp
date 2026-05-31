@@ -415,10 +415,10 @@ export async function activateCurrentUserMfa(input: { factorId: string; code: st
   });
 }
 
-export async function disableCurrentUserMfa(): Promise<{ ok: true }> {
+export async function disableCurrentUserMfa(input: { code: string }): Promise<{ ok: true }> {
   return requestJson<{ ok: true }>(`${apiBaseUrl}/api/auth/mfa/disable`, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify(input),
   });
 }
 

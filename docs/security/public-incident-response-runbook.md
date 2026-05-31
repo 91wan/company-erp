@@ -19,6 +19,7 @@ For any confirmed or suspected security incident:
    # Then execute after operator approval.
    DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --all --confirm
    ```
+   The dry run is mandatory unless the database is actively being abused and the incident commander records the reason for skipping it.
 3. **Force password reset for all high-privilege accounts** (admin, systemSettings.manage, userAccounts.manage).
 4. **Export audit logs immediately**:
    ```bash
@@ -37,6 +38,10 @@ Actions:
 1. Disable the affected account immediately.
 2. Revoke all sessions for that account:
    ```bash
+   # Dry run targeted revocation first.
+   DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --user-account-id <user-account-id>
+
+   # Execute after confirmation.
    DATABASE_URL=postgresql://... npm run auth:revoke-all-sessions -- --user-account-id <user-account-id> --confirm
    ```
 3. Force password reset + new MFA secret.
@@ -70,9 +75,10 @@ Symptoms: Unusual query patterns, high CPU on PostgreSQL, unknown connections in
 
 Actions:
 1. Verify PostgreSQL is not directly reachable from internet (`nmap -p 5432 <public-ip>` must show closed).
-2. Check if any service account credentials were leaked.
-3. Review WAF logs for SQL injection attempts.
-4. Force rotate `POSTGRES_PASSWORD` and restart affected services.
+2. Verify `NAS_ATTACHMENTS_ROOT` is not reachable by public URL, CDN path, SMB/WebDAV exposure, or reverse-proxy static alias.
+3. Check if any service account credentials were leaked.
+4. Review WAF logs for SQL injection attempts.
+5. Force rotate `POSTGRES_PASSWORD` and restart affected services.
 
 ### WAF 告警 (WAF Alert)
 
