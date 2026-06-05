@@ -4,7 +4,7 @@ import {
   createPrismaBusinessProjectRepository,
   type BusinessProjectPrismaClient,
   type BusinessProjectRecord,
-} from "../src/prismaBusinessProjectsRepository";
+} from "../src/infra/prisma/prismaBusinessProjectsRepository";
 
 const now = new Date("2026-05-13T10:00:00.000Z");
 

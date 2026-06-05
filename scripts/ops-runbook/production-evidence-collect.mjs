@@ -7,7 +7,7 @@ import { evaluateProductionHealth } from "./production-health-check.mjs";
 
 const PASS = "PRODUCTION_EVIDENCE_COLLECTED";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
   console.log(`Usage: npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 [--expected-commit <sha>]

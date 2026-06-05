@@ -5,7 +5,7 @@ import {
   WarehouseConflictError,
   type MaterialRepository,
   type WarehouseRepository,
-} from "../src/materialsWarehouses";
+} from "../src/modules/inventory/materialsWarehouses";
 import type { MaterialDto, WarehouseDto } from "@company-erp/shared";
 
 const now = "2026-05-11T09:00:00.000Z";

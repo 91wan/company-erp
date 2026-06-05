@@ -4,7 +4,7 @@ import {
   createPrismaInventoryRepository,
   type InventoryMovementRecord,
   type InventoryPrismaClient,
-} from "../src/prismaInventoryRepository";
+} from "../src/infra/prisma/prismaInventoryRepository";
 
 const now = new Date("2026-05-11T12:00:00.000Z");
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runImportPilotSmoke } from "../src/importPilotSmoke";
+import { runImportPilotSmoke } from "../src/bootstrap/importPilotSmoke";
 
 describe("import pilot smoke runner", () => {
   it("runs the NAS pilot import chains without legacy health certificate fields or PDF/image requirements", async () => {

@@ -1,20 +1,20 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isPublicPath, routePermission } from "../src/routePermission";
+import { isPublicPath, routePermission } from "../src/modules/auth/routePermission";
 
 const routeSource = [
   "../src/app.ts",
-  "../src/appCoreRoutes.ts",
-  "../src/auditLogRoutes.ts",
-  "../src/attachmentRoutes.ts",
-  "../src/importJobRoutes.ts",
-  "../src/masterDataRoutes.ts",
-  "../src/peoplePermissionsRoutes.ts",
-  "../src/purchaseRoutes.ts",
-  "../src/inventoryRoutes.ts",
-  "../src/projectSiteRoutes.ts",
-  "../src/marketOperationsRoutes.ts",
-  "../src/contractsBusinessCertificatesRoutes.ts",
+  "../src/modules/appCore/appCoreRoutes.ts",
+  "../src/modules/audit/auditLogRoutes.ts",
+  "../src/modules/attachments/attachmentRoutes.ts",
+  "../src/modules/importJobs/importJobRoutes.ts",
+  "../src/modules/masterData/masterDataRoutes.ts",
+  "../src/modules/peoplePermissions/peoplePermissionsRoutes.ts",
+  "../src/modules/purchases/purchaseRoutes.ts",
+  "../src/modules/inventory/inventoryRoutes.ts",
+  "../src/modules/projectSites/projectSiteRoutes.ts",
+  "../src/modules/marketOperations/marketOperationsRoutes.ts",
+  "../src/modules/contracts/contractsBusinessCertificatesRoutes.ts",
 ]
   .map((file) => readFileSync(new URL(file, import.meta.url), "utf8"))
   .join("\n");

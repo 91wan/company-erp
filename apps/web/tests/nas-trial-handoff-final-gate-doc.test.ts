@@ -10,7 +10,7 @@ function read(relativePath: string): string {
 
 describe("NAS trial handoff final gate", () => {
   it("records the handoff evidence boundary and role coverage", () => {
-    const doc = read("docs/audits/2026-05-20-nas-trial-handoff-final-gate.md");
+    const doc = read("docs/archive/audits/2026-05-20-nas-trial-handoff-final-gate.md");
 
     expect(doc).toContain("# NAS trial handoff final gate");
     expect(doc).toContain("npm run pilot:verify-evidence");
@@ -30,11 +30,11 @@ describe("NAS trial handoff final gate", () => {
     const checkedFiles = [
       "docs/deployment/nas-trial-operator-runbook.md",
       "docs/deployment/nas-trial-evidence-template.md",
-      "docs/audits/2026-05-20-nas-trial-readiness-v5.md",
-      "docs/audits/2026-05-20-nas-trial-handoff-final-gate.md",
-      "scripts/verify-pilot-evidence-manifest.mjs",
-      "scripts/verify-audit-export.mjs",
-      "scripts/attachments-legacy-report.mjs",
+      "docs/archive/audits/2026-05-20-nas-trial-readiness-v5.md",
+      "docs/archive/audits/2026-05-20-nas-trial-handoff-final-gate.md",
+      "scripts/ops-runbook/verify-pilot-evidence-manifest.mjs",
+      "scripts/ops-runbook/verify-audit-export.mjs",
+      "scripts/ops-runbook/attachments-legacy-report.mjs",
     ];
 
     for (const file of checkedFiles) {

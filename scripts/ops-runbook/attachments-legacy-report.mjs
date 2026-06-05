@@ -70,7 +70,7 @@ function fail(message, suggestion = "使用 --dry-run 做只读检查；需要�
   process.exit(status);
 }
 
-function isInsideRepository(outputPath, repoRoot = fileURLToPath(new URL("..", import.meta.url))) {
+function isInsideRepository(outputPath, repoRoot = fileURLToPath(new URL("../..", import.meta.url))) {
   const root = resolve(repoRoot);
   const target = resolve(outputPath);
   return target === root || target.startsWith(`${root}${sep}`);
@@ -223,7 +223,7 @@ export function formatCsvReport(rows) {
   return `${headers.join(",")}\n${lines.join("\n")}\n`;
 }
 
-export function writeReportOutput(outputPath, content, repoRoot = fileURLToPath(new URL("..", import.meta.url))) {
+export function writeReportOutput(outputPath, content, repoRoot = fileURLToPath(new URL("../..", import.meta.url))) {
   const target = resolve(outputPath);
   if (isInsideRepository(outputPath, repoRoot)) {
     throw new Error("Output path must be outside the repository");

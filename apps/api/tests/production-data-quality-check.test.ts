@@ -7,7 +7,7 @@ const repoRoot = new URL("../../..", import.meta.url).pathname;
 
 async function importDataQualityCheck() {
   const module = (await import(
-    pathToFileURL(join(repoRoot, "scripts/production-data-quality-check.mjs")).href
+    pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-data-quality-check.mjs")).href
   )) as {
     evaluateDataQuality: (opts: {
       rows?: Record<string, unknown[]>;
@@ -142,7 +142,7 @@ describe("production-data-quality-check fixture gate", () => {
   it("BLOCKED when DATABASE_URL is missing (CLI test)", () => {
     const result = spawnSync(
       "node",
-      [join(repoRoot, "scripts/production-data-quality-check.mjs"), "--json"],
+      [join(repoRoot, "scripts/ops-runbook/production-data-quality-check.mjs"), "--json"],
       { cwd: repoRoot, encoding: "utf8", env: { PATH: process.env.PATH } },
     );
 

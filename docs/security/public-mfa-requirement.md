@@ -47,7 +47,7 @@ In the current permission matrix, `admin` is the only role with access to `syste
 
 - **TOTP** (Time-based One-Time Password, RFC 6238), 6 digits, 30-second period
 - TOTP secret encrypted at rest with AES-256-GCM (same key derivation as identity encryption)
-- Secret key managed by `apps/api/src/mfa.ts`
+- Secret key managed by `apps/api/src/modules/auth/mfa.ts`
 
 ## Recovery Codes
 

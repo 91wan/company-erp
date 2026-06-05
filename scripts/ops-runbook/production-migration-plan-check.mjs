@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const PASS = "PRODUCTION_MIGRATION_PLAN_PASS";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const BACKUP_KEYWORDS = ["backup", "备份", "snapshot", "dump"];
 

@@ -79,7 +79,7 @@ function countCsvRecords(csv) {
   return Math.max(rows - 1, 0);
 }
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const options = parseArgs(process.argv.slice(2));
 
 if (options.help) {

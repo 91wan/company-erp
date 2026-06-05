@@ -10,7 +10,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = join(__dirname, "..");
+const root = join(__dirname, "../..");
 const apiSrc = join(root, "apps/api/src");
 const webSrc = join(root, "apps/web/src");
 
@@ -43,22 +43,18 @@ function readWeb(relPath) {
 
 console.log("\n─── NAS 试点导入前置检查 ───\n");
 
-check("package.json 定义 import:pilot-check 和 import:pilot-smoke", () => {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  if (pkg.scripts?.["import:pilot-check"] !== "node scripts/import-pilot-check.mjs") {
-    throw new Error("package.json 缺少 import:pilot-check");
-  }
-  if (pkg.scripts?.["import:pilot-smoke"] !== "node scripts/import-pilot-smoke.mjs") {
-    throw new Error("package.json 缺少 import:pilot-smoke");
+check("import-pilot-check 脚本存在", () => {
+  if (!existsSync(join(root, "scripts/ops-runbook/import-pilot-check.mjs"))) {
+    throw new Error("缺少 scripts/ops-runbook/import-pilot-check.mjs");
   }
 });
 
 check("import:pilot-smoke 脚本存在", () => {
-  if (!existsSync(join(root, "scripts/import-pilot-smoke.mjs"))) {
-    throw new Error("缺少 scripts/import-pilot-smoke.mjs");
+  if (!existsSync(join(root, "scripts/ops-runbook/import-pilot-smoke.mjs"))) {
+    throw new Error("缺少 scripts/ops-runbook/import-pilot-smoke.mjs");
   }
-  if (!existsSync(join(root, "apps/api/src/importPilotSmoke.ts"))) {
-    throw new Error("缺少 apps/api/src/importPilotSmoke.ts");
+  if (!existsSync(join(root, "apps/api/src/bootstrap/importPilotSmoke.ts"))) {
+    throw new Error("缺少 apps/api/src/bootstrap/importPilotSmoke.ts");
   }
 });
 
@@ -280,7 +276,7 @@ check("默认仓库名为无锡总部仓库", () => {
 
 console.log(`\n─── 结果：${passed} 通过 / ${failed} 失败 ───`);
 if (failed === 0) {
-  console.log("静态检查已通过；请继续运行 npm run import:pilot-smoke 完成真实导入演练。\n");
+  console.log("静态检查已通过；请继续运行 node scripts/ops-runbook/import-pilot-smoke.mjs 完成真实导入演练。\n");
 } else {
   console.log("");
 }

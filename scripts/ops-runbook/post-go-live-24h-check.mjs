@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const PASS = "POST_GO_LIVE_24H_PASS";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const requiredFiles = [
   "post-go-live-24h-check.md",

@@ -2,12 +2,12 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { buildApp, validateRuntimeSecurityEnvironment } from "./app.js";
 import type { BuildAppOptions } from "./appRouteContext.js";
-import { validateIdentityEncryptionSecret } from "./identityCrypto.js";
+import { validateIdentityEncryptionSecret } from "./modules/auth/identityCrypto.js";
 import {
   createPrismaMaterialRepository,
   createPrismaWarehouseRepository,
-} from "./prismaMaterialsWarehousesRepository.js";
-import { createPrismaPartyRepository } from "./prismaPartyRepository.js";
+} from "./infra/prisma/prismaMaterialsWarehousesRepository.js";
+import { createPrismaPartyRepository } from "./infra/prisma/prismaPartyRepository.js";
 import {
   createPrismaAuthRepository,
   createPrismaDepartmentRepository,
@@ -15,27 +15,27 @@ import {
   createPrismaExternalProjectSiteAccountRepository,
   createPrismaProjectSiteAssignmentRepository,
   createPrismaUserAccountRepository,
-} from "./prismaPeoplePermissionsRepository.js";
+} from "./infra/prisma/prismaPeoplePermissionsRepository.js";
 import {
   createPrismaPurchaseRecordRepository,
   createPrismaPurchaseRequestRepository,
-} from "./prismaPurchasesRepository.js";
-import { createPrismaReplenishmentSuggestionRepository } from "./prismaReplenishmentRepository.js";
-import { createPrismaInventoryRepository } from "./prismaInventoryRepository.js";
+} from "./infra/prisma/prismaPurchasesRepository.js";
+import { createPrismaReplenishmentSuggestionRepository } from "./infra/prisma/prismaReplenishmentRepository.js";
+import { createPrismaInventoryRepository } from "./infra/prisma/prismaInventoryRepository.js";
 import {
   createPrismaProjectSiteComplianceRepository,
   createPrismaProjectSiteKitchenEquipmentRepository,
   createPrismaProjectSiteRepository,
   createPrismaProjectUsageRequestRepository,
-} from "./prismaProjectSitesRepository.js";
-import { createPrismaContractRepository } from "./prismaContractsRepository.js";
-import { createPrismaBusinessProjectRepository } from "./prismaBusinessProjectsRepository.js";
-import { createPrismaCertificateRepository } from "./prismaCertificatesRepository.js";
-import { createPrismaImportJobRepository } from "./prismaImportJobRepository.js";
-import { createPrismaMarketOperationsHandoffRepository } from "./prismaMarketOperationsHandoffsRepository.js";
-import { createPrismaAppConfigRepository } from "./prismaAppConfigRepository.js";
-import { createPrismaAuditLogRepository } from "./prismaAuditLogRepository.js";
-import { createPrismaAttachmentRepository } from "./prismaAttachmentsRepository.js";
+} from "./infra/prisma/prismaProjectSitesRepository.js";
+import { createPrismaContractRepository } from "./infra/prisma/prismaContractsRepository.js";
+import { createPrismaBusinessProjectRepository } from "./infra/prisma/prismaBusinessProjectsRepository.js";
+import { createPrismaCertificateRepository } from "./infra/prisma/prismaCertificatesRepository.js";
+import { createPrismaImportJobRepository } from "./infra/prisma/prismaImportJobRepository.js";
+import { createPrismaMarketOperationsHandoffRepository } from "./infra/prisma/prismaMarketOperationsHandoffsRepository.js";
+import { createPrismaAppConfigRepository } from "./infra/prisma/prismaAppConfigRepository.js";
+import { createPrismaAuditLogRepository } from "./infra/prisma/prismaAuditLogRepository.js";
+import { createPrismaAttachmentRepository } from "./infra/prisma/prismaAttachmentsRepository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import type { AuthAccountRecord, AuthRepository, AuthSessionRecord, MfaFactorRecord } from "../src/auth";
-import { encryptMfaSecret, generateTotpSecret, generateTotpToken } from "../src/mfa";
-import { hashPassword } from "../src/password";
+import type { AuthAccountRecord, AuthRepository, AuthSessionRecord, MfaFactorRecord } from "../src/modules/auth/auth";
+import { encryptMfaSecret, generateTotpSecret, generateTotpToken } from "../src/modules/auth/mfa";
+import { hashPassword } from "../src/modules/auth/password";
 
 const ADMIN_ID = "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb";
 const SESSION_SECRET = "public-api-smoke-session-secret-long-enough";

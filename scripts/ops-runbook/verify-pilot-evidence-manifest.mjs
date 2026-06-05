@@ -51,7 +51,7 @@ function parseArgs(argv) {
   return { help: false, evidenceDir };
 }
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { help, evidenceDir } = parseArgs(process.argv.slice(2));
 
 if (help) {

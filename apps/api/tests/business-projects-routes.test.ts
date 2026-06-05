@@ -6,13 +6,13 @@ import type {
   UpdateBusinessProjectInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 import {
   BusinessProjectConflictError,
   type BusinessProjectListFilters,
   type BusinessProjectRepository,
-} from "../src/businessProjects";
+} from "../src/modules/businessProjects/businessProjects";
 
 const now = "2026-05-13T09:00:00.000Z";
 const businessProjectId = "77777777-7777-4777-8777-777777777777";

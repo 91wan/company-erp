@@ -5,8 +5,8 @@
  */
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { createPrismaImportJobRepository, type ImportJobPrismaClient, type ImportJobRowRecord } from "../src/prismaImportJobRepository";
-import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/importTemplates";
+import { createPrismaImportJobRepository, type ImportJobPrismaClient, type ImportJobRowRecord } from "../src/infra/prisma/prismaImportJobRepository";
+import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/modules/importJobs/importTemplates";
 
 // ---------------------------------------------------------------------------
 // Helpers

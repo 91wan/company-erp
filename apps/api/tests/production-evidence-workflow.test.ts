@@ -89,7 +89,7 @@ describe("production evidence collection helper", () => {
         response.end("not found");
       }, async (baseUrl) => {
         const result = await runNode([
-          "scripts/production-evidence-collect.mjs",
+          "scripts/ops-runbook/production-evidence-collect.mjs",
           "--evidence-dir",
           evidenceDir,
           "--base-url",
@@ -119,7 +119,7 @@ describe("production evidence collection helper", () => {
     try {
       const commitSha = "a".repeat(40);
       const repoInside = await runNode([
-        "scripts/production-evidence-collect.mjs",
+        "scripts/ops-runbook/production-evidence-collect.mjs",
         "--evidence-dir",
         join(repoRoot, ".tmp-evidence-collect"),
         "--base-url",
@@ -142,7 +142,7 @@ describe("production evidence collection helper", () => {
         response.statusCode = 500;
         response.end("down");
       }, async (baseUrl) => {
-        const result = await runNode(["scripts/production-evidence-collect.mjs", "--evidence-dir", join(tempRoot, "bad-health"), "--base-url", baseUrl]);
+        const result = await runNode(["scripts/ops-runbook/production-evidence-collect.mjs", "--evidence-dir", join(tempRoot, "bad-health"), "--base-url", baseUrl]);
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain("BLOCKED");
       });
@@ -170,7 +170,7 @@ describe("production evidence collection helper", () => {
         response.end("not found");
       }, async (baseUrl) => {
         const result = await runNode([
-          "scripts/production-evidence-collect.mjs",
+          "scripts/ops-runbook/production-evidence-collect.mjs",
           "--evidence-dir",
           join(tempRoot, "mismatch"),
           "--base-url",
@@ -196,12 +196,12 @@ describe("production cutover and post go-live gates", () => {
         checklist,
         "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T10:00:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
       );
-      const pass = await runNode(["scripts/production-cutover-check.mjs", "--checklist", checklist]);
+      const pass = await runNode(["scripts/ops-runbook/production-cutover-check.mjs", "--checklist", checklist]);
       expect(pass.status).toBe(0);
       expect(pass.stdout).toContain("PRODUCTION_CUTOVER_CHECK_PASS");
 
       writeFileSync(checklist, "releaseCommitSha: aaaaaaa\noperator: <operator>\ngo/no-go: no-go\n");
-      const fail = await runNode(["scripts/production-cutover-check.mjs", "--checklist", checklist]);
+      const fail = await runNode(["scripts/ops-runbook/production-cutover-check.mjs", "--checklist", checklist]);
       expect(fail.status).not.toBe(0);
       expect(fail.stderr).toContain("BLOCKED");
       expect(fail.stderr).toContain("go/no-go");
@@ -227,13 +227,13 @@ describe("production cutover and post go-live gates", () => {
         writeFileSync(join(evidenceDir, "screenshots", image), "png-placeholder");
       }
 
-      const pass = await runNode(["scripts/post-go-live-24h-check.mjs", "--evidence-dir", evidenceDir]);
+      const pass = await runNode(["scripts/ops-runbook/post-go-live-24h-check.mjs", "--evidence-dir", evidenceDir]);
       expect(pass.status).toBe(0);
       expect(pass.stdout).toContain("POST_GO_LIVE_24H_PASS");
 
       const missing = join(tempRoot, "missing");
       mkdirSync(missing, { recursive: true });
-      const fail = await runNode(["scripts/post-go-live-24h-check.mjs", "--evidence-dir", missing]);
+      const fail = await runNode(["scripts/ops-runbook/post-go-live-24h-check.mjs", "--evidence-dir", missing]);
       expect(fail.status).not.toBe(0);
       expect(fail.stderr).toContain("post-go-live-24h-check.md");
     } finally {
@@ -247,10 +247,10 @@ describe("production evidence template consistency", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-template-consistency-"));
     try {
       const output = join(tempRoot, "evidence");
-      const templateModule = (await import(pathToFileURL(join(repoRoot, "scripts/create-go-live-evidence-template.mjs")).href)) as {
+      const templateModule = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/create-go-live-evidence-template.mjs")).href)) as {
         createTemplates: (outputDir: string) => { status: string };
       };
-      const checkModule = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+      const checkModule = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href)) as {
         requiredGoLiveEvidenceFiles: string[];
         requiredGoLiveManifestFields: string[];
       };

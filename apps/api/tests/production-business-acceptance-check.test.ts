@@ -7,7 +7,7 @@ const repoRoot = new URL("../../..", import.meta.url).pathname;
 
 async function importBusinessAcceptanceCheck() {
   const module = (await import(
-    pathToFileURL(join(repoRoot, "scripts/production-business-acceptance-check.mjs")).href
+    pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-business-acceptance-check.mjs")).href
   )) as {
     evaluateBusinessAcceptance: (opts: { text?: string; acceptancePath?: string }) => {
       status: string;
@@ -102,7 +102,7 @@ describe("production-business-acceptance-check fixture gate", () => {
   it("--json outputs parseable JSON for blocked case", () => {
     const result = spawnSync(
       "node",
-      [join(repoRoot, "scripts/production-business-acceptance-check.mjs"), "--acceptance", "/nonexistent/path.md", "--json"],
+      [join(repoRoot, "scripts/ops-runbook/production-business-acceptance-check.mjs"), "--acceptance", "/nonexistent/path.md", "--json"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 

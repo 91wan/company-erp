@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPrismaAuditLogRepository, type AuditLogPrismaClient, type AuditLogRecord } from "../src/prismaAuditLogRepository";
+import { createPrismaAuditLogRepository, type AuditLogPrismaClient, type AuditLogRecord } from "../src/infra/prisma/prismaAuditLogRepository";
 
 const now = new Date("2026-05-14T10:00:00.000Z");
 

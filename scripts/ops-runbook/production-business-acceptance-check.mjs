@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const PASS = "PRODUCTION_BUSINESS_ACCEPTANCE_PASS";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const REQUIRED_ACCEPTANCE_ITEMS = [
   "Dashboard",

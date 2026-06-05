@@ -15,10 +15,10 @@ import {
   type AuthSessionRecord,
   type MfaFactorRecord,
   type MfaRecoveryCodeRecord,
-} from "../src/auth";
-import { encryptMfaSecret, generateTotpSecret, generateTotpToken, verifyMfaSetupToken } from "../src/mfa";
-import { hashPassword } from "../src/password";
-import type { CreateAuditLogInput } from "../src/auditLogs";
+} from "../src/modules/auth/auth";
+import { encryptMfaSecret, generateTotpSecret, generateTotpToken, verifyMfaSetupToken } from "../src/modules/auth/mfa";
+import { hashPassword } from "../src/modules/auth/password";
+import type { CreateAuditLogInput } from "../src/modules/audit/auditLogs";
 
 const now = "2026-05-29T10:00:00.000Z";
 const TEST_SECRET = "public-internet-mfa-flow-test-secret-long-enough";
@@ -421,7 +421,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     const factor = mfaFactors.find((f) => f.id === factorId)!;
 
     // Decrypt the secret to generate a valid TOTP code
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const secret = decryptMfaSecret(factor.secretEncrypted);
     const totpCode = generateTotpToken(secret);
 
@@ -468,7 +468,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     });
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const totpCode = generateTotpToken(decryptMfaSecret(factor.secretEncrypted));
 
     const activateRes = await app.inject({
@@ -504,7 +504,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
     factor.createdAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const totpCode = generateTotpToken(decryptMfaSecret(factor.secretEncrypted));
 
     const activateRes = await app.inject({
@@ -592,7 +592,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     });
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const secret = decryptMfaSecret(factor.secretEncrypted);
     const totpCode = generateTotpToken(secret);
     await app.inject({
@@ -632,7 +632,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     });
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const totpCode = generateTotpToken(decryptMfaSecret(factor.secretEncrypted));
 
     const activateRes = await app.inject({
@@ -678,7 +678,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     const { factorId } = setupRes.json();
     const recoveryCode = (setupRes.json().recoveryCodes as string[])[0];
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     await app.inject({
       method: "POST", url: "/api/auth/mfa/activate-challenge",
       payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
@@ -728,7 +728,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     });
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const totpSecret = decryptMfaSecret(factor.secretEncrypted);
     const activateRes = await app.inject({
       method: "POST", url: "/api/auth/mfa/activate-challenge",
@@ -787,7 +787,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     const { factorId } = setupRes.json();
     const recoveryCode = (setupRes.json().recoveryCodes as string[])[0];
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const activateRes = await app.inject({
       method: "POST", url: "/api/auth/mfa/activate-challenge",
       payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
@@ -840,7 +840,7 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     const { factorId } = setupRes.json();
     const recoveryCode = (setupRes.json().recoveryCodes as string[])[0];
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     await app.inject({
       method: "POST", url: "/api/auth/mfa/activate-challenge",
       payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
@@ -1084,7 +1084,7 @@ describe("P0-3: MFA audit logs do not contain TOTP secret or recovery code plain
     });
     const { factorId } = setupRes.json();
     const factor = mfaFactors.find((f) => f.id === factorId)!;
-    const { decryptMfaSecret } = await import("../src/mfa");
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
     const secret = decryptMfaSecret(factor.secretEncrypted);
     const totpCode = generateTotpToken(secret);
 

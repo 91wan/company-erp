@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPrismaProjectSiteComplianceRepository } from "../src/prismaProjectSitesRepository";
+import { createPrismaProjectSiteComplianceRepository } from "../src/infra/prisma/prismaProjectSitesRepository";
 
 const site = {
   id: "site-1",

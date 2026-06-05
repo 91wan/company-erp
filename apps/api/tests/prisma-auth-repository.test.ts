@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPrismaAuthRepository } from "../src/prismaPeoplePermissionsRepository";
+import { createPrismaAuthRepository } from "../src/infra/prisma/prismaPeoplePermissionsRepository";
 
 describe("Prisma auth repository", () => {
   it("counts only unrevoked non-expired sessions for access review exports", async () => {

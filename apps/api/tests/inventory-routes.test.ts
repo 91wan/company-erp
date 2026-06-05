@@ -8,15 +8,15 @@ import type {
   EmployeeDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuditLogRepository } from "../src/auditLogs";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
 import {
   InventoryMovementConflictError,
   type InventoryRepository,
-} from "../src/inventory";
-import type { MaterialRepository } from "../src/materialsWarehouses";
-import type { EmployeeRepository } from "../src/peoplePermissions";
-import { hashPassword } from "../src/password";
+} from "../src/modules/inventory/inventory";
+import type { MaterialRepository } from "../src/modules/inventory/materialsWarehouses";
+import type { EmployeeRepository } from "../src/modules/peoplePermissions/peoplePermissions";
+import { hashPassword } from "../src/modules/auth/password";
 
 const now = "2026-05-11T12:00:00.000Z";
 const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

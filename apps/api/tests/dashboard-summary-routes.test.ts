@@ -12,13 +12,13 @@ import type {
   PurchaseRequestDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuthAccountRecord, AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
-import type { CertificateRepository } from "../src/certificates";
-import type { ContractRepository } from "../src/contracts";
-import type { InventoryRepository } from "../src/inventory";
-import type { ProjectSiteComplianceRepository, ProjectSiteRepository, ProjectUsageRequestRepository } from "../src/projectSites";
-import type { PurchaseRecordRepository, PurchaseRequestRepository } from "../src/purchases";
+import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
+import type { CertificateRepository } from "../src/modules/certificates/certificates";
+import type { ContractRepository } from "../src/modules/contracts/contracts";
+import type { InventoryRepository } from "../src/modules/inventory/inventory";
+import type { ProjectSiteComplianceRepository, ProjectSiteRepository, ProjectUsageRequestRepository } from "../src/modules/projectSites/projectSites";
+import type { PurchaseRecordRepository, PurchaseRequestRepository } from "../src/modules/purchases/purchases";
 
 const now = "2026-05-15T08:00:00.000Z";
 const assignedProjectSiteId = "11111111-1111-4111-8111-111111111111";

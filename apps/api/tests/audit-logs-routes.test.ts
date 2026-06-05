@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AuditLogDto } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuditLogRepository } from "../src/auditLogs";
-import type { AuthAccountRecord, AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
-import type { UserAccountRepository } from "../src/peoplePermissions";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
+import type { UserAccountRepository } from "../src/modules/peoplePermissions/peoplePermissions";
 
 const now = "2026-05-14T10:00:00.000Z";
 

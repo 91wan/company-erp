@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const PASS = "PRODUCTION_DATA_QUALITY_PASS";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const STORAGE_KEY_BAD_PATTERNS = [
   /^https?:\/\//i,

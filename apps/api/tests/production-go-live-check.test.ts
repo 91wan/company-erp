@@ -23,7 +23,7 @@ async function evaluateGoLiveEvidence(input: {
   expectedCommit?: string;
   baseUrl?: string;
 }): Promise<GoLiveEvidenceResult> {
-  const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+  const module = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href)) as {
     evaluateGoLiveEvidence: (options: {
       evidenceDir: string;
       expectedCommit?: string;
@@ -170,7 +170,7 @@ async function withMockHealthServer(
 }
 
 function runGoLiveCheckCli(args: string[]) {
-  return spawnSync("node", [join(repoRoot, "scripts/production-go-live-check.mjs"), ...args], {
+  return spawnSync("node", [join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs"), ...args], {
     cwd: repoRoot,
     encoding: "utf8",
   });
@@ -943,7 +943,7 @@ describe("production-go-live-check fixture gate", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "go-live-noseal-"));
     try {
       writeFixture(tempDir);
-      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href)) as {
         evaluateGoLiveEvidence: (opts: { evidenceDir: string; requireSeal?: boolean }) => Promise<{ status: string; blockers: string[]; warnings: string[] }>;
       };
       const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir, requireSeal: false });
@@ -958,7 +958,7 @@ describe("production-go-live-check fixture gate", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "go-live-requireseal-"));
     try {
       writeFixture(tempDir);
-      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href)) as {
         evaluateGoLiveEvidence: (opts: { evidenceDir: string; requireSeal?: boolean }) => Promise<{ status: string; blockers: string[] }>;
       };
       const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir, requireSeal: true });
@@ -987,7 +987,7 @@ describe("production-go-live-check fixture gate", () => {
       };
       writeFileSync(join(tempDir, "evidence-sha256-manifest.json"), JSON.stringify(sealManifest) + "\n");
 
-      const module = (await import(pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href)) as {
+      const module = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href)) as {
         evaluateGoLiveEvidence: (opts: { evidenceDir: string }) => Promise<{ status: string; blockers: string[] }>;
       };
       const result = await module.evaluateGoLiveEvidence({ evidenceDir: tempDir });
@@ -1002,7 +1002,7 @@ describe("production-go-live-check fixture gate", () => {
 describe("production-cutover-check fixture gate", () => {
   async function importCutoverCheck() {
     const module = (await import(
-      pathToFileURL(join(repoRoot, "scripts/production-cutover-check.mjs")).href
+      pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-cutover-check.mjs")).href
     )) as {
       evaluateProductionCutoverChecklist: (options: { text: string }) => {
         status: string;
@@ -1094,7 +1094,7 @@ describe("production-cutover-check fixture gate", () => {
   it("--json outputs valid parseable JSON for pass and blocked", () => {
     const passResult = spawnSync(
       "node",
-      [join(repoRoot, "scripts/production-cutover-check.mjs"), "--checklist", "/nonexistent/path", "--json"],
+      [join(repoRoot, "scripts/ops-runbook/production-cutover-check.mjs"), "--checklist", "/nonexistent/path", "--json"],
       { encoding: "utf8" },
     );
     expect(() => JSON.parse(passResult.stdout)).not.toThrow();

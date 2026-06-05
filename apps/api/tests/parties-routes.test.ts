@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { PartyConflictError, type PartyRepository } from "../src/parties";
+import { PartyConflictError, type PartyRepository } from "../src/modules/masterData/parties";
 import type { PartyDto } from "@company-erp/shared";
 
 const now = "2026-05-11T08:00:00.000Z";

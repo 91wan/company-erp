@@ -4,7 +4,7 @@ import {
   TRIAL_DEPARTMENTS,
   TRIAL_HEADQUARTERS_WAREHOUSE,
   TRIAL_OPERATOR_PARTY,
-} from "../src/trialData.js";
+} from "../src/bootstrap/trialData.js";
 
 describe("trial data bootstrap", () => {
   it("upserts the minimum pilot master data idempotently", async () => {

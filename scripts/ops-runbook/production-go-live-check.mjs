@@ -12,7 +12,7 @@ import { evaluateProductionMigrationPlan } from "./production-migration-plan-che
 
 const READY = "READY_FOR_INTERNAL_PRODUCTION_GO_LIVE";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export const requiredGoLiveEvidenceFiles = [
   "production-go-live-manifest.json",

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp, buildLoggerOptions, redactLogPayload, validateRuntimeSecurityEnvironment } from "../src/app";
-import { hashPassword } from "../src/password";
-import { parseCookieHeader, type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { validateIdentityEncryptionSecret } from "../src/identityCrypto";
+import { hashPassword } from "../src/modules/auth/password";
+import { parseCookieHeader, type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { validateIdentityEncryptionSecret } from "../src/modules/auth/identityCrypto";
 
 const now = "2026-05-11T10:00:00.000Z";
 

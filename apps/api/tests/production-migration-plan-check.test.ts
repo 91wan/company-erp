@@ -22,7 +22,7 @@ const validPlan =
 
 async function importMigrationPlanCheck() {
   const module = (await import(
-    pathToFileURL(join(repoRoot, "scripts/production-migration-plan-check.mjs")).href
+    pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-migration-plan-check.mjs")).href
   )) as {
     evaluateProductionMigrationPlan: (options: { text: string }) => {
       status: string;
@@ -202,7 +202,7 @@ describe("production-migration-plan-check fixture gate", () => {
   it("--json outputs parseable JSON for blocked case", () => {
     const result = spawnSync(
       "node",
-      [join(repoRoot, "scripts/production-migration-plan-check.mjs"), "--plan", "/nonexistent/path.md", "--json"],
+      [join(repoRoot, "scripts/ops-runbook/production-migration-plan-check.mjs"), "--plan", "/nonexistent/path.md", "--json"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 

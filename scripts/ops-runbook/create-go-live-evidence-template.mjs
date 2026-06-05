@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const CREATED = "GO_LIVE_EVIDENCE_TEMPLATE_CREATED";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
   console.log(`Usage: npm run production:evidence-template -- --output <outside-git-path>

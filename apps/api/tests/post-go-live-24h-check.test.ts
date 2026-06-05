@@ -14,7 +14,7 @@ type PostGoLiveResult = {
 };
 
 async function evaluatePostGoLive24hEvidence(input: { evidenceDir: string }): Promise<PostGoLiveResult> {
-  const module = (await import(pathToFileURL(join(repoRoot, "scripts/post-go-live-24h-check.mjs")).href)) as {
+  const module = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/post-go-live-24h-check.mjs")).href)) as {
     evaluatePostGoLive24hEvidence: (options: { evidenceDir: string }) => PostGoLiveResult;
   };
   return module.evaluatePostGoLive24hEvidence(input);
@@ -143,7 +143,7 @@ describe("post-go-live-24h-check fixture gate", () => {
   it("--json outputs parseable JSON", () => {
     const result = spawnSync(
       "node",
-      [join(repoRoot, "scripts/post-go-live-24h-check.mjs"), "--evidence-dir", "/nonexistent/dir", "--json"],
+      [join(repoRoot, "scripts/ops-runbook/post-go-live-24h-check.mjs"), "--evidence-dir", "/nonexistent/dir", "--json"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 

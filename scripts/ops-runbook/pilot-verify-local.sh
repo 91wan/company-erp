@@ -36,7 +36,7 @@ const { existsSync, readFileSync } = require("node:fs");
 const [, , pattern, mode, ...paths] = process.argv;
 const excluded = new Set([
   "apps/api/tests/test-fixture-redaction.test.ts",
-  "scripts/pilot-verify-local.sh",
+  "scripts/ops-runbook/pilot-verify-local.sh",
 ]);
 
 function gitFiles(args) {
@@ -83,8 +83,8 @@ require_source_match() {
   fi
 }
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-original_command="scripts/pilot-verify-local.sh"
+repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
+original_command="scripts/ops-runbook/pilot-verify-local.sh"
 for arg in "$@"; do
   original_command+=" $(printf '%q' "$arg")"
 done
@@ -210,7 +210,7 @@ if ! docker compose --env-file "$safe_env" config >/dev/null 2>&1; then
 fi
 
 echo "Running NAS preflight with temporary safe env..."
-preflight_output="$(PREFLIGHT_ENV_FILE="$safe_env" bash scripts/preflight-nas.sh)"
+preflight_output="$(PREFLIGHT_ENV_FILE="$safe_env" bash scripts/ops-runbook/preflight-nas.sh)"
 printf '%s\n' "$preflight_output"
 if [[ -n "$evidence_dir" ]]; then
   {
@@ -228,13 +228,13 @@ require_source_match "project-site attachment upload audit" "attachment.business
 echo "Controlled external project-site attachment upload smoke passed"
 
 echo "Running attachment legacy readiness report dry-run..."
-legacy_report_output="$(npm run attachments:legacy-report -- --dry-run)"
+legacy_report_output="$(node scripts/ops-runbook/attachments-legacy-report.mjs --dry-run)"
 printf '%s\n' "$legacy_report_output"
 if [[ -n "$evidence_dir" ]]; then
   printf '%s\n' "$legacy_report_output" > "$evidence_dir/legacy-report-dry-run.txt"
   if [[ -n "${PILOT_LEGACY_REPORT_DATABASE_URL:-}" ]]; then
     echo "Running attachment legacy machine report with explicit pilot database URL..."
-    DATABASE_URL="$PILOT_LEGACY_REPORT_DATABASE_URL" npm run attachments:legacy-report -- --json --output "$evidence_dir/legacy-report.json"
+    DATABASE_URL="$PILOT_LEGACY_REPORT_DATABASE_URL" node scripts/ops-runbook/attachments-legacy-report.mjs --json --output "$evidence_dir/legacy-report.json"
   else
     cat > "$evidence_dir/legacy-report.json" <<'EOF'
 {

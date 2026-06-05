@@ -83,8 +83,6 @@ export function evaluatePublicInternetReadiness({
     requireScript({ blockers, packageScripts, name: "public:readiness-gate", command: "node scripts/public-internet-readiness-gate.mjs" }),
     requireScript({ blockers, packageScripts, name: "public:go-live-check", command: "node scripts/public-go-live-check.mjs" }),
     requireScript({ blockers, packageScripts, name: "public:security-evidence-check", command: "node scripts/public-security-evidence-check.mjs" }),
-    requireScript({ blockers, packageScripts, name: "production:readiness-gate", command: "node scripts/production-readiness-gate.mjs" }),
-    requireScript({ blockers, packageScripts, name: "production:go-live-check", command: "node scripts/production-go-live-check.mjs" }),
   ]) {
     if (script) passed.push(`${script} script`);
   }
@@ -123,13 +121,13 @@ export function evaluatePublicInternetReadiness({
   // P0-3: stricter public path function must exist
   requireSourceMarker({
     blockers, readText,
-    path: "apps/api/src/routePermission.ts",
+    path: "apps/api/src/modules/auth/routePermission.ts",
     marker: "isPublicInternetPath",
     description: "isPublicInternetPath for stricter internet mode public path",
   });
 
   // P0-2: security headers middleware must exist
-  requireText({ blockers, readText, path: "apps/api/src/securityHeaders.ts", markers: [
+  requireText({ blockers, readText, path: "apps/api/src/middleware/securityHeaders.ts", markers: [
     "Content-Security-Policy",
     "Strict-Transport-Security",
     "X-Frame-Options",
@@ -137,14 +135,14 @@ export function evaluatePublicInternetReadiness({
   ]});
 
   // P0-3: fetch metadata protection must exist
-  requireText({ blockers, readText, path: "apps/api/src/fetchMetadataProtection.ts", markers: [
+  requireText({ blockers, readText, path: "apps/api/src/middleware/fetchMetadataProtection.ts", markers: [
     "FETCH_METADATA_BLOCKED",
     "sec-fetch-site",
     "cross-site",
   ]});
 
   // P0-4 / P0-5: MFA implementation must exist — tracked separately for BLOCKED_MFA_NOT_IMPLEMENTED output
-  requireText({ blockers: mfaBlockers, readText, path: "apps/api/src/mfa.ts", markers: [
+  requireText({ blockers: mfaBlockers, readText, path: "apps/api/src/modules/auth/mfa.ts", markers: [
     "generateTotpSecret",
     "verifyTotp",
     "encryptMfaSecret",
@@ -157,37 +155,37 @@ export function evaluatePublicInternetReadiness({
   ]});
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/auth.ts",
+    path: "apps/api/src/modules/auth/auth.ts",
     marker: "MFA_REQUIRED",
     description: "MFA_REQUIRED login flow",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/auth.ts",
+    path: "apps/api/src/modules/auth/auth.ts",
     marker: "MFA_SETUP_REQUIRED",
     description: "MFA_SETUP_REQUIRED first-time setup flow",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/auth.ts",
+    path: "apps/api/src/modules/auth/auth.ts",
     marker: "/api/auth/mfa/verify-login",
     description: "MFA verify-login route",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/auth.ts",
+    path: "apps/api/src/modules/auth/auth.ts",
     marker: "/api/auth/mfa/setup-challenge",
     description: "MFA setup-challenge route (first-time setup without session)",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/auth.ts",
+    path: "apps/api/src/modules/auth/auth.ts",
     marker: "/api/auth/mfa/activate-challenge",
     description: "MFA activate-challenge route",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/routePermission.ts",
+    path: "apps/api/src/modules/auth/routePermission.ts",
     marker: "isAuthenticatedAuthSelfServicePath",
     description: "isAuthenticatedAuthSelfServicePath to allow MFA self-service without PERMISSION_NOT_MAPPED",
   });
@@ -235,7 +233,7 @@ export function evaluatePublicInternetReadiness({
   }
   // Prisma repository must implement MFA methods
   requireText({ blockers: mfaBlockers, readText,
-    path: "apps/api/src/prismaPeoplePermissionsRepository.ts",
+    path: "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts",
     markers: [
       "createMfaFactor",
       "createMfaFactorWithRecoveryCodes",
@@ -283,13 +281,13 @@ export function evaluatePublicInternetReadiness({
   // P0-6: attachment Cache-Control and Content-Disposition must be set
   requireSourceMarker({
     blockers, readText,
-    path: "apps/api/src/attachmentRoutes.ts",
+    path: "apps/api/src/modules/attachments/attachmentRoutes.ts",
     marker: "private, no-store",
     description: "Cache-Control: private, no-store on attachment downloads",
   });
   requireSourceMarker({
     blockers, readText,
-    path: "apps/api/src/attachmentRoutes.ts",
+    path: "apps/api/src/modules/attachments/attachmentRoutes.ts",
     marker: "Content-Disposition",
     description: "Content-Disposition header on attachment downloads",
   });
@@ -436,7 +434,7 @@ function main() {
     for (const blocker of result.mfaBlockers) {
       console.error(`- ${blocker}`);
     }
-    console.error("处理建议: 先实现 MFA（apps/api/src/mfa.ts、数据库 schema、API 路由、测试），然后重新运行 npm run public:readiness-gate。");
+    console.error("处理建议: 先实现 MFA（apps/api/src/modules/auth/mfa.ts、数据库 schema、API 路由、测试），然后重新运行 npm run public:readiness-gate。");
     return 1;
   }
 

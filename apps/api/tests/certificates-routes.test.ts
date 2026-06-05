@@ -11,14 +11,14 @@ import type {
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
 import { certificateFiltersForRequest, isOutsideCertificateScope } from "../src/appRouteContext";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
 import {
   CertificateConflictError,
   getCertificateComputedStatus,
   type CertificateListFilters,
   type CertificateRepository,
-} from "../src/certificates";
-import { hashPassword } from "../src/password";
+} from "../src/modules/certificates/certificates";
+import { hashPassword } from "../src/modules/auth/password";
 import type {
   CreateProjectSiteInsuranceCoveredPersonInput,
   CreateProjectSiteInsurancePolicyInput,
@@ -29,7 +29,7 @@ import type {
   ProjectSiteInsurancePolicyListFilters,
   ProjectSitePayrollSubmissionListFilters,
   ProjectSiteRosterPersonListFilters,
-} from "../src/projectSites";
+} from "../src/modules/projectSites/projectSites";
 
 const now = "2026-05-12T08:00:00.000Z";
 const certificateId = "11111111-1111-4111-8111-111111111111";

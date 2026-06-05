@@ -5,12 +5,12 @@ import type {
   UpdateMarketOperationsHandoffInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 import {
   MarketOperationsHandoffConflictError,
   type MarketOperationsHandoffRepository,
-} from "../src/marketOperationsHandoffs";
+} from "../src/modules/marketOperations/marketOperationsHandoffs";
 
 const now = "2026-05-13T10:00:00.000Z";
 

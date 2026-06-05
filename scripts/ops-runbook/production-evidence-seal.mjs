@@ -7,7 +7,7 @@ import { requiredGoLiveEvidenceFiles, optionalGoLiveEvidenceFiles } from "./prod
 
 const PASS = "PRODUCTION_EVIDENCE_SEALED";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const SENSITIVE_PATTERNS = [
   /\bAUTH_SESSION_SECRET\s*=\s*\S+/i,

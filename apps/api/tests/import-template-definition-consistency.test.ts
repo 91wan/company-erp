@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/importTemplates";
-import { REQUIRED_HEADERS } from "../src/prismaImportJobRepository";
+import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/modules/importJobs/importTemplates";
+import { REQUIRED_HEADERS } from "../src/infra/prisma/prismaImportJobRepository";
 
 describe("import template definition consistency", () => {
   it("every IMPORT_TEMPLATE_TYPES code has a matching IMPORT_TEMPLATE_DEFINITIONS entry", () => {

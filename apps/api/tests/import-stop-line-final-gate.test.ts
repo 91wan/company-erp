@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { IMPORT_TEMPLATE_TYPES } from "@company-erp/shared";
-import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/importTemplates";
+import { IMPORT_TEMPLATE_DEFINITIONS } from "../src/modules/importJobs/importTemplates";
 
 const root = join(process.cwd(), "../..");
 
@@ -32,7 +32,7 @@ describe("import module stop-line final gate", () => {
 
   it("requires the stop-line document and import pilot gate checks", () => {
     const stopLinePath = join(root, "docs/import/import-module-stop-line.md");
-    const checkScriptPath = join(root, "scripts/import-pilot-check.mjs");
+    const checkScriptPath = join(root, "scripts/ops-runbook/import-pilot-check.mjs");
     expect(existsSync(stopLinePath)).toBe(true);
 
     const stopLine = readFileSync(stopLinePath, "utf8");

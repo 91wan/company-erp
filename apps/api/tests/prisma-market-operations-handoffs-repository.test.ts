@@ -4,7 +4,7 @@ import {
   createPrismaMarketOperationsHandoffRepository,
   type MarketOperationsHandoffRecord,
   type MarketOperationsHandoffPrismaClient,
-} from "../src/prismaMarketOperationsHandoffsRepository";
+} from "../src/infra/prisma/prismaMarketOperationsHandoffsRepository";
 
 const now = new Date("2026-05-13T10:00:00.000Z");
 

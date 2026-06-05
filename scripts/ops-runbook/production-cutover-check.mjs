@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const PASS = "PRODUCTION_CUTOVER_CHECK_PASS";
 const BLOCKED = "BLOCKED";
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
   console.log(`Usage: npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md [--json]

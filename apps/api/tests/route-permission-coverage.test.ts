@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { isPublicPath, routePermission } from "../src/routePermission";
+import { isPublicPath, routePermission } from "../src/modules/auth/routePermission";
 
 type PrintedRoute = {
   path: string;
