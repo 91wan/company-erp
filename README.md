@@ -2,9 +2,9 @@
 
 [中文说明](./README_ZH.md)
 
-Company ERP is a lightweight internal web ERP for company operations, designed
-for NAS intranet deployment. It focuses on practical daily workflows rather
-than public SaaS, finance automation, OCR, or mobile apps.
+Company ERP is a lightweight web ERP for company operations, designed for NAS
+deployment with public internet access enabled. It focuses on practical daily
+workflows rather than finance automation, OCR, or mobile apps.
 
 ## NAS Trial Readiness
 
@@ -14,9 +14,9 @@ Before scheduling a NAS intranet trial, run:
 npm run pilot:ready
 ```
 
-Passing this command only means the team can arrange a small NAS intranet trial
-for 1-3 project sites; it is not a formal production launch. Do not expose API
-or PostgreSQL to the public internet. Do not import all real data directly for
+Passing this command only means the team can arrange a small NAS trial for 1-3
+project sites; it is not a formal production launch. Do not import all real
+data directly for
 the first drill; use desensitized data or a small controlled sample first. The
 current Excel import module does not do OCR, ZIP image batch ingestion, contract
 PDF batch upload, import rollback, or overwrite-style import. If data is
@@ -56,7 +56,7 @@ npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url
 ```
 
 `pilot:ready` means the system can be scheduled for a controlled 1-3 project
-site intranet trial. `production:ready` means the repository can enter internal
+site trial. `production:ready` means the repository can enter internal
 production review after the local gates pass. `production:evidence-template`
 creates the Git-external evidence directory skeleton. `production:go-live-check`
 means the Git-external evidence directory has the required restore drill,
@@ -65,12 +65,10 @@ cutover checklist, and release sign-off proof. `production:evidence-collect`
 can safely collect health/app-version/draft-manifest evidence without reading
 `.env`, database dumps, attachment bytes, contracts, health certificate images,
 or payroll files. Internal formal go-live requires
-`production:ready` + `production:go-live-check`; it still does not authorize
-public internet access, router port forwarding, public SaaS use, or direct
-exposure of API/PostgreSQL.
+`production:ready` + `production:go-live-check`.
 
 The go-live manifest must keep the scope explicit: `businessScope=internal_erp`,
-`publicAccess=false`, selected `dataScope`, and selected `attachmentScope`.
+selected `dataScope`, and selected `attachmentScope`.
 `production:health-check` verifies the Web UI entrypoint, a same-origin
 `/assets` file, `/health`, and `/api/app-version`.
 
@@ -92,7 +90,7 @@ The go-live manifest must keep the scope explicit: `businessScope=internal_erp`,
 
 ## Boundaries
 
-This project is for company internal network use by default.
+This project is deployed on the company NAS with public internet access enabled.
 
 - Do not commit `.env`, NAS credentials, database dumps, attachments, scanned
   contracts, staff private data, WeChat exports, or real business records.
@@ -144,7 +142,8 @@ checked through:
 - `/volume1/company-erp/app/.deploy-revision.json` on the NAS
 - `docker compose ps`
 
-Do not expose the API or PostgreSQL directly to the public internet.
+Do not expose the PostgreSQL port directly; all external access goes through the
+Nginx same-origin proxy and API layer.
 
 ## Release Notes
 
