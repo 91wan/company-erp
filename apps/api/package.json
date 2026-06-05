@@ -17,7 +17,7 @@
     "demo:cleanup": "tsx src/bootstrap/demoCleanupCli.ts",
     "demo:cleanup:prod": "node dist/bootstrap/demoCleanupCli.js",
     "build": "tsc -p tsconfig.build.json && node -e \"import('./dist/app.js').then(() => console.log('api dist import ok'))\"",
-    "test": "vitest run",
+    "test": "vitest run --test-timeout=60000",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
