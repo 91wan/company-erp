@@ -7,7 +7,7 @@ const BLOCKED = "BLOCKED";
 
 function usage() {
   console.log(`Usage: npm run production:readiness-gate
-       node scripts/production-readiness-gate.mjs [--help]
+       node scripts/ops-runbook/production-readiness-gate.mjs [--help]
 
 Runs a local, read-only internal production review gate.
 
@@ -79,67 +79,67 @@ export function evaluateProductionReadiness({
       blockers,
       packageScripts,
       name: "production:readiness-gate",
-      command: "node scripts/production-readiness-gate.mjs",
+      command: "node scripts/ops-runbook/production-readiness-gate.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:health-check",
-      command: "node scripts/production-health-check.mjs",
+      command: "node scripts/ops-runbook/production-health-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:evidence-collect",
-      command: "node scripts/production-evidence-collect.mjs",
+      command: "node scripts/ops-runbook/production-evidence-collect.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:restore-drill-check",
-      command: "node scripts/production-restore-drill-check.mjs",
+      command: "node scripts/ops-runbook/production-restore-drill-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:cutover-check",
-      command: "node scripts/production-cutover-check.mjs",
+      command: "node scripts/ops-runbook/production-cutover-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:migration-plan-check",
-      command: "node scripts/production-migration-plan-check.mjs",
+      command: "node scripts/ops-runbook/production-migration-plan-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:post-go-live-24h-check",
-      command: "node scripts/post-go-live-24h-check.mjs",
+      command: "node scripts/ops-runbook/post-go-live-24h-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:data-quality-check",
-      command: "node scripts/production-data-quality-check.mjs",
+      command: "node scripts/ops-runbook/production-data-quality-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:business-acceptance-check",
-      command: "node scripts/production-business-acceptance-check.mjs",
+      command: "node scripts/ops-runbook/production-business-acceptance-check.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "production:evidence-seal",
-      command: "node scripts/production-evidence-seal.mjs",
+      command: "node scripts/ops-runbook/production-evidence-seal.mjs",
     }),
     requireScript({
       blockers,
       packageScripts,
       name: "attachments:production-check",
-      command: "node scripts/attachment-production-check.mjs",
+      command: "node scripts/ops-runbook/attachment-production-check.mjs",
     }),
     requireScript({
       blockers,
