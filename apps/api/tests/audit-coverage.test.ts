@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const routeRoot = resolve(import.meta.dirname, "../src");
@@ -87,8 +87,19 @@ const requiredProjectSiteEquipmentAuditRoutes: ReadonlyArray<AuditRoute> = [
   ["projectSiteRoutes.ts", "post", "/api/project-site-kitchen-equipment-change-requests/:id/review"],
 ];
 
+function findRouteFile(fileName: string): string {
+  // Search in modules subdirectories for the route file
+  const modulesDir = join(routeRoot, "modules");
+  for (const moduleName of readdirSync(modulesDir)) {
+    const candidate = join(modulesDir, moduleName, fileName);
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`Cannot find route file: ${fileName}`);
+}
+
 function routeHandlerSource(fileName: string, method: string, path: string): string {
-  const source = readFileSync(resolve(routeRoot, fileName), "utf8");
+  const filePath = findRouteFile(fileName);
+  const source = readFileSync(filePath, "utf8");
   const marker = `app.${method}("${path}"`;
   const start = source.indexOf(marker);
   if (start < 0) throw new Error(`Missing route marker ${marker} in ${fileName}`);
@@ -97,10 +108,18 @@ function routeHandlerSource(fileName: string, method: string, path: string): str
 }
 
 function allRegisteredMutationRoutes(): AuditRoute[] {
-  return readdirSync(routeRoot)
-    .filter((fileName) => fileName.endsWith("Routes.ts"))
-    .flatMap((fileName) => {
-      const source = readFileSync(resolve(routeRoot, fileName), "utf8");
+  const modulesDir = join(routeRoot, "modules");
+  const moduleNames = readdirSync(modulesDir);
+  return moduleNames
+    .flatMap((moduleName) => {
+      const moduleDir = join(modulesDir, moduleName);
+      return readdirSync(moduleDir)
+        .filter((fileName) => fileName.endsWith("Routes.ts"))
+        .map((fileName) => join("modules", moduleName, fileName));
+    })
+    .flatMap((relPath) => {
+      const source = readFileSync(resolve(routeRoot, relPath), "utf8");
+      const fileName = relPath.split("/").at(-1) ?? relPath;
       return [...source.matchAll(/app\.(post|patch|put|delete)\("([^"]+)"/g)].map((match) => [
         fileName,
         match[1],

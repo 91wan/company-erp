@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-内网轻量 ERP，部署在公司 NAS，管理采购、库存、项目点、合同、证照等日常运营流程。
+部署在公司 NAS 并启用公网访问的轻量 Web ERP，管理采购、库存、项目点、合同、证照等日常运营流程。
 
 - **前端**：`apps/web` — React + Vite + TypeScript，Apple 风格工作台
 - **后端**：`apps/api` — Fastify + TypeScript + Prisma + PostgreSQL

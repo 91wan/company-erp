@@ -7,8 +7,8 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { isPublicInternetPath, isPublicPath } from "../src/routePermission";
-import type { AuthRepository } from "../src/auth";
+import { isPublicInternetPath, isPublicPath } from "../src/modules/auth/routePermission";
+import type { AuthRepository } from "../src/modules/auth/auth";
 
 function createFakeAuthRepository(): AuthRepository {
   return {

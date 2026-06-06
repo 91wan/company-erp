@@ -15,11 +15,11 @@ import type {
   UpdateAttachmentRecordInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AttachmentRecordRepository } from "../src/attachments";
-import type { AuditLogRepository } from "../src/auditLogs";
-import type { AuthAccountRecord, AuthRepository } from "../src/auth";
-import type { CertificateListFilters, CertificateRepository } from "../src/certificates";
-import { hashPassword } from "../src/password";
+import type { AttachmentRecordRepository } from "../src/modules/attachments/attachments";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
+import type { CertificateListFilters, CertificateRepository } from "../src/modules/certificates/certificates";
+import { hashPassword } from "../src/modules/auth/password";
 import type {
   CreateProjectSiteInsuranceCoveredPersonInput,
   CreateProjectSiteInsurancePolicyInput,
@@ -32,8 +32,8 @@ import type {
   ProjectSitePayrollSubmissionListFilters,
   ProjectSiteRepository,
   ProjectSiteRosterPersonListFilters,
-} from "../src/projectSites";
-import { resetAttachmentUploadQuotaForTests } from "../src/diskSpaceGuard";
+} from "../src/modules/projectSites/projectSites";
+import { resetAttachmentUploadQuotaForTests } from "../src/modules/appCore/diskSpaceGuard";
 
 const now = "2026-05-14T10:00:00.000Z";
 

@@ -9,7 +9,7 @@ const repoRoot = new URL("../../..", import.meta.url).pathname;
 
 async function importSeal() {
   const module = (await import(
-    pathToFileURL(join(repoRoot, "scripts/production-evidence-seal.mjs")).href
+    pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-evidence-seal.mjs")).href
   )) as {
     sealEvidencePackage: (opts: { evidenceDir: string }) => {
       status: string;

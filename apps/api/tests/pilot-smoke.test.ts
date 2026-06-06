@@ -6,7 +6,7 @@ import {
   redactSecrets,
   reuseOrCreate,
   type PilotApiClient,
-} from "../src/pilotSmoke.js";
+} from "../src/bootstrap/pilotSmoke.js";
 
 describe("pilot workflow smoke helpers", () => {
   it("uses only DEMO-prefixed business identifiers", () => {

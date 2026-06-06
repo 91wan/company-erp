@@ -27,9 +27,9 @@ describe("evidence redaction regression gate", () => {
 
   it("keeps verifier scripts away from .env loading, NAS roots, and raw evidence output", () => {
     const scriptPaths = [
-      "scripts/verify-pilot-evidence-manifest.mjs",
-      "scripts/verify-audit-export.mjs",
-      "scripts/attachments-legacy-report.mjs",
+      "scripts/ops-runbook/verify-pilot-evidence-manifest.mjs",
+      "scripts/ops-runbook/verify-audit-export.mjs",
+      "scripts/ops-runbook/attachments-legacy-report.mjs",
     ];
 
     for (const scriptPath of scriptPaths) {

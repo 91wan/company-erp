@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { createMemoryAppConfigRepository } from "../src/appConfig";
-import type { CreateAuditLogInput } from "../src/auditLogs";
-import type { AuthAccountRecord, AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+import type { CreateAuditLogInput } from "../src/modules/audit/auditLogs";
+import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 
 const now = "2026-05-13T10:00:00.000Z";
 

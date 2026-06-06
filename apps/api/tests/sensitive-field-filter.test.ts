@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSensitiveImportField } from "../src/importJobRoutes";
+import { isSensitiveImportField } from "../src/modules/importJobs/importJobRoutes";
 
 describe("isSensitiveImportField (P0-4)", () => {
   it("filters exact sensitive keys", () => {

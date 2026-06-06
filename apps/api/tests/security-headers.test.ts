@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { publicInternetEnabled, securityHeadersEnabled } from "../src/securityHeaders";
+import { publicInternetEnabled, securityHeadersEnabled } from "../src/middleware/securityHeaders";
 
 describe("securityHeadersEnabled / publicInternetEnabled", () => {
   const savedHeaders = process.env.PUBLIC_SECURITY_HEADERS_ENABLED;

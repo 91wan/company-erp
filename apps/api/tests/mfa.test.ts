@@ -12,7 +12,7 @@ import {
   requiresMfa,
   verifyPendingMfaToken,
   verifyTotp,
-} from "../src/mfa";
+} from "../src/modules/auth/mfa";
 
 describe("MFA secret encryption / decryption", () => {
   const savedSecret = process.env.IDENTITY_ENCRYPTION_SECRET;

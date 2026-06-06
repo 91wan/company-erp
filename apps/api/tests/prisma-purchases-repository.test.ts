@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { createPrismaPurchaseRecordRepository } from "../src/prismaPurchasesRepository";
+import { createPrismaPurchaseRecordRepository } from "../src/infra/prisma/prismaPurchasesRepository";
 
 describe("Prisma purchase repositories", () => {
   it("persists and returns purchaseRequestNo when a purchase record has no request id link", async () => {

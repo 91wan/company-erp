@@ -4,8 +4,8 @@ import {
   createPrismaAttachmentRepository,
   type AttachmentRecord,
   type AttachmentRecordPrismaClient,
-} from "../src/prismaAttachmentsRepository";
-import { AttachmentConflictError } from "../src/attachments";
+} from "../src/infra/prisma/prismaAttachmentsRepository";
+import { AttachmentConflictError } from "../src/modules/attachments/attachments";
 
 const now = new Date("2026-05-14T10:00:00.000Z");
 

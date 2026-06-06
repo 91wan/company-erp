@@ -10,7 +10,7 @@ import {
   AttachmentUploadQuotaExceededError,
   ensureAttachmentStorageHasFreeSpace,
   resetAttachmentUploadQuotaForTests,
-} from "../src/diskSpaceGuard";
+} from "../src/modules/appCore/diskSpaceGuard";
 
 describe("attachment upload guards", () => {
   it("blocks uploads when the attachment storage volume is below the configured free-space threshold", async () => {

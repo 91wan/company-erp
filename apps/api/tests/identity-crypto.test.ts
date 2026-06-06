@@ -5,7 +5,7 @@ import {
   encryptIdentityNo,
   identityKeyVersionFromEncrypted,
   validateIdentityEncryptionSecret,
-} from "../src/identityCrypto";
+} from "../src/modules/auth/identityCrypto";
 
 describe("identity number crypto policy", () => {
   const savedSecret = process.env.IDENTITY_ENCRYPTION_SECRET;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { hashSessionToken, type AuthAccountRecord, type AuthRepository, type AuthSessionRecord } from "../src/auth";
-import { hashPassword } from "../src/password";
+import { hashSessionToken, type AuthAccountRecord, type AuthRepository, type AuthSessionRecord } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 import type { DepartmentDto } from "@company-erp/shared";
-import type { DepartmentRepository } from "../src/peoplePermissions";
+import type { DepartmentRepository } from "../src/modules/peoplePermissions/peoplePermissions";
 
 const now = "2026-05-11T10:00:00.000Z";
 

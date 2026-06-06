@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { AuditLogDto, PurchaseRecordDto, PurchaseRequestDto } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuditLogRepository } from "../src/auditLogs";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 import {
   PurchaseRecordConflictError,
   PurchaseRequestConflictError,
   PurchaseRequestStateConflictError,
   type PurchaseRecordRepository,
   type PurchaseRequestRepository,
-} from "../src/purchases";
+} from "../src/modules/purchases/purchases";
 
 const now = "2026-05-11T11:00:00.000Z";
 const assignedProjectSiteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

@@ -2,10 +2,10 @@ import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import type { ImportJobDto, ImportJobSummaryDto, ImportTemplateTypeCode } from "@company-erp/shared";
-import type { AuthAccountRecord, AuthRepository } from "../src/auth";
-import type { AuditLogRepository } from "../src/auditLogs";
-import { ImportJobValidationError, type ImportJobPreviewInput, type ImportJobRepository } from "../src/importJobs";
-import { hashPassword } from "../src/password";
+import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import { ImportJobValidationError, type ImportJobPreviewInput, type ImportJobRepository } from "../src/modules/importJobs/importJobs";
+import { hashPassword } from "../src/modules/auth/password";
 
 const now = "2026-05-11T12:00:00.000Z";
 

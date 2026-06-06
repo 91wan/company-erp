@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   EmployeeProjectSiteAssignmentConflictError,
   EmployeeProjectSiteAssignmentValidationError,
-} from "../src/peoplePermissions";
-import { createPrismaProjectSiteAssignmentRepository } from "../src/prismaPeoplePermissionsRepository";
+} from "../src/modules/peoplePermissions/peoplePermissions";
+import { createPrismaProjectSiteAssignmentRepository } from "../src/infra/prisma/prismaPeoplePermissionsRepository";
 
 const now = new Date("2026-05-13T10:00:00.000Z");
 const employeeId = "11111111-1111-4111-8111-111111111111";
@@ -116,7 +116,7 @@ function createPrisma(overrides: Partial<FakeProjectSiteAssignmentDelegate> = {}
 
 describe("Prisma project-site assignment repository", () => {
   it("keeps project-site assignment relation types typed without broad casts", () => {
-    const sourcePath = fileURLToPath(new URL("../src/prismaPeoplePermissionsRepository.ts", import.meta.url));
+    const sourcePath = fileURLToPath(new URL("../src/infra/prisma/prismaPeoplePermissionsRepository.ts", import.meta.url));
     const source = readFileSync(sourcePath, "utf8");
 
     expect(source).not.toContain("relationType as any");

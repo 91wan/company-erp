@@ -32,9 +32,9 @@ describe("NAS trial handoff final gate", () => {
       "docs/deployment/nas-trial-evidence-template.md",
       "docs/audits/2026-05-20-nas-trial-readiness-v5.md",
       "docs/audits/2026-05-20-nas-trial-handoff-final-gate.md",
-      "scripts/verify-pilot-evidence-manifest.mjs",
-      "scripts/verify-audit-export.mjs",
-      "scripts/attachments-legacy-report.mjs",
+      "scripts/ops-runbook/verify-pilot-evidence-manifest.mjs",
+      "scripts/ops-runbook/verify-audit-export.mjs",
+      "scripts/ops-runbook/attachments-legacy-report.mjs",
     ];
 
     for (const file of checkedFiles) {

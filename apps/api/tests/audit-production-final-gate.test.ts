@@ -33,10 +33,10 @@ describe("audit production readiness final gate", () => {
   });
 
   it("keeps attachment read and download routes audited", () => {
-    expect(routeHandlerSource("attachmentRoutes.ts", "get", "/api/attachments/:id/content")).toContain(
+    expect(routeHandlerSource("modules/attachments/attachmentRoutes.ts", "get", "/api/attachments/:id/content")).toContain(
       'action: "attachment.content_read"',
     );
-    expect(routeHandlerSource("attachmentRoutes.ts", "get", "/api/attachments/:id/download-url")).toContain(
+    expect(routeHandlerSource("modules/attachments/attachmentRoutes.ts", "get", "/api/attachments/:id/download-url")).toContain(
       'action: "attachment.download_url"',
     );
   });

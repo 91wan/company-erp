@@ -11,9 +11,9 @@ import { buildApp } from "../src/app";
 import {
   ReplenishmentSuggestionConflictError,
   type ReplenishmentSuggestionRepository,
-} from "../src/replenishment";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+} from "../src/modules/inventory/replenishment";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 
 const now = "2026-05-11T12:00:00.000Z";
 

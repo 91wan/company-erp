@@ -5,7 +5,7 @@ import {
   type ImportJobPrismaClient,
   type ImportJobRecord,
   type ImportJobRowRecord,
-} from "../src/prismaImportJobRepository";
+} from "../src/infra/prisma/prismaImportJobRepository";
 
 const now = new Date("2026-05-13T00:00:00.000Z");
 

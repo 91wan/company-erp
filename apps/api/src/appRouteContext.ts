@@ -1,31 +1,31 @@
 import { USER_ROLE_ASSIGNMENT_POLICY, type MvpRoleCode, type ProjectUsageRequestDto } from "@company-erp/shared";
 import type { AppConfigRepository } from "./appConfig.js";
-import type { AttachmentRecordRepository } from "./attachments.js";
-import { AuditLogWriteError, redactAuditJson, type AuditLogRepository } from "./auditLogs.js";
-import type { AuthenticatedRequest, AuthOptions, AuthRepository } from "./auth.js";
-import type { BusinessProjectRepository } from "./businessProjects.js";
-import type { CertificateRepository } from "./certificates.js";
-import type { ContractRepository } from "./contracts.js";
-import type { ImportJobRepository } from "./importJobs.js";
-import type { InventoryRepository } from "./inventory.js";
-import type { MarketOperationsHandoffRepository } from "./marketOperationsHandoffs.js";
-import type { MaterialRepository, WarehouseRepository } from "./materialsWarehouses.js";
-import type { PartyRepository } from "./parties.js";
+import type { AttachmentRecordRepository } from "./modules/attachments/attachments.js";
+import { AuditLogWriteError, redactAuditJson, type AuditLogRepository } from "./modules/audit/auditLogs.js";
+import type { AuthenticatedRequest, AuthOptions, AuthRepository } from "./modules/auth/auth.js";
+import type { BusinessProjectRepository } from "./modules/businessProjects/businessProjects.js";
+import type { CertificateRepository } from "./modules/certificates/certificates.js";
+import type { ContractRepository } from "./modules/contracts/contracts.js";
+import type { ImportJobRepository } from "./modules/importJobs/importJobs.js";
+import type { InventoryRepository } from "./modules/inventory/inventory.js";
+import type { MarketOperationsHandoffRepository } from "./modules/marketOperations/marketOperationsHandoffs.js";
+import type { MaterialRepository, WarehouseRepository } from "./modules/inventory/materialsWarehouses.js";
+import type { PartyRepository } from "./modules/masterData/parties.js";
 import type {
   DepartmentRepository,
   EmployeeProjectSiteAssignmentRepository,
   EmployeeRepository,
   ExternalProjectSiteAccountRepository,
   UserAccountRepository,
-} from "./peoplePermissions.js";
+} from "./modules/peoplePermissions/peoplePermissions.js";
 import type {
   ProjectSiteComplianceRepository,
   ProjectSiteKitchenEquipmentRepository,
   ProjectSiteRepository,
   ProjectUsageRequestRepository,
-} from "./projectSites.js";
-import type { PurchaseRecordRepository, PurchaseRequestRepository } from "./purchases.js";
-import type { ReplenishmentSuggestionRepository } from "./replenishment.js";
+} from "./modules/projectSites/projectSites.js";
+import type { PurchaseRecordRepository, PurchaseRequestRepository } from "./modules/purchases/purchases.js";
+import type { ReplenishmentSuggestionRepository } from "./modules/inventory/replenishment.js";
 
 export type BuildAppOptions = {
   auth?: AuthOptions;

@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import type { AuditLogRepository, CreateAuditLogInput } from "../src/auditLogs";
-import { hashPassword } from "../src/password";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import type { AuditLogRepository, CreateAuditLogInput } from "../src/modules/audit/auditLogs";
+import { hashPassword } from "../src/modules/auth/password";
 import {
   DepartmentConflictError,
   EmployeeProjectSiteAssignmentConflictError,
@@ -18,7 +18,7 @@ import {
   type EmployeeRepository,
   type ExternalProjectSiteAccountRepository,
   type UserAccountRepository,
-} from "../src/peoplePermissions";
+} from "../src/modules/peoplePermissions/peoplePermissions";
 import type {
   DepartmentDto,
   EmployeeDto,
@@ -827,7 +827,7 @@ describe("user accounts API", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "company-erp-access-review-export-"));
     const exportPath = join(tempDir, "access-review-export.json");
     writeFileSync(exportPath, JSON.stringify(payload), "utf8");
-    const gate = spawnSync("node", ["scripts/access-review-check.mjs", "--export", exportPath], {
+    const gate = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", exportPath], {
       cwd: process.cwd().replace(/\/apps\/api$/, ""),
       encoding: "utf8",
     });
@@ -883,7 +883,7 @@ describe("user accounts API", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "company-erp-access-review-disabled-session-"));
     const exportPath = join(tempDir, "access-review-export.json");
     writeFileSync(exportPath, JSON.stringify(payload), "utf8");
-    const gate = spawnSync("node", ["scripts/access-review-check.mjs", "--export", exportPath], {
+    const gate = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", exportPath], {
       cwd: process.cwd().replace(/\/apps\/api$/, ""),
       encoding: "utf8",
     });

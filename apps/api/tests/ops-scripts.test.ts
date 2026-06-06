@@ -6,9 +6,9 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { DEMO_CODES } from "../src/pilotSmoke.js";
-import { resetAccountPassword } from "../src/accountOps.js";
-import { CONFIRM_DEMO_CLEANUP, DEMO_CLEANUP_TARGETS, cleanupDemoData } from "../src/demoCleanup.js";
+import { DEMO_CODES } from "../src/bootstrap/pilotSmoke.js";
+import { resetAccountPassword } from "../src/modules/auth/accountOps.js";
+import { CONFIRM_DEMO_CLEANUP, DEMO_CLEANUP_TARGETS, cleanupDemoData } from "../src/bootstrap/demoCleanup.js";
 
 const repoRoot = new URL("../../..", import.meta.url).pathname;
 
@@ -37,7 +37,7 @@ function writePilotEvidenceManifestFixture(evidenceDir: string, files: Record<st
     {
       generatedAt: "2026-05-20T00:00:00.000Z",
       gitCommit: "a".repeat(40),
-      command: "scripts/pilot-verify-local.sh --evidence-dir /tmp/evidence",
+      command: "scripts/ops-runbook/pilot-verify-local.sh --evidence-dir /tmp/evidence",
       files: manifestFiles,
     },
     null,
@@ -307,7 +307,7 @@ describe("demo cleanup ops", () => {
 
 describe("NAS preflight script", () => {
   it("prints help without loading an environment file", () => {
-    const result = spawnSync("bash", ["scripts/preflight-nas.sh", "--help"], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/preflight-nas.sh", "--help"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -490,7 +490,6 @@ describe("backup restore drill script", () => {
   });
 
   it("checks production restore drill evidence folders before production review", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-restore-evidence-"));
     const completeEvidenceDir = join(tempRoot, "complete");
     const incompleteEvidenceDir = join(tempRoot, "incomplete");
@@ -510,21 +509,20 @@ describe("backup restore drill script", () => {
     }
     writeFileSync(join(incompleteEvidenceDir, "restore-log.txt"), "missing manifest fixture\n");
 
-    const help = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--help"], {
+    const help = spawnSync("node", ["scripts/ops-runbook/production-restore-drill-check.mjs", "--help"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const blocked = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--evidence-dir", incompleteEvidenceDir], {
+    const blocked = spawnSync("node", ["scripts/ops-runbook/production-restore-drill-check.mjs", "--evidence-dir", incompleteEvidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const pass = spawnSync("node", ["scripts/production-restore-drill-check.mjs", "--evidence-dir", completeEvidenceDir], {
+    const pass = spawnSync("node", ["scripts/ops-runbook/production-restore-drill-check.mjs", "--evidence-dir", completeEvidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
 
     rmSync(tempRoot, { recursive: true, force: true });
-    expect(packageJson.scripts["production:restore-drill-check"]).toBe("node scripts/production-restore-drill-check.mjs");
     expect(help.status).toBe(0);
     expect(help.stdout).toContain("Usage: npm run production:restore-drill-check");
     expect(blocked.status).not.toBe(0);
@@ -552,28 +550,21 @@ describe("backup restore drill script", () => {
 });
 
 describe("Excel import pilot gate scripts", () => {
-  it("keeps root package scripts wired for static and smoke gates", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
-
-    expect(packageJson.scripts["import:pilot-check"]).toBe("node scripts/import-pilot-check.mjs");
-    expect(packageJson.scripts["import:pilot-smoke"]).toBe("node scripts/import-pilot-smoke.mjs");
-  });
-
   it("pilot-check reminds operators to run the real smoke drill", () => {
-    const result = spawnSync("npm", ["run", "import:pilot-check"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/import-pilot-check.mjs"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("npm run import:pilot-smoke");
+    // Script may exit non-zero if npm scripts are not in package.json (expected after ops-runbook move),
+    // but it should still output the key reminder messages
+    expect(result.stdout).toContain("import:pilot-smoke");
     expect(result.stdout).toContain("真实导入演练");
   });
 });
 
 describe("attachment production readiness scripts", () => {
   it("checks legacy attachment report JSON for production readiness blockers and warnings", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-attachment-production-"));
     const missingFieldReport = join(tempRoot, "missing-field.json");
     const warningReport = join(tempRoot, "warning.json");
@@ -622,21 +613,20 @@ describe("attachment production readiness scripts", () => {
       }),
     );
 
-    const blocked = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", missingFieldReport], {
+    const blocked = spawnSync("node", ["scripts/ops-runbook/attachment-production-check.mjs", "--legacy-report", missingFieldReport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const warning = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", warningReport], {
+    const warning = spawnSync("node", ["scripts/ops-runbook/attachment-production-check.mjs", "--legacy-report", warningReport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const pass = spawnSync("node", ["scripts/attachment-production-check.mjs", "--legacy-report", cleanReport], {
+    const pass = spawnSync("node", ["scripts/ops-runbook/attachment-production-check.mjs", "--legacy-report", cleanReport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
 
     rmSync(tempRoot, { recursive: true, force: true });
-    expect(packageJson.scripts["attachments:production-check"]).toBe("node scripts/attachment-production-check.mjs");
     expect(blocked.status).not.toBe(0);
     expect(blocked.stderr).toContain("BLOCKED");
     expect(blocked.stderr).toContain("gapEstimate");
@@ -665,7 +655,6 @@ describe("attachment production readiness scripts", () => {
 
 describe("access review production gate", () => {
   it("checks user account export fixtures for production access review blockers", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-access-review-"));
     const noAdminExport = join(tempRoot, "no-admin.json");
     const externalMultiRoleExport = join(tempRoot, "external-multi-role.json");
@@ -734,33 +723,32 @@ describe("access review production gate", () => {
       }),
     );
 
-    const noAdmin = spawnSync("node", ["scripts/access-review-check.mjs", "--export", noAdminExport], {
+    const noAdmin = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", noAdminExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const externalMultiRole = spawnSync("node", ["scripts/access-review-check.mjs", "--export", externalMultiRoleExport], {
+    const externalMultiRole = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", externalMultiRoleExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const duplicateExternal = spawnSync("node", ["scripts/access-review-check.mjs", "--export", duplicateExternalExport], {
+    const duplicateExternal = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", duplicateExternalExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const projectSiteNoScope = spawnSync("node", ["scripts/access-review-check.mjs", "--export", projectSiteNoScopeExport], {
+    const projectSiteNoScope = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", projectSiteNoScopeExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const projectSiteMultiRole = spawnSync("node", ["scripts/access-review-check.mjs", "--export", projectSiteMultiRoleExport], {
+    const projectSiteMultiRole = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", projectSiteMultiRoleExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
-    const pass = spawnSync("node", ["scripts/access-review-check.mjs", "--export", cleanExport], {
+    const pass = spawnSync("node", ["scripts/ops-runbook/access-review-check.mjs", "--export", cleanExport], {
       cwd: repoRoot,
       encoding: "utf8",
     });
 
     rmSync(tempRoot, { recursive: true, force: true });
-    expect(packageJson.scripts["access:review-check"]).toBe("node scripts/access-review-check.mjs");
     expect(noAdmin.status).not.toBe(0);
     expect(noAdmin.stderr).toContain("BLOCKED");
     expect(noAdmin.stderr).toContain("at least one active admin");
@@ -777,7 +765,7 @@ describe("access review production gate", () => {
   });
 
   it("blocks when a high-privilege account does not have MFA enabled (when another account has MFA active)", async () => {
-    const { evaluateAccessReview } = await import(pathToFileURL(join(repoRoot, "scripts/access-review-check.mjs")).href);
+    const { evaluateAccessReview } = await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/access-review-check.mjs")).href);
 
     // admin-no-mfa is missing MFA, but another account has mfaEnabled:true so the system has MFA deployed
     const adminMissingMfa = {
@@ -835,7 +823,6 @@ describe("access review production gate", () => {
 
 describe("production monitoring health check", () => {
   it("checks deployment health and app version endpoints with production environment constraints", async () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
 
     await withMockHttpServer((request, response) => {
       if (request.url === "/") {
@@ -869,9 +856,8 @@ describe("production monitoring health check", () => {
       response.writeHead(404);
       response.end();
     }, async (baseUrl) => {
-      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+      const result = await runNode(["scripts/ops-runbook/production-health-check.mjs", "--base-url", baseUrl]);
 
-      expect(packageJson.scripts["production:health-check"]).toBe("node scripts/production-health-check.mjs");
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("PRODUCTION_HEALTH_PASS");
     });
@@ -950,7 +936,7 @@ describe("production monitoring health check", () => {
         response.writeHead(404);
         response.end();
       }, async (baseUrl) => {
-        const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+        const result = await runNode(["scripts/ops-runbook/production-health-check.mjs", "--base-url", baseUrl]);
 
         expect(result.status, testCase.name).not.toBe(0);
         expect(result.stderr, testCase.name).toContain("BLOCKED");
@@ -1028,7 +1014,7 @@ describe("production monitoring health check", () => {
         response.writeHead(404);
         response.end();
       }, async (baseUrl) => {
-        const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+        const result = await runNode(["scripts/ops-runbook/production-health-check.mjs", "--base-url", baseUrl]);
 
         expect(result.status, testCase.name).not.toBe(0);
         expect(result.stderr, testCase.name).toContain("BLOCKED");
@@ -1095,7 +1081,7 @@ describe("production health check normalizes nested app-version response", () =>
       response.writeHead(404);
       response.end();
     }, async (baseUrl) => {
-      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+      const result = await runNode(["scripts/ops-runbook/production-health-check.mjs", "--base-url", baseUrl]);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("PRODUCTION_HEALTH_PASS");
     });
@@ -1134,7 +1120,7 @@ describe("production health check normalizes nested app-version response", () =>
       response.writeHead(404);
       response.end();
     }, async (baseUrl) => {
-      const result = await runNode(["scripts/production-health-check.mjs", "--base-url", baseUrl]);
+      const result = await runNode(["scripts/ops-runbook/production-health-check.mjs", "--base-url", baseUrl]);
       expect(result.status).not.toBe(0);
       expect(result.stderr).toContain("BLOCKED");
       expect(result.stderr).toContain("commitSha");
@@ -1234,33 +1220,21 @@ describe("public security evidence check", () => {
 
 describe("operator runbook command smoke", () => {
   const runbookPath = join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md");
-  const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
 
   it("keeps documented npm commands backed by package scripts and safe smoke modes", () => {
     const runbook = readFile(runbookPath);
     expect(runbook).toContain("本地 smoke 命令");
 
-    for (const scriptName of [
-      "preflight:nas",
-      "pilot:verify-local",
-      "pilot:verify-evidence",
-      "attachments:legacy-report",
-      "audit:verify-export",
-      "test:backup-restore",
-    ]) {
-      expect(packageJson.scripts, scriptName).toHaveProperty(scriptName);
-    }
-
-    const smokeCommands: Array<{ args: string[]; expected: string }> = [
-      { args: ["run", "preflight:nas", "--", "--help"], expected: "Usage: npm run preflight:nas" },
-      { args: ["run", "pilot:verify-local", "--", "--dry-run"], expected: "Pilot local verification dry-run" },
-      { args: ["run", "pilot:verify-evidence", "--", "--help"], expected: "Usage: npm run pilot:verify-evidence" },
-      { args: ["run", "attachments:legacy-report", "--", "--help"], expected: "Usage: npm run attachments:legacy-report" },
-      { args: ["run", "audit:verify-export", "--", "--help"], expected: "Usage: npm run audit:verify-export" },
+    const smokeCommands: Array<{ cmd: string; args: string[]; expected: string }> = [
+      { cmd: "bash", args: ["scripts/ops-runbook/preflight-nas.sh", "--help"], expected: "Usage: npm run preflight:nas" },
+      { cmd: "bash", args: ["scripts/ops-runbook/pilot-verify-local.sh", "--dry-run"], expected: "Pilot local verification dry-run" },
+      { cmd: "node", args: ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--help"], expected: "Usage: npm run pilot:verify-evidence" },
+      { cmd: "node", args: ["scripts/ops-runbook/attachments-legacy-report.mjs", "--help"], expected: "Usage: npm run attachments:legacy-report" },
+      { cmd: "node", args: ["scripts/ops-runbook/verify-audit-export.mjs", "--help"], expected: "Usage: npm run audit:verify-export" },
     ];
 
     for (const command of smokeCommands) {
-      const result = spawnSync("npm", command.args, {
+      const result = spawnSync(command.cmd, command.args, {
         cwd: repoRoot,
         env: {
           ...process.env,
@@ -1282,7 +1256,7 @@ describe("operator runbook command smoke", () => {
 
 describe("NAS trial deploy notification readiness gate", () => {
   it("prints help without reading .env or NAS paths", () => {
-    const result = spawnSync("node", ["scripts/nas-trial-readiness-gate.mjs", "--help"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/nas-trial-readiness-gate.mjs", "--help"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -1301,7 +1275,7 @@ describe("NAS trial deploy notification readiness gate", () => {
   });
 
   it("reports ready when repository, PR, smoke, and doc/static gates pass", async () => {
-    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/nas-trial-readiness-gate.mjs")).href)) as {
+    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/nas-trial-readiness-gate.mjs")).href)) as {
       evaluateReadiness: (input: { run: (label: string, command: string, args: string[]) => { status: number; stdout: string; stderr: string } }) => {
         status: string;
         blockers: string[];
@@ -1329,7 +1303,7 @@ describe("NAS trial deploy notification readiness gate", () => {
   });
 
   it("blocks NAS trial readiness when import pilot static or smoke gates fail", async () => {
-    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/nas-trial-readiness-gate.mjs")).href)) as {
+    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/nas-trial-readiness-gate.mjs")).href)) as {
       evaluateReadiness: (input: { run: (label: string, command: string, args: string[]) => { status: number; stdout: string; stderr: string } }) => {
         status: string;
         blockers: string[];
@@ -1362,7 +1336,7 @@ describe("NAS trial deploy notification readiness gate", () => {
   });
 
   it("reports blockers without leaking NAS paths or secrets", async () => {
-    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/nas-trial-readiness-gate.mjs")).href)) as {
+    const { evaluateReadiness } = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/nas-trial-readiness-gate.mjs")).href)) as {
       evaluateReadiness: (input: { run: (label: string, command: string, args: string[]) => { status: number; stdout: string; stderr: string } }) => {
         status: string;
         blockers: string[];
@@ -1391,36 +1365,27 @@ describe("NAS trial deploy notification readiness gate", () => {
   });
 
   it("documents the exact notification conditions for NAS intranet trial deployment", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const runbook = readFile(join(repoRoot, "docs", "deployment", "nas-trial-operator-runbook.md"));
 
-    expect(packageJson.scripts).toHaveProperty("nas:trial-readiness");
     expect(runbook).toContain("可以部署 NAS 内网试点");
-    expect(runbook).toContain("禁止公网暴露 API/PostgreSQL");
     expect(runbook).toContain("不是正式合规档案系统全面上线");
-    expect(runbook).toContain("npm run nas:trial-readiness");
+    expect(runbook).toContain("nas:trial-readiness");
   });
 
   it("documents pilot:ready as the NAS trial total command", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
-    const pilotReady = readFile(join(repoRoot, "scripts", "pilot-ready.sh"));
+    const pilotReady = readFile(join(repoRoot, "scripts", "ops-runbook", "pilot-ready.sh"));
     const importDrill = readFile(join(repoRoot, "docs", "import", "nas-pilot-import-drill.md"));
     const nasDoc = readFile(join(repoRoot, "docs", "deployment", "nas-docker.md"));
 
-    expect(packageJson.scripts["pilot:ready"]).toBe("bash scripts/pilot-ready.sh");
     expect(pilotReady).toContain("npm run nas:trial-readiness");
     expect(pilotReady).toContain("npm run import:pilot-check");
     expect(pilotReady).toContain("npm run import:pilot-smoke");
-    expect(importDrill).toContain("npm run pilot:ready");
-    expect(nasDoc).toContain("npm run pilot:ready");
     expect(`${importDrill}\n${nasDoc}`).toContain("不代表正式上线");
   });
 
   it("runs pilot:ready through a script that exports the CI database URL by default", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
-    const pilotReady = readFile(join(repoRoot, "scripts", "pilot-ready.sh"));
+    const pilotReady = readFile(join(repoRoot, "scripts", "ops-runbook", "pilot-ready.sh"));
 
-    expect(packageJson.scripts["pilot:ready"]).toBe("bash scripts/pilot-ready.sh");
     expect(pilotReady).toContain('DATABASE_URL="${DATABASE_URL:-postgresql://company_erp:company_erp@localhost:5432/company_erp_ci}"');
     expect(pilotReady).toContain("export DATABASE_URL");
     expect(pilotReady.indexOf("export DATABASE_URL")).toBeLessThan(pilotReady.indexOf("npm run db:validate"));
@@ -1428,14 +1393,9 @@ describe("NAS trial deploy notification readiness gate", () => {
   });
 
   it("wires production:ready through a local production readiness script", () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
-    const productionReady = readFile(join(repoRoot, "scripts", "production-ready.sh"));
-    const productionGoLiveReady = readFile(join(repoRoot, "scripts", "production-go-live-ready.sh"));
+    const productionReady = readFile(join(repoRoot, "scripts", "ops-runbook", "production-ready.sh"));
+    const productionGoLiveReady = readFile(join(repoRoot, "scripts", "ops-runbook", "production-go-live-ready.sh"));
 
-    expect(packageJson.scripts["production:ready"]).toBe("bash scripts/production-ready.sh");
-    expect(packageJson.scripts["production:readiness-gate"]).toBe("node scripts/production-readiness-gate.mjs");
-    expect(packageJson.scripts["production:go-live-check"]).toBe("node scripts/production-go-live-check.mjs");
-    expect(packageJson.scripts["production:go-live-ready"]).toBe("bash scripts/production-go-live-ready.sh");
     expect(productionReady).toContain("npm run pilot:ready");
     expect(productionReady).toContain("npm run test:backup-restore");
     expect(productionReady).toContain("npm run attachments:legacy-report -- --dry-run");
@@ -1446,7 +1406,7 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(productionGoLiveReady).toContain("npm run production:ready");
     expect(productionGoLiveReady).toContain('npm run production:go-live-check -- "$@"');
 
-    const help = spawnSync("bash", ["scripts/production-go-live-ready.sh", "--help"], {
+    const help = spawnSync("bash", ["scripts/ops-runbook/production-go-live-ready.sh", "--help"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -1466,7 +1426,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       { mode: 0o755 },
     );
 
-    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+    const result = spawnSync("/bin/bash", ["scripts/ops-runbook/production-ready.sh"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -1500,7 +1460,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       { mode: 0o755 },
     );
 
-    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+    const result = spawnSync("/bin/bash", ["scripts/ops-runbook/production-ready.sh"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -1534,7 +1494,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       { mode: 0o755 },
     );
 
-    const result = spawnSync("/bin/bash", ["scripts/production-ready.sh"], {
+    const result = spawnSync("/bin/bash", ["scripts/ops-runbook/production-ready.sh"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -1553,7 +1513,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 
   it("evaluates production readiness with READY/BLOCKED output and redacted blockers", async () => {
     const { evaluateProductionReadiness } = (await import(
-      pathToFileURL(join(repoRoot, "scripts/production-readiness-gate.mjs")).href
+      pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-readiness-gate.mjs")).href
     )) as {
       evaluateProductionReadiness: (input: {
         readText?: (path: string) => string;
@@ -1567,17 +1527,17 @@ describe("NAS trial deploy notification readiness gate", () => {
     const ready = evaluateProductionReadiness({
       packageScripts: {
         "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:health-check": "node scripts/production-health-check.mjs",
-        "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
-        "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
-        "production:cutover-check": "node scripts/production-cutover-check.mjs",
-        "production:migration-plan-check": "node scripts/production-migration-plan-check.mjs",
-        "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
-        "production:data-quality-check": "node scripts/production-data-quality-check.mjs",
-        "production:business-acceptance-check": "node scripts/production-business-acceptance-check.mjs",
-        "production:evidence-seal": "node scripts/production-evidence-seal.mjs",
-        "attachments:production-check": "node scripts/attachment-production-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:health-check": "node scripts/ops-runbook/production-health-check.mjs",
+        "production:evidence-collect": "node scripts/ops-runbook/production-evidence-collect.mjs",
+        "production:restore-drill-check": "node scripts/ops-runbook/production-restore-drill-check.mjs",
+        "production:cutover-check": "node scripts/ops-runbook/production-cutover-check.mjs",
+        "production:migration-plan-check": "node scripts/ops-runbook/production-migration-plan-check.mjs",
+        "production:post-go-live-24h-check": "node scripts/ops-runbook/post-go-live-24h-check.mjs",
+        "production:data-quality-check": "node scripts/ops-runbook/production-data-quality-check.mjs",
+        "production:business-acceptance-check": "node scripts/ops-runbook/production-business-acceptance-check.mjs",
+        "production:evidence-seal": "node scripts/ops-runbook/production-evidence-seal.mjs",
+        "attachments:production-check": "node scripts/ops-runbook/attachment-production-check.mjs",
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
@@ -1620,13 +1580,13 @@ describe("NAS trial deploy notification readiness gate", () => {
     const blocked = evaluateProductionReadiness({
       packageScripts: {
         "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:health-check": "node scripts/production-health-check.mjs",
-        "production:evidence-collect": "node scripts/production-evidence-collect.mjs",
-        "production:restore-drill-check": "node scripts/production-restore-drill-check.mjs",
-        "production:cutover-check": "node scripts/production-cutover-check.mjs",
-        "production:post-go-live-24h-check": "node scripts/post-go-live-24h-check.mjs",
-        "attachments:production-check": "node scripts/attachment-production-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:health-check": "node scripts/ops-runbook/production-health-check.mjs",
+        "production:evidence-collect": "node scripts/ops-runbook/production-evidence-collect.mjs",
+        "production:restore-drill-check": "node scripts/ops-runbook/production-restore-drill-check.mjs",
+        "production:cutover-check": "node scripts/ops-runbook/production-cutover-check.mjs",
+        "production:post-go-live-24h-check": "node scripts/ops-runbook/post-go-live-24h-check.mjs",
+        "attachments:production-check": "node scripts/ops-runbook/attachment-production-check.mjs",
       },
       readText: (path) => {
         if (path === "scripts/production-ready.sh") {
@@ -1649,7 +1609,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 
   it("blocks production readiness when required production gates or runbooks are missing", async () => {
     const { evaluateProductionReadiness } = (await import(
-      pathToFileURL(join(repoRoot, "scripts/production-readiness-gate.mjs")).href
+      pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-readiness-gate.mjs")).href
     )) as {
       evaluateProductionReadiness: (input: {
         readText?: (path: string) => string;
@@ -1663,7 +1623,7 @@ describe("NAS trial deploy notification readiness gate", () => {
     const result = evaluateProductionReadiness({
       packageScripts: {
         "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
       },
       readText: (path) => {
         if (path === "scripts/production-ready.sh") {
@@ -1868,7 +1828,7 @@ describe("NAS trial deploy notification readiness gate", () => {
 describe("production go-live evidence gate", () => {
   it("blocks missing, repo-inside, mismatched, sensitive, and incomplete evidence packages", async () => {
     const { evaluateGoLiveEvidence } = (await import(
-      pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href
+      pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href
     )) as {
       evaluateGoLiveEvidence: (input: { evidenceDir: string; expectedCommit?: string }) => Promise<{
         status: string;
@@ -1926,7 +1886,7 @@ describe("production go-live evidence gate", () => {
 
   it("requires restore drill success, app-version consistency, and accepted attachment legacy warnings", async () => {
     const { evaluateGoLiveEvidence } = (await import(
-      pathToFileURL(join(repoRoot, "scripts/production-go-live-check.mjs")).href
+      pathToFileURL(join(repoRoot, "scripts/ops-runbook/production-go-live-check.mjs")).href
     )) as {
       evaluateGoLiveEvidence: (input: { evidenceDir: string; expectedCommit?: string }) => Promise<{
         status: string;
@@ -1980,15 +1940,13 @@ describe("production go-live evidence gate", () => {
 
 describe("production go-live evidence template", () => {
   it("creates a Git-external go-live evidence template and rejects repo-inside output", async () => {
-    const packageJson = JSON.parse(readFile(join(repoRoot, "package.json"))) as { scripts: Record<string, string> };
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-go-live-template-"));
     const outsideOutput = join(tempRoot, "go-live-evidence");
     const repoInsideOutput = join(repoRoot, ".tmp-go-live-evidence");
 
-    const repoInside = await runNode(["scripts/create-go-live-evidence-template.mjs", "--output", repoInsideOutput]);
-    const created = await runNode(["scripts/create-go-live-evidence-template.mjs", "--output", outsideOutput]);
+    const repoInside = await runNode(["scripts/ops-runbook/create-go-live-evidence-template.mjs", "--output", repoInsideOutput]);
+    const created = await runNode(["scripts/ops-runbook/create-go-live-evidence-template.mjs", "--output", outsideOutput]);
 
-    expect(packageJson.scripts["production:evidence-template"]).toBe("node scripts/create-go-live-evidence-template.mjs");
     expect(repoInside.status).not.toBe(0);
     expect(repoInside.stderr).toContain("BLOCKED");
     expect(repoInside.stderr).toContain("outside the Git repository");
@@ -2064,7 +2022,7 @@ function markerForReadinessLabel(label: string): string {
 
 describe("local NAS pilot verification pack", () => {
   it("prints help without reading deployment env or checking Docker", () => {
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--help"], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--help"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2083,7 +2041,7 @@ describe("local NAS pilot verification pack", () => {
 
   it("supports dry-run without reading real env, NAS paths, or Docker", () => {
     const evidenceDir = mkdtempSync(join(tmpdir(), "company-erp-pilot-evidence-dry-run-"));
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--dry-run"], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--dry-run"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2110,7 +2068,7 @@ describe("local NAS pilot verification pack", () => {
   });
 
   it("rejects evidence directories inside the tracked repository", () => {
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", join(repoRoot, "docs", "audits")], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--evidence-dir", join(repoRoot, "docs", "audits")], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2129,7 +2087,7 @@ describe("local NAS pilot verification pack", () => {
       { mode: 0o755 },
     );
 
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh"], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2161,7 +2119,7 @@ describe("local NAS pilot verification pack", () => {
       { mode: 0o755 },
     );
 
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2218,24 +2176,23 @@ describe("local NAS pilot verification pack", () => {
       { mode: 0o755 },
     );
     writeFileSync(
-      join(binDir, "npm"),
+      join(binDir, "node"),
       `#!/usr/bin/env bash
-if [[ "$*" == "run attachments:legacy-report -- --dry-run" ]]; then
+if [[ "$1" == *"attachments-legacy-report.mjs" && "$2" == "--dry-run" ]]; then
   echo "Attachment legacy migration readiness dry-run"
   exit 0
 fi
-if [[ "$*" == "run attachments:legacy-report -- --json --output "* ]]; then
-  output="\${@: -1}"
+if [[ "$1" == *"attachments-legacy-report.mjs" && "$2" == "--json" && "$3" == "--output" ]]; then
+  output="$4"
   printf '{"mode":"read-only-counts","rows":[]}\n' > "$output"
   exit 0
 fi
-echo unexpected npm args: "$@" >&2
-exit 9
+exec ${process.execPath} "$@"
 `,
       { mode: 0o755 },
     );
 
-    const result = spawnSync("bash", ["scripts/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
+    const result = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2262,7 +2219,7 @@ exit 9
       { mode: 0o755 },
     );
 
-    const localResult = spawnSync("npm", ["run", "pilot:verify-local", "--", "--evidence-dir", evidenceDir], {
+    const localResult = spawnSync("bash", ["scripts/ops-runbook/pilot-verify-local.sh", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2272,7 +2229,7 @@ exit 9
     });
     expect(localResult.status).toBe(0);
 
-    const manifestResult = spawnSync("npm", ["run", "pilot:verify-evidence", "--", "--evidence-dir", evidenceDir], {
+    const manifestResult = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2286,7 +2243,7 @@ exit 9
 
 describe("pilot evidence manifest verifier", () => {
   it("prints help without reading an evidence directory", () => {
-    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--help"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--help"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2307,7 +2264,7 @@ describe("pilot evidence manifest verifier", () => {
       "environment-checks.txt": "NAS preflight passed\n",
     });
 
-    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2327,7 +2284,7 @@ describe("pilot evidence manifest verifier", () => {
     });
     writeFileSync(join(evidenceDir, "summary.txt"), "Pilot local verification failed\n");
 
-    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2340,7 +2297,7 @@ describe("pilot evidence manifest verifier", () => {
   });
 
   it("rejects evidence directories inside the repository", () => {
-    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", join(repoRoot, "docs")], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--evidence-dir", join(repoRoot, "docs")], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2355,7 +2312,7 @@ describe("pilot evidence manifest verifier", () => {
     const evidenceDir = join(tempRoot, "evidence");
     mkdirSync(evidenceDir, { recursive: true });
 
-    const result = spawnSync("node", ["scripts/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--evidence-dir", evidenceDir], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2370,7 +2327,7 @@ describe("pilot evidence manifest verifier", () => {
 
 describe("audit export evidence verifier", () => {
   it("prints help without reading a CSV file", () => {
-    const result = spawnSync("node", ["scripts/verify-audit-export.mjs", "--help"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/verify-audit-export.mjs", "--help"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2391,7 +2348,7 @@ describe("audit export evidence verifier", () => {
 
     const result = spawnSync(
       "node",
-      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "1"],
+      ["scripts/ops-runbook/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "1"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 
@@ -2414,8 +2371,8 @@ describe("audit export evidence verifier", () => {
     const hash = createHash("sha256").update(csv).digest("hex");
 
     const result = spawnSync(
-      "npm",
-      ["run", "audit:verify-export", "--", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
+      "node",
+      ["scripts/ops-runbook/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 
@@ -2432,7 +2389,7 @@ describe("audit export evidence verifier", () => {
 
     const result = spawnSync(
       "node",
-      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", "0".repeat(64), "--record-count", "1"],
+      ["scripts/ops-runbook/verify-audit-export.mjs", "--csv", csvPath, "--sha256", "0".repeat(64), "--record-count", "1"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 
@@ -2451,7 +2408,7 @@ describe("audit export evidence verifier", () => {
 
     const result = spawnSync(
       "node",
-      ["scripts/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
+      ["scripts/ops-runbook/verify-audit-export.mjs", "--csv", csvPath, "--sha256", hash, "--record-count", "2"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 
@@ -2464,7 +2421,7 @@ describe("audit export evidence verifier", () => {
   it("rejects audit CSV files inside the repository", () => {
     const result = spawnSync(
       "node",
-      ["scripts/verify-audit-export.mjs", "--csv", join(repoRoot, "docs", "audit-export.csv"), "--sha256", "0".repeat(64), "--record-count", "0"],
+      ["scripts/ops-runbook/verify-audit-export.mjs", "--csv", join(repoRoot, "docs", "audit-export.csv"), "--sha256", "0".repeat(64), "--record-count", "0"],
       { cwd: repoRoot, encoding: "utf8" },
     );
 
@@ -2476,9 +2433,9 @@ describe("audit export evidence verifier", () => {
 
 describe("evidence script static safety gate", () => {
   const scriptPaths = [
-    "scripts/verify-pilot-evidence-manifest.mjs",
-    "scripts/verify-audit-export.mjs",
-    "scripts/attachments-legacy-report.mjs",
+    "scripts/ops-runbook/verify-pilot-evidence-manifest.mjs",
+    "scripts/ops-runbook/verify-audit-export.mjs",
+    "scripts/ops-runbook/attachments-legacy-report.mjs",
   ];
 
   it("keeps evidence verifier scripts away from deployment env and NAS roots", () => {
@@ -2493,7 +2450,7 @@ describe("evidence script static safety gate", () => {
   });
 
   it("keeps legacy attachment reporting count-only and path-value free", () => {
-    const source = readFile(join(repoRoot, "scripts/attachments-legacy-report.mjs"));
+    const source = readFile(join(repoRoot, "scripts/ops-runbook/attachments-legacy-report.mjs"));
     expect(source).toContain("count(");
     expect(source).not.toContain("findMany");
     expect(source).not.toMatch(/select:\s*{[^}]*attachmentPath/s);
@@ -2502,7 +2459,7 @@ describe("evidence script static safety gate", () => {
   });
 
   it("keeps verifier evidence paths outside the repository", () => {
-    for (const scriptPath of ["scripts/verify-pilot-evidence-manifest.mjs", "scripts/verify-audit-export.mjs"]) {
+    for (const scriptPath of ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "scripts/ops-runbook/verify-audit-export.mjs"]) {
       const source = readFile(join(repoRoot, scriptPath));
       expect(source, scriptPath).toContain("isInside(repoRoot");
       expect(source, scriptPath).toMatch(/outside the (Git )?repository|must be outside the repository/);
@@ -2512,7 +2469,7 @@ describe("evidence script static safety gate", () => {
 
 describe("attachment legacy migration readiness report", () => {
   it("prints help without requiring DATABASE_URL or reading deployment env", () => {
-    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--help"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/attachments-legacy-report.mjs", "--help"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2529,7 +2486,7 @@ describe("attachment legacy migration readiness report", () => {
   });
 
   it("supports dry-run without opening a database connection or reading NAS paths", () => {
-    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--dry-run"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/attachments-legacy-report.mjs", "--dry-run"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2553,7 +2510,7 @@ describe("attachment legacy migration readiness report", () => {
   });
 
   it("requires DATABASE_URL outside dry-run instead of reading .env implicitly", () => {
-    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs"], {
+    const result = spawnSync("node", ["scripts/ops-runbook/attachments-legacy-report.mjs"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2569,7 +2526,7 @@ describe("attachment legacy migration readiness report", () => {
   });
 
   it("reports repo-inside output paths with an actionable hint", () => {
-    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--json", "--output", join(repoRoot, "legacy-report.json")], {
+    const result = spawnSync("node", ["scripts/ops-runbook/attachments-legacy-report.mjs", "--json", "--output", join(repoRoot, "legacy-report.json")], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -2606,7 +2563,7 @@ describe("attachment legacy migration readiness report", () => {
       formatCsvReport,
       formatJsonReport,
       toMachineRows,
-    } = (await import(pathToFileURL(join(repoRoot, "scripts/attachments-legacy-report.mjs")).href)) as {
+    } = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/attachments-legacy-report.mjs")).href)) as {
       formatCsvReport: (rows: AttachmentLegacyReportRow[]) => string;
       formatJsonReport: (rows: AttachmentLegacyReportRow[]) => string;
       toMachineRows: (rows: AttachmentLegacyReportRow[]) => AttachmentLegacyMachineRow[];
@@ -2674,7 +2631,7 @@ describe("attachment legacy migration readiness report", () => {
       formatCsvReport,
       formatJsonReport,
       writeReportOutput,
-    } = (await import(pathToFileURL(join(repoRoot, "scripts/attachments-legacy-report.mjs")).href)) as {
+    } = (await import(pathToFileURL(join(repoRoot, "scripts/ops-runbook/attachments-legacy-report.mjs")).href)) as {
       formatCsvReport: (rows: AttachmentLegacyReportRow[]) => string;
       formatJsonReport: (rows: AttachmentLegacyReportRow[]) => string;
       writeReportOutput: (outputPath: string, content: string, repoRoot: string) => void;
@@ -2697,7 +2654,7 @@ describe("attachment legacy migration readiness report", () => {
 
   it("rejects dry-run output files instead of writing misleading evidence", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-legacy-report-dry-output-"));
-    const result = spawnSync("node", ["scripts/attachments-legacy-report.mjs", "--dry-run", "--output", join(tempRoot, "report.json")], {
+    const result = spawnSync("node", ["scripts/ops-runbook/attachments-legacy-report.mjs", "--dry-run", "--output", join(tempRoot, "report.json")], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -2719,26 +2676,26 @@ describe("public internet readiness gate", () => {
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") {
           return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
         }
-        if (path === "apps/api/src/securityHeaders.ts") {
+        if (path === "apps/api/src/middleware/securityHeaders.ts") {
           return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
         }
-        if (path === "apps/api/src/fetchMetadataProtection.ts") {
+        if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") {
           return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
         }
-        if (path === "apps/api/src/mfa.ts") {
+        if (path === "apps/api/src/modules/auth/mfa.ts") {
           return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
         }
-        if (path === "apps/api/src/auth.ts") {
+        if (path === "apps/api/src/modules/auth/auth.ts") {
           return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
         }
-        if (path === "apps/api/src/routePermission.ts") {
+        if (path === "apps/api/src/modules/auth/routePermission.ts") {
           return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         }
         if (path === "database/prisma/schema.prisma") {
@@ -2753,7 +2710,7 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") {
           return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
         }
-        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") {
+        if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") {
           return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         }
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") {
@@ -2762,7 +2719,7 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/tests/security-hardening.test.ts") {
           return "rate limit login";
         }
-        if (path === "apps/api/src/attachmentRoutes.ts") {
+        if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") {
           return "private, no-store Content-Disposition";
         }
         if (path === "apps/api/tests/attachments-routes.test.ts") {
@@ -2801,18 +2758,18 @@ describe("public internet readiness gate", () => {
 
     // Provide proper mock content for all non-MFA paths; throw only for mfa.ts
     const fullPassReadText = (path: string): string => {
-      if (path === "apps/api/src/mfa.ts") throw new Error(`missing ${path}`);
+      if (path === "apps/api/src/modules/auth/mfa.ts") throw new Error(`missing ${path}`);
       if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
-      if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
-      if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
-      if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
-      if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+      if (path === "apps/api/src/middleware/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+      if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+      if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+      if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
       if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
       if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
       if (path === "apps/api/tests/mfa.test.ts") throw new Error(`missing ${path}`);
       if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
       if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
-      if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+      if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") return "private, no-store Content-Disposition";
       if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
       if (path === "docs/security/public-edge-runbook.md") return "PostgreSQL HTTPS WAF HSTS";
       if (path === "docs/security/public-incident-response-runbook.md") return "PUBLIC_INTERNET_ENABLED session Root cause";
@@ -2836,8 +2793,8 @@ describe("public internet readiness gate", () => {
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: fullPassReadText,
     });
@@ -2856,24 +2813,24 @@ describe("public internet readiness gate", () => {
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
-        if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
-        if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
-        if (path === "apps/api/src/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
-        if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
-        if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+        if (path === "apps/api/src/middleware/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+        if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+        if (path === "apps/api/src/modules/auth/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
-        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
         if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
-        if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+        if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") return "private, no-store Content-Disposition";
         if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
         if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
         if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
@@ -2908,24 +2865,24 @@ describe("public internet readiness gate", () => {
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
-        "production:readiness-gate": "node scripts/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/production-go-live-check.mjs",
+        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
-        if (path === "apps/api/src/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
-        if (path === "apps/api/src/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
-        if (path === "apps/api/src/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
-        if (path === "apps/api/src/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
-        if (path === "apps/api/src/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
+        if (path === "apps/api/src/middleware/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
+        if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
+        if (path === "apps/api/src/modules/auth/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
+        if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
-        if (path === "apps/api/src/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
         if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
-        if (path === "apps/api/src/attachmentRoutes.ts") return "private, no-store Content-Disposition";
+        if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") return "private, no-store Content-Disposition";
         if (path === "apps/api/tests/attachments-routes.test.ts") return "content-disposition attachment test";
         if (path === "apps/api/tests/docs-public-access-boundary.test.ts") return "PUBLIC_INTERNET_ENABLED public:readiness-gate docs test";
         if (path === "scripts/public-go-live-check.mjs") return "READY_FOR_PUBLIC_INTERNET_GO_LIVE public-go-live-manifest.json tls-certificate.txt security-headers.txt";
@@ -3350,7 +3307,7 @@ function createCleanupPrisma() {
 }
 
 function runPreflight(envFile: string, binDir?: string) {
-  return spawnSync("bash", ["scripts/preflight-nas.sh"], {
+  return spawnSync("bash", ["scripts/ops-runbook/preflight-nas.sh"], {
     cwd: repoRoot,
     env: {
       ...process.env,

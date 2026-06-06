@@ -9,15 +9,15 @@ import type {
   UpdateContractInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuditLogRepository } from "../src/auditLogs";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
 import {
   ContractConflictError,
   getContractExpiryState,
   type ContractListFilters,
   type ContractRepository,
-} from "../src/contracts";
-import { hashPassword } from "../src/password";
+} from "../src/modules/contracts/contracts";
+import { hashPassword } from "../src/modules/auth/password";
 
 const now = "2026-05-11T11:00:00.000Z";
 const contractId = "11111111-1111-4111-8111-111111111111";

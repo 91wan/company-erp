@@ -21,10 +21,10 @@ import type {
   WarehouseDto,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AuditLogRepository } from "../src/auditLogs";
+import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
 import { externalProjectSiteAccountSiteIds, scopedProjectSiteIds } from "../src/appRouteContext";
-import { type AuthAccountRecord, type AuthRepository } from "../src/auth";
-import { hashPassword } from "../src/password";
+import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
+import { hashPassword } from "../src/modules/auth/password";
 import {
   ProjectSiteConflictError,
   ProjectUsageRequestConflictError,
@@ -33,8 +33,8 @@ import {
   type ProjectSiteKitchenEquipmentRepository,
   type ProjectSiteRepository,
   type ProjectUsageRequestRepository,
-} from "../src/projectSites";
-import type { MaterialRepository, WarehouseRepository } from "../src/materialsWarehouses";
+} from "../src/modules/projectSites/projectSites";
+import type { MaterialRepository, WarehouseRepository } from "../src/modules/inventory/materialsWarehouses";
 
 const now = "2026-05-11T13:00:00.000Z";
 const warehouseId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
