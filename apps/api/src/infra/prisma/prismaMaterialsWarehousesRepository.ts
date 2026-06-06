@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { isRecordNotFound,isUniqueViolation,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreateMaterialInput,
@@ -180,8 +181,8 @@ function toWarehouseUpdateData(input: UpdateWarehouseInput): Prisma.WarehouseUpd
 }
 
 function mapMaterialConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
 
     if (targets.includes("material_code")) {
       throw new MaterialConflictError("materialCode");
@@ -192,8 +193,8 @@ function mapMaterialConflict(error: unknown): never {
 }
 
 function mapWarehouseConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
 
     if (targets.includes("warehouse_code")) {
       throw new WarehouseConflictError("warehouseCode");
@@ -256,7 +257,7 @@ export function createPrismaMaterialRepository(prisma: PrismaClient): MaterialRe
         });
         return toMaterialDto(material);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        if (isRecordNotFound(error)) {
           return null;
         }
 
@@ -308,7 +309,7 @@ export function createPrismaWarehouseRepository(prisma: PrismaClient): Warehouse
         });
         return toWarehouseDto(warehouse);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        if (isRecordNotFound(error)) {
           return null;
         }
 

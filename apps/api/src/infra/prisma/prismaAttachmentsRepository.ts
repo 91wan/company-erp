@@ -1,4 +1,5 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import { isRecordNotFound,isUniqueViolation } from "./prismaErrors.js";
 import type { AttachmentRecordDto, AttachmentStatusCode, CreateAttachmentRecordInput, UpdateAttachmentRecordInput } from "@company-erp/shared";
 import {
   AttachmentConflictError,
@@ -146,7 +147,7 @@ function updateData(input: UpdateAttachmentRecordInput): AttachmentUpdateData {
 }
 
 function mapPrismaError(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+  if (isUniqueViolation(error)) {
     throw new AttachmentConflictError();
   }
   throw error;
@@ -180,7 +181,7 @@ export function createPrismaAttachmentRepository(prisma: PrismaClient | Attachme
         const record = await client.attachmentRecord.update({ where: { id }, data: updateData(input) });
         return toDto(record);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapPrismaError(error);
       }
     },

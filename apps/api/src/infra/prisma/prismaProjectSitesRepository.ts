@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { isForeignKeyViolation,isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumberOrZero as decimalToNumber } from "./prismaScalars.js";
 import type {
   CertificateComputedStatusCode,
@@ -518,7 +519,7 @@ function usageWhere(filters: ProjectUsageRequestListFilters): Prisma.ProjectUsag
 function mapSiteError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("site_code")) throw new ProjectSiteConflictError("siteCode");
     }
     if (error.code === "P2003" || error.code === "P2025") {
@@ -531,7 +532,7 @@ function mapSiteError(error: unknown): never {
 function mapUsageError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("request_no")) throw new ProjectUsageRequestConflictError("requestNo");
       if (targets.includes("movement_no")) throw new ProjectUsageRequestConflictError("outboundNo");
     }
@@ -691,7 +692,7 @@ function toKitchenEquipmentChangeRequestCreateData(
 function mapComplianceError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : "";
+      const targets = uniqueViolationTargets(error).join(",");
       if (targets.includes("policy_no")) throw new ProjectSiteValidationError(["policyNo already exists"]);
       if (targets.includes("project_site_id") && targets.includes("payroll_month")) {
         throw new ProjectSiteValidationError(["payroll submission for this month already exists"]);
@@ -705,7 +706,7 @@ function mapComplianceError(error: unknown): never {
 }
 
 function mapKitchenEquipmentError(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2003" || error.code === "P2025")) {
+  if (isForeignKeyViolation(error) || isRecordNotFound(error)) {
     throw new ProjectSiteValidationError(["Referenced project site, equipment, contract, or employee was not found"]);
   }
   throw error;
@@ -831,7 +832,7 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
         return toProjectSiteDto(site);
       } catch (error) {
         if (error instanceof ProjectSiteValidationError) throw error;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapSiteError(error);
       }
     },
@@ -1293,7 +1294,7 @@ export function createPrismaProjectSiteKitchenEquipmentRepository(prisma: Prisma
         });
         return toKitchenEquipmentDto(equipment);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapKitchenEquipmentError(error);
       }
     },
@@ -1407,7 +1408,7 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
         });
         return toProjectUsageRequestDto(request);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapUsageError(error);
       }
     },

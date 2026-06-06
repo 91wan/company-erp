@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import type {
   CertificateRecordDto,
   CreateCertificateRecordInput,
@@ -156,7 +157,7 @@ function updateData(input: UpdateCertificateRecordInput): Prisma.CertificateReco
 function mapCertificateError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("certificate_code")) throw new CertificateConflictError("certificateCode");
     }
 
@@ -231,7 +232,7 @@ export function createPrismaCertificateRepository(prisma: PrismaClient): Certifi
         const record = await prisma.certificateRecord.update({ where: { id }, data: updateData(input), include });
         return toCertificateDto(record);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapCertificateError(error);
       }
     },

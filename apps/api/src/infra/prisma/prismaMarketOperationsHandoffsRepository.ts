@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import type {
   CreateMarketOperationsHandoffInput,
   MarketOperationsHandoffDto,
@@ -143,7 +144,7 @@ function where(filters: MarketOperationsHandoffListFilters): Prisma.MarketOperat
 function mapError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("handoff_no")) throw new MarketOperationsHandoffConflictError("handoffNo");
     }
     if (error.code === "P2003" || error.code === "P2025") {
@@ -189,7 +190,7 @@ export function createPrismaMarketOperationsHandoffRepository(
         });
         return toDto(handoff);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapError(error);
       }
     },
