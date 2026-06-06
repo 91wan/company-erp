@@ -2187,7 +2187,7 @@ if [[ "$1" == *"attachments-legacy-report.mjs" && "$2" == "--json" && "$3" == "-
   printf '{"mode":"read-only-counts","rows":[]}\n' > "$output"
   exit 0
 fi
-exec /usr/bin/env node "$@"
+exec ${process.execPath} "$@"
 `,
       { mode: 0o755 },
     );
