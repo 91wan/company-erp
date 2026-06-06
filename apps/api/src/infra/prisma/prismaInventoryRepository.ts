@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import type {
   CreateInventoryMovementInput,
   InventoryBalanceDto,
@@ -326,6 +327,8 @@ export function createPrismaInventoryRepository(prisma: InventoryPrismaClient): 
         where: movementWhere(filters),
         include,
         orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }, { movementNo: "asc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
       return movements.map(toInventoryMovementDto);
     },
