@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { isRecordNotFound,isUniqueViolation,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreatePurchaseRecordInput,
@@ -262,16 +263,16 @@ function recordUpdateData(input: UpdatePurchaseRecordInput): Prisma.PurchaseReco
 }
 
 function mapRequestConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("request_no")) throw new PurchaseRequestConflictError("requestNo");
   }
   throw error;
 }
 
 function mapRecordConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("purchase_no")) throw new PurchaseRecordConflictError("purchaseNo");
   }
   throw error;
@@ -351,7 +352,7 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
         const request = await prisma.purchaseRequest.update({ where: { id }, data: requestUpdateData(input), include });
         return toPurchaseRequestDto(request);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapRequestConflict(error);
       }
     },
@@ -437,7 +438,7 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
         const record = await prisma.purchaseRecord.update({ where: { id }, data: recordUpdateData(input), include });
         return toPurchaseRecordDto(record);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapRecordConflict(error);
       }
     },

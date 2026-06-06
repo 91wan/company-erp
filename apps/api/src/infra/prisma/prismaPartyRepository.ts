@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { isRecordNotFound,isUniqueViolation,uniqueViolationTargets } from "./prismaErrors.js";
 import type {
   CreatePartyInput,
   PartyDto,
@@ -88,8 +89,8 @@ function toUpdateData(input: UpdatePartyInput): Prisma.PartyUpdateInput {
 }
 
 function mapConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
 
     if (targets.includes("party_code")) {
       throw new PartyConflictError("partyCode");
@@ -147,7 +148,7 @@ export function createPrismaPartyRepository(prisma: PrismaClient): PartyReposito
         });
         return toDto(party);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        if (isRecordNotFound(error)) {
           return null;
         }
 

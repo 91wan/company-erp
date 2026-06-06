@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, type RoleCode as PrismaRoleCode } from "@prisma/client";
+import { isForeignKeyViolation,isRecordNotFound,isUniqueViolation,uniqueViolationTargets } from "./prismaErrors.js";
 import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
@@ -251,10 +252,6 @@ function toMfaFactorRecord(factor: PrismaMfaFactor) {
   };
 }
 
-function isPrismaKnownRequestCode(error: unknown, code: string): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
-}
-
 function toExternalProjectSiteAccountDto(
   account: PrismaExternalProjectSiteAccount,
 ): ExternalProjectSiteAccountDto {
@@ -315,16 +312,16 @@ function relationUpdate<TConnect extends object>(
 }
 
 function mapDepartmentConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("department_code")) throw new DepartmentConflictError("departmentCode");
   }
   throw error;
 }
 
 function mapEmployeeConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("employee_no")) throw new EmployeeConflictError("employeeNo");
     if (targets.includes("phone")) throw new EmployeeConflictError("phone");
     if (targets.includes("email")) throw new EmployeeConflictError("email");
@@ -333,8 +330,8 @@ function mapEmployeeConflict(error: unknown): never {
 }
 
 function mapUserAccountConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("username")) throw new UserAccountConflictError("username");
     if (targets.includes("employee_id")) throw new UserAccountConflictError("employeeId");
   }
@@ -342,8 +339,8 @@ function mapUserAccountConflict(error: unknown): never {
 }
 
 function mapExternalProjectSiteConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+  if (isUniqueViolation(error)) {
+    const targets = uniqueViolationTargets(error);
     if (targets.includes("username")) throw new ExternalProjectSiteAccountConflictError("username");
     if (targets.includes("project_site_id")) {
       throw new ExternalProjectSiteAccountConflictError("activeProjectSiteAccount");
@@ -416,7 +413,7 @@ export function createPrismaDepartmentRepository(prisma: PrismaClient): Departme
         });
         return toDepartmentDto(department);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapDepartmentConflict(error);
       }
     },
@@ -511,7 +508,7 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
         });
         return toEmployeeDto(employee);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapEmployeeConflict(error);
       }
     },
@@ -617,7 +614,7 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
         });
         return toUserAccountDto(userAccount);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapUserAccountConflict(error);
       }
     },
@@ -708,7 +705,7 @@ export function createPrismaExternalProjectSiteAccountRepository(
         return toExternalProjectSiteAccountDto(account);
       } catch (error) {
         if (error instanceof ExternalProjectSiteAccountConflictError) throw error;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        if (isForeignKeyViolation(error)) {
           throw new ExternalProjectSiteAccountValidationError(["Referenced project site or subcontractor was not found"]);
         }
         mapExternalProjectSiteConflict(error);
@@ -776,8 +773,8 @@ export function createPrismaExternalProjectSiteAccountRepository(
         return toExternalProjectSiteAccountDto(account);
       } catch (error) {
         if (error instanceof ExternalProjectSiteAccountConflictError) throw error;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        if (isRecordNotFound(error)) return null;
+        if (isForeignKeyViolation(error)) {
           throw new ExternalProjectSiteAccountValidationError(["Referenced project site or subcontractor was not found"]);
         }
         mapExternalProjectSiteConflict(error);
@@ -888,7 +885,7 @@ export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient
         return toProjectSiteAssignmentDto(assignment);
       } catch (error) {
         if (error instanceof EmployeeProjectSiteAssignmentConflictError) throw error;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2003" || error.code === "P2025")) {
+        if (isForeignKeyViolation(error) || isRecordNotFound(error)) {
           throw new EmployeeProjectSiteAssignmentValidationError(["Referenced employee or project site was not found"]);
         }
         throw error;
@@ -922,8 +919,8 @@ export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient
         return toProjectSiteAssignmentDto(assignment);
       } catch (error) {
         if (error instanceof EmployeeProjectSiteAssignmentConflictError) throw error;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        if (isRecordNotFound(error)) return null;
+        if (isForeignKeyViolation(error)) {
           throw new EmployeeProjectSiteAssignmentValidationError(["Referenced employee or project site was not found"]);
         }
         throw error;
@@ -1103,7 +1100,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
           return toMfaFactorRecord(factor);
         });
       } catch (error) {
-        if (isPrismaKnownRequestCode(error, "P2002")) return null;
+        if (isUniqueViolation(error)) return null;
         throw error;
       }
     },
@@ -1138,7 +1135,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
           return true;
         });
       } catch (error) {
-        if (isPrismaKnownRequestCode(error, "P2002")) return false;
+        if (isUniqueViolation(error)) return false;
         throw error;
       }
     },

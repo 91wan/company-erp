@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumberOrZero as decimalToNumber } from "./prismaScalars.js";
 import type {
   BusinessProjectDto,
@@ -178,7 +179,7 @@ function where(filters: BusinessProjectListFilters): Prisma.BusinessProjectWhere
 function mapError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("project_code")) throw new BusinessProjectConflictError("projectCode");
     }
     if (error.code === "P2003" || error.code === "P2025") {

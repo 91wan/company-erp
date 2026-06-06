@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreateInventoryMovementInput,
@@ -234,7 +235,7 @@ function createMovementData(input: CreateInventoryMovementInput): Prisma.Invento
 function mapInventoryError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("movement_no")) throw new InventoryMovementConflictError("movementNo");
     }
     if (error.code === "P2003" || error.code === "P2025") {

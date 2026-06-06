@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, type ContractAttachment as PrismaContractAttachment } from "@prisma/client";
+import { isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
 import type {
   ContractAttachmentDto,
@@ -197,7 +198,7 @@ function attachmentUpdateData(input: UpdateContractAttachmentInput): Prisma.Cont
 function mapContractError(error: unknown): never {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      const targets = Array.isArray(error.meta?.target) ? error.meta.target : [];
+      const targets = uniqueViolationTargets(error);
       if (targets.includes("contract_no")) throw new ContractConflictError("contractNo");
     }
 
@@ -301,7 +302,7 @@ export function createPrismaContractRepository(prisma: PrismaClient): ContractRe
         });
         return toContractAttachmentDto(attachment);
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return null;
+        if (isRecordNotFound(error)) return null;
         mapContractError(error);
       }
     },
