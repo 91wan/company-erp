@@ -7,6 +7,7 @@ import {
   type InventoryMovementTypeCode,
   type InventorySourceTypeCode,
 } from "@company-erp/shared";
+import { normalizeListPaging } from "../../listPaging.js";
 
 export type InventoryMovementListFilters = {
   warehouseId?: string;
@@ -17,6 +18,8 @@ export type InventoryMovementListFilters = {
   q?: string;
   dateFrom?: string;
   dateTo?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type InventoryBalanceListFilters = {
@@ -133,6 +136,10 @@ export function normalizeInventoryMovementFilters(
   const dateTo = normalizeOptionalDate(query.dateTo, "dateTo", issues);
   if (dateFrom) filters.dateFrom = dateFrom;
   if (dateTo) filters.dateTo = dateTo;
+
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
 
   if (issues.length > 0) throw new InventoryMovementValidationError(issues);
   return filters;

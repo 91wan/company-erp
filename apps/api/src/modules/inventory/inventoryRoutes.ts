@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "../../appRouteContext.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import { InventoryMovementConflictError, InventoryMovementValidationError, normalizeInventoryBalanceFilters, normalizeInventoryMovementFilters, normalizeInventoryMovementInput } from "./inventory.js";
 import { ReplenishmentSuggestionConflictError, ReplenishmentSuggestionValidationError, normalizeConvertReplenishmentSuggestionInput, normalizeReplenishmentSuggestionFilters, normalizeUpdateReplenishmentSuggestionInput } from "./replenishment.js";
 
@@ -17,6 +18,8 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
         ...(scope ? { projectSiteIds: scope, sourceType: "project_usage" as const } : {}),
       };
       const inventoryMovements = await options.inventoryRepository.listMovements(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return { inventoryMovements };
     } catch (error) {
       if (error instanceof InventoryMovementValidationError) {

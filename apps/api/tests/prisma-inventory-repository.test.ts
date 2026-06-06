@@ -145,6 +145,8 @@ describe("Prisma inventory repository", () => {
 
     expect(findManyCalls).toEqual([
       expect.objectContaining({
+        take: 200,
+        skip: 0,
         where: expect.objectContaining({
           projectSiteId: { in: ["site-1"] },
           sourceType: "project_usage",
