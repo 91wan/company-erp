@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreateInventoryMovementInput,
   InventoryBalanceDto,
@@ -97,15 +98,6 @@ export type InventoryPrismaClient = {
   };
   $transaction<T>(callback: (tx: InventoryPrismaTransactionClient) => Promise<T>): Promise<T>;
 };
-
-function decimalToNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number") return value;
-  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
-    return value.toNumber();
-  }
-  return Number(value);
-}
 
 function dateToString(value: Date | string | null | undefined): string | null {
   if (!value) return null;

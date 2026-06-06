@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreatePurchaseRecordInput,
   CreatePurchaseRequestInput,
@@ -34,10 +35,6 @@ type PrismaPurchaseRecord = Prisma.PurchaseRecordGetPayload<{
     lines: true;
   };
 }>;
-
-function decimalToNumber(value: Prisma.Decimal | null): number | null {
-  return value === null ? null : value.toNumber();
-}
 
 function dateToString(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;

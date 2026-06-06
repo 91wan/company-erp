@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { decimalToNumberOrZero as decimalToNumber } from "./prismaScalars.js";
 import type {
   BusinessProjectDto,
   BusinessProjectInvestmentSummaryDto,
@@ -46,15 +47,6 @@ export type BusinessProjectPrismaClient = {
   businessProject: BusinessProjectDelegate;
   contract: ContractDelegate;
 };
-
-function decimalToNumber(value: unknown): number {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
-    return value.toNumber();
-  }
-  return Number(value);
-}
 
 function dateToString(value: Date | string | null | undefined): string | null {
   if (!value) return null;

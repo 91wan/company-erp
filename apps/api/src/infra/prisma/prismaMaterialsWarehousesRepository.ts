@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { decimalToNumber } from "./prismaScalars.js";
 import type {
   CreateMaterialInput,
   CreateWarehouseInput,
@@ -24,10 +25,6 @@ type PrismaMaterial = Prisma.MaterialGetPayload<{
 }>;
 
 type PrismaWarehouse = Prisma.WarehouseGetPayload<Record<string, never>>;
-
-function decimalToNumber(value: Prisma.Decimal | null): number | null {
-  return value === null ? null : value.toNumber();
-}
 
 function toMaterialDto(material: PrismaMaterial): MaterialDto {
   return {

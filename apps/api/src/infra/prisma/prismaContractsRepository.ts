@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, type ContractAttachment as PrismaContractAttachment } from "@prisma/client";
+import { decimalToNumber } from "./prismaScalars.js";
 import type {
   ContractAttachmentDto,
   ContractDto,
@@ -22,10 +23,6 @@ type PrismaContract = Prisma.ContractGetPayload<{
     projectSite: true;
   };
 }>;
-
-function decimalToNumber(value: Prisma.Decimal | null): number | null {
-  return value === null ? null : value.toNumber();
-}
 
 function dateToString(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;

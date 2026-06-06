@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { decimalToNumberOrZero as decimalToNumber } from "./prismaScalars.js";
 import type {
   CertificateComputedStatusCode,
   CreateProjectSiteInput,
@@ -45,15 +46,6 @@ import {
   type ProjectUsageRequestListFilters,
   type ProjectUsageRequestRepository,
 } from "../../modules/projectSites/projectSites.js";
-
-function decimalToNumber(value: unknown): number {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
-    return value.toNumber();
-  }
-  return Number(value);
-}
 
 function decimalToNullableNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
