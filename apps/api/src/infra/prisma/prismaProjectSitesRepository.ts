@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { isForeignKeyViolation,isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumberOrZero as decimalToNumber } from "./prismaScalars.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import type {
   CertificateComputedStatusCode,
   CreateProjectSiteInput,
@@ -1381,6 +1382,8 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
         where: usageWhere(filters),
         include: usageInclude,
         orderBy: [{ requestDate: "desc" }, { updatedAt: "desc" }, { requestNo: "asc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
       return requests.map(toProjectUsageRequestDto);
     },

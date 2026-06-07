@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { isRecordNotFound,isUniqueViolation,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import type {
   CreatePurchaseRecordInput,
   CreatePurchaseRequestInput,
@@ -333,6 +334,8 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
         },
         include,
         orderBy: [{ updatedAt: "desc" }, { requestNo: "asc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
       return requests.map(toPurchaseRequestDto);
     },
@@ -418,6 +421,8 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
         },
         include,
         orderBy: [{ updatedAt: "desc" }, { purchaseNo: "asc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
       return records.map(toPurchaseRecordDto);
     },
