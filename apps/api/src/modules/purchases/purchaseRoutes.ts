@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { BuildAppOptions } from "../../appRouteContext.js";
 import { isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog } from "../../appRouteContext.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import {
   PurchaseRecordConflictError,
   PurchaseRecordValidationError,
@@ -28,6 +29,8 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const purchaseRequests = await options.purchaseRequestRepository.list(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return { purchaseRequests };
     } catch (error) {
       if (error instanceof PurchaseRequestValidationError) {
@@ -222,6 +225,8 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const purchaseRecords = await options.purchaseRecordRepository.list(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return { purchaseRecords };
     } catch (error) {
       if (error instanceof PurchaseRecordValidationError) {

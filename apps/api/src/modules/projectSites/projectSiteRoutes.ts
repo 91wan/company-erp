@@ -8,6 +8,7 @@ import type {
 } from "@company-erp/shared";
 import type { AuthenticatedRequest } from "../auth/auth.js";
 import { externalProjectSiteAccountSiteIds, isOutsideProjectSiteScope, redactProjectUsageRequestForResponse, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "../../appRouteContext.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import { ProjectSiteConflictError, ProjectSiteValidationError, ProjectUsageRequestConflictError, ProjectUsageRequestValidationError, normalizeCoveredPersonInput, normalizeInsurancePolicyFilters, normalizeInsurancePolicyInput, normalizeIssueProjectUsageRequestInput, normalizePayrollSubmissionFilters, normalizePayrollSubmissionInput, normalizeProjectSiteFilters, normalizeProjectSiteInput, normalizeProjectSiteInsuranceCoveredPersonFilters, normalizeProjectSiteKitchenEquipmentChangeRequestFilters, normalizeProjectSiteKitchenEquipmentChangeRequestInput, normalizeProjectSiteKitchenEquipmentChangeRequestReviewInput, normalizeProjectSiteKitchenEquipmentFilters, normalizeProjectSiteKitchenEquipmentInput, normalizeProjectUsageRequestFilters, normalizeProjectUsageRequestInput, normalizeRosterPersonFilters, normalizeRosterPersonInput } from "./projectSites.js";
 
 function kitchenEquipmentAuditSnapshot(equipment: ProjectSiteKitchenEquipmentDto) {
@@ -640,6 +641,8 @@ export function registerProjectSiteRoutes(app: FastifyInstance, options: BuildAp
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const projectUsageRequests = await options.projectUsageRequestRepository.list(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return {
         projectUsageRequests: projectUsageRequests.map((projectUsageRequest) =>
           redactProjectUsageRequestForResponse(request, projectUsageRequest),

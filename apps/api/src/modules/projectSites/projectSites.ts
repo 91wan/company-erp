@@ -35,6 +35,7 @@ import {
   type UpdateProjectSiteKitchenEquipmentInput,
   type UpdateProjectUsageRequestInput,
 } from "@company-erp/shared";
+import { normalizeListPaging } from "../../listPaging.js";
 
 export type ProjectSiteListFilters = {
   status?: ProjectSiteStatusCode;
@@ -55,6 +56,8 @@ export type ProjectUsageRequestListFilters = {
   q?: string;
   dateFrom?: string;
   dateTo?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type ProjectSiteRosterPersonListFilters = {
@@ -669,6 +672,10 @@ export function normalizeProjectUsageRequestFilters(
   const dateTo = normalizeOptionalDate(query.dateTo, "dateTo", issues);
   if (dateFrom) filters.dateFrom = dateFrom;
   if (dateTo) filters.dateTo = dateTo;
+
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
 
   if (issues.length > 0) throw new ProjectUsageRequestValidationError(issues);
   return filters;

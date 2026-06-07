@@ -12,6 +12,7 @@ import {
   type UpdatePurchaseRecordInput,
   type UpdatePurchaseRequestInput,
 } from "@company-erp/shared";
+import { normalizeListPaging } from "../../listPaging.js";
 
 export type PurchaseRequestListFilters = {
   status?: PurchaseRequestStatusCode;
@@ -19,6 +20,8 @@ export type PurchaseRequestListFilters = {
   projectSiteId?: string;
   projectSiteIds?: readonly string[];
   q?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type PurchaseRecordListFilters = {
@@ -28,6 +31,8 @@ export type PurchaseRecordListFilters = {
   purchaserName?: string;
   projectSiteIds?: readonly string[];
   q?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type PurchaseRequestRepository = {
@@ -393,6 +398,10 @@ export function normalizePurchaseRequestFilters(query: Record<string, unknown>):
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
 
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
+
   return filters;
 }
 
@@ -416,6 +425,10 @@ export function normalizePurchaseRecordFilters(query: Record<string, unknown>): 
   for (const field of ["supplierPartyId", "purchaserName", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
+
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
 
   return filters;
 }
