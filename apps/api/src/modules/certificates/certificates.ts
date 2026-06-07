@@ -11,6 +11,7 @@ import {
   type CreateCertificateRecordInput,
   type UpdateCertificateRecordInput,
 } from "@company-erp/shared";
+import { normalizeListPaging } from "../../listPaging.js";
 
 export type CertificateListFilters = {
   type?: CertificateTypeCode;
@@ -21,6 +22,8 @@ export type CertificateListFilters = {
   isComplianceCritical?: boolean;
   projectSiteIds?: readonly string[];
   q?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type CertificateRepository = {
@@ -194,6 +197,10 @@ export function normalizeCertificateFilters(query: Record<string, unknown>): Cer
   for (const field of ["responsibleEmployeeId", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
+
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
 
   if (issues.length > 0) throw new CertificateValidationError(issues);
   return filters;

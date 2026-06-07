@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { AttachmentRecordDto, CertificateRecordDto, ContractDto, CreateCertificateRecordInput, UpdateCertificateRecordInput } from "@company-erp/shared";
 import { certificateFiltersForRequest, isOutsideCertificateScope, isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog, type BuildAppOptions } from "../../appRouteContext.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import { BusinessProjectConflictError, BusinessProjectValidationError, normalizeBusinessProjectFilters, normalizeBusinessProjectInput } from "../businessProjects/businessProjects.js";
 import {
   CertificateConflictError,
@@ -89,6 +90,8 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const contracts = await options.contractRepository.list(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return { contracts: await Promise.all(contracts.map((contract) => withContractAttachments(options, contract))) };
     } catch (error) {
       if (error instanceof ContractValidationError) {
@@ -359,6 +362,8 @@ export function registerContractsBusinessCertificatesRoutes(app: FastifyInstance
         ...scopeFilters,
       };
       const certificates = await options.certificateRepository.list(filters);
+      reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
+      reply.header("X-List-Offset", String(filters.offset ?? 0));
       return { certificates: await Promise.all(certificates.map((certificate) => withCertificateAttachments(options, certificate))) };
     } catch (error) {
       if (error instanceof CertificateValidationError) {
