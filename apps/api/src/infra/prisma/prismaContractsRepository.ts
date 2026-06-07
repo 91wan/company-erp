@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient, type ContractAttachment as PrismaContractAttachment } from "@prisma/client";
 import { isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
 import { decimalToNumber } from "./prismaScalars.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import type {
   ContractAttachmentDto,
   ContractDto,
@@ -245,6 +246,8 @@ export function createPrismaContractRepository(prisma: PrismaClient): ContractRe
         },
         include,
         orderBy: [{ updatedAt: "desc" }, { contractNo: "asc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
 
       const dtos = contracts.map(toContractDto);

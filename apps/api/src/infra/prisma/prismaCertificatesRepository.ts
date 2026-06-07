@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { isRecordNotFound,uniqueViolationTargets } from "./prismaErrors.js";
+import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
 import type {
   CertificateRecordDto,
   CreateCertificateRecordInput,
@@ -209,6 +210,8 @@ export function createPrismaCertificateRepository(prisma: PrismaClient): Certifi
         },
         include,
         orderBy: [{ isDisabled: "asc" }, { expiryDate: "asc" }, { updatedAt: "desc" }],
+        take: filters.limit ?? DEFAULT_LIST_LIMIT,
+        skip: filters.offset ?? 0,
       });
       const dtos = records.map(toCertificateDto);
       return filters.computedStatus

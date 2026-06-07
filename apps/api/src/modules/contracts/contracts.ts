@@ -18,6 +18,7 @@ import {
   type UpdateContractAttachmentInput,
   type UpdateContractInput,
 } from "@company-erp/shared";
+import { normalizeListPaging } from "../../listPaging.js";
 
 export type ContractListFilters = {
   status?: ContractStatusCode;
@@ -31,6 +32,8 @@ export type ContractListFilters = {
   projectSiteIds?: readonly string[];
   expiry?: ContractExpiryStateCode;
   q?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type ContractRepository = {
@@ -186,6 +189,10 @@ export function normalizeContractFilters(query: Record<string, unknown>): Contra
   for (const field of ["counterpartyPartyId", "businessProjectId", "projectSiteId", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
   }
+
+  const paging = normalizeListPaging(query);
+  filters.limit = paging.limit;
+  filters.offset = paging.offset;
 
   if (issues.length > 0) throw new ContractValidationError(issues);
   return filters;
