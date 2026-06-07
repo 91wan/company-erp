@@ -707,6 +707,61 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     expect(secondVerify.json().error).toBe("MFA_CODE_INVALID");
   });
 
+  it("locks MFA verify-login per account across rotating IPs (second-factor brute-force guard)", async () => {
+    const { repo, mfaFactors, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: repo,
+      auditLogRepository,
+    });
+
+    // Set up and activate a real MFA factor for the account.
+    const setupLogin = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const { mfaSetupToken } = setupLogin.json();
+    const setupRes = await app.inject({
+      method: "POST", url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken },
+    });
+    const { factorId } = setupRes.json();
+    const factor = mfaFactors.find((f) => f.id === factorId)!;
+    const { decryptMfaSecret } = await import("../src/modules/auth/mfa");
+    await app.inject({
+      method: "POST", url: "/api/auth/mfa/activate-challenge",
+      payload: { mfaSetupToken, factorId, code: generateTotpToken(decryptMfaSecret(factor.secretEncrypted)) },
+    });
+
+    // One login yields a stateless pending MFA token reusable across attempts.
+    const login = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const pendingMfaToken = login.json().pendingMfaToken as string;
+
+    // Six wrong-code attempts, each from a distinct IP so the per-IP limit (max 5)
+    // never fires — proving the lock is per-account, not per-IP.
+    const statuses: number[] = [];
+    let lastError: string | undefined;
+    for (let i = 0; i < 6; i += 1) {
+      const res = await app.inject({
+        method: "POST", url: "/api/auth/mfa/verify-login",
+        payload: { pendingMfaToken, code: "000000" },
+        remoteAddress: `10.10.0.${i + 1}`,
+      });
+      statuses.push(res.statusCode);
+      lastError = res.json().error;
+    }
+    await app.close();
+
+    expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+    expect(statuses[5]).toBe(429);
+    expect(lastError).toBe("TOO_MANY_MFA_ATTEMPTS");
+  });
+
   it("requires step-up verification before disabling MFA", async () => {
     const { repo, mfaFactors, auditLogRepository } = createMfaAuthRepository([
       { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },

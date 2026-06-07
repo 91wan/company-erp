@@ -530,6 +530,29 @@ export function registerAuth(
     return entry.count <= max;
   }
 
+  // Per-account MFA verification throttle (IP-independent), so an attacker who
+  // already knows the password cannot brute-force the second factor by rotating
+  // IPs to bypass the per-IP rate limit on /api/auth/mfa/verify-login.
+  const mfaAttempts = new Map<string, { count: number; windowStart: number }>();
+
+  function checkAndRecordMfaAttempt(userAccountId: string): boolean {
+    if (!publicRateLimitEnabled()) return true;
+    const windowMs = loginRateLimitWindowMs();
+    const max = loginRateLimitMaxPerUsername();
+    const now = Date.now();
+    const entry = mfaAttempts.get(userAccountId);
+    if (!entry || now - entry.windowStart > windowMs) {
+      mfaAttempts.set(userAccountId, { count: 1, windowStart: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= max;
+  }
+
+  function resetMfaAttempts(userAccountId: string): void {
+    mfaAttempts.delete(userAccountId);
+  }
+
   app.addHook("preHandler", async (request, reply) => {
     const pathname = new URL(request.url, "http://company-erp.local").pathname;
     // Use stricter public path in public internet mode; fallback to standard check for intranet
@@ -702,6 +725,11 @@ export function registerAuth(
         return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
       }
 
+      // Per-account throttle: blocks second-factor brute-force even across rotating IPs.
+      if (!checkAndRecordMfaAttempt(userAccountId)) {
+        return reply.status(429).send({ error: "TOO_MANY_MFA_ATTEMPTS" });
+      }
+
       // Try TOTP first, then recovery code
       const factor = await authRepository.findActiveMfaFactor?.(userAccountId);
       let mfaOk = false;
@@ -733,6 +761,8 @@ export function registerAuth(
         });
         return reply.status(401).send({ error: "MFA_CODE_INVALID" });
       }
+
+      resetMfaAttempts(userAccountId);
 
       if (mfaMethod === "recovery_code") {
         await writeAuthAudit(request, "mfa.recovery_code_used", "user_mfa_factor", factor?.id ?? account.id, {
