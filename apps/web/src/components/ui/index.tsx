@@ -144,18 +144,27 @@ export function DrawerFormHeader({
   );
 }
 
+export type DataTableSort = {
+  keys: (string | null)[];
+  activeKey: string | null;
+  direction: "asc" | "desc";
+  onSort: (key: string) => void;
+};
+
 export function DataTable({
   headers,
   rows,
   emptyState,
   loading,
   onRowClick,
+  sort,
 }: {
   headers: string[];
   rows: ReactNode[][];
   emptyState?: ReactNode;
   loading?: ReactNode;
   onRowClick?: (rowIndex: number) => void;
+  sort?: DataTableSort;
 }) {
   if (loading) return <div className="ui-table-state">{loading}</div>;
   if (rows.length === 0) return <div className="ui-table-state">{emptyState ?? "暂无数据"}</div>;
@@ -165,9 +174,19 @@ export function DataTable({
       <table className="ui-data-table">
         <thead>
           <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
+            {headers.map((header, index) => {
+              const sortKey = sort?.keys[index] ?? null;
+              if (!sort || !sortKey) return <th key={header}>{header}</th>;
+              const active = sort.activeKey === sortKey;
+              return (
+                <th key={header} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" className="ui-th-sort" onClick={() => sort.onSort(sortKey)}>
+                    {header}
+                    <span aria-hidden="true" className="ui-th-sort-icon">{active ? (sort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

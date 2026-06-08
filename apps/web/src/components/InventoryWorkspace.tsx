@@ -193,6 +193,7 @@ export function InventoryWorkspace({
   const ledgerLoadedRef = useRef(false);
   const [movementSummary, setMovementSummary] = useState<MovementSummary>({ totalCount: 0, inboundQuantity: 0 });
   const [summaryRefresh, setSummaryRefresh] = useState(0);
+  const [balanceSort, setBalanceSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   useEffect(() => {
     if (isInventoryTab(initialTab)) setActiveTab(initialTab);
@@ -343,6 +344,38 @@ export function InventoryWorkspace({
       return matchesType && matchesQuery;
     });
   }, [movementFilter, movements, query]);
+
+  const sortedBalances = useMemo(() => {
+    if (!balanceSort) return balances;
+    const { key, direction } = balanceSort;
+    const factor = direction === "asc" ? 1 : -1;
+    const value = (balance: InventoryBalanceDto): string | number | null | undefined => {
+      switch (key) {
+        case "materialCode": return balance.materialCode;
+        case "currentQuantity": return balance.currentQuantity;
+        case "safeStock": return balance.safeStock;
+        case "lastMovementAt": return balance.lastMovementAt;
+        default: return null;
+      }
+    };
+    return [...balances].sort((a, b) => {
+      const av = value(a);
+      const bv = value(b);
+      // 空值恒排在末尾，与排序方向无关。
+      if (av === null || av === undefined) return bv === null || bv === undefined ? 0 : 1;
+      if (bv === null || bv === undefined) return -1;
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
+      return String(av).localeCompare(String(bv), "zh-CN") * factor;
+    });
+  }, [balances, balanceSort]);
+
+  function toggleBalanceSort(key: string) {
+    setBalanceSort((current) =>
+      current && current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  }
 
   const lowStockCount = balances.filter((balance) => balance.isLowStock).length;
   const activeTabMovements = filteredMovements.filter((movement) => {
@@ -728,7 +761,7 @@ export function InventoryWorkspace({
         ) : (
           <DataTable
             headers={["仓库", "物料编码", "物料名称", "当前库存", "安全库存", "状态", "最近变动"]}
-            rows={balances.map((balance) => [
+            rows={sortedBalances.map((balance) => [
               balance.warehouseCode,
               balance.materialCode,
               balance.materialName,
@@ -737,8 +770,14 @@ export function InventoryWorkspace({
               <InventoryStockBadge key={`${balance.warehouseId}-${balance.materialId}`} low={balance.isLowStock} />,
               balance.lastMovementAt ?? "-",
             ])}
+            sort={{
+              keys: [null, "materialCode", null, "currentQuantity", "safeStock", null, "lastMovementAt"],
+              activeKey: balanceSort?.key ?? null,
+              direction: balanceSort?.direction ?? "asc",
+              onSort: toggleBalanceSort,
+            }}
             onRowClick={(rowIndex) => {
-              const balance = balances[rowIndex];
+              const balance = sortedBalances[rowIndex];
               setSelectedBalanceKey(balance ? `${balance.warehouseId}:${balance.materialId}` : "");
             }}
           />
