@@ -49,6 +49,8 @@ type PurchaseRecordLineRollupRecord = {
 type InventoryMovementFindManyArgs = Prisma.InventoryMovementFindManyArgs & { include: typeof movementInclude };
 type InventoryMovementFindUniqueArgs = Prisma.InventoryMovementFindUniqueArgs & { include: typeof movementInclude };
 type InventoryMovementCreateArgs = Prisma.InventoryMovementCreateArgs & { include: typeof movementInclude };
+type InventoryMovementAggregateArgs = Prisma.InventoryMovementAggregateArgs & { _sum: { quantity: true } };
+type InventoryMovementAggregateRow = { _sum: { quantity: unknown } };
 type InventoryBalanceGroupByArgs = Prisma.InventoryMovementGroupByArgs & {
   by: ["warehouseId", "materialId", "unit"];
   _sum: { quantity: true };
@@ -88,6 +90,8 @@ export type InventoryPrismaClient = {
     findMany(args: InventoryMovementFindManyArgs): Promise<InventoryMovementRecord[]>;
     findUnique(args: InventoryMovementFindUniqueArgs): Promise<InventoryMovementRecord | null>;
     create(args: InventoryMovementCreateArgs): Promise<InventoryMovementRecord>;
+    count(args: { where?: Prisma.InventoryMovementWhereInput }): Promise<number>;
+    aggregate(args: InventoryMovementAggregateArgs): Promise<InventoryMovementAggregateRow>;
     groupBy(args: InventoryBalanceGroupByArgs): Promise<unknown>;
   };
   purchaseRecordLine: InventoryPrismaTransactionClient["purchaseRecordLine"];
@@ -331,6 +335,21 @@ export function createPrismaInventoryRepository(prisma: InventoryPrismaClient): 
         skip: filters.offset ?? 0,
       });
       return movements.map(toInventoryMovementDto);
+    },
+
+    async countMovements(filters: InventoryMovementListFilters) {
+      return client.inventoryMovement.count({ where: movementWhere(filters) });
+    },
+
+    async summarizeMovements(filters: InventoryMovementListFilters) {
+      const [totalCount, inboundAggregate] = await Promise.all([
+        client.inventoryMovement.count({ where: movementWhere(filters) }),
+        client.inventoryMovement.aggregate({
+          _sum: { quantity: true },
+          where: movementWhere({ ...filters, movementType: "inbound" }),
+        }),
+      ]);
+      return { totalCount, inboundQuantity: decimalToNumber(inboundAggregate._sum.quantity) ?? 0 };
     },
 
     async getMovementById(id: string) {

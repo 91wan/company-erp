@@ -29,8 +29,15 @@ export type InventoryBalanceListFilters = {
   q?: string;
 };
 
+export type InventoryMovementSummary = {
+  totalCount: number;
+  inboundQuantity: number;
+};
+
 export type InventoryRepository = {
   listMovements(filters: InventoryMovementListFilters): Promise<InventoryMovementDto[]>;
+  countMovements?(filters: InventoryMovementListFilters): Promise<number>;
+  summarizeMovements?(filters: InventoryMovementListFilters): Promise<InventoryMovementSummary>;
   getMovementById(id: string): Promise<InventoryMovementDto | null>;
   createMovement(input: CreateInventoryMovementInput): Promise<InventoryMovementDto>;
   listBalances(filters: InventoryBalanceListFilters): Promise<InventoryBalanceDto[]>;

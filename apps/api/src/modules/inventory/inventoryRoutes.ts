@@ -18,15 +18,32 @@ export function registerInventoryRoutes(app: FastifyInstance, options: BuildAppO
         ...(scope ? { projectSiteIds: scope, sourceType: "project_usage" as const } : {}),
       };
       const inventoryMovements = await options.inventoryRepository.listMovements(filters);
+      const total = options.inventoryRepository.countMovements
+        ? await options.inventoryRepository.countMovements(filters)
+        : inventoryMovements.length;
       reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
       reply.header("X-List-Offset", String(filters.offset ?? 0));
-      return { inventoryMovements };
+      return { inventoryMovements, total };
     } catch (error) {
       if (error instanceof InventoryMovementValidationError) {
         return reply.status(400).send({ error: "INVENTORY_VALIDATION_FAILED", issues: error.issues });
       }
       throw error;
     }
+  });
+
+  app.get("/api/inventory-movements/summary", async (request, reply) => {
+    if (!options.inventoryRepository?.summarizeMovements) {
+      return reply.status(503).send({ error: "INVENTORY_REPOSITORY_NOT_CONFIGURED" });
+    }
+
+    const scope = scopedProjectSiteIds(request);
+    if (scope?.length === 0) {
+      return { inventoryMovementSummary: { totalCount: 0, inboundQuantity: 0 } };
+    }
+    const filters = scope ? { projectSiteIds: scope, sourceType: "project_usage" as const } : {};
+    const inventoryMovementSummary = await options.inventoryRepository.summarizeMovements(filters);
+    return { inventoryMovementSummary };
   });
 
   app.get("/api/inventory-movements/:id", async (request, reply) => {
