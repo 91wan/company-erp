@@ -41,7 +41,28 @@
 
 .workspace-pagination-controls {
   display: inline-flex;
+  align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.workspace-pagination-size,
+.workspace-pagination-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workspace-pagination-jump input {
+  width: 52px;
+}
+
+.workspace-list-refetching {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+  pointer-events: none;
 }
 
 .inventory-workspace {

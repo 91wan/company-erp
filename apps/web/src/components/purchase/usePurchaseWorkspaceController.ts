@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   ContractDto,
   CreatePurchaseRecordInput,
@@ -118,6 +118,9 @@ export function usePurchaseWorkspaceController({
   const [recordFilter, setRecordFilter] = useState<PurchaseRecordFilter>("all");
   const [recordOffset, setRecordOffset] = useState(0);
   const [recordTotal, setRecordTotal] = useState(0);
+  const [recordPageSize, setRecordPageSize] = useState(PURCHASE_RECORD_PAGE_SIZE);
+  const [recordRefetching, setRecordRefetching] = useState(false);
+  const recordsLoadedRef = useRef(false);
   const [requestSubmitState, setRequestSubmitState] = useState<PurchaseSubmitState>("idle");
   const [recordSubmitState, setRecordSubmitState] = useState<PurchaseSubmitState>("idle");
   const [reviewState, setReviewState] = useState<PurchaseSubmitState>("idle");
@@ -162,12 +165,14 @@ export function usePurchaseWorkspaceController({
 
   useEffect(() => {
     let mounted = true;
-    setRecordStatus("loading");
+    // 首次加载才整页显示「加载中」；后续筛选/搜索/翻页只标记 refetching，保留旧行避免闪烁。
+    if (recordsLoadedRef.current) setRecordRefetching(true);
+    else setRecordStatus("loading");
     Promise.resolve(
       loadPurchaseRecords({
         status: recordFilter === "all" ? undefined : recordFilter,
         q: debouncedRecordQuery || undefined,
-        limit: PURCHASE_RECORD_PAGE_SIZE,
+        limit: recordPageSize,
         offset: recordOffset,
       }),
     )
@@ -177,15 +182,18 @@ export function usePurchaseWorkspaceController({
         setPurchaseRecords(page.records);
         setRecordTotal(page.total);
         setRecordStatus("ready");
+        setRecordRefetching(false);
+        recordsLoadedRef.current = true;
       })
       .catch(() => {
         if (!mounted) return;
+        setRecordRefetching(false);
         setRecordStatus("error");
       });
     return () => {
       mounted = false;
     };
-  }, [loadPurchaseRecords, recordFilter, debouncedRecordQuery, recordOffset]);
+  }, [loadPurchaseRecords, recordFilter, debouncedRecordQuery, recordOffset, recordPageSize]);
 
   useEffect(() => {
     let mounted = true;
@@ -225,12 +233,22 @@ export function usePurchaseWorkspaceController({
     setRecordOffset(0);
     setRecordQuery(next);
   };
-  const recordPage = Math.floor(recordOffset / PURCHASE_RECORD_PAGE_SIZE) + 1;
-  const recordPageCount = Math.max(1, Math.ceil(recordTotal / PURCHASE_RECORD_PAGE_SIZE));
+  const recordPage = Math.floor(recordOffset / recordPageSize) + 1;
+  const recordPageCount = Math.max(1, Math.ceil(recordTotal / recordPageSize));
   const canPrevRecordPage = recordOffset > 0;
-  const canNextRecordPage = recordOffset + PURCHASE_RECORD_PAGE_SIZE < recordTotal;
-  const goToPrevRecordPage = () => setRecordOffset((current) => Math.max(0, current - PURCHASE_RECORD_PAGE_SIZE));
-  const goToNextRecordPage = () => setRecordOffset((current) => current + PURCHASE_RECORD_PAGE_SIZE);
+  const canNextRecordPage = recordOffset + recordPageSize < recordTotal;
+  const goToPrevRecordPage = () => setRecordOffset((current) => Math.max(0, current - recordPageSize));
+  const goToNextRecordPage = () => setRecordOffset((current) => current + recordPageSize);
+  const goToRecordPage = (page: number) => {
+    const target = Math.min(Math.max(page, 1), recordPageCount);
+    setRecordOffset((target - 1) * recordPageSize);
+  };
+  const changeRecordPageSize = (size: number) => {
+    setRecordOffset(0);
+    setRecordPageSize(size);
+  };
+  // 区分「暂无数据」与「未找到匹配」：有筛选或搜索词时按搜索无结果处理。
+  const recordSearchActive = recordFilter !== "all" || debouncedRecordQuery.length > 0;
 
   const pendingApprovalRequests = useMemo(
     () => purchaseRequests.filter((request) => request.status === "pending_approval"),
@@ -356,10 +374,15 @@ export function usePurchaseWorkspaceController({
     recordTotal,
     recordPage,
     recordPageCount,
+    recordPageSize,
+    recordRefetching,
+    recordSearchActive,
     canPrevRecordPage,
     canNextRecordPage,
     goToPrevRecordPage,
     goToNextRecordPage,
+    goToRecordPage,
+    changeRecordPageSize,
     recordSubmitError,
     recordSubmitState,
     requestFilter,

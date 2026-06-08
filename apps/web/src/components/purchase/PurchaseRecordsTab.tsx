@@ -18,10 +18,15 @@ export function PurchaseRecordsTab({
   recordTotal,
   recordPage,
   recordPageCount,
+  recordPageSize,
+  recordRefetching,
+  recordSearchActive,
   canPrevRecordPage,
   canNextRecordPage,
   onPrevPage,
   onNextPage,
+  onJumpPage,
+  onPageSizeChange,
   onFilterChange,
   onQueryChange,
   onSelectRecord,
@@ -33,10 +38,15 @@ export function PurchaseRecordsTab({
   recordTotal: number;
   recordPage: number;
   recordPageCount: number;
+  recordPageSize: number;
+  recordRefetching: boolean;
+  recordSearchActive: boolean;
   canPrevRecordPage: boolean;
   canNextRecordPage: boolean;
   onPrevPage: () => void;
   onNextPage: () => void;
+  onJumpPage: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onFilterChange: (value: PurchaseRecordFilter) => void;
   onQueryChange: (value: string) => void;
   onSelectRecord: (record: PurchaseRecordDto) => void;
@@ -54,19 +64,27 @@ export function PurchaseRecordsTab({
         />
         {recordStatus === "loading" ? <PurchaseStateMessage icon={<RefreshCw size={18} />} text="加载采购记录..." /> : null}
         {recordStatus === "error" ? <PurchaseStateMessage text="采购记录加载失败" /> : null}
-        {recordStatus === "ready" && recordTotal === 0 ? <PurchaseStateMessage text="暂无采购记录" /> : null}
+        {recordStatus === "ready" && recordTotal === 0 ? (
+          <PurchaseStateMessage text={recordSearchActive ? "未找到匹配的采购记录" : "暂无采购记录"} />
+        ) : null}
         {recordStatus === "ready" && filteredRecords.length > 0 ? (
-          <PurchaseRecordsTable records={filteredRecords} onSelectRecord={onSelectRecord} />
+          <div className={recordRefetching ? "workspace-list-refetching" : undefined}>
+            <PurchaseRecordsTable records={filteredRecords} onSelectRecord={onSelectRecord} />
+          </div>
         ) : null}
         {recordStatus === "ready" && recordTotal > 0 ? (
           <PurchasePaginationBar
             total={recordTotal}
             page={recordPage}
             pageCount={recordPageCount}
+            pageSize={recordPageSize}
+            refetching={recordRefetching}
             canPrev={canPrevRecordPage}
             canNext={canNextRecordPage}
             onPrev={onPrevPage}
             onNext={onNextPage}
+            onJump={onJumpPage}
+            onPageSizeChange={onPageSizeChange}
           />
         ) : null}
       </SectionCard>
