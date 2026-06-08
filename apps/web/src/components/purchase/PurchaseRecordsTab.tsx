@@ -1,10 +1,9 @@
 import { PackageCheck, RefreshCw } from "lucide-react";
 import type { PurchaseRecordDto, PurchaseRecordStatusCode } from "@company-erp/shared";
 import { PURCHASE_RECORD_STATUSES } from "@company-erp/shared";
-import { SectionCard, WorkspaceSectionStack } from "../ui";
+import { ListPaginationBar, SectionCard, WorkspaceSectionStack } from "../ui";
 import {
   PurchaseFilterToolbar,
-  PurchasePaginationBar,
   PurchaseRecordsTable,
   PurchaseStateMessage,
 } from "./PurchaseWorkspaceParts";
@@ -73,7 +72,7 @@ export function PurchaseRecordsTab({
           </div>
         ) : null}
         {recordStatus === "ready" && recordTotal > 0 ? (
-          <PurchasePaginationBar
+          <ListPaginationBar
             total={recordTotal}
             page={recordPage}
             pageCount={recordPageCount}
