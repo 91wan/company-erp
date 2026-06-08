@@ -229,6 +229,40 @@ export function PurchaseStateMessage({ icon, text }: { icon?: ReactNode; text: s
   );
 }
 
+export function PurchasePaginationBar({
+  total,
+  page,
+  pageCount,
+  canPrev,
+  canNext,
+  onPrev,
+  onNext,
+}: {
+  total: number;
+  page: number;
+  pageCount: number;
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="workspace-pagination">
+      <span className="workspace-pagination-summary">
+        共 {total} 条 · 第 {page} / {pageCount} 页
+      </span>
+      <div className="workspace-pagination-controls">
+        <button type="button" onClick={onPrev} disabled={!canPrev}>
+          上一页
+        </button>
+        <button type="button" onClick={onNext} disabled={!canNext}>
+          下一页
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",

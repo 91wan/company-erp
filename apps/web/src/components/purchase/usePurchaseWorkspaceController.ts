@@ -10,6 +10,8 @@ import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
 import type {
   PurchasePendingReviewAction,
   PurchaseRecordFilter,
+  PurchaseRecordsPage,
+  PurchaseRecordsQuery,
   PurchaseRequestFilter,
   PurchaseRequestReviewPayload,
   PurchaseSubmitState,
@@ -19,6 +21,7 @@ import {
   emptyRecordForm,
   emptyRequestForm,
   isPurchaseTab,
+  PURCHASE_RECORD_PAGE_SIZE,
 } from "./purchaseWorkspaceTypes";
 import type { RecordFormState, RequestFormState } from "./purchaseWorkspaceTypes";
 
@@ -27,9 +30,24 @@ async function defaultLoadPurchaseRequests(): Promise<PurchaseRequestDto[]> {
   return payload.purchaseRequests;
 }
 
-async function defaultLoadPurchaseRecords(): Promise<PurchaseRecordDto[]> {
-  const payload = await requestJson<{ purchaseRecords: PurchaseRecordDto[] }>(`${apiBaseUrl}/api/purchase-records`);
-  return payload.purchaseRecords;
+function buildRecordsSearch(query: PurchaseRecordsQuery): string {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.q) params.set("q", query.q);
+  params.set("limit", String(query.limit));
+  params.set("offset", String(query.offset));
+  return params.toString();
+}
+
+async function defaultLoadPurchaseRecords(query: PurchaseRecordsQuery): Promise<PurchaseRecordsPage> {
+  const payload = await requestJson<{ purchaseRecords: PurchaseRecordDto[]; total?: number }>(
+    `${apiBaseUrl}/api/purchase-records?${buildRecordsSearch(query)}`,
+  );
+  return { records: payload.purchaseRecords, total: payload.total ?? payload.purchaseRecords.length };
+}
+
+function normalizeRecordsPage(result: PurchaseRecordDto[] | PurchaseRecordsPage): PurchaseRecordsPage {
+  return Array.isArray(result) ? { records: result, total: result.length } : result;
 }
 
 async function defaultLoadContracts(): Promise<ContractDto[]> {
@@ -95,8 +113,11 @@ export function usePurchaseWorkspaceController({
   const [recordStatus, setRecordStatus] = useState<"loading" | "ready" | "error">("loading");
   const [requestQuery, setRequestQuery] = useState("");
   const [recordQuery, setRecordQuery] = useState("");
+  const [debouncedRecordQuery, setDebouncedRecordQuery] = useState("");
   const [requestFilter, setRequestFilter] = useState<PurchaseRequestFilter>("all");
   const [recordFilter, setRecordFilter] = useState<PurchaseRecordFilter>("all");
+  const [recordOffset, setRecordOffset] = useState(0);
+  const [recordTotal, setRecordTotal] = useState(0);
   const [requestSubmitState, setRequestSubmitState] = useState<PurchaseSubmitState>("idle");
   const [recordSubmitState, setRecordSubmitState] = useState<PurchaseSubmitState>("idle");
   const [reviewState, setReviewState] = useState<PurchaseSubmitState>("idle");
@@ -135,12 +156,26 @@ export function usePurchaseWorkspaceController({
   }, [loadPurchaseRequests]);
 
   useEffect(() => {
+    const handle = setTimeout(() => setDebouncedRecordQuery(recordQuery.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [recordQuery]);
+
+  useEffect(() => {
     let mounted = true;
     setRecordStatus("loading");
-    loadPurchaseRecords()
-      .then((nextRecords) => {
+    Promise.resolve(
+      loadPurchaseRecords({
+        status: recordFilter === "all" ? undefined : recordFilter,
+        q: debouncedRecordQuery || undefined,
+        limit: PURCHASE_RECORD_PAGE_SIZE,
+        offset: recordOffset,
+      }),
+    )
+      .then((result) => {
         if (!mounted) return;
-        setPurchaseRecords(nextRecords);
+        const page = normalizeRecordsPage(result);
+        setPurchaseRecords(page.records);
+        setRecordTotal(page.total);
         setRecordStatus("ready");
       })
       .catch(() => {
@@ -150,7 +185,7 @@ export function usePurchaseWorkspaceController({
     return () => {
       mounted = false;
     };
-  }, [loadPurchaseRecords]);
+  }, [loadPurchaseRecords, recordFilter, debouncedRecordQuery, recordOffset]);
 
   useEffect(() => {
     let mounted = true;
@@ -181,28 +216,21 @@ export function usePurchaseWorkspaceController({
     });
   }, [purchaseRequests, requestFilter, requestQuery]);
 
-  const filteredRecords = useMemo(() => {
-    const query = recordQuery.trim().toLowerCase();
-    return purchaseRecords.filter((record) => {
-      const matchesStatus = recordFilter === "all" || record.status === recordFilter;
-      const matchesQuery =
-        query.length === 0 ||
-        [
-          record.purchaseNo,
-          record.purchaserName,
-          record.purchasePlatform,
-          record.shopName,
-          record.supplierPartyName,
-          record.supplierNameText,
-          record.contractNo,
-          record.contractName,
-          record.lines[0]?.materialName,
-        ]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(query));
-      return matchesStatus && matchesQuery;
-    });
-  }, [purchaseRecords, recordFilter, recordQuery]);
+  // 采购记录走服务端分页 + 服务端筛选：状态/搜索/翻页变化时回到第一页重新请求。
+  const changeRecordFilter = (next: PurchaseRecordFilter) => {
+    setRecordOffset(0);
+    setRecordFilter(next);
+  };
+  const changeRecordQuery = (next: string) => {
+    setRecordOffset(0);
+    setRecordQuery(next);
+  };
+  const recordPage = Math.floor(recordOffset / PURCHASE_RECORD_PAGE_SIZE) + 1;
+  const recordPageCount = Math.max(1, Math.ceil(recordTotal / PURCHASE_RECORD_PAGE_SIZE));
+  const canPrevRecordPage = recordOffset > 0;
+  const canNextRecordPage = recordOffset + PURCHASE_RECORD_PAGE_SIZE < recordTotal;
+  const goToPrevRecordPage = () => setRecordOffset((current) => Math.max(0, current - PURCHASE_RECORD_PAGE_SIZE));
+  const goToNextRecordPage = () => setRecordOffset((current) => current + PURCHASE_RECORD_PAGE_SIZE);
 
   const pendingApprovalRequests = useMemo(
     () => purchaseRequests.filter((request) => request.status === "pending_approval"),
@@ -299,6 +327,7 @@ export function usePurchaseWorkspaceController({
         ],
       });
       setPurchaseRecords((current) => [created, ...current.filter((record) => record.id !== created.id)]);
+      setRecordTotal((current) => current + 1);
       setRecordForm({ ...emptyRecordForm });
       setRecordSubmitState("idle");
       setOpenFormDrawer(null);
@@ -312,7 +341,7 @@ export function usePurchaseWorkspaceController({
     activeTab,
     canManage,
     contracts,
-    filteredRecords,
+    filteredRecords: purchaseRecords,
     filteredRequests,
     openFormDrawer,
     pendingApprovalRequests,
@@ -324,6 +353,13 @@ export function usePurchaseWorkspaceController({
     recordFormDirty,
     recordQuery,
     recordStatus,
+    recordTotal,
+    recordPage,
+    recordPageCount,
+    canPrevRecordPage,
+    canNextRecordPage,
+    goToPrevRecordPage,
+    goToNextRecordPage,
     recordSubmitError,
     recordSubmitState,
     requestFilter,
@@ -344,9 +380,9 @@ export function usePurchaseWorkspaceController({
     setActiveTab,
     setOpenFormDrawer,
     setPendingReviewAction,
-    setRecordFilter,
+    setRecordFilter: changeRecordFilter,
     setRecordForm,
-    setRecordQuery,
+    setRecordQuery: changeRecordQuery,
     setRequestFilter,
     setRequestForm,
     setRequestQuery,

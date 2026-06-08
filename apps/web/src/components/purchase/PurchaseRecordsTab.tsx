@@ -4,6 +4,7 @@ import { PURCHASE_RECORD_STATUSES } from "@company-erp/shared";
 import { SectionCard, WorkspaceSectionStack } from "../ui";
 import {
   PurchaseFilterToolbar,
+  PurchasePaginationBar,
   PurchaseRecordsTable,
   PurchaseStateMessage,
 } from "./PurchaseWorkspaceParts";
@@ -14,6 +15,13 @@ export function PurchaseRecordsTab({
   recordFilter,
   recordQuery,
   recordStatus,
+  recordTotal,
+  recordPage,
+  recordPageCount,
+  canPrevRecordPage,
+  canNextRecordPage,
+  onPrevPage,
+  onNextPage,
   onFilterChange,
   onQueryChange,
   onSelectRecord,
@@ -22,6 +30,13 @@ export function PurchaseRecordsTab({
   recordFilter: PurchaseRecordFilter;
   recordQuery: string;
   recordStatus: "loading" | "ready" | "error";
+  recordTotal: number;
+  recordPage: number;
+  recordPageCount: number;
+  canPrevRecordPage: boolean;
+  canNextRecordPage: boolean;
+  onPrevPage: () => void;
+  onNextPage: () => void;
   onFilterChange: (value: PurchaseRecordFilter) => void;
   onQueryChange: (value: string) => void;
   onSelectRecord: (record: PurchaseRecordDto) => void;
@@ -39,9 +54,20 @@ export function PurchaseRecordsTab({
         />
         {recordStatus === "loading" ? <PurchaseStateMessage icon={<RefreshCw size={18} />} text="加载采购记录..." /> : null}
         {recordStatus === "error" ? <PurchaseStateMessage text="采购记录加载失败" /> : null}
-        {recordStatus === "ready" && filteredRecords.length === 0 ? <PurchaseStateMessage text="暂无采购记录" /> : null}
+        {recordStatus === "ready" && recordTotal === 0 ? <PurchaseStateMessage text="暂无采购记录" /> : null}
         {recordStatus === "ready" && filteredRecords.length > 0 ? (
           <PurchaseRecordsTable records={filteredRecords} onSelectRecord={onSelectRecord} />
+        ) : null}
+        {recordStatus === "ready" && recordTotal > 0 ? (
+          <PurchasePaginationBar
+            total={recordTotal}
+            page={recordPage}
+            pageCount={recordPageCount}
+            canPrev={canPrevRecordPage}
+            canNext={canNextRecordPage}
+            onPrev={onPrevPage}
+            onNext={onNextPage}
+          />
         ) : null}
       </SectionCard>
     </WorkspaceSectionStack>

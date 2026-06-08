@@ -408,6 +408,49 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("京东企业购").length).toBeGreaterThan(0);
   });
 
+  it("paginates purchase records server-side and reflects the exact total", async () => {
+    const loadPurchaseRecords = vi.fn((query: { limit: number; offset: number }) => {
+      const total = 25;
+      const pageLength = query.offset === 0 ? query.limit : total - query.offset;
+      const records = Array.from({ length: pageLength }, (_, index) => ({
+        ...purchaseRecord,
+        id: `rec-${query.offset}-${index}`,
+        purchaseNo: `PO-${query.offset}-${index}`,
+      }));
+      return Promise.resolve({ records, total });
+    });
+
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={loadPurchaseRecords}
+        loadContracts={() => Promise.resolve([])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
+
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 0 })),
+    );
+
+    const summary = await screen.findByText(
+      (_, element) => element?.classList.contains("workspace-pagination-summary") ?? false,
+    );
+    expect(summary.textContent).toContain("共 25 条");
+    expect(summary.textContent).toContain("第 1 / 2 页");
+    expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 20 })),
+    );
+    await waitFor(() => expect(summary.textContent).toContain("第 2 / 2 页"));
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "上一页" })).not.toBeDisabled();
+  });
+
   it("generates replenishment suggestions and converts one to a purchase request", async () => {
     const convertedRequest = {
       ...purchaseRequest,

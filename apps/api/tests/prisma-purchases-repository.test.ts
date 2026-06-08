@@ -66,4 +66,29 @@ describe("Prisma purchase repositories", () => {
     expect(createData).toMatchObject({ purchaseRequestNo: "PR-HISTORY-001" });
     expect(created.purchaseRequestNo).toBe("PR-HISTORY-001");
   });
+
+  it("counts records with the same where clause as list (status + scoped sites)", async () => {
+    let countArgs: { where?: unknown } | undefined;
+    const prisma = {
+      purchaseRecord: {
+        async count(args: { where?: unknown }) {
+          countArgs = args;
+          return 42;
+        },
+      },
+    } as unknown as PrismaClient;
+
+    const repository = createPrismaPurchaseRecordRepository(prisma);
+    const total = await repository.count!({
+      status: "ordered",
+      projectSiteIds: ["site-1", "site-2"],
+      q: "京东",
+    });
+
+    expect(total).toBe(42);
+    expect(countArgs?.where).toMatchObject({
+      status: "ordered",
+      purchaseRequest: { projectSiteId: { in: ["site-1", "site-2"] } },
+    });
+  });
 });
