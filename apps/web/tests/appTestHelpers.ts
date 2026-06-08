@@ -307,6 +307,17 @@ export function mockShellFetch(
     if (url.includes("/api/purchase-records")) {
       return Promise.resolve(jsonResponse({ purchaseRecords: data.purchaseRecords ?? [purchaseRecord] }));
     }
+    if (pathname === "/api/inventory-movements/summary") {
+      const movements = data.inventoryMovements ?? [inventoryMovement];
+      return Promise.resolve(jsonResponse({
+        inventoryMovementSummary: {
+          totalCount: movements.length,
+          inboundQuantity: movements
+            .filter((movement) => movement.movementType === "inbound")
+            .reduce((sum, movement) => sum + movement.quantity, 0),
+        },
+      }));
+    }
     if (url.includes("/api/inventory-movements")) {
       return Promise.resolve(jsonResponse({ inventoryMovements: data.inventoryMovements ?? [inventoryMovement] }));
     }
