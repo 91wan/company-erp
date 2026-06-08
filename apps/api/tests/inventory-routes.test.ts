@@ -219,6 +219,15 @@ function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): Inven
   return {
     async listMovements(filters) {
       const matched = movements.filter((movement) => matchesFilters(movement, filters));
+      if (filters.sortField) {
+        const dir = filters.sortDir === "desc" ? -1 : 1;
+        const field = filters.sortField;
+        matched.sort((a, b) =>
+          field === "quantity"
+            ? (a.quantity - b.quantity) * dir
+            : String(a[field] ?? "").localeCompare(String(b[field] ?? "")) * dir,
+        );
+      }
       const offset = filters.offset ?? 0;
       const limit = filters.limit ?? matched.length;
       return matched.slice(offset, offset + limit);
@@ -386,6 +395,25 @@ describe("inventory movements API", () => {
     expect(secondPage.json().inventoryMovements).toHaveLength(1);
     expect(secondPage.json().total).toBe(3);
     expect(secondPage.headers["x-list-offset"]).toBe("2");
+  });
+
+  it("sorts movements by the requested field and rejects unknown sort fields", async () => {
+    const seeded = [
+      makeMovement({ id: "11111111-1111-4111-8111-111111111301", movementNo: "RK-SORT-1", quantity: 30 }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111302", movementNo: "RK-SORT-2", quantity: 10 }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111303", movementNo: "RK-SORT-3", quantity: 20 }),
+    ];
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository(seeded) });
+
+    const asc = await app.inject({ method: "GET", url: "/api/inventory-movements?sortField=quantity&sortDir=asc" });
+    const desc = await app.inject({ method: "GET", url: "/api/inventory-movements?sortField=quantity&sortDir=desc" });
+    const invalid = await app.inject({ method: "GET", url: "/api/inventory-movements?sortField=bogus" });
+    await app.close();
+
+    expect(asc.json().inventoryMovements.map((movement: InventoryMovementDto) => movement.quantity)).toEqual([10, 20, 30]);
+    expect(desc.json().inventoryMovements.map((movement: InventoryMovementDto) => movement.quantity)).toEqual([30, 20, 10]);
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().error).toBe("INVENTORY_VALIDATION_FAILED");
   });
 
   it("summarizes movement count and inbound quantity over the full set", async () => {

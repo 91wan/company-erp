@@ -193,6 +193,39 @@ describe("Prisma inventory repository", () => {
     expect(detail).toMatchObject({ purchaseRecordLineId: "44444444-4444-4444-8444-444444444444" });
   });
 
+  it("orders movements by the requested sort field with stable tiebreakers", async () => {
+    const findManyCalls: unknown[] = [];
+    const prisma = createBaseClient({
+      inventoryMovement: {
+        async findMany(args) {
+          findManyCalls.push(args);
+          return [];
+        },
+        async findUnique() {
+          return null;
+        },
+        async create() {
+          return makeMovement();
+        },
+        async groupBy() {
+          return [];
+        },
+      },
+    });
+
+    const repository = createPrismaInventoryRepository(prisma);
+    await repository.listMovements({ sortField: "quantity", sortDir: "asc" });
+    await repository.listMovements({});
+
+    expect(findManyCalls[0]).toMatchObject({
+      orderBy: [{ quantity: "asc" }, { createdAt: "desc" }, { movementNo: "asc" }],
+    });
+    // 无 sortField 时回退默认排序（日期倒序）。
+    expect(findManyCalls[1]).toMatchObject({
+      orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }, { movementNo: "asc" }],
+    });
+  });
+
   it("creates movements and rolls purchase receiving quantities up to the purchase record status", async () => {
     const movementCreateCalls: unknown[] = [];
     const purchaseLineUpdates: unknown[] = [];

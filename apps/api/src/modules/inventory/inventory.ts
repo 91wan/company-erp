@@ -18,6 +18,8 @@ export type InventoryMovementListFilters = {
   q?: string;
   dateFrom?: string;
   dateTo?: string;
+  sortField?: "movementDate" | "movementNo" | "quantity";
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 };
@@ -58,6 +60,7 @@ export class InventoryMovementValidationError extends Error {
 }
 
 const movementTypes = new Set(INVENTORY_MOVEMENT_TYPES.map((movementType) => movementType.code));
+const movementSortFields = new Set(["movementDate", "movementNo", "quantity"]);
 const sourceTypes = new Set(INVENTORY_SOURCE_TYPES.map((sourceType) => sourceType.code));
 const creatableMovementTypes = new Set<InventoryMovementTypeCode>([
   "opening",
@@ -143,6 +146,21 @@ export function normalizeInventoryMovementFilters(
   const dateTo = normalizeOptionalDate(query.dateTo, "dateTo", issues);
   if (dateFrom) filters.dateFrom = dateFrom;
   if (dateTo) filters.dateTo = dateTo;
+
+  if (query.sortField !== undefined) {
+    if (typeof query.sortField === "string" && movementSortFields.has(query.sortField)) {
+      filters.sortField = query.sortField as InventoryMovementListFilters["sortField"];
+    } else {
+      issues.push("sortField is unsupported");
+    }
+  }
+  if (query.sortDir !== undefined) {
+    if (query.sortDir === "asc" || query.sortDir === "desc") {
+      filters.sortDir = query.sortDir;
+    } else {
+      issues.push("sortDir is unsupported");
+    }
+  }
 
   const paging = normalizeListPaging(query);
   filters.limit = paging.limit;
