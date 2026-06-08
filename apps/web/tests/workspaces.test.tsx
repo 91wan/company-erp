@@ -624,6 +624,42 @@ describe("Company ERP workspace components", () => {
     ).toBeInTheDocument();
   });
 
+  it("sorts the current-stock table by quantity when the column header is clicked", async () => {
+    const balances = [
+      { ...inventoryBalance, warehouseId: "w-b", materialId: "m-b", materialCode: "MAT-B", currentQuantity: 50, isLowStock: false },
+      { ...inventoryBalance, warehouseId: "w-a", materialId: "m-a", materialCode: "MAT-A", currentQuantity: 5, isLowStock: false },
+    ];
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryBalances={() => Promise.resolve(balances)}
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+      />,
+    );
+
+    await screen.findByText("暂无低库存风险");
+    fireEvent.click(screen.getByRole("tab", { name: "当前库存" }));
+    await screen.findByText("MAT-A");
+
+    // 默认插入序：MAT-B 在前。
+    let rows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(within(rows[1]).getByText("MAT-B")).toBeInTheDocument();
+
+    const sortButton = screen.getByRole("button", { name: "当前库存" });
+    fireEvent.click(sortButton); // 升序：5 在前
+    rows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(within(rows[1]).getByText("MAT-A")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /当前库存/ })).toHaveAttribute("aria-sort", "ascending");
+
+    fireEvent.click(sortButton); // 降序：50 在前
+    rows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(within(rows[1]).getByText("MAT-B")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /当前库存/ })).toHaveAttribute("aria-sort", "descending");
+  });
+
   it("paginates the inventory ledger server-side and opens detail for a later page", async () => {
     const loadInventoryMovementsPage = vi.fn(({ offset }: { limit: number; offset: number }) =>
       Promise.resolve({

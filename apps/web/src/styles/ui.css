@@ -316,6 +316,23 @@
   font-weight: 760;
 }
 
+.ui-th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-th-sort-icon {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
 .ui-table-state,
 .ui-empty-state {
   padding: 18px;
