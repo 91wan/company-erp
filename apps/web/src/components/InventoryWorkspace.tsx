@@ -1,5 +1,5 @@
 import { ClipboardList, Filter, PackageCheck, RefreshCw, Save, Search, Warehouse } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_SOURCE_TYPES,
@@ -12,11 +12,24 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DataTable, DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
+import { DataTable, DetailDrawer, EmptyState, FormDrawer, ListPaginationBar, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
 import { inventoryRiskToBadge } from "./statusMappers";
+
+const INVENTORY_LEDGER_PAGE_SIZE = 20;
+
+type InventoryMovementsQuery = {
+  movementType?: InventoryMovementTypeCode;
+  q?: string;
+  limit: number;
+  offset: number;
+};
+type InventoryMovementsPage = { rows: InventoryMovementDto[]; total: number };
+type MovementSummary = { totalCount: number; inboundQuantity: number };
 
 type InventoryWorkspaceProps = {
   loadInventoryMovements?: () => Promise<InventoryMovementDto[]>;
+  loadInventoryMovementsPage?: (query: InventoryMovementsQuery) => Promise<InventoryMovementsPage>;
+  loadInventoryMovementSummary?: () => Promise<MovementSummary>;
   loadInventoryBalances?: () => Promise<InventoryBalanceDto[]>;
   createInventoryMovement?: (input: CreateInventoryMovementInput) => Promise<InventoryMovementDto>;
   loadMaterials?: () => Promise<MaterialDto[]>;
@@ -70,6 +83,25 @@ async function defaultLoadInventoryMovements(): Promise<InventoryMovementDto[]> 
   return payload.inventoryMovements;
 }
 
+async function defaultLoadInventoryMovementsPage(query: InventoryMovementsQuery): Promise<InventoryMovementsPage> {
+  const params = new URLSearchParams();
+  if (query.movementType) params.set("movementType", query.movementType);
+  if (query.q) params.set("q", query.q);
+  params.set("limit", String(query.limit));
+  params.set("offset", String(query.offset));
+  const payload = await requestJson<{ inventoryMovements: InventoryMovementDto[]; total?: number }>(
+    `${apiBaseUrl}/api/inventory-movements?${params.toString()}`,
+  );
+  return { rows: payload.inventoryMovements, total: payload.total ?? payload.inventoryMovements.length };
+}
+
+async function defaultLoadInventoryMovementSummary(): Promise<MovementSummary> {
+  const payload = await requestJson<{ inventoryMovementSummary?: MovementSummary }>(
+    `${apiBaseUrl}/api/inventory-movements/summary`,
+  );
+  return payload.inventoryMovementSummary ?? { totalCount: 0, inboundQuantity: 0 };
+}
+
 async function defaultLoadInventoryBalances(): Promise<InventoryBalanceDto[]> {
   const payload = await requestJson<{ inventoryBalances: InventoryBalanceDto[] }>(
     `${apiBaseUrl}/api/inventory-balances`,
@@ -105,6 +137,8 @@ async function defaultCreateInventoryMovement(input: CreateInventoryMovementInpu
 
 export function InventoryWorkspace({
   loadInventoryMovements = defaultLoadInventoryMovements,
+  loadInventoryMovementsPage = defaultLoadInventoryMovementsPage,
+  loadInventoryMovementSummary = defaultLoadInventoryMovementSummary,
   loadInventoryBalances = defaultLoadInventoryBalances,
   createInventoryMovement = defaultCreateInventoryMovement,
   loadMaterials = defaultLoadMaterials,
@@ -145,6 +179,20 @@ export function InventoryWorkspace({
     handledBy: "",
     remark: "",
   });
+
+  // 库存流水（ledger）真翻页：独立分页源，与入库/出库标签页的封顶 movements 数组解耦。
+  const [ledgerRows, setLedgerRows] = useState<InventoryMovementDto[]>([]);
+  const [ledgerTotal, setLedgerTotal] = useState(0);
+  const [ledgerOffset, setLedgerOffset] = useState(0);
+  const [ledgerPageSize, setLedgerPageSize] = useState(INVENTORY_LEDGER_PAGE_SIZE);
+  const [ledgerStatus, setLedgerStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [ledgerRefetching, setLedgerRefetching] = useState(false);
+  const [ledgerQuery, setLedgerQuery] = useState("");
+  const [debouncedLedgerQuery, setDebouncedLedgerQuery] = useState("");
+  const [ledgerFilter, setLedgerFilter] = useState<"all" | InventoryMovementTypeCode>("all");
+  const ledgerLoadedRef = useRef(false);
+  const [movementSummary, setMovementSummary] = useState<MovementSummary>({ totalCount: 0, inboundQuantity: 0 });
+  const [summaryRefresh, setSummaryRefresh] = useState(0);
 
   useEffect(() => {
     if (isInventoryTab(initialTab)) setActiveTab(initialTab);
@@ -226,6 +274,54 @@ export function InventoryWorkspace({
     };
   }, [loadEmployees, loadMaterials, loadWarehouses]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedLedgerQuery(ledgerQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [ledgerQuery]);
+
+  useEffect(() => {
+    let mounted = true;
+    loadInventoryMovementSummary()
+      .then((summary) => {
+        if (mounted && summary) setMovementSummary(summary);
+      })
+      .catch(() => {
+        /* 摘要卡片为参考信息，加载失败时保留默认值，不打断主流程 */
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [loadInventoryMovementSummary, summaryRefresh]);
+
+  useEffect(() => {
+    if (activeTab !== "movements") return undefined;
+    let mounted = true;
+    if (ledgerLoadedRef.current) setLedgerRefetching(true);
+    else setLedgerStatus("loading");
+    loadInventoryMovementsPage({
+      movementType: ledgerFilter === "all" ? undefined : ledgerFilter,
+      q: debouncedLedgerQuery || undefined,
+      limit: ledgerPageSize,
+      offset: ledgerOffset,
+    })
+      .then((page) => {
+        if (!mounted) return;
+        setLedgerRows(page.rows);
+        setLedgerTotal(page.total);
+        ledgerLoadedRef.current = true;
+        setLedgerRefetching(false);
+        setLedgerStatus("ready");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setLedgerRefetching(false);
+        setLedgerStatus("error");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab, loadInventoryMovementsPage, ledgerFilter, debouncedLedgerQuery, ledgerOffset, ledgerPageSize]);
+
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return movements.filter((movement) => {
@@ -249,9 +345,6 @@ export function InventoryWorkspace({
   }, [movementFilter, movements, query]);
 
   const lowStockCount = balances.filter((balance) => balance.isLowStock).length;
-  const inboundQuantity = movements
-    .filter((movement) => movement.movementType === "inbound")
-    .reduce((sum, movement) => sum + movement.quantity, 0);
   const activeTabMovements = filteredMovements.filter((movement) => {
     if (activeTab === "inbound") return movement.movementType === "inbound" || movement.movementType === "opening" || movement.movementType === "adjustment_in";
     if (activeTab === "outbound") return movement.movementType === "outbound" || movement.movementType === "adjustment_out";
@@ -260,11 +353,43 @@ export function InventoryWorkspace({
   const movementsEntityNotVisible = Boolean(
     initialEntityId && activeTab === "movements" && movementStatus === "ready" && !movements.find((m) => m.id === initialEntityId)
   );
-  const selectedMovement = movements.find((movement) => movement.id === selectedMovementId) ?? null;
+  const selectedMovement =
+    ledgerRows.find((movement) => movement.id === selectedMovementId) ??
+    movements.find((movement) => movement.id === selectedMovementId) ??
+    null;
   const selectedBalance =
     balances.find((balance) => `${balance.warehouseId}:${balance.materialId}` === selectedBalanceKey) ?? null;
   const isOutboundMovement = form.movementType === "outbound" || form.movementType === "adjustment_out";
   const quantityLabel = isOutboundMovement ? "出库数量" : "入库数量";
+
+  const ledgerPage = Math.floor(ledgerOffset / ledgerPageSize) + 1;
+  const ledgerPageCount = Math.max(1, Math.ceil(ledgerTotal / ledgerPageSize));
+  const canPrevLedger = ledgerOffset > 0;
+  const canNextLedger = ledgerOffset + ledgerPageSize < ledgerTotal;
+  const ledgerSearchActive = ledgerFilter !== "all" || debouncedLedgerQuery.length > 0;
+
+  function changeLedgerFilter(value: "all" | InventoryMovementTypeCode) {
+    setLedgerFilter(value);
+    setLedgerOffset(0);
+  }
+  function changeLedgerQuery(value: string) {
+    setLedgerQuery(value);
+    setLedgerOffset(0);
+  }
+  function goToPrevLedgerPage() {
+    setLedgerOffset((offset) => Math.max(0, offset - ledgerPageSize));
+  }
+  function goToNextLedgerPage() {
+    setLedgerOffset((offset) => offset + ledgerPageSize);
+  }
+  function goToLedgerPage(page: number) {
+    const clamped = Math.min(Math.max(1, page), ledgerPageCount);
+    setLedgerOffset((clamped - 1) * ledgerPageSize);
+  }
+  function changeLedgerPageSize(size: number) {
+    setLedgerPageSize(size);
+    setLedgerOffset(0);
+  }
 
   function updateSelectedMaterial(materialId: string) {
     const material = materials.find((candidate) => candidate.id === materialId);
@@ -301,6 +426,7 @@ export function InventoryWorkspace({
         remark: form.remark || null,
       });
       setMovements((current) => [created, ...current.filter((movement) => movement.id !== created.id)]);
+      setSummaryRefresh((value) => value + 1);
       if (showBalances) {
         setBalances(await loadInventoryBalances());
       }
@@ -339,10 +465,10 @@ export function InventoryWorkspace({
         )}
         summary={(
           <div className="summary-grid compact-summary" aria-label="库存指标摘要">
-            <SummaryCard label="库存流水" value={movements.length} detail="最近出入库记录" tone="info" />
+            <SummaryCard label="库存流水" value={movementSummary.totalCount} detail="最近出入库记录" tone="info" />
             <SummaryCard label="当前库存项" value={balances.length} detail={showBalances ? "按仓库和物料汇总" : "无权限查看余额"} tone={showBalances ? "neutral" : "disabled"} />
             <SummaryCard label="低库存" value={lowStockCount} detail="低于安全库存" tone={lowStockCount > 0 ? "danger" : "success"} />
-            <SummaryCard label="本轮入库数量" value={inboundQuantity} detail="入库流水合计" tone="success" />
+            <SummaryCard label="本轮入库数量" value={movementSummary.inboundQuantity} detail="入库流水合计" tone="success" />
           </div>
         )}
         tabs={(
@@ -631,8 +757,8 @@ export function InventoryWorkspace({
               <label className="table-search">
               <Search aria-hidden="true" size={16} />
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={ledgerQuery}
+                onChange={(event) => changeLedgerQuery(event.target.value)}
                 placeholder="搜索单号、物料、仓库、经办人"
               />
               </label>
@@ -642,8 +768,8 @@ export function InventoryWorkspace({
               <Filter aria-hidden="true" size={16} />
               <select
                 aria-label="库存流水类型筛选"
-                value={movementFilter}
-                onChange={(event) => setMovementFilter(event.target.value as "all" | InventoryMovementTypeCode)}
+                value={ledgerFilter}
+                onChange={(event) => changeLedgerFilter(event.target.value as "all" | InventoryMovementTypeCode)}
               >
                 <option value="all">全部类型</option>
                 {INVENTORY_MOVEMENT_TYPES.map((movementType) => (
@@ -655,29 +781,46 @@ export function InventoryWorkspace({
               </label>
             )}
           />
-          {movementStatus === "loading" ? (
+          {ledgerStatus === "loading" ? (
             <StateMessage icon={<RefreshCw size={16} />} text="库存流水加载中" />
-          ) : movementStatus === "error" ? (
+          ) : ledgerStatus === "error" ? (
             <StateMessage icon={<PackageCheck size={16} />} text="库存流水接口暂不可用" />
-          ) : activeTabMovements.length === 0 ? (
-            <StateMessage icon={<PackageCheck size={16} />} text="暂无库存流水" />
+          ) : ledgerTotal === 0 ? (
+            <StateMessage icon={<PackageCheck size={16} />} text={ledgerSearchActive ? "未找到匹配的库存流水" : "暂无库存流水"} />
           ) : (
-            <DataTable
-              headers={["单号", "日期", "类型", "仓库", "物料", "数量", "处理摘要"]}
-              rows={activeTabMovements.map((movement) => [
-                movement.movementNo,
-                movement.movementDate,
-                movementTypeLabel.get(movement.movementType) ?? movement.movementType,
-                movement.warehouseCode,
-                `${movement.materialCode} ${movement.materialName}`,
-                `${movement.quantity} ${movement.unit}`,
-                <span key={movement.id} className="table-cell-stack">
-                  <strong>{movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "未指定来源"}</strong>
-                  <small>{movement.handledBy ?? "未记录经办人"}</small>
-                </span>,
-              ])}
-              onRowClick={(rowIndex) => setSelectedMovementId(activeTabMovements[rowIndex]?.id ?? "")}
-            />
+            <>
+              <div className={ledgerRefetching ? "workspace-list-refetching" : undefined}>
+                <DataTable
+                  headers={["单号", "日期", "类型", "仓库", "物料", "数量", "处理摘要"]}
+                  rows={ledgerRows.map((movement) => [
+                    movement.movementNo,
+                    movement.movementDate,
+                    movementTypeLabel.get(movement.movementType) ?? movement.movementType,
+                    movement.warehouseCode,
+                    `${movement.materialCode} ${movement.materialName}`,
+                    `${movement.quantity} ${movement.unit}`,
+                    <span key={movement.id} className="table-cell-stack">
+                      <strong>{movement.sourceType ? sourceTypeLabel.get(movement.sourceType) ?? movement.sourceType : "未指定来源"}</strong>
+                      <small>{movement.handledBy ?? "未记录经办人"}</small>
+                    </span>,
+                  ])}
+                  onRowClick={(rowIndex) => setSelectedMovementId(ledgerRows[rowIndex]?.id ?? "")}
+                />
+              </div>
+              <ListPaginationBar
+                total={ledgerTotal}
+                page={ledgerPage}
+                pageCount={ledgerPageCount}
+                pageSize={ledgerPageSize}
+                refetching={ledgerRefetching}
+                canPrev={canPrevLedger}
+                canNext={canNextLedger}
+                onPrev={goToPrevLedgerPage}
+                onNext={goToNextLedgerPage}
+                onJump={goToLedgerPage}
+                onPageSizeChange={changeLedgerPageSize}
+              />
+            </>
           )}
         </SectionCard>
       ) : null}

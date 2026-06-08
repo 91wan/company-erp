@@ -624,6 +624,116 @@ describe("Company ERP workspace components", () => {
     ).toBeInTheDocument();
   });
 
+  it("paginates the inventory ledger server-side and opens detail for a later page", async () => {
+    const loadInventoryMovementsPage = vi.fn(({ offset }: { limit: number; offset: number }) =>
+      Promise.resolve({
+        rows: [
+          offset === 0
+            ? { ...inventoryMovement, id: "led-1", movementNo: "RK-LEDGER-P1" }
+            : { ...inventoryMovement, id: "led-2", movementNo: "RK-LEDGER-P2" },
+        ],
+        total: 25,
+      }),
+    );
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryMovementsPage={loadInventoryMovementsPage}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([material])}
+        loadWarehouses={() => Promise.resolve([warehouse])}
+        loadEmployees={() => Promise.resolve([employee])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "库存流水" }));
+
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 20, offset: 0 }),
+      ),
+    );
+    expect(await screen.findByText("RK-LEDGER-P1")).toBeInTheDocument();
+
+    const summary = screen.getByText(
+      (_, element) => element?.classList.contains("workspace-pagination-summary") ?? false,
+    );
+    expect(summary.textContent).toContain("共 25 条");
+    expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 20, offset: 20 }),
+      ),
+    );
+    expect(await screen.findByText("RK-LEDGER-P2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("RK-LEDGER-P2"));
+    expect(
+      await screen.findByRole("heading", { name: "库存流水详情" }),
+    ).toBeInTheDocument();
+  });
+
+  it("wires inventory summary cards to the movement summary endpoint", async () => {
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryMovementSummary={() => Promise.resolve({ totalCount: 42, inboundQuantity: 100 })}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+      />,
+    );
+
+    const summaryRegion = screen.getByLabelText("库存指标摘要");
+    expect(await within(summaryRegion).findByText("42")).toBeInTheDocument();
+    expect(within(summaryRegion).getByText("100")).toBeInTheDocument();
+  });
+
+  it("sends inventory ledger type filter and search query to the server", async () => {
+    const loadInventoryMovementsPage = vi.fn(() => Promise.resolve({ rows: [], total: 0 }));
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryMovementsPage={loadInventoryMovementsPage}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "库存流水" }));
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0, movementType: undefined, q: undefined }),
+      ),
+    );
+    expect(await screen.findByText("暂无库存流水")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("库存流水类型筛选"), { target: { value: "outbound" } });
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ movementType: "outbound" }),
+      ),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("搜索单号、物料、仓库、经办人"), {
+      target: { value: "RK123" },
+    });
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ q: "RK123" }),
+      ),
+    );
+    expect(await screen.findByText("未找到匹配的库存流水")).toBeInTheDocument();
+  });
+
   it("renders inventory empty and error states", async () => {
     const { rerender } = render(
       <InventoryWorkspace
