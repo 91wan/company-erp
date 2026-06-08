@@ -64,8 +64,13 @@ function makeMovement(overrides: Partial<InventoryMovementRecord> = {}): Invento
   };
 }
 
-function createBaseClient(overrides: Partial<InventoryPrismaClient> = {}): InventoryPrismaClient {
-  return {
+type BaseClientOverrides = Omit<Partial<InventoryPrismaClient>, "inventoryMovement"> & {
+  inventoryMovement?: Partial<InventoryPrismaClient["inventoryMovement"]>;
+};
+
+function createBaseClient(overrides: BaseClientOverrides = {}): InventoryPrismaClient {
+  const { inventoryMovement, ...rest } = overrides;
+  const base: InventoryPrismaClient = {
     inventoryMovement: {
       async findMany() {
         return [];
@@ -75,6 +80,12 @@ function createBaseClient(overrides: Partial<InventoryPrismaClient> = {}): Inven
       },
       async create() {
         return makeMovement();
+      },
+      async count() {
+        return 0;
+      },
+      async aggregate() {
+        return { _sum: { quantity: null } };
       },
       async groupBy() {
         return [];
@@ -106,7 +117,11 @@ function createBaseClient(overrides: Partial<InventoryPrismaClient> = {}): Inven
     async $transaction(callback) {
       return callback(this);
     },
-    ...overrides,
+  };
+  return {
+    ...base,
+    ...rest,
+    inventoryMovement: { ...base.inventoryMovement, ...(inventoryMovement ?? {}) },
   };
 }
 
@@ -401,5 +416,32 @@ describe("Prisma inventory repository", () => {
         unit: "套",
       }),
     ).rejects.toMatchObject({ name: "InventoryMovementValidationError" });
+  });
+
+  it("summarizes movements via count + inbound aggregate sharing the movement where", async () => {
+    let countWhere: unknown;
+    let aggregateWhere: unknown;
+    const prisma = createBaseClient({
+      inventoryMovement: {
+        async count(args) {
+          countWhere = args.where;
+          return 7;
+        },
+        async aggregate(args) {
+          aggregateWhere = args.where;
+          return { _sum: { quantity: decimal(20) } };
+        },
+      },
+    });
+
+    const repository = createPrismaInventoryRepository(prisma);
+    const summary = await repository.summarizeMovements!({ projectSiteIds: ["55555555-5555-4555-8555-555555555555"] });
+
+    expect(summary).toEqual({ totalCount: 7, inboundQuantity: 20 });
+    expect(countWhere).toMatchObject({ projectSiteId: { in: ["55555555-5555-4555-8555-555555555555"] } });
+    expect(aggregateWhere).toMatchObject({
+      projectSiteId: { in: ["55555555-5555-4555-8555-555555555555"] },
+      movementType: "inbound",
+    });
   });
 });

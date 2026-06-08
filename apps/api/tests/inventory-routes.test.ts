@@ -12,6 +12,7 @@ import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
 import { type AuthAccountRecord, type AuthRepository } from "../src/modules/auth/auth";
 import {
   InventoryMovementConflictError,
+  type InventoryMovementListFilters,
   type InventoryRepository,
 } from "../src/modules/inventory/inventory";
 import type { MaterialRepository } from "../src/modules/inventory/materialsWarehouses";
@@ -194,28 +195,43 @@ function createFakeMaterialRepository(seed: MaterialDto[] = [makeMaterial()]): M
 function createFakeInventoryRepository(seed: InventoryMovementDto[] = []): InventoryRepository {
   const movements = [...seed];
 
+  const matchesFilters = (movement: InventoryMovementDto, filters: InventoryMovementListFilters): boolean => {
+    const matchesWarehouse = filters.warehouseId ? movement.warehouseId === filters.warehouseId : true;
+    const matchesMaterial = filters.materialId ? movement.materialId === filters.materialId : true;
+    const matchesMovementType = filters.movementType ? movement.movementType === filters.movementType : true;
+    const matchesSourceType = filters.sourceType ? movement.sourceType === filters.sourceType : true;
+    const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(movement.projectSiteId ?? "") : true;
+    const matchesQuery = filters.q
+      ? [movement.movementNo, movement.materialName, movement.materialCode, movement.warehouseCode]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
+      : true;
+    return (
+      matchesWarehouse &&
+      matchesMaterial &&
+      matchesMovementType &&
+      matchesSourceType &&
+      matchesScopedSites &&
+      matchesQuery
+    );
+  };
+
   return {
     async listMovements(filters) {
-      return movements.filter((movement) => {
-        const matchesWarehouse = filters.warehouseId ? movement.warehouseId === filters.warehouseId : true;
-        const matchesMaterial = filters.materialId ? movement.materialId === filters.materialId : true;
-        const matchesMovementType = filters.movementType ? movement.movementType === filters.movementType : true;
-        const matchesSourceType = filters.sourceType ? movement.sourceType === filters.sourceType : true;
-        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(movement.projectSiteId ?? "") : true;
-        const matchesQuery = filters.q
-          ? [movement.movementNo, movement.materialName, movement.materialCode, movement.warehouseCode]
-              .filter(Boolean)
-              .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
-          : true;
-        return (
-          matchesWarehouse &&
-          matchesMaterial &&
-          matchesMovementType &&
-          matchesSourceType &&
-          matchesScopedSites &&
-          matchesQuery
-        );
-      });
+      const matched = movements.filter((movement) => matchesFilters(movement, filters));
+      const offset = filters.offset ?? 0;
+      const limit = filters.limit ?? matched.length;
+      return matched.slice(offset, offset + limit);
+    },
+    async countMovements(filters) {
+      return movements.filter((movement) => matchesFilters(movement, filters)).length;
+    },
+    async summarizeMovements(filters) {
+      const matched = movements.filter((movement) => matchesFilters(movement, filters));
+      const inboundQuantity = matched
+        .filter((movement) => movement.movementType === "inbound")
+        .reduce((sum, movement) => sum + movement.quantity, 0);
+      return { totalCount: matched.length, inboundQuantity };
     },
     async getMovementById(id) {
       return movements.find((movement) => movement.id === id) ?? null;
@@ -350,6 +366,41 @@ describe("inventory movements API", () => {
     expect(response.json()).toMatchObject({
       inventoryMovements: [{ movementNo: "RK20260511001", materialCode: "MAT0001" }],
     });
+  });
+
+  it("paginates movements and reports the exact total beyond the current page", async () => {
+    const seeded = [
+      makeMovement({ id: "11111111-1111-4111-8111-111111111101", movementNo: "RK-PAGE-1" }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111102", movementNo: "RK-PAGE-2" }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111103", movementNo: "RK-PAGE-3" }),
+    ];
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository(seeded) });
+
+    const firstPage = await app.inject({ method: "GET", url: "/api/inventory-movements?limit=2&offset=0" });
+    const secondPage = await app.inject({ method: "GET", url: "/api/inventory-movements?limit=2&offset=2" });
+    await app.close();
+
+    expect(firstPage.json().inventoryMovements).toHaveLength(2);
+    expect(firstPage.json().total).toBe(3);
+    expect(firstPage.headers["x-list-offset"]).toBe("0");
+    expect(secondPage.json().inventoryMovements).toHaveLength(1);
+    expect(secondPage.json().total).toBe(3);
+    expect(secondPage.headers["x-list-offset"]).toBe("2");
+  });
+
+  it("summarizes movement count and inbound quantity over the full set", async () => {
+    const seeded = [
+      makeMovement({ id: "11111111-1111-4111-8111-111111111201", movementNo: "RK-SUM-1", movementType: "inbound", quantity: 12 }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111202", movementNo: "RK-SUM-2", movementType: "inbound", quantity: 8 }),
+      makeMovement({ id: "11111111-1111-4111-8111-111111111203", movementNo: "CK-SUM-1", movementType: "outbound", quantity: -5 }),
+    ];
+    const app = await buildApp({ inventoryRepository: createFakeInventoryRepository(seeded) });
+
+    const response = await app.inject({ method: "GET", url: "/api/inventory-movements/summary" });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ inventoryMovementSummary: { totalCount: 3, inboundQuantity: 20 } });
   });
 
   it("returns movement detail and 404 for missing movement", async () => {
