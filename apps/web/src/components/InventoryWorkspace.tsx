@@ -17,9 +17,13 @@ import { inventoryRiskToBadge } from "./statusMappers";
 
 const INVENTORY_LEDGER_PAGE_SIZE = 20;
 
+type LedgerSortField = "movementNo" | "movementDate" | "quantity";
+
 type InventoryMovementsQuery = {
   movementType?: InventoryMovementTypeCode;
   q?: string;
+  sortField?: LedgerSortField;
+  sortDir?: "asc" | "desc";
   limit: number;
   offset: number;
 };
@@ -87,6 +91,8 @@ async function defaultLoadInventoryMovementsPage(query: InventoryMovementsQuery)
   const params = new URLSearchParams();
   if (query.movementType) params.set("movementType", query.movementType);
   if (query.q) params.set("q", query.q);
+  if (query.sortField) params.set("sortField", query.sortField);
+  if (query.sortDir) params.set("sortDir", query.sortDir);
   params.set("limit", String(query.limit));
   params.set("offset", String(query.offset));
   const payload = await requestJson<{ inventoryMovements: InventoryMovementDto[]; total?: number }>(
@@ -190,6 +196,7 @@ export function InventoryWorkspace({
   const [ledgerQuery, setLedgerQuery] = useState("");
   const [debouncedLedgerQuery, setDebouncedLedgerQuery] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState<"all" | InventoryMovementTypeCode>("all");
+  const [ledgerSort, setLedgerSort] = useState<{ field: LedgerSortField; direction: "asc" | "desc" } | null>(null);
   const ledgerLoadedRef = useRef(false);
   const [movementSummary, setMovementSummary] = useState<MovementSummary>({ totalCount: 0, inboundQuantity: 0 });
   const [summaryRefresh, setSummaryRefresh] = useState(0);
@@ -302,6 +309,8 @@ export function InventoryWorkspace({
     loadInventoryMovementsPage({
       movementType: ledgerFilter === "all" ? undefined : ledgerFilter,
       q: debouncedLedgerQuery || undefined,
+      sortField: ledgerSort?.field,
+      sortDir: ledgerSort?.direction,
       limit: ledgerPageSize,
       offset: ledgerOffset,
     })
@@ -321,7 +330,7 @@ export function InventoryWorkspace({
     return () => {
       mounted = false;
     };
-  }, [activeTab, loadInventoryMovementsPage, ledgerFilter, debouncedLedgerQuery, ledgerOffset, ledgerPageSize]);
+  }, [activeTab, loadInventoryMovementsPage, ledgerFilter, debouncedLedgerQuery, ledgerSort, ledgerOffset, ledgerPageSize]);
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -422,6 +431,15 @@ export function InventoryWorkspace({
   function changeLedgerPageSize(size: number) {
     setLedgerPageSize(size);
     setLedgerOffset(0);
+  }
+  function toggleLedgerSort(field: string) {
+    const next = field as LedgerSortField;
+    setLedgerOffset(0);
+    setLedgerSort((current) =>
+      current && current.field === next
+        ? { field: next, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { field: next, direction: "asc" },
+    );
   }
 
   function updateSelectedMaterial(materialId: string) {
@@ -843,6 +861,12 @@ export function InventoryWorkspace({
                       <small>{movement.handledBy ?? "未记录经办人"}</small>
                     </span>,
                   ])}
+                  sort={{
+                    keys: ["movementNo", "movementDate", null, null, null, "quantity", null],
+                    activeKey: ledgerSort?.field ?? null,
+                    direction: ledgerSort?.direction ?? "asc",
+                    onSort: toggleLedgerSort,
+                  }}
                   onRowClick={(rowIndex) => setSelectedMovementId(ledgerRows[rowIndex]?.id ?? "")}
                 />
               </div>

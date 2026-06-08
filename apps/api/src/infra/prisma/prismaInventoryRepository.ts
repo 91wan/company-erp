@@ -283,6 +283,21 @@ function movementWhere(filters: InventoryMovementListFilters): Prisma.InventoryM
   };
 }
 
+function movementOrderBy(filters: InventoryMovementListFilters): Prisma.InventoryMovementOrderByWithRelationInput[] {
+  const tiebreak: Prisma.InventoryMovementOrderByWithRelationInput[] = [{ createdAt: "desc" }, { movementNo: "asc" }];
+  const dir = filters.sortDir ?? "asc";
+  switch (filters.sortField) {
+    case "movementNo":
+      return [{ movementNo: dir }, { createdAt: "desc" }];
+    case "quantity":
+      return [{ quantity: dir }, ...tiebreak];
+    case "movementDate":
+      return [{ movementDate: dir }, ...tiebreak];
+    default:
+      return [{ movementDate: "desc" }, ...tiebreak];
+  }
+}
+
 async function updatePurchaseReceivingRollup(
   tx: InventoryPrismaTransactionClient,
   purchaseRecordLineId: string,
@@ -330,7 +345,7 @@ export function createPrismaInventoryRepository(prisma: InventoryPrismaClient): 
       const movements = await client.inventoryMovement.findMany({
         where: movementWhere(filters),
         include,
-        orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }, { movementNo: "asc" }],
+        orderBy: movementOrderBy(filters),
         take: filters.limit ?? DEFAULT_LIST_LIMIT,
         skip: filters.offset ?? 0,
       });

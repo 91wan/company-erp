@@ -713,6 +713,46 @@ describe("Company ERP workspace components", () => {
     ).toBeInTheDocument();
   });
 
+  it("sends inventory ledger column sort to the server and resets to the first page", async () => {
+    const loadInventoryMovementsPage = vi.fn(() =>
+      Promise.resolve({ rows: [{ ...inventoryMovement, id: "led-s", movementNo: "RK-SORTED" }], total: 25 }),
+    );
+
+    render(
+      <InventoryWorkspace
+        loadInventoryMovements={() => Promise.resolve([])}
+        loadInventoryMovementsPage={loadInventoryMovementsPage}
+        loadInventoryBalances={() => Promise.resolve([])}
+        loadMaterials={() => Promise.resolve([])}
+        loadWarehouses={() => Promise.resolve([])}
+        loadEmployees={() => Promise.resolve([])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "库存流水" }));
+    await screen.findByText("RK-SORTED");
+
+    // 先翻到第 2 页，确认排序会把页码重置回首页。
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(expect.objectContaining({ offset: 20 })),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数量" }));
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ sortField: "quantity", sortDir: "asc", offset: 0 }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数量" }));
+    await waitFor(() =>
+      expect(loadInventoryMovementsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ sortField: "quantity", sortDir: "desc" }),
+      ),
+    );
+  });
+
   it("wires inventory summary cards to the movement summary endpoint", async () => {
     render(
       <InventoryWorkspace
