@@ -20,7 +20,7 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
       actions={(
         <SummaryPill>
           <ShoppingCart aria-hidden="true" size={18} />
-          {model.purchaseRequests.length + model.purchaseRecords.length} 条采购数据
+          {model.purchaseRequests.length + model.recordTotal} 条采购数据
         </SummaryPill>
       )}
       summary={(
@@ -38,7 +38,7 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
             detail="已准入未采购"
             tone="neutral"
           />
-          <SummaryCard label="采购记录" value={model.purchaseRecords.length} detail="采购执行" tone="info" />
+          <SummaryCard label="采购记录" value={model.recordTotal} detail="采购执行" tone="info" />
         </MetricSummaryGrid>
       )}
       tabs={(
@@ -86,6 +86,13 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
           recordFilter={model.recordFilter}
           recordQuery={model.recordQuery}
           recordStatus={model.recordStatus}
+          recordTotal={model.recordTotal}
+          recordPage={model.recordPage}
+          recordPageCount={model.recordPageCount}
+          canPrevRecordPage={model.canPrevRecordPage}
+          canNextRecordPage={model.canNextRecordPage}
+          onPrevPage={model.goToPrevRecordPage}
+          onNextPage={model.goToNextRecordPage}
           onFilterChange={model.setRecordFilter}
           onQueryChange={model.setRecordQuery}
           onSelectRecord={(record) => model.setSelectedRecordId(record.id)}

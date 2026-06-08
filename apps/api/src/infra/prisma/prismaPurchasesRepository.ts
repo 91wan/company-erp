@@ -387,6 +387,30 @@ export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): Pur
   };
 }
 
+function buildPurchaseRecordWhere(filters: PurchaseRecordListFilters): Prisma.PurchaseRecordWhereInput {
+  return {
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
+    ...(filters.supplierPartyId ? { supplierPartyId: filters.supplierPartyId } : {}),
+    ...(filters.purchaserName ? { purchaserName: { contains: filters.purchaserName, mode: "insensitive" } } : {}),
+    ...(filters.projectSiteIds ? { purchaseRequest: { projectSiteId: { in: [...filters.projectSiteIds] } } } : {}),
+    ...(filters.q
+      ? {
+          OR: [
+            { purchaseNo: { contains: filters.q, mode: "insensitive" } },
+            { purchaserName: { contains: filters.q, mode: "insensitive" } },
+            { purchasePlatform: { contains: filters.q, mode: "insensitive" } },
+            { shopName: { contains: filters.q, mode: "insensitive" } },
+            { supplierNameText: { contains: filters.q, mode: "insensitive" } },
+            { contract: { contractNo: { contains: filters.q, mode: "insensitive" } } },
+            { contract: { contractName: { contains: filters.q, mode: "insensitive" } } },
+            { lines: { some: { materialName: { contains: filters.q, mode: "insensitive" } } } },
+          ],
+        }
+      : {}),
+  };
+}
+
 export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): PurchaseRecordRepository {
   const include = {
     purchaseRequest: { include: { projectSite: true } },
@@ -398,33 +422,16 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
   return {
     async list(filters: PurchaseRecordListFilters) {
       const records = await prisma.purchaseRecord.findMany({
-        where: {
-          ...(filters.status ? { status: filters.status } : {}),
-          ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
-          ...(filters.supplierPartyId ? { supplierPartyId: filters.supplierPartyId } : {}),
-          ...(filters.purchaserName ? { purchaserName: { contains: filters.purchaserName, mode: "insensitive" } } : {}),
-          ...(filters.projectSiteIds ? { purchaseRequest: { projectSiteId: { in: [...filters.projectSiteIds] } } } : {}),
-          ...(filters.q
-            ? {
-                OR: [
-                  { purchaseNo: { contains: filters.q, mode: "insensitive" } },
-                  { purchaserName: { contains: filters.q, mode: "insensitive" } },
-                  { purchasePlatform: { contains: filters.q, mode: "insensitive" } },
-                  { shopName: { contains: filters.q, mode: "insensitive" } },
-                  { supplierNameText: { contains: filters.q, mode: "insensitive" } },
-                  { contract: { contractNo: { contains: filters.q, mode: "insensitive" } } },
-                  { contract: { contractName: { contains: filters.q, mode: "insensitive" } } },
-                  { lines: { some: { materialName: { contains: filters.q, mode: "insensitive" } } } },
-                ],
-              }
-            : {}),
-        },
+        where: buildPurchaseRecordWhere(filters),
         include,
         orderBy: [{ updatedAt: "desc" }, { purchaseNo: "asc" }],
         take: filters.limit ?? DEFAULT_LIST_LIMIT,
         skip: filters.offset ?? 0,
       });
       return records.map(toPurchaseRecordDto);
+    },
+    async count(filters: PurchaseRecordListFilters) {
+      return prisma.purchaseRecord.count({ where: buildPurchaseRecordWhere(filters) });
     },
     async getById(id: string) {
       const record = await prisma.purchaseRecord.findUnique({ where: { id }, include });

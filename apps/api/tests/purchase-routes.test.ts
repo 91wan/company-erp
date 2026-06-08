@@ -8,6 +8,7 @@ import {
   PurchaseRecordConflictError,
   PurchaseRequestConflictError,
   PurchaseRequestStateConflictError,
+  type PurchaseRecordListFilters,
   type PurchaseRecordRepository,
   type PurchaseRequestRepository,
 } from "../src/modules/purchases/purchases";
@@ -242,21 +243,29 @@ function createFakePurchaseRequestRepository(seed: PurchaseRequestDto[] = []): P
 function createFakePurchaseRecordRepository(seed: PurchaseRecordDto[] = []): PurchaseRecordRepository {
   const records = [...seed];
 
+  const matchesFilters = (record: PurchaseRecordDto, filters: PurchaseRecordListFilters): boolean => {
+    const matchesStatus = filters.status ? record.status === filters.status : true;
+    const matchesSource = filters.sourceType ? record.sourceType === filters.sourceType : true;
+    const matchesSupplier = filters.supplierPartyId ? record.supplierPartyId === filters.supplierPartyId : true;
+    const matchesPurchaser = filters.purchaserName ? record.purchaserName.includes(filters.purchaserName) : true;
+    const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(record.projectSiteId ?? "") : true;
+    const matchesQuery = filters.q
+      ? [record.purchaseNo, record.purchasePlatform, record.shopName, record.lines[0]?.materialName]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
+      : true;
+    return matchesStatus && matchesSource && matchesSupplier && matchesPurchaser && matchesScopedSites && matchesQuery;
+  };
+
   return {
     async list(filters) {
-      return records.filter((record) => {
-        const matchesStatus = filters.status ? record.status === filters.status : true;
-        const matchesSource = filters.sourceType ? record.sourceType === filters.sourceType : true;
-        const matchesSupplier = filters.supplierPartyId ? record.supplierPartyId === filters.supplierPartyId : true;
-        const matchesPurchaser = filters.purchaserName ? record.purchaserName.includes(filters.purchaserName) : true;
-        const matchesScopedSites = filters.projectSiteIds ? filters.projectSiteIds.includes(record.projectSiteId ?? "") : true;
-        const matchesQuery = filters.q
-          ? [record.purchaseNo, record.purchasePlatform, record.shopName, record.lines[0]?.materialName]
-              .filter(Boolean)
-              .some((value) => value!.toLowerCase().includes(filters.q!.toLowerCase()))
-          : true;
-        return matchesStatus && matchesSource && matchesSupplier && matchesPurchaser && matchesScopedSites && matchesQuery;
-      });
+      const matched = records.filter((record) => matchesFilters(record, filters));
+      const offset = filters.offset ?? 0;
+      const limit = filters.limit ?? matched.length;
+      return matched.slice(offset, offset + limit);
+    },
+    async count(filters) {
+      return records.filter((record) => matchesFilters(record, filters)).length;
     },
     async getById(id) {
       return records.find((record) => record.id === id) ?? null;
@@ -756,7 +765,7 @@ describe("purchase records API", () => {
     const logs = await auditLogRepository.list({});
     await app.close();
 
-    expect(listResponse.json()).toEqual({ purchaseRecords: [makePurchaseRecord()] });
+    expect(listResponse.json()).toEqual({ purchaseRecords: [makePurchaseRecord()], total: 1 });
     expect(detailResponse.json()).toEqual({ purchaseRecord: makePurchaseRecord() });
     expect(createResponse.statusCode).toBe(201);
     expect(createResponse.json()).toMatchObject({
@@ -770,6 +779,27 @@ describe("purchase records API", () => {
     expect(updateResponse.json()).toMatchObject({ purchaseRecord: { status: "ordered" } });
     expect(logs.map((log) => log.action)).toEqual(["purchase_record.create", "purchase_record.update"]);
     expect(logs.at(0)).toMatchObject({ entityType: "purchase_record", entityId: createResponse.json().purchaseRecord.id });
+  });
+
+  it("paginates records and reports the exact total beyond the current page", async () => {
+    const seeded = [
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333301", purchaseNo: "PO-PAGE-1" }),
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333302", purchaseNo: "PO-PAGE-2" }),
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333303", purchaseNo: "PO-PAGE-3" }),
+    ];
+    const app = await buildApp({ purchaseRecordRepository: createFakePurchaseRecordRepository(seeded) });
+
+    const firstPage = await app.inject({ method: "GET", url: "/api/purchase-records?limit=2&offset=0" });
+    const secondPage = await app.inject({ method: "GET", url: "/api/purchase-records?limit=2&offset=2" });
+    await app.close();
+
+    expect(firstPage.json().purchaseRecords).toHaveLength(2);
+    expect(firstPage.json().total).toBe(3);
+    expect(firstPage.headers["x-list-limit"]).toBe("2");
+    expect(firstPage.headers["x-list-offset"]).toBe("0");
+    expect(secondPage.json().purchaseRecords).toHaveLength(1);
+    expect(secondPage.json().total).toBe(3);
+    expect(secondPage.headers["x-list-offset"]).toBe("2");
   });
 
   it("blocks purchase records linked to unapproved purchase requests", async () => {

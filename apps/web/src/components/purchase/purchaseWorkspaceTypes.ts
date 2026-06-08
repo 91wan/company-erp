@@ -9,9 +9,23 @@ import type {
   PurchaseSourceTypeCode,
 } from "@company-erp/shared";
 
+export const PURCHASE_RECORD_PAGE_SIZE = 20;
+
+export type PurchaseRecordsQuery = {
+  status?: PurchaseRecordStatusCode;
+  q?: string;
+  limit: number;
+  offset: number;
+};
+
+export type PurchaseRecordsPage = {
+  records: PurchaseRecordDto[];
+  total: number;
+};
+
 export type PurchaseWorkspaceProps = {
   loadPurchaseRequests?: () => Promise<PurchaseRequestDto[]>;
-  loadPurchaseRecords?: () => Promise<PurchaseRecordDto[]>;
+  loadPurchaseRecords?: (query: PurchaseRecordsQuery) => Promise<PurchaseRecordDto[] | PurchaseRecordsPage>;
   loadContracts?: () => Promise<ContractDto[]>;
   createPurchaseRequest?: (input: CreatePurchaseRequestInput) => Promise<PurchaseRequestDto>;
   createPurchaseRecord?: (input: CreatePurchaseRecordInput) => Promise<PurchaseRecordDto>;

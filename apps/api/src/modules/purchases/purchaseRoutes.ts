@@ -225,9 +225,12 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
         ...(scope ? { projectSiteIds: scope } : {}),
       };
       const purchaseRecords = await options.purchaseRecordRepository.list(filters);
+      const total = options.purchaseRecordRepository.count
+        ? await options.purchaseRecordRepository.count(filters)
+        : purchaseRecords.length;
       reply.header("X-List-Limit", String(filters.limit ?? DEFAULT_LIST_LIMIT));
       reply.header("X-List-Offset", String(filters.offset ?? 0));
-      return { purchaseRecords };
+      return { purchaseRecords, total };
     } catch (error) {
       if (error instanceof PurchaseRecordValidationError) {
         return reply.status(400).send({ error: "PURCHASE_RECORD_VALIDATION_FAILED", issues: error.issues });

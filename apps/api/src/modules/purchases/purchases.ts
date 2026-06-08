@@ -62,6 +62,7 @@ export type PurchaseRequestReviewInput = {
 
 export type PurchaseRecordRepository = {
   list(filters: PurchaseRecordListFilters): Promise<PurchaseRecordDto[]>;
+  count?(filters: PurchaseRecordListFilters): Promise<number>;
   getById(id: string): Promise<PurchaseRecordDto | null>;
   create(input: CreatePurchaseRecordInput): Promise<PurchaseRecordDto>;
   update(id: string, input: UpdatePurchaseRecordInput): Promise<PurchaseRecordDto | null>;
