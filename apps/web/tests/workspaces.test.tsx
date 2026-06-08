@@ -438,7 +438,8 @@ describe("Company ERP workspace components", () => {
       (_, element) => element?.classList.contains("workspace-pagination-summary") ?? false,
     );
     expect(summary.textContent).toContain("共 25 条");
-    expect(summary.textContent).toContain("第 1 / 2 页");
+    const jump = screen.getByLabelText("跳转到页码") as HTMLInputElement;
+    expect(jump.value).toBe("1");
     expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
@@ -446,9 +447,48 @@ describe("Company ERP workspace components", () => {
     await waitFor(() =>
       expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 20 })),
     );
-    await waitFor(() => expect(summary.textContent).toContain("第 2 / 2 页"));
+    await waitFor(() => expect(jump.value).toBe("2"));
     expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "上一页" })).not.toBeDisabled();
+  });
+
+  it("changes page size and jumps to a page server-side, keeping rows during refetch", async () => {
+    const loadPurchaseRecords = vi.fn((query: { limit: number; offset: number }) => {
+      const total = 130;
+      const remaining = Math.max(0, total - query.offset);
+      const pageLength = Math.min(query.limit, remaining);
+      const records = Array.from({ length: pageLength }, (_, index) => ({
+        ...purchaseRecord,
+        id: `rec-${query.offset}-${index}`,
+        purchaseNo: `PO-${query.offset}-${index}`,
+      }));
+      return Promise.resolve({ records, total });
+    });
+
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={loadPurchaseRecords}
+        loadContracts={() => Promise.resolve([])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 0 })),
+    );
+
+    fireEvent.change(screen.getByLabelText("每页条数"), { target: { value: "50" } });
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 })),
+    );
+
+    const jump = screen.getByLabelText("跳转到页码") as HTMLInputElement;
+    fireEvent.change(jump, { target: { value: "3" } });
+    fireEvent.keyDown(jump, { key: "Enter" });
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 100 })),
+    );
   });
 
   it("generates replenishment suggestions and converts one to a purchase request", async () => {

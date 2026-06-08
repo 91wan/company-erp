@@ -89,10 +89,15 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
           recordTotal={model.recordTotal}
           recordPage={model.recordPage}
           recordPageCount={model.recordPageCount}
+          recordPageSize={model.recordPageSize}
+          recordRefetching={model.recordRefetching}
+          recordSearchActive={model.recordSearchActive}
           canPrevRecordPage={model.canPrevRecordPage}
           canNextRecordPage={model.canNextRecordPage}
           onPrevPage={model.goToPrevRecordPage}
           onNextPage={model.goToNextRecordPage}
+          onJumpPage={model.goToRecordPage}
+          onPageSizeChange={model.changeRecordPageSize}
           onFilterChange={model.setRecordFilter}
           onQueryChange={model.setRecordQuery}
           onSelectRecord={(record) => model.setSelectedRecordId(record.id)}
