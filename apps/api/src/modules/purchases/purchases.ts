@@ -31,6 +31,8 @@ export type PurchaseRecordListFilters = {
   purchaserName?: string;
   projectSiteIds?: readonly string[];
   q?: string;
+  sortField?: "purchaseDate" | "purchaseNo";
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 };
@@ -106,6 +108,7 @@ export class PurchaseRecordValidationError extends Error {
 const requestStatuses = new Set(PURCHASE_REQUEST_STATUSES.map((status) => status.code));
 const recordStatuses = new Set(PURCHASE_RECORD_STATUSES.map((status) => status.code));
 const sourceTypes = new Set(PURCHASE_SOURCE_TYPES.map((sourceType) => sourceType.code));
+const recordSortFields = new Set(["purchaseDate", "purchaseNo"]);
 const patchableRequestStatuses = new Set<PurchaseRequestStatusCode>(["draft", "cancelled"]);
 
 function normalizeNullableString(value: unknown): string | null | undefined {
@@ -425,6 +428,19 @@ export function normalizePurchaseRecordFilters(query: Record<string, unknown>): 
 
   for (const field of ["supplierPartyId", "purchaserName", "q"] as const) {
     if (typeof query[field] === "string" && query[field].trim()) filters[field] = query[field].trim();
+  }
+
+  if (query.sortField !== undefined) {
+    if (typeof query.sortField !== "string" || !recordSortFields.has(query.sortField)) {
+      throw new PurchaseRecordValidationError(["sortField is unsupported"]);
+    }
+    filters.sortField = query.sortField as PurchaseRecordListFilters["sortField"];
+  }
+  if (query.sortDir !== undefined) {
+    if (query.sortDir !== "asc" && query.sortDir !== "desc") {
+      throw new PurchaseRecordValidationError(["sortDir is unsupported"]);
+    }
+    filters.sortDir = query.sortDir;
   }
 
   const paging = normalizeListPaging(query);

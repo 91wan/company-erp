@@ -10,6 +10,7 @@ import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
 import type {
   PurchasePendingReviewAction,
   PurchaseRecordFilter,
+  PurchaseRecordSortField,
   PurchaseRecordsPage,
   PurchaseRecordsQuery,
   PurchaseRequestFilter,
@@ -34,6 +35,8 @@ function buildRecordsSearch(query: PurchaseRecordsQuery): string {
   const params = new URLSearchParams();
   if (query.status) params.set("status", query.status);
   if (query.q) params.set("q", query.q);
+  if (query.sortField) params.set("sortField", query.sortField);
+  if (query.sortDir) params.set("sortDir", query.sortDir);
   params.set("limit", String(query.limit));
   params.set("offset", String(query.offset));
   return params.toString();
@@ -116,6 +119,7 @@ export function usePurchaseWorkspaceController({
   const [debouncedRecordQuery, setDebouncedRecordQuery] = useState("");
   const [requestFilter, setRequestFilter] = useState<PurchaseRequestFilter>("all");
   const [recordFilter, setRecordFilter] = useState<PurchaseRecordFilter>("all");
+  const [recordSort, setRecordSort] = useState<{ field: PurchaseRecordSortField; direction: "asc" | "desc" } | null>(null);
   const [recordOffset, setRecordOffset] = useState(0);
   const [recordTotal, setRecordTotal] = useState(0);
   const [recordPageSize, setRecordPageSize] = useState(PURCHASE_RECORD_PAGE_SIZE);
@@ -172,6 +176,8 @@ export function usePurchaseWorkspaceController({
       loadPurchaseRecords({
         status: recordFilter === "all" ? undefined : recordFilter,
         q: debouncedRecordQuery || undefined,
+        sortField: recordSort?.field,
+        sortDir: recordSort?.direction,
         limit: recordPageSize,
         offset: recordOffset,
       }),
@@ -193,7 +199,7 @@ export function usePurchaseWorkspaceController({
     return () => {
       mounted = false;
     };
-  }, [loadPurchaseRecords, recordFilter, debouncedRecordQuery, recordOffset, recordPageSize]);
+  }, [loadPurchaseRecords, recordFilter, debouncedRecordQuery, recordSort, recordOffset, recordPageSize]);
 
   useEffect(() => {
     let mounted = true;
@@ -246,6 +252,15 @@ export function usePurchaseWorkspaceController({
   const changeRecordPageSize = (size: number) => {
     setRecordOffset(0);
     setRecordPageSize(size);
+  };
+  // 排序走服务端：变更排序列/方向时回到第一页，用新顺序从头分页。
+  const changeRecordSort = (field: PurchaseRecordSortField) => {
+    setRecordOffset(0);
+    setRecordSort((current) =>
+      current && current.field === field
+        ? { field, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { field, direction: "asc" },
+    );
   };
   // 区分「暂无数据」与「未找到匹配」：有筛选或搜索词时按搜索无结果处理。
   const recordSearchActive = recordFilter !== "all" || debouncedRecordQuery.length > 0;
@@ -377,6 +392,9 @@ export function usePurchaseWorkspaceController({
     recordPageSize,
     recordRefetching,
     recordSearchActive,
+    recordSortField: recordSort?.field ?? null,
+    recordSortDir: recordSort?.direction ?? "asc",
+    changeRecordSort,
     canPrevRecordPage,
     canNextRecordPage,
     goToPrevRecordPage,

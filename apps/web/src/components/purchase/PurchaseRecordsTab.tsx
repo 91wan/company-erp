@@ -7,7 +7,7 @@ import {
   PurchaseRecordsTable,
   PurchaseStateMessage,
 } from "./PurchaseWorkspaceParts";
-import type { PurchaseRecordFilter } from "./purchaseWorkspaceTypes";
+import type { PurchaseRecordFilter, PurchaseRecordSortField } from "./purchaseWorkspaceTypes";
 
 export function PurchaseRecordsTab({
   filteredRecords,
@@ -29,6 +29,9 @@ export function PurchaseRecordsTab({
   onFilterChange,
   onQueryChange,
   onSelectRecord,
+  recordSortField,
+  recordSortDir,
+  onSortRecord,
 }: {
   filteredRecords: PurchaseRecordDto[];
   recordFilter: PurchaseRecordFilter;
@@ -49,6 +52,9 @@ export function PurchaseRecordsTab({
   onFilterChange: (value: PurchaseRecordFilter) => void;
   onQueryChange: (value: string) => void;
   onSelectRecord: (record: PurchaseRecordDto) => void;
+  recordSortField: string | null;
+  recordSortDir: "asc" | "desc";
+  onSortRecord: (field: PurchaseRecordSortField) => void;
 }) {
   return (
     <WorkspaceSectionStack>
@@ -68,7 +74,11 @@ export function PurchaseRecordsTab({
         ) : null}
         {recordStatus === "ready" && filteredRecords.length > 0 ? (
           <div className={recordRefetching ? "workspace-list-refetching" : undefined}>
-            <PurchaseRecordsTable records={filteredRecords} onSelectRecord={onSelectRecord} />
+            <PurchaseRecordsTable
+              records={filteredRecords}
+              onSelectRecord={onSelectRecord}
+              sort={{ activeField: recordSortField, direction: recordSortDir, onSort: onSortRecord }}
+            />
           </div>
         ) : null}
         {recordStatus === "ready" && recordTotal > 0 ? (

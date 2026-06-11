@@ -11,9 +11,13 @@ import type {
 
 export const PURCHASE_RECORD_PAGE_SIZE = 20;
 
+export type PurchaseRecordSortField = "purchaseDate" | "purchaseNo";
+
 export type PurchaseRecordsQuery = {
   status?: PurchaseRecordStatusCode;
   q?: string;
+  sortField?: PurchaseRecordSortField;
+  sortDir?: "asc" | "desc";
   limit: number;
   offset: number;
 };

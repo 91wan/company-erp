@@ -11,7 +11,14 @@ import {
   PURCHASE_REQUEST_STATUSES,
   PURCHASE_SOURCE_TYPES,
 } from "@company-erp/shared";
-import { StatusBadge, Toolbar as UiToolbar, WorkspaceTableContainer } from "../ui";
+import { SortHeaderButton, StatusBadge, Toolbar as UiToolbar, WorkspaceTableContainer } from "../ui";
+import type { PurchaseRecordSortField } from "./purchaseWorkspaceTypes";
+
+export type PurchaseRecordsSort = {
+  activeField: string | null;
+  direction: "asc" | "desc";
+  onSort: (field: PurchaseRecordSortField) => void;
+};
 
 const requestStatusLabel = new Map(PURCHASE_REQUEST_STATUSES.map((status) => [status.code, status.label]));
 const recordStatusLabel = new Map(PURCHASE_RECORD_STATUSES.map((status) => [status.code, status.label]));
@@ -122,18 +129,28 @@ export function PurchaseRequestsTable({
   );
 }
 
-export function PurchaseRecordsTable({ records, onSelectRecord }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void }) {
+function SortableRecordTh({ label, field, sort }: { label: string; field: PurchaseRecordSortField; sort?: PurchaseRecordsSort }) {
+  if (!sort) return <th>{label}</th>;
+  const active = sort.activeField === field;
+  return (
+    <th aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+      <SortHeaderButton label={label} active={active} direction={sort.direction} onClick={() => sort.onSort(field)} />
+    </th>
+  );
+}
+
+export function PurchaseRecordsTable({ records, onSelectRecord, sort }: { records: PurchaseRecordDto[]; onSelectRecord: (record: PurchaseRecordDto) => void; sort?: PurchaseRecordsSort }) {
   return (
     <WorkspaceTableContainer>
       <table>
         <thead>
           <tr>
-            <th>采购单号</th>
+            <SortableRecordTh label="采购单号" field="purchaseNo" sort={sort} />
             <th>采购人</th>
             <th>来源</th>
             <th>供应商/平台/店铺</th>
             <th>物料/数量</th>
-            <th>采购日期</th>
+            <SortableRecordTh label="采购日期" field="purchaseDate" sort={sort} />
             <th>状态</th>
           </tr>
         </thead>

@@ -91,4 +91,23 @@ describe("Prisma purchase repositories", () => {
       purchaseRequest: { projectSiteId: { in: ["site-1", "site-2"] } },
     });
   });
+
+  it("orders records by the requested sort field and falls back to recency by default", async () => {
+    const findManyCalls: Array<{ orderBy?: unknown }> = [];
+    const prisma = {
+      purchaseRecord: {
+        async findMany(args: { orderBy?: unknown }) {
+          findManyCalls.push(args);
+          return [];
+        },
+      },
+    } as unknown as PrismaClient;
+
+    const repository = createPrismaPurchaseRecordRepository(prisma);
+    await repository.list({ sortField: "purchaseDate", sortDir: "desc" });
+    await repository.list({});
+
+    expect(findManyCalls[0]?.orderBy).toEqual([{ purchaseDate: "desc" }, { purchaseNo: "asc" }]);
+    expect(findManyCalls[1]?.orderBy).toEqual([{ updatedAt: "desc" }, { purchaseNo: "asc" }]);
+  });
 });
