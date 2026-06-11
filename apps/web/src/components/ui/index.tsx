@@ -151,6 +151,25 @@ export type DataTableSort = {
   onSort: (key: string) => void;
 };
 
+export function SortHeaderButton({
+  label,
+  active,
+  direction,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  direction: "asc" | "desc";
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="ui-th-sort" onClick={onClick}>
+      {label}
+      <span aria-hidden="true" className="ui-th-sort-icon">{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</span>
+    </button>
+  );
+}
+
 export function DataTable({
   headers,
   rows,
@@ -180,10 +199,7 @@ export function DataTable({
               const active = sort.activeKey === sortKey;
               return (
                 <th key={header} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button type="button" className="ui-th-sort" onClick={() => sort.onSort(sortKey)}>
-                    {header}
-                    <span aria-hidden="true" className="ui-th-sort-icon">{active ? (sort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                  </button>
+                  <SortHeaderButton label={header} active={active} direction={sort.direction} onClick={() => sort.onSort(sortKey)} />
                 </th>
               );
             })}

@@ -491,6 +491,51 @@ describe("Company ERP workspace components", () => {
     );
   });
 
+  it("sorts purchase records server-side via column header and resets to the first page", async () => {
+    const loadPurchaseRecords = vi.fn((query: { limit: number; offset: number; sortField?: string; sortDir?: string }) => {
+      const total = 25;
+      const pageLength = query.offset === 0 ? query.limit : total - query.offset;
+      const records = Array.from({ length: pageLength }, (_, index) => ({
+        ...purchaseRecord,
+        id: `rec-${query.offset}-${index}`,
+        purchaseNo: `PO-${query.offset}-${index}`,
+      }));
+      return Promise.resolve({ records, total });
+    });
+
+    render(
+      <PurchaseWorkspace
+        loadPurchaseRequests={() => Promise.resolve([])}
+        loadPurchaseRecords={loadPurchaseRecords}
+        loadContracts={() => Promise.resolve([])}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "采购执行" }));
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 0 })),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(expect.objectContaining({ offset: 20 })),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "采购日期" }));
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ sortField: "purchaseDate", sortDir: "asc", offset: 0 }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "采购日期" }));
+    await waitFor(() =>
+      expect(loadPurchaseRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ sortField: "purchaseDate", sortDir: "desc" }),
+      ),
+    );
+  });
+
   it("generates replenishment suggestions and converts one to a purchase request", async () => {
     const convertedRequest = {
       ...purchaseRequest,

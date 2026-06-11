@@ -101,6 +101,9 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
           onFilterChange={model.setRecordFilter}
           onQueryChange={model.setRecordQuery}
           onSelectRecord={(record) => model.setSelectedRecordId(record.id)}
+          recordSortField={model.recordSortField}
+          recordSortDir={model.recordSortDir}
+          onSortRecord={model.changeRecordSort}
         />
       ) : null}
       {model.activeTab === "arrivals" ? <PurchaseArrivalsTab /> : null}

@@ -411,6 +411,18 @@ function buildPurchaseRecordWhere(filters: PurchaseRecordListFilters): Prisma.Pu
   };
 }
 
+function purchaseRecordOrderBy(filters: PurchaseRecordListFilters): Prisma.PurchaseRecordOrderByWithRelationInput[] {
+  const dir = filters.sortDir ?? "asc";
+  switch (filters.sortField) {
+    case "purchaseNo":
+      return [{ purchaseNo: dir }];
+    case "purchaseDate":
+      return [{ purchaseDate: dir }, { purchaseNo: "asc" }];
+    default:
+      return [{ updatedAt: "desc" }, { purchaseNo: "asc" }];
+  }
+}
+
 export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): PurchaseRecordRepository {
   const include = {
     purchaseRequest: { include: { projectSite: true } },
@@ -424,7 +436,7 @@ export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): Purc
       const records = await prisma.purchaseRecord.findMany({
         where: buildPurchaseRecordWhere(filters),
         include,
-        orderBy: [{ updatedAt: "desc" }, { purchaseNo: "asc" }],
+        orderBy: purchaseRecordOrderBy(filters),
         take: filters.limit ?? DEFAULT_LIST_LIMIT,
         skip: filters.offset ?? 0,
       });

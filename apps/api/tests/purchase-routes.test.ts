@@ -260,6 +260,11 @@ function createFakePurchaseRecordRepository(seed: PurchaseRecordDto[] = []): Pur
   return {
     async list(filters) {
       const matched = records.filter((record) => matchesFilters(record, filters));
+      if (filters.sortField) {
+        const dir = filters.sortDir === "desc" ? -1 : 1;
+        const field = filters.sortField;
+        matched.sort((a, b) => String(a[field] ?? "").localeCompare(String(b[field] ?? "")) * dir);
+      }
       const offset = filters.offset ?? 0;
       const limit = filters.limit ?? matched.length;
       return matched.slice(offset, offset + limit);
@@ -800,6 +805,25 @@ describe("purchase records API", () => {
     expect(secondPage.json().purchaseRecords).toHaveLength(1);
     expect(secondPage.json().total).toBe(3);
     expect(secondPage.headers["x-list-offset"]).toBe("2");
+  });
+
+  it("sorts records by the requested field and rejects unknown sort fields", async () => {
+    const seeded = [
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333401", purchaseNo: "PO-SORT-2" }),
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333402", purchaseNo: "PO-SORT-1" }),
+      makePurchaseRecord({ id: "33333333-3333-4333-8333-333333333403", purchaseNo: "PO-SORT-3" }),
+    ];
+    const app = await buildApp({ purchaseRecordRepository: createFakePurchaseRecordRepository(seeded) });
+
+    const asc = await app.inject({ method: "GET", url: "/api/purchase-records?sortField=purchaseNo&sortDir=asc" });
+    const desc = await app.inject({ method: "GET", url: "/api/purchase-records?sortField=purchaseNo&sortDir=desc" });
+    const invalid = await app.inject({ method: "GET", url: "/api/purchase-records?sortField=bogus" });
+    await app.close();
+
+    expect(asc.json().purchaseRecords.map((record: PurchaseRecordDto) => record.purchaseNo)).toEqual(["PO-SORT-1", "PO-SORT-2", "PO-SORT-3"]);
+    expect(desc.json().purchaseRecords.map((record: PurchaseRecordDto) => record.purchaseNo)).toEqual(["PO-SORT-3", "PO-SORT-2", "PO-SORT-1"]);
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().error).toBe("PURCHASE_RECORD_VALIDATION_FAILED");
   });
 
   it("blocks purchase records linked to unapproved purchase requests", async () => {
