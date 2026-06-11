@@ -415,20 +415,25 @@
 
 .detail-grid {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 10px 14px;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 12px 16px;
   margin: 0;
   color: var(--ink);
   font-size: 13px;
 }
 
+/* 抽屉层级：标签轻而小、值重而深，拉开主次。 */
 .detail-grid dt {
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 560;
+  font-size: 12px;
+  letter-spacing: 0.01em;
 }
 
 .detail-grid dd {
   margin: 0;
+  color: var(--ink);
+  font-weight: 560;
   overflow-wrap: anywhere;
 }
 

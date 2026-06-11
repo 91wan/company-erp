@@ -35,6 +35,28 @@ th:first-child {
   padding-left: 14px;
 }
 
+/* 关键列高亮：首列是行的身份（单号/编码），加重便于扫读。 */
+tbody td:first-child {
+  color: #101828;
+  font-weight: 660;
+}
+
+/* 窄屏适配：横向滚动时首列吸附，身份列始终可见。 */
+th:first-child,
+td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+th:first-child {
+  background: #fbfcfe;
+}
+
+td:first-child {
+  background: #ffffff;
+}
+
 tbody tr:last-child td {
   border-bottom: 0;
 }
