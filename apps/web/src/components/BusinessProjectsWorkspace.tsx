@@ -26,6 +26,7 @@ import {
   SummaryCard,
   Toolbar,
   WorkspaceScaffold,
+  useToast,
   type TabItem,
 } from "./ui";
 
@@ -138,6 +139,7 @@ export function BusinessProjectsWorkspace({
   const [submitState, setSubmitState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const toast = useToast();
   const [form, setForm] = useState<FormState>({
     projectCode: "",
     projectName: "",
@@ -272,6 +274,7 @@ export function BusinessProjectsWorkspace({
       });
       setIsCreateDrawerOpen(false);
       setSubmitState("saved");
+      toast.notify("业务项目已保存", "success");
     } catch {
       setSubmitState("error");
     }
@@ -603,9 +606,6 @@ export function BusinessProjectsWorkspace({
               }
             />
           </label>
-          {submitState === "saved" ? (
-            <p className="form-success">业务项目已保存。</p>
-          ) : null}
           {submitState === "error" ? (
             <p className="form-error">
               业务项目保存失败，请检查编码、日期或负责人。
