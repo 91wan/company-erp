@@ -22,7 +22,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
-import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold, useToast } from "./ui";
+import { DetailDrawer, EmptyState, FieldError, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold, useFormErrors, useToast } from "./ui";
 import { contractExpiryToBadge } from "./statusMappers";
 
 type ContractsWorkspaceProps = {
@@ -130,6 +130,15 @@ export function ContractsWorkspace({
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
   const toast = useToast();
+  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+    | "contractNo"
+    | "contractName"
+    | "counterpartyPartyId"
+    | "startDate"
+    | "endDate"
+    | "amount"
+    | "budgetAmount"
+  >();
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
   const [activeTab, setActiveTab] = useState<ContractTab>(isContractTab(initialTab) ? initialTab : "risk");
   const [selectedContractId, setSelectedContractId] = useState("");
@@ -250,6 +259,25 @@ export function ContractsWorkspace({
 
   async function handleContractSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const endDateError =
+      contractForm.contractForm !== "framework" && !contractForm.endDate
+        ? "请填写结束日期"
+        : contractForm.startDate &&
+            contractForm.endDate &&
+            contractForm.endDate < contractForm.startDate
+          ? "结束日期不能早于开始日期"
+          : undefined;
+    const negativeAmount = (value: string) => value.trim() !== "" && Number(value) < 0;
+    const valid = validate({
+      contractNo: contractForm.contractNo.trim() ? undefined : "请填写合同编号",
+      contractName: contractForm.contractName.trim() ? undefined : "请填写合同名称",
+      counterpartyPartyId: contractForm.counterpartyPartyId ? undefined : "请选择相对方",
+      startDate: contractForm.startDate ? undefined : "请填写开始日期",
+      endDate: endDateError,
+      amount: negativeAmount(contractForm.amount) ? "金额不能为负" : undefined,
+      budgetAmount: negativeAmount(contractForm.budgetAmount) ? "金额不能为负" : undefined,
+    });
+    if (!valid) return;
     setContractSubmitState("saving");
     setContractSubmitError("");
 
@@ -359,7 +387,7 @@ export function ContractsWorkspace({
         </SectionCard>
 
         <FormDrawer title="新增合同" open={openFormDrawer === "contract"} onClose={() => setOpenFormDrawer(null)}>
-          {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleContractSubmit} noValidate>
+          {canManage ? <form ref={formRef} className="dashboard-panel workspace-form" onSubmit={handleContractSubmit} noValidate>
           <div className="panel-header">
             <h3>新增合同</h3>
             <button type="submit" disabled={contractSubmitState === "saving" || !hasCounterparties}>
@@ -372,15 +400,17 @@ export function ContractsWorkspace({
           {masterStatus === "ready" && !hasCounterparties ? <p className="form-error">缺少往来方资料，暂不能新增合同。</p> : null}
           <label>
             <span>合同编号</span>
-            <input required value={contractForm.contractNo} onChange={(event) => setContractForm((current) => ({ ...current, contractNo: event.target.value }))} />
+            <input {...fieldProps("contractNo")} required value={contractForm.contractNo} onChange={(event) => { clearError("contractNo"); setContractForm((current) => ({ ...current, contractNo: event.target.value })); }} />
           </label>
+          <FieldError name="contractNo" errors={errors} />
           <label>
             <span>合同名称</span>
-            <input required value={contractForm.contractName} onChange={(event) => setContractForm((current) => ({ ...current, contractName: event.target.value }))} />
+            <input {...fieldProps("contractName")} required value={contractForm.contractName} onChange={(event) => { clearError("contractName"); setContractForm((current) => ({ ...current, contractName: event.target.value })); }} />
           </label>
+          <FieldError name="contractName" errors={errors} />
           <label>
             <span>相对方</span>
-            <select required value={contractForm.counterpartyPartyId} onChange={(event) => setContractForm((current) => ({ ...current, counterpartyPartyId: event.target.value }))}>
+            <select {...fieldProps("counterpartyPartyId")} required value={contractForm.counterpartyPartyId} onChange={(event) => { clearError("counterpartyPartyId"); setContractForm((current) => ({ ...current, counterpartyPartyId: event.target.value })); }}>
               {parties.map((party) => (
                 <option key={party.id} value={party.id}>
                   {party.partyCode} {party.partyName}
@@ -388,6 +418,7 @@ export function ContractsWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="counterpartyPartyId" errors={errors} />
           <label>
             <span>合同方向</span>
             <select value={contractForm.direction} onChange={(event) => setContractForm((current) => ({ ...current, direction: event.target.value as ContractDirectionCode }))}>
@@ -467,20 +498,24 @@ export function ContractsWorkspace({
           </label>
           <label>
             <span>开始日期</span>
-            <input required type="date" value={contractForm.startDate} onChange={(event) => setContractForm((current) => ({ ...current, startDate: event.target.value }))} />
+            <input {...fieldProps("startDate")} required type="date" value={contractForm.startDate} onChange={(event) => { clearError("startDate"); clearError("endDate"); setContractForm((current) => ({ ...current, startDate: event.target.value })); }} />
           </label>
+          <FieldError name="startDate" errors={errors} />
           <label>
             <span>结束日期（框架合同可空）</span>
-            <input aria-label="结束日期" required={contractForm.contractForm !== "framework"} type="date" value={contractForm.endDate} onChange={(event) => setContractForm((current) => ({ ...current, endDate: event.target.value }))} />
+            <input {...fieldProps("endDate")} aria-label="结束日期" required={contractForm.contractForm !== "framework"} type="date" value={contractForm.endDate} onChange={(event) => { clearError("endDate"); setContractForm((current) => ({ ...current, endDate: event.target.value })); }} />
           </label>
+          <FieldError name="endDate" errors={errors} />
           <label>
             <span>合同金额</span>
-            <input type="number" min="0" step="0.01" value={contractForm.amount} onChange={(event) => setContractForm((current) => ({ ...current, amount: event.target.value }))} />
+            <input {...fieldProps("amount")} type="number" min="0" step="0.01" value={contractForm.amount} onChange={(event) => { clearError("amount"); setContractForm((current) => ({ ...current, amount: event.target.value })); }} />
           </label>
+          <FieldError name="amount" errors={errors} />
           <label>
             <span>预算金额</span>
-            <input type="number" min="0" step="0.01" value={contractForm.budgetAmount} onChange={(event) => setContractForm((current) => ({ ...current, budgetAmount: event.target.value }))} />
+            <input {...fieldProps("budgetAmount")} type="number" min="0" step="0.01" value={contractForm.budgetAmount} onChange={(event) => { clearError("budgetAmount"); setContractForm((current) => ({ ...current, budgetAmount: event.target.value })); }} />
           </label>
+          <FieldError name="budgetAmount" errors={errors} />
           <p className="form-hint">正式附件请在合同保存后进入详情的“统一附件”登记；历史主附件引用仅在详情中只读展示。</p>
           <label>
             <span>备注</span>
