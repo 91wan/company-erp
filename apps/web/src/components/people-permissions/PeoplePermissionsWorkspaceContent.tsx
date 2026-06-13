@@ -18,7 +18,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
-import { FormDrawer, SegmentedTabs, SummaryCard, WorkspaceScaffold, useToast, type TabItem } from "../ui";
+import { FieldError, FormDrawer, SegmentedTabs, SummaryCard, WorkspaceScaffold, useFormErrors, useToast, type TabItem } from "../ui";
 import { AssignmentsTab } from "./AssignmentsTab";
 import { DepartmentsTab } from "./DepartmentsTab";
 import { EmployeesTab } from "./EmployeesTab";
@@ -208,6 +208,13 @@ export function PeoplePermissionsWorkspace({
   const [openFormDrawer, setOpenFormDrawer] = useState<PeopleFormDrawer | null>(null);
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
   const toast = useToast();
+  const deptV = useFormErrors<"departmentCode" | "name">();
+  const empV = useFormErrors<"employeeNo" | "name" | "departmentId">();
+  const acctV = useFormErrors<"username" | "initialPassword">();
+  const extV = useFormErrors<
+    "projectSiteId" | "currentContactName" | "currentContactPhone" | "username" | "initialPassword"
+  >();
+  const assignV = useFormErrors<"employeeId" | "projectSiteId">();
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [externalAccountSubmit, setExternalAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
@@ -405,6 +412,13 @@ export function PeoplePermissionsWorkspace({
 
   async function handleDepartmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !deptV.validate({
+        departmentCode: departmentForm.departmentCode.trim() ? undefined : "请填写部门编码",
+        name: departmentForm.name.trim() ? undefined : "请填写部门名称",
+      })
+    )
+      return;
     setDepartmentSubmit("saving");
     setDepartmentSubmitError("");
     try {
@@ -422,6 +436,14 @@ export function PeoplePermissionsWorkspace({
 
   async function handleEmployeeSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !empV.validate({
+        employeeNo: employeeForm.employeeNo.trim() ? undefined : "请填写员工编号",
+        name: employeeForm.name.trim() ? undefined : "请填写员工姓名",
+        departmentId: employeeForm.departmentId ? undefined : "请选择所属部门",
+      })
+    )
+      return;
     setEmployeeSubmit("saving");
     setEmployeeSubmitError("");
     try {
@@ -444,6 +466,13 @@ export function PeoplePermissionsWorkspace({
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !acctV.validate({
+        username: accountForm.username.trim() ? undefined : "请填写登录账号",
+        initialPassword: accountForm.initialPassword.trim() ? undefined : "请填写初始密码",
+      })
+    )
+      return;
     setAccountSubmit("saving");
     setAccountSubmitError("");
     try {
@@ -467,6 +496,16 @@ export function PeoplePermissionsWorkspace({
 
   async function handleExternalAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !extV.validate({
+        projectSiteId: externalAccountForm.projectSiteId ? undefined : "请选择项目点",
+        currentContactName: externalAccountForm.currentContactName.trim() ? undefined : "请填写当前联系人",
+        currentContactPhone: externalAccountForm.currentContactPhone.trim() ? undefined : "请填写手机号",
+        username: externalAccountForm.username.trim() ? undefined : "请填写项目点登录账号",
+        initialPassword: externalAccountForm.initialPassword.trim() ? undefined : "请填写项目点初始密码",
+      })
+    )
+      return;
     setExternalAccountSubmit("saving");
     setExternalAccountSubmitError("");
     try {
@@ -514,6 +553,13 @@ export function PeoplePermissionsWorkspace({
 
   async function handleAssignmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !assignV.validate({
+        employeeId: assignmentForm.employeeId ? undefined : "请选择员工",
+        projectSiteId: assignmentForm.projectSiteId ? undefined : "请选择项目点",
+      })
+    )
+      return;
     setAssignmentSubmit("saving");
     setAssignmentSubmitError("");
     try {
@@ -634,34 +680,38 @@ export function PeoplePermissionsWorkspace({
       {activeTab === "permissions" ? <PermissionMatrixTab /> : null}
 
       <FormDrawer title="新增部门" open={openFormDrawer === "departments"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel workspace-form" onSubmit={handleDepartmentSubmit}>
+        <form ref={deptV.formRef} noValidate className="dashboard-panel workspace-form" onSubmit={handleDepartmentSubmit}>
           <FormHeader title="新增部门" buttonText="保存部门" saving={departmentSubmit === "saving"} />
           <label>
             <span>部门编码</span>
-            <input required value={departmentForm.departmentCode} onChange={(event) => setDepartmentForm((current) => ({ ...current, departmentCode: event.target.value }))} />
+            <input {...deptV.fieldProps("departmentCode")} required value={departmentForm.departmentCode} onChange={(event) => { deptV.clearError("departmentCode"); setDepartmentForm((current) => ({ ...current, departmentCode: event.target.value })); }} />
           </label>
+          <FieldError name="departmentCode" errors={deptV.errors} errorId={deptV.errorId} />
           <label>
             <span>部门名称</span>
-            <input required value={departmentForm.name} onChange={(event) => setDepartmentForm((current) => ({ ...current, name: event.target.value }))} />
+            <input {...deptV.fieldProps("name")} required value={departmentForm.name} onChange={(event) => { deptV.clearError("name"); setDepartmentForm((current) => ({ ...current, name: event.target.value })); }} />
           </label>
+          <FieldError name="name" errors={deptV.errors} errorId={deptV.errorId} />
           {departmentSubmit === "error" ? <p className="form-error">{departmentSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form>
       </FormDrawer>
 
       <FormDrawer title="新增员工" open={openFormDrawer === "employees"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel workspace-form" onSubmit={handleEmployeeSubmit}>
+        <form ref={empV.formRef} noValidate className="dashboard-panel workspace-form" onSubmit={handleEmployeeSubmit}>
           <FormHeader title="新增员工" buttonText="保存员工" saving={employeeSubmit === "saving"} />
           <label>
             <span>员工编号</span>
-            <input required value={employeeForm.employeeNo} onChange={(event) => setEmployeeForm((current) => ({ ...current, employeeNo: event.target.value }))} />
+            <input {...empV.fieldProps("employeeNo")} required value={employeeForm.employeeNo} onChange={(event) => { empV.clearError("employeeNo"); setEmployeeForm((current) => ({ ...current, employeeNo: event.target.value })); }} />
           </label>
+          <FieldError name="employeeNo" errors={empV.errors} errorId={empV.errorId} />
           <label>
             <span>员工姓名</span>
-            <input required value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} />
+            <input {...empV.fieldProps("name")} required value={employeeForm.name} onChange={(event) => { empV.clearError("name"); setEmployeeForm((current) => ({ ...current, name: event.target.value })); }} />
           </label>
+          <FieldError name="name" errors={empV.errors} errorId={empV.errorId} />
           <label>
             <span>所属部门</span>
-            <select required value={employeeForm.departmentId} onChange={(event) => setEmployeeForm((current) => ({ ...current, departmentId: event.target.value }))}>
+            <select {...empV.fieldProps("departmentId")} required value={employeeForm.departmentId} onChange={(event) => { empV.clearError("departmentId"); setEmployeeForm((current) => ({ ...current, departmentId: event.target.value })); }}>
               <option value="">请选择</option>
               {departments.map((department) => (
                 <option key={department.id} value={department.id}>
@@ -670,12 +720,13 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="departmentId" errors={empV.errors} errorId={empV.errorId} />
           {employeeSubmit === "error" ? <p className="form-error">{employeeSubmitError || "保存失败，请检查唯一编码或稍后重试。"}</p> : null}
         </form>
       </FormDrawer>
 
       <FormDrawer title="新增账号" open={openFormDrawer === "userAccounts"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel workspace-form" onSubmit={handleAccountSubmit}>
+        <form ref={acctV.formRef} noValidate className="dashboard-panel workspace-form" onSubmit={handleAccountSubmit}>
           <FormHeader title="新增账号" buttonText="保存账号" saving={accountSubmit === "saving"} />
           <label>
             <span>绑定员工</span>
@@ -690,12 +741,14 @@ export function PeoplePermissionsWorkspace({
           </label>
           <label>
             <span>登录账号</span>
-            <input required value={accountForm.username} onChange={(event) => setAccountForm((current) => ({ ...current, username: event.target.value }))} />
+            <input {...acctV.fieldProps("username")} required value={accountForm.username} onChange={(event) => { acctV.clearError("username"); setAccountForm((current) => ({ ...current, username: event.target.value })); }} />
           </label>
+          <FieldError name="username" errors={acctV.errors} errorId={acctV.errorId} />
           <label>
             <span>初始密码</span>
-            <input required type="password" value={accountForm.initialPassword} onChange={(event) => setAccountForm((current) => ({ ...current, initialPassword: event.target.value }))} />
+            <input {...acctV.fieldProps("initialPassword")} required type="password" value={accountForm.initialPassword} onChange={(event) => { acctV.clearError("initialPassword"); setAccountForm((current) => ({ ...current, initialPassword: event.target.value })); }} />
           </label>
+          <FieldError name="initialPassword" errors={acctV.errors} errorId={acctV.errorId} />
           <fieldset>
             <legend>固定角色</legend>
             {MVP_ROLES.map((role) => (
@@ -710,15 +763,17 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增项目点账号" open={openFormDrawer === "externalAccounts"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel workspace-form" onSubmit={handleExternalAccountSubmit}>
+        <form ref={extV.formRef} noValidate className="dashboard-panel workspace-form" onSubmit={handleExternalAccountSubmit}>
           <FormHeader title="新增项目点账号" buttonText="保存项目点账号" saving={externalAccountSubmit === "saving"} />
           <p className="form-hint">一个项目点最多一个当前有效项目点账号；更换项目经理建议停用旧账号并创建新账号。</p>
           <label>
             <span>账号绑定项目点</span>
             <select
+              {...extV.fieldProps("projectSiteId")}
               required
               value={externalAccountForm.projectSiteId}
               onChange={(event) => {
+                extV.clearError("projectSiteId");
                 const site = projectSites.find((item) => item.id === event.target.value);
                 setExternalAccountForm((current) => ({
                   ...current,
@@ -735,47 +790,60 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="projectSiteId" errors={extV.errors} errorId={extV.errorId} />
           <label>
             <span>当前联系人</span>
             <input
+              {...extV.fieldProps("currentContactName")}
               required
               value={externalAccountForm.currentContactName}
-              onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, currentContactName: event.target.value }))
-              }
+              onChange={(event) => {
+                extV.clearError("currentContactName");
+                setExternalAccountForm((current) => ({ ...current, currentContactName: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="currentContactName" errors={extV.errors} errorId={extV.errorId} />
           <label>
             <span>手机号</span>
             <input
+              {...extV.fieldProps("currentContactPhone")}
               required
               value={externalAccountForm.currentContactPhone}
-              onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, currentContactPhone: event.target.value }))
-              }
+              onChange={(event) => {
+                extV.clearError("currentContactPhone");
+                setExternalAccountForm((current) => ({ ...current, currentContactPhone: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="currentContactPhone" errors={extV.errors} errorId={extV.errorId} />
           <label>
             <span>项目点登录账号</span>
             <input
+              {...extV.fieldProps("username")}
               required
               value={externalAccountForm.username}
-              onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, username: event.target.value }))
-              }
+              onChange={(event) => {
+                extV.clearError("username");
+                setExternalAccountForm((current) => ({ ...current, username: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="username" errors={extV.errors} errorId={extV.errorId} />
           <label>
             <span>项目点初始密码</span>
             <input
+              {...extV.fieldProps("initialPassword")}
               required
               type="password"
               value={externalAccountForm.initialPassword}
-              onChange={(event) =>
-                setExternalAccountForm((current) => ({ ...current, initialPassword: event.target.value }))
-              }
+              onChange={(event) => {
+                extV.clearError("initialPassword");
+                setExternalAccountForm((current) => ({ ...current, initialPassword: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="initialPassword" errors={extV.errors} errorId={extV.errorId} />
           <label>
             <span>开始日期</span>
             <input
@@ -791,16 +859,18 @@ export function PeoplePermissionsWorkspace({
       </FormDrawer>
 
       <FormDrawer title="新增项目点分配" open={openFormDrawer === "assignments"} onClose={() => setOpenFormDrawer(null)}>
-        <form className="dashboard-panel workspace-form" onSubmit={handleAssignmentSubmit}>
+        <form ref={assignV.formRef} noValidate className="dashboard-panel workspace-form" onSubmit={handleAssignmentSubmit}>
           <FormHeader title="新增项目点分配" buttonText="保存分配" saving={assignmentSubmit === "saving"} />
           <label>
             <span>员工</span>
             <select
+              {...assignV.fieldProps("employeeId")}
               required
               value={assignmentForm.employeeId}
-              onChange={(event) =>
-                setAssignmentForm((current) => ({ ...current, employeeId: event.target.value }))
-              }
+              onChange={(event) => {
+                assignV.clearError("employeeId");
+                setAssignmentForm((current) => ({ ...current, employeeId: event.target.value }));
+              }}
             >
               <option value="">请选择员工</option>
               {employees.map((employee) => (
@@ -810,14 +880,17 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="employeeId" errors={assignV.errors} errorId={assignV.errorId} />
           <label>
             <span>项目点</span>
             <select
+              {...assignV.fieldProps("projectSiteId")}
               required
               value={assignmentForm.projectSiteId}
-              onChange={(event) =>
-                setAssignmentForm((current) => ({ ...current, projectSiteId: event.target.value }))
-              }
+              onChange={(event) => {
+                assignV.clearError("projectSiteId");
+                setAssignmentForm((current) => ({ ...current, projectSiteId: event.target.value }));
+              }}
             >
               <option value="">请选择项目点</option>
               {projectSites.map((site) => (
@@ -827,6 +900,7 @@ export function PeoplePermissionsWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="projectSiteId" errors={assignV.errors} errorId={assignV.errorId} />
           <label>
             <span>关系类型</span>
             <select
