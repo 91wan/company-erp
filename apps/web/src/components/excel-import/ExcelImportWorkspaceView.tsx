@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedTabs, WorkspaceScaffold, type TabItem } from "../ui";
 import { ImportJobsTab } from "./ImportJobsTab";
@@ -86,9 +86,6 @@ export function ExcelImportWorkspaceView({ model }: { model: ExcelImportControll
         ) : null}
         {model.actionStatus === "error" ? (
           <div className="workspace-state"><span>{model.actionError || "Excel 导入操作失败"}</span></div>
-        ) : null}
-        {model.actionStatus === "success" ? (
-          <div className="workspace-state"><CheckCircle2 size={18} /><span>Excel 导入操作成功</span></div>
         ) : null}
         {model.loadStatus === "ready" && model.jobs.length === 0 && model.activeTab !== "jobs" ? (
           <div className="workspace-state"><span>暂无导入批次</span></div>

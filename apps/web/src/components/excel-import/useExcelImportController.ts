@@ -7,6 +7,7 @@ import {
   type ImportTemplateTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, getAppVersion, requestJson } from "../../apiClient";
+import { useToast } from "../ui";
 import type { NavigationIntent } from "../shell/dashboardShellNavigation";
 
 // ---------------------------------------------------------------------------
@@ -82,6 +83,7 @@ export function useExcelImportController({
   const [file, setFile] = useState<File | null>(null);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [actionStatus, setActionStatus] = useState<"idle" | "saving" | "error" | "success">("idle");
+  const toast = useToast();
   const [actionError, setActionError] = useState("");
   const [activeTab, setActiveTab] = useState<ExcelImportTab>(() =>
     isExcelImportTab(initialTab) ? initialTab : canManage ? "preview" : "jobs",
@@ -156,6 +158,7 @@ export function useExcelImportController({
       setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]);
       setActiveTab("rows");
       setActionStatus("success");
+      toast.notify("导入预览已生成", "success");
     } catch {
       setActionError("Excel 导入操作失败");
       setActionStatus("error");
@@ -182,6 +185,7 @@ export function useExcelImportController({
       setSelectedJob(confirmed);
       setJobs((current) => current.map((item) => (item.id === confirmed.id ? confirmed : item)));
       setActionStatus("success");
+      toast.notify("导入已确认写入", "success");
     } catch {
       setActionError("Excel 导入操作失败");
       setActionStatus("error");
@@ -217,6 +221,7 @@ export function useExcelImportController({
       setJobs((current) => current.map((item) => (item.id === confirmed.id ? confirmed : item)));
       setActiveTab("rows");
       setActionStatus("success");
+      toast.notify("导入已确认写入", "success");
     } catch {
       setActionError("Excel 导入操作失败");
       setActionStatus("error");
