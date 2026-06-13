@@ -24,6 +24,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
 import {
+  FieldError,
   FormDrawer,
   SectionCard,
   SegmentedTabs,
@@ -31,6 +32,7 @@ import {
   SummaryCard,
   Toolbar,
   WorkspaceScaffold,
+  useFormErrors,
   useToast,
   type TabItem,
 } from "./ui";
@@ -144,6 +146,10 @@ export function MaterialsWarehousesWorkspace({
     "idle" | "saving" | "error"
   >("idle");
   const toast = useToast();
+  const materialValidation = useFormErrors<
+    "materialCode" | "materialName" | "baseUnit"
+  >();
+  const warehouseValidation = useFormErrors<"warehouseCode" | "warehouseName">();
   const [warehouseSubmitState, setWarehouseSubmitState] = useState<
     "idle" | "saving" | "error"
   >("idle");
@@ -249,6 +255,12 @@ export function MaterialsWarehousesWorkspace({
 
   async function handleMaterialSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const valid = materialValidation.validate({
+      materialCode: materialForm.materialCode.trim() ? undefined : "请填写物料编码",
+      materialName: materialForm.materialName.trim() ? undefined : "请填写物料名称",
+      baseUnit: materialForm.baseUnit.trim() ? undefined : "请填写基本单位",
+    });
+    if (!valid) return;
     setMaterialSubmitState("saving");
 
     try {
@@ -276,6 +288,11 @@ export function MaterialsWarehousesWorkspace({
 
   async function handleWarehouseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const valid = warehouseValidation.validate({
+      warehouseCode: warehouseForm.warehouseCode.trim() ? undefined : "请填写仓库编码",
+      warehouseName: warehouseForm.warehouseName.trim() ? undefined : "请填写仓库名称",
+    });
+    if (!valid) return;
     setWarehouseSubmitState("saving");
 
     try {
@@ -465,6 +482,8 @@ export function MaterialsWarehousesWorkspace({
         onClose={() => setOpenFormDrawer(null)}
       >
         <form
+          ref={materialValidation.formRef}
+          noValidate
           className="dashboard-panel workspace-form"
           onSubmit={handleMaterialSubmit}
         >
@@ -479,29 +498,35 @@ export function MaterialsWarehousesWorkspace({
           <label>
             <span>物料编码</span>
             <input
+              {...materialValidation.fieldProps("materialCode")}
               required
               value={materialForm.materialCode}
-              onChange={(event) =>
+              onChange={(event) => {
+                materialValidation.clearError("materialCode");
                 setMaterialForm((current) => ({
                   ...current,
                   materialCode: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="materialCode" errors={materialValidation.errors} />
           <label>
             <span>物料名称</span>
             <input
+              {...materialValidation.fieldProps("materialName")}
               required
               value={materialForm.materialName}
-              onChange={(event) =>
+              onChange={(event) => {
+                materialValidation.clearError("materialName");
                 setMaterialForm((current) => ({
                   ...current,
                   materialName: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="materialName" errors={materialValidation.errors} />
           <label>
             <span>物料类别</span>
             <select
@@ -523,16 +548,19 @@ export function MaterialsWarehousesWorkspace({
           <label>
             <span>基本单位</span>
             <input
+              {...materialValidation.fieldProps("baseUnit")}
               required
               value={materialForm.baseUnit}
-              onChange={(event) =>
+              onChange={(event) => {
+                materialValidation.clearError("baseUnit");
                 setMaterialForm((current) => ({
                   ...current,
                   baseUnit: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="baseUnit" errors={materialValidation.errors} />
           <p className="form-hint">
             当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。
           </p>
@@ -637,6 +665,8 @@ export function MaterialsWarehousesWorkspace({
         onClose={() => setOpenFormDrawer(null)}
       >
         <form
+          ref={warehouseValidation.formRef}
+          noValidate
           className="dashboard-panel workspace-form"
           onSubmit={handleWarehouseSubmit}
         >
@@ -651,29 +681,35 @@ export function MaterialsWarehousesWorkspace({
           <label>
             <span>仓库编码</span>
             <input
+              {...warehouseValidation.fieldProps("warehouseCode")}
               required
               value={warehouseForm.warehouseCode}
-              onChange={(event) =>
+              onChange={(event) => {
+                warehouseValidation.clearError("warehouseCode");
                 setWarehouseForm((current) => ({
                   ...current,
                   warehouseCode: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="warehouseCode" errors={warehouseValidation.errors} />
           <label>
             <span>仓库名称</span>
             <input
+              {...warehouseValidation.fieldProps("warehouseName")}
               required
               value={warehouseForm.warehouseName}
-              onChange={(event) =>
+              onChange={(event) => {
+                warehouseValidation.clearError("warehouseName");
                 setWarehouseForm((current) => ({
                   ...current,
                   warehouseName: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="warehouseName" errors={warehouseValidation.errors} />
           <label>
             <span>仓库类型</span>
             <select
