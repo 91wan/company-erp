@@ -7,7 +7,7 @@ import {
   type PartyTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { FormDrawer, SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useToast } from "./ui";
+import { FieldError, FormDrawer, SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useFormErrors, useToast } from "./ui";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
@@ -46,6 +46,9 @@ export function PartiesWorkspace({
   const [typeFilter, setTypeFilter] = useState<"all" | PartyTypeCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const toast = useToast();
+  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+    "partyCode" | "partyName"
+  >();
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreatePartyInput>({
     partyCode: "",
@@ -96,6 +99,11 @@ export function PartiesWorkspace({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const valid = validate({
+      partyCode: form.partyCode.trim() ? undefined : "请填写往来方编码",
+      partyName: form.partyName.trim() ? undefined : "请填写往来方名称",
+    });
+    if (!valid) return;
     setSubmitState("saving");
 
     try {
@@ -204,7 +212,7 @@ export function PartiesWorkspace({
         open={isCreateDrawerOpen}
         onClose={() => setIsCreateDrawerOpen(false)}
       >
-        <form className="dashboard-panel party-form" onSubmit={handleSubmit}>
+        <form ref={formRef} noValidate className="dashboard-panel party-form" onSubmit={handleSubmit}>
           <div className="panel-header">
             <h3>新增往来方</h3>
             <button type="submit" disabled={submitState === "saving"}>
@@ -216,19 +224,29 @@ export function PartiesWorkspace({
           <label>
             <span>往来方编码</span>
             <input
+              {...fieldProps("partyCode")}
               required
               value={form.partyCode}
-              onChange={(event) => setForm((current) => ({ ...current, partyCode: event.target.value }))}
+              onChange={(event) => {
+                clearError("partyCode");
+                setForm((current) => ({ ...current, partyCode: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="partyCode" errors={errors} />
           <label>
             <span>往来方名称</span>
             <input
+              {...fieldProps("partyName")}
               required
               value={form.partyName}
-              onChange={(event) => setForm((current) => ({ ...current, partyName: event.target.value }))}
+              onChange={(event) => {
+                clearError("partyName");
+                setForm((current) => ({ ...current, partyName: event.target.value }));
+              }}
             />
           </label>
+          <FieldError name="partyName" errors={errors} />
 
           <fieldset>
             <legend>往来方类型</legend>
