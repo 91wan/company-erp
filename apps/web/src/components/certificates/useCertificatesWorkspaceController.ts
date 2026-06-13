@@ -15,6 +15,7 @@ import {
   requestJson,
   uploadAttachment,
 } from "../../apiClient";
+import { useToast } from "../ui";
 import type { CertificatesWorkspaceProps, CertificateStatusFilter } from "./certificateWorkspaceTypes";
 import {
   createEmptyCertificateForm,
@@ -90,6 +91,7 @@ export function useCertificatesWorkspaceController({
   const [statusFilter, setStatusFilter] = useState<CertificateStatusFilter>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitError, setSubmitError] = useState("");
+  const toast = useToast();
   const [form, setForm] = useState(() =>
     createEmptyCertificateForm(ownerOptions.defaultOwnerType, ownerOptions.defaultPersonOwnerSource),
   );
@@ -291,6 +293,7 @@ export function useCertificatesWorkspaceController({
       setActiveTab("review");
       setSubmitState("saved");
       setCreateDrawerOpen(false);
+      toast.notify("证照已保存", "success");
     } catch (error) {
       setSubmitError(formatApiError(error, "证照保存或图片上传失败，请检查归属对象、图片格式或复核日期。"));
       setSubmitState("error");

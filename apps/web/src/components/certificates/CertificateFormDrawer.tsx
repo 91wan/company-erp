@@ -156,7 +156,6 @@ function CertificateFormFields({
         <Save aria-hidden="true" size={16} />
         {hasImage ? "保存并上传图片" : "保存待复核记录"}
       </button>
-      {model.submitState === "saved" ? <CertificateStateLine text="证照已保存" /> : null}
       {model.submitState === "error" ? <CertificateStateLine text={model.submitError || "证照保存或图片上传失败，请检查归属对象、图片格式或复核日期。"} tone="danger" /> : null}
     </form>
   );
