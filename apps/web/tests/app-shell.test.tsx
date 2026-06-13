@@ -217,7 +217,7 @@ describe("Company ERP app shell", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
 
-    expect(await screen.findByText("系统设置已保存。")).toBeInTheDocument();
+    expect(await screen.findByText("系统设置已保存")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "无锡餐服 ERP" }),
     ).toBeInTheDocument();
@@ -397,7 +397,7 @@ describe("Company ERP app shell", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
 
-    expect(await screen.findByText("附件引用已登记。")).toBeInTheDocument();
+    expect(await screen.findByText("附件引用已登记")).toBeInTheDocument();
     expect(
       screen.getByText("certificates/demo-certificate.jpg"),
     ).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SystemSettingsWorkspace } from "../src/components/system/SystemSettingsWorkspace";
+import { ToastProvider } from "../src/components/ui";
 import {
   adminUser,
   attachmentRecord,
@@ -15,14 +16,16 @@ describe("SystemSettingsWorkspace", () => {
     mockShellFetch(adminUser, { companyName: "Company ERP" });
 
     render(
-      <SystemSettingsWorkspace
-        companyName="Company ERP"
-        canManage={true}
-        canReadAuditLogs={false}
-        canReadAttachments={false}
-        canManageAttachments={false}
-        onCompanyNameChange={onCompanyNameChange}
-      />,
+      <ToastProvider>
+        <SystemSettingsWorkspace
+          companyName="Company ERP"
+          canManage={true}
+          canReadAuditLogs={false}
+          canReadAttachments={false}
+          canManageAttachments={false}
+          onCompanyNameChange={onCompanyNameChange}
+        />
+      </ToastProvider>,
     );
 
     fireEvent.change(screen.getByLabelText("公司名称"), {
@@ -30,7 +33,7 @@ describe("SystemSettingsWorkspace", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
 
-    expect(await screen.findByText("系统设置已保存。")).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("系统设置已保存");
     expect(onCompanyNameChange).toHaveBeenCalledWith({
       companyName: "无锡餐服 ERP",
     });

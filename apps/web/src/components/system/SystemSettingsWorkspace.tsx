@@ -22,6 +22,7 @@ import {
   SegmentedTabs,
   StatusBadge as UiStatusBadge,
   WorkspaceScaffold,
+  useToast,
   type TabItem,
 } from "../ui";
 
@@ -137,6 +138,7 @@ export function SystemSettingsWorkspace({
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">(
     "idle",
   );
+  const toast = useToast();
   const [appVersion, setAppVersion] = useState<AppVersionDto | null>(null);
   const [versionStatus, setVersionStatus] = useState<
     "loading" | "success" | "error"
@@ -276,6 +278,7 @@ export function SystemSettingsWorkspace({
       onCompanyNameChange(appConfig);
       setNextCompanyName(appConfig.companyName);
       setStatus("success");
+      toast.notify("系统设置已保存", "success");
     } catch (error) {
       setSettingsError(
         formatApiError(error, "保存失败，请检查权限或公司名称。"),
@@ -317,6 +320,7 @@ export function SystemSettingsWorkspace({
       });
       setAttachmentStatus("success");
       setAttachmentSaveStatus("success");
+      toast.notify("附件引用已登记", "success");
     } catch (error) {
       setAttachmentSaveError(
         formatApiError(error, "附件引用格式不合法或保存失败。"),
@@ -458,9 +462,6 @@ export function SystemSettingsWorkspace({
               />
             </label>
 
-            {status === "success" ? (
-              <p className="form-success">系统设置已保存。</p>
-            ) : null}
             {status === "error" ? (
               <p className="form-error">
                 {settingsError || "保存失败，请检查权限或公司名称。"}
@@ -820,9 +821,6 @@ export function SystemSettingsWorkspace({
                     ? "登记中"
                     : "登记附件引用"}
                 </button>
-                {attachmentSaveStatus === "success" ? (
-                  <p className="form-success">附件引用已登记。</p>
-                ) : null}
                 {attachmentSaveStatus === "error" ? (
                   <p className="form-error">
                     {attachmentSaveError || "附件引用格式不合法或保存失败。"}
