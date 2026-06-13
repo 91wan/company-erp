@@ -307,6 +307,20 @@
   font-weight: 620;
 }
 
+/* 字段级行内校验：无效输入红框 + 字段下方错误文案。 */
+.workspace-form input[aria-invalid="true"],
+.workspace-form select[aria-invalid="true"],
+.party-form input[aria-invalid="true"],
+.party-form select[aria-invalid="true"] {
+  border-color: #f04438;
+}
+
+.field-error {
+  color: #d92d20;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .form-success {
   margin: 0;
   color: #047857;

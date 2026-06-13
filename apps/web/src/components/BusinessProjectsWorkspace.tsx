@@ -20,12 +20,14 @@ import {
 import { apiBaseUrl, requestJson } from "../apiClient";
 import {
   DataTable,
+  FieldError,
   FormDrawer,
   SectionCard,
   SegmentedTabs,
   SummaryCard,
   Toolbar,
   WorkspaceScaffold,
+  useFormErrors,
   useToast,
   type TabItem,
 } from "./ui";
@@ -140,6 +142,9 @@ export function BusinessProjectsWorkspace({
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const toast = useToast();
+  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+    "projectCode" | "projectName" | "endDate"
+  >();
   const [form, setForm] = useState<FormState>({
     projectCode: "",
     projectName: "",
@@ -242,6 +247,15 @@ export function BusinessProjectsWorkspace({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const valid = validate({
+      projectCode: form.projectCode.trim() ? undefined : "请填写项目编码",
+      projectName: form.projectName.trim() ? undefined : "请填写项目名称",
+      endDate:
+        form.startDate && form.endDate && form.endDate < form.startDate
+          ? "结束日期不能早于开始日期"
+          : undefined,
+    });
+    if (!valid) return;
     setSubmitState("saving");
 
     try {
@@ -459,6 +473,8 @@ export function BusinessProjectsWorkspace({
         onClose={() => setIsCreateDrawerOpen(false)}
       >
         <form
+          ref={formRef}
+          noValidate
           className="dashboard-panel workspace-form"
           onSubmit={handleSubmit}
         >
@@ -477,29 +493,35 @@ export function BusinessProjectsWorkspace({
           <label>
             <span>项目编码</span>
             <input
+              {...fieldProps("projectCode")}
               required
               value={form.projectCode}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearError("projectCode");
                 setForm((current) => ({
                   ...current,
                   projectCode: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="projectCode" errors={errors} />
           <label>
             <span>项目名称</span>
             <input
+              {...fieldProps("projectName")}
               required
               value={form.projectName}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearError("projectName");
                 setForm((current) => ({
                   ...current,
                   projectName: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="projectName" errors={errors} />
           <label>
             <span>项目类型</span>
             <select
@@ -573,27 +595,31 @@ export function BusinessProjectsWorkspace({
             <input
               type="date"
               value={form.startDate}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearError("endDate");
                 setForm((current) => ({
                   ...current,
                   startDate: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
           <label>
             <span>结束日期</span>
             <input
+              {...fieldProps("endDate")}
               type="date"
               value={form.endDate}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearError("endDate");
                 setForm((current) => ({
                   ...current,
                   endDate: event.target.value,
-                }))
-              }
+                }));
+              }}
             />
           </label>
+          <FieldError name="endDate" errors={errors} />
           <label>
             <span>备注</span>
             <input

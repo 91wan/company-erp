@@ -6,6 +6,7 @@ export { SegmentedTabs, type TabItem } from "./SegmentedTabs";
 export { ConfirmAction } from "./ConfirmAction";
 export { ListPaginationBar } from "./ListPaginationBar";
 export { ToastProvider, useToast, type ToastTone, type ToastApi } from "./Toast";
+export { useFormErrors, FieldError, type FieldErrorMap } from "./FormErrors";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "rejected" | "disabled" | "notApplicable";
 
