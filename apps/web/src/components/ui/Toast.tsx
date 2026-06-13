@@ -29,6 +29,9 @@ const TONE_DURATION_MS: Record<ToastTone, number> = {
   error: 6000,
 };
 
+/** 同屏最多保留的 toast 数；超过则丢弃最旧的。 */
+const MAX_TOASTS = 5;
+
 const TONE_ICON = {
   success: CheckCircle2,
   error: AlertTriangle,
@@ -52,7 +55,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const notify = useCallback(
     (message: string, tone: ToastTone = "info") => {
       const id = (nextId.current += 1);
-      setToasts((list) => [...list, { id, message, tone }]);
+      setToasts((list) => {
+        const next = [...list, { id, message, tone }];
+        // 超过上限丢弃最旧的；被丢弃 toast 的计时器到点后 dismiss 自然清理。
+        return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next;
+      });
       const timer = setTimeout(() => dismiss(id), TONE_DURATION_MS[tone]);
       timers.current.set(id, timer);
     },
@@ -70,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ notify }}>
       {children}
-      <div className="ui-toast-viewport" aria-live="polite" aria-atomic="false">
+      <div className="ui-toast-viewport">
         {toasts.map((toast) => {
           const Icon = TONE_ICON[toast.tone];
           return (

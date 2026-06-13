@@ -510,7 +510,7 @@ export function MaterialsWarehousesWorkspace({
               }}
             />
           </label>
-          <FieldError name="materialCode" errors={materialValidation.errors} />
+          <FieldError name="materialCode" errors={materialValidation.errors} errorId={materialValidation.errorId} />
           <label>
             <span>物料名称</span>
             <input
@@ -526,7 +526,7 @@ export function MaterialsWarehousesWorkspace({
               }}
             />
           </label>
-          <FieldError name="materialName" errors={materialValidation.errors} />
+          <FieldError name="materialName" errors={materialValidation.errors} errorId={materialValidation.errorId} />
           <label>
             <span>物料类别</span>
             <select
@@ -560,7 +560,7 @@ export function MaterialsWarehousesWorkspace({
               }}
             />
           </label>
-          <FieldError name="baseUnit" errors={materialValidation.errors} />
+          <FieldError name="baseUnit" errors={materialValidation.errors} errorId={materialValidation.errorId} />
           <p className="form-hint">
             当前物料入库、出库和领用数量统一按整数处理，不允许录入小数。
           </p>
@@ -693,7 +693,7 @@ export function MaterialsWarehousesWorkspace({
               }}
             />
           </label>
-          <FieldError name="warehouseCode" errors={warehouseValidation.errors} />
+          <FieldError name="warehouseCode" errors={warehouseValidation.errors} errorId={warehouseValidation.errorId} />
           <label>
             <span>仓库名称</span>
             <input
@@ -709,7 +709,7 @@ export function MaterialsWarehousesWorkspace({
               }}
             />
           </label>
-          <FieldError name="warehouseName" errors={warehouseValidation.errors} />
+          <FieldError name="warehouseName" errors={warehouseValidation.errors} errorId={warehouseValidation.errorId} />
           <label>
             <span>仓库类型</span>
             <select

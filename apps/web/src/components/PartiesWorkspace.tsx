@@ -46,7 +46,7 @@ export function PartiesWorkspace({
   const [typeFilter, setTypeFilter] = useState<"all" | PartyTypeCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const toast = useToast();
-  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+  const { errors, errorId, fieldProps, clearError, validate, formRef } = useFormErrors<
     "partyCode" | "partyName"
   >();
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
@@ -233,7 +233,7 @@ export function PartiesWorkspace({
               }}
             />
           </label>
-          <FieldError name="partyCode" errors={errors} />
+          <FieldError name="partyCode" errors={errors} errorId={errorId} />
           <label>
             <span>往来方名称</span>
             <input
@@ -246,7 +246,7 @@ export function PartiesWorkspace({
               }}
             />
           </label>
-          <FieldError name="partyName" errors={errors} />
+          <FieldError name="partyName" errors={errors} errorId={errorId} />
 
           <fieldset>
             <legend>往来方类型</legend>

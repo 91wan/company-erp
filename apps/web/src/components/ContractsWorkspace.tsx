@@ -130,7 +130,7 @@ export function ContractsWorkspace({
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
   const toast = useToast();
-  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+  const { errors, errorId, fieldProps, clearError, validate, formRef } = useFormErrors<
     | "contractNo"
     | "contractName"
     | "counterpartyPartyId"
@@ -402,12 +402,12 @@ export function ContractsWorkspace({
             <span>合同编号</span>
             <input {...fieldProps("contractNo")} required value={contractForm.contractNo} onChange={(event) => { clearError("contractNo"); setContractForm((current) => ({ ...current, contractNo: event.target.value })); }} />
           </label>
-          <FieldError name="contractNo" errors={errors} />
+          <FieldError name="contractNo" errors={errors} errorId={errorId} />
           <label>
             <span>合同名称</span>
             <input {...fieldProps("contractName")} required value={contractForm.contractName} onChange={(event) => { clearError("contractName"); setContractForm((current) => ({ ...current, contractName: event.target.value })); }} />
           </label>
-          <FieldError name="contractName" errors={errors} />
+          <FieldError name="contractName" errors={errors} errorId={errorId} />
           <label>
             <span>相对方</span>
             <select {...fieldProps("counterpartyPartyId")} required value={contractForm.counterpartyPartyId} onChange={(event) => { clearError("counterpartyPartyId"); setContractForm((current) => ({ ...current, counterpartyPartyId: event.target.value })); }}>
@@ -418,7 +418,7 @@ export function ContractsWorkspace({
               ))}
             </select>
           </label>
-          <FieldError name="counterpartyPartyId" errors={errors} />
+          <FieldError name="counterpartyPartyId" errors={errors} errorId={errorId} />
           <label>
             <span>合同方向</span>
             <select value={contractForm.direction} onChange={(event) => setContractForm((current) => ({ ...current, direction: event.target.value as ContractDirectionCode }))}>
@@ -500,22 +500,22 @@ export function ContractsWorkspace({
             <span>开始日期</span>
             <input {...fieldProps("startDate")} required type="date" value={contractForm.startDate} onChange={(event) => { clearError("startDate"); clearError("endDate"); setContractForm((current) => ({ ...current, startDate: event.target.value })); }} />
           </label>
-          <FieldError name="startDate" errors={errors} />
+          <FieldError name="startDate" errors={errors} errorId={errorId} />
           <label>
             <span>结束日期（框架合同可空）</span>
             <input {...fieldProps("endDate")} aria-label="结束日期" required={contractForm.contractForm !== "framework"} type="date" value={contractForm.endDate} onChange={(event) => { clearError("endDate"); setContractForm((current) => ({ ...current, endDate: event.target.value })); }} />
           </label>
-          <FieldError name="endDate" errors={errors} />
+          <FieldError name="endDate" errors={errors} errorId={errorId} />
           <label>
             <span>合同金额</span>
             <input {...fieldProps("amount")} type="number" min="0" step="0.01" value={contractForm.amount} onChange={(event) => { clearError("amount"); setContractForm((current) => ({ ...current, amount: event.target.value })); }} />
           </label>
-          <FieldError name="amount" errors={errors} />
+          <FieldError name="amount" errors={errors} errorId={errorId} />
           <label>
             <span>预算金额</span>
             <input {...fieldProps("budgetAmount")} type="number" min="0" step="0.01" value={contractForm.budgetAmount} onChange={(event) => { clearError("budgetAmount"); setContractForm((current) => ({ ...current, budgetAmount: event.target.value })); }} />
           </label>
-          <FieldError name="budgetAmount" errors={errors} />
+          <FieldError name="budgetAmount" errors={errors} errorId={errorId} />
           <p className="form-hint">正式附件请在合同保存后进入详情的“统一附件”登记；历史主附件引用仅在详情中只读展示。</p>
           <label>
             <span>备注</span>

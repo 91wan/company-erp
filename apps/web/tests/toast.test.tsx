@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider, useToast, type ToastTone } from "../src/components/ui";
 
@@ -78,5 +79,35 @@ describe("ToastProvider / useToast", () => {
       fireEvent.click(screen.getByRole("button", { name: "emit" })),
     ).not.toThrow();
     expect(screen.queryByText("无 Provider")).not.toBeInTheDocument();
+  });
+
+  it("超过上限时丢弃最旧的，最多显示 5 个", () => {
+    function CountingEmitter() {
+      const toast = useToast();
+      const seq = useRef(0);
+      return (
+        <button
+          type="button"
+          onClick={() => toast.notify(`toast-${(seq.current += 1)}`, "success")}
+        >
+          emit
+        </button>
+      );
+    }
+    render(
+      <ToastProvider>
+        <CountingEmitter />
+      </ToastProvider>,
+    );
+
+    const button = screen.getByRole("button", { name: "emit" });
+    for (let i = 0; i < 6; i += 1) {
+      fireEvent.click(button);
+    }
+
+    expect(screen.getAllByRole("status")).toHaveLength(5);
+    // 最旧的 toast-1 已被丢弃，最新的 toast-6 仍在。
+    expect(screen.queryByText("toast-1")).not.toBeInTheDocument();
+    expect(screen.getByText("toast-6")).toBeInTheDocument();
   });
 });
