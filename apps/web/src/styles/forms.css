@@ -321,6 +321,12 @@
   font-weight: 600;
 }
 
+/* fieldset 内是多列 grid，错误文案跨满整行避免挤进列。 */
+.workspace-form fieldset .field-error,
+.party-form fieldset .field-error {
+  grid-column: 1 / -1;
+}
+
 .form-success {
   margin: 0;
   color: #047857;

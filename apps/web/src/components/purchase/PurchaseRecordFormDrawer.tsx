@@ -2,7 +2,7 @@ import { Save } from "lucide-react";
 import type { ContractDto, PurchaseSourceTypeCode } from "@company-erp/shared";
 import { PURCHASE_SOURCE_TYPES } from "@company-erp/shared";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { DrawerFormHeader, FormDrawer } from "../ui";
+import { DrawerFormHeader, FieldError, FormDrawer, useFormErrors } from "../ui";
 import type { RecordFormState } from "./purchaseWorkspaceTypes";
 
 export function PurchaseRecordFormDrawer({
@@ -28,10 +28,33 @@ export function PurchaseRecordFormDrawer({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onFormChange: Dispatch<SetStateAction<RecordFormState>>;
 }) {
+  const { errors, errorId, fieldProps, clearError, validate, formRef } = useFormErrors<
+    "purchaseNo" | "purchaserName" | "purchaseDate" | "materialName" | "purchaseQuantity" | "unit"
+  >();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const quantity = form.purchaseQuantity.trim();
+    const valid = validate({
+      purchaseNo: form.purchaseNo.trim() ? undefined : "请填写采购单号",
+      purchaserName: form.purchaserName.trim() ? undefined : "请填写采购人",
+      purchaseDate: form.purchaseDate ? undefined : "请填写采购日期",
+      materialName: form.materialName.trim() ? undefined : "请填写采购物料名称",
+      purchaseQuantity: !quantity
+        ? "请填写采购数量"
+        : Number(quantity) <= 0
+          ? "采购数量必须大于 0"
+          : undefined,
+      unit: form.unit.trim() ? undefined : "请填写采购单位",
+    });
+    if (!valid) return;
+    onSubmit(event);
+  }
+
   return (
     <FormDrawer title="新增采购记录" open={open} dirty={dirty && submitState !== "saving"} onClose={onClose}>
       {canManage ? (
-        <form className="workspace-form" onSubmit={onSubmit} noValidate>
+        <form ref={formRef} className="workspace-form" onSubmit={handleSubmit} noValidate>
           <DrawerFormHeader
             title="新增采购记录"
             action={(
@@ -43,12 +66,14 @@ export function PurchaseRecordFormDrawer({
           />
           <label>
             <span>采购单号</span>
-            <input required value={form.purchaseNo} onChange={(event) => onFormChange((current) => ({ ...current, purchaseNo: event.target.value }))} />
+            <input {...fieldProps("purchaseNo")} required value={form.purchaseNo} onChange={(event) => { clearError("purchaseNo"); onFormChange((current) => ({ ...current, purchaseNo: event.target.value })); }} />
           </label>
+          <FieldError name="purchaseNo" errors={errors} errorId={errorId} />
           <label>
             <span>采购人</span>
-            <input required value={form.purchaserName} onChange={(event) => onFormChange((current) => ({ ...current, purchaserName: event.target.value }))} />
+            <input {...fieldProps("purchaserName")} required value={form.purchaserName} onChange={(event) => { clearError("purchaserName"); onFormChange((current) => ({ ...current, purchaserName: event.target.value })); }} />
           </label>
+          <FieldError name="purchaserName" errors={errors} errorId={errorId} />
           <label>
             <span>采购来源</span>
             <select value={form.sourceType} onChange={(event) => onFormChange((current) => ({ ...current, sourceType: event.target.value as PurchaseSourceTypeCode }))}>
@@ -84,20 +109,24 @@ export function PurchaseRecordFormDrawer({
           </label>
           <label>
             <span>采购日期</span>
-            <input required type="date" value={form.purchaseDate} onChange={(event) => onFormChange((current) => ({ ...current, purchaseDate: event.target.value }))} />
+            <input {...fieldProps("purchaseDate")} required type="date" value={form.purchaseDate} onChange={(event) => { clearError("purchaseDate"); onFormChange((current) => ({ ...current, purchaseDate: event.target.value })); }} />
           </label>
+          <FieldError name="purchaseDate" errors={errors} errorId={errorId} />
           <label>
             <span>采购物料名称</span>
-            <input required value={form.materialName} onChange={(event) => onFormChange((current) => ({ ...current, materialName: event.target.value }))} />
+            <input {...fieldProps("materialName")} required value={form.materialName} onChange={(event) => { clearError("materialName"); onFormChange((current) => ({ ...current, materialName: event.target.value })); }} />
           </label>
+          <FieldError name="materialName" errors={errors} errorId={errorId} />
           <label>
             <span>采购数量</span>
-            <input required type="number" min="0.001" step="0.001" value={form.purchaseQuantity} onChange={(event) => onFormChange((current) => ({ ...current, purchaseQuantity: event.target.value }))} />
+            <input {...fieldProps("purchaseQuantity")} required type="number" min="0.001" step="0.001" value={form.purchaseQuantity} onChange={(event) => { clearError("purchaseQuantity"); onFormChange((current) => ({ ...current, purchaseQuantity: event.target.value })); }} />
           </label>
+          <FieldError name="purchaseQuantity" errors={errors} errorId={errorId} />
           <label>
             <span>采购单位</span>
-            <input required value={form.unit} onChange={(event) => onFormChange((current) => ({ ...current, unit: event.target.value }))} />
+            <input {...fieldProps("unit")} required value={form.unit} onChange={(event) => { clearError("unit"); onFormChange((current) => ({ ...current, unit: event.target.value })); }} />
           </label>
+          <FieldError name="unit" errors={errors} errorId={errorId} />
           {submitState === "error" ? <p className="form-error">{submitError || "保存失败，请检查单号是否重复或稍后重试。"}</p> : null}
         </form>
       ) : null}
