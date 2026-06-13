@@ -12,7 +12,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DataTable, DetailDrawer, EmptyState, FormDrawer, ListPaginationBar, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
+import { DataTable, DetailDrawer, EmptyState, FormDrawer, ListPaginationBar, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useToast } from "./ui";
 import { inventoryRiskToBadge } from "./statusMappers";
 
 const INVENTORY_LEDGER_PAGE_SIZE = 20;
@@ -170,6 +170,7 @@ export function InventoryWorkspace({
   const [activeTab, setActiveTab] = useState<InventoryTab>(isInventoryTab(initialTab) ? initialTab : "risk");
   const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const toast = useToast();
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<MovementFormState>({
     movementDate: "",
@@ -497,6 +498,7 @@ export function InventoryWorkspace({
       }));
       setSubmitState("idle");
       setMovementDrawerOpen(false);
+      toast.notify(`${movementTypeLabel.get(created.movementType) ?? "库存流水"}已登记`, "success");
     } catch (error) {
       setSubmitError(formatApiError(error, "入库登记失败，请检查必填项或单号是否重复。"));
       setSubmitState("error");

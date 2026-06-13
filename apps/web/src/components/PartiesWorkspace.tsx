@@ -7,7 +7,7 @@ import {
   type PartyTypeCode,
 } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "../apiClient";
-import { FormDrawer, SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold } from "./ui";
+import { FormDrawer, SectionCard, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useToast } from "./ui";
 
 type PartiesWorkspaceProps = {
   loadParties?: () => Promise<PartyDto[]>;
@@ -45,6 +45,7 @@ export function PartiesWorkspace({
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | PartyTypeCode>("all");
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
+  const toast = useToast();
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreatePartyInput>({
     partyCode: "",
@@ -103,6 +104,7 @@ export function PartiesWorkspace({
       setForm({ partyCode: "", partyName: "", partyTypes: ["supplier"], status: "enabled" });
       setIsCreateDrawerOpen(false);
       setSubmitState("idle");
+      toast.notify("往来方已保存", "success");
     } catch {
       setSubmitState("error");
     }

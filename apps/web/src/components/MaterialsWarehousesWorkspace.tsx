@@ -31,6 +31,7 @@ import {
   SummaryCard,
   Toolbar,
   WorkspaceScaffold,
+  useToast,
   type TabItem,
 } from "./ui";
 
@@ -142,6 +143,7 @@ export function MaterialsWarehousesWorkspace({
   const [materialSubmitState, setMaterialSubmitState] = useState<
     "idle" | "saving" | "error"
   >("idle");
+  const toast = useToast();
   const [warehouseSubmitState, setWarehouseSubmitState] = useState<
     "idle" | "saving" | "error"
   >("idle");
@@ -266,6 +268,7 @@ export function MaterialsWarehousesWorkspace({
       });
       setOpenFormDrawer(null);
       setMaterialSubmitState("idle");
+      toast.notify("物料已保存", "success");
     } catch {
       setMaterialSubmitState("error");
     }
@@ -289,6 +292,7 @@ export function MaterialsWarehousesWorkspace({
       });
       setOpenFormDrawer(null);
       setWarehouseSubmitState("idle");
+      toast.notify("仓库已保存", "success");
     } catch {
       setWarehouseSubmitState("error");
     }
