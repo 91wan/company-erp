@@ -142,7 +142,7 @@ export function BusinessProjectsWorkspace({
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const toast = useToast();
-  const { errors, fieldProps, clearError, validate, formRef } = useFormErrors<
+  const { errors, errorId, fieldProps, clearError, validate, formRef } = useFormErrors<
     "projectCode" | "projectName" | "endDate"
   >();
   const [form, setForm] = useState<FormState>({
@@ -505,7 +505,7 @@ export function BusinessProjectsWorkspace({
               }}
             />
           </label>
-          <FieldError name="projectCode" errors={errors} />
+          <FieldError name="projectCode" errors={errors} errorId={errorId} />
           <label>
             <span>项目名称</span>
             <input
@@ -521,7 +521,7 @@ export function BusinessProjectsWorkspace({
               }}
             />
           </label>
-          <FieldError name="projectName" errors={errors} />
+          <FieldError name="projectName" errors={errors} errorId={errorId} />
           <label>
             <span>项目类型</span>
             <select
@@ -619,7 +619,7 @@ export function BusinessProjectsWorkspace({
               }}
             />
           </label>
-          <FieldError name="endDate" errors={errors} />
+          <FieldError name="endDate" errors={errors} errorId={errorId} />
           <label>
             <span>备注</span>
             <input
