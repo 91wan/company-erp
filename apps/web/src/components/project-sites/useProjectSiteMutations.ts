@@ -11,6 +11,7 @@ import type {
   ProjectUsageRequestDto,
 } from "@company-erp/shared";
 import { formatApiError } from "../../apiClient";
+import { useToast } from "../ui";
 import type { ProjectSiteCreateFormState } from "./ProjectSiteCreateFormDrawer";
 import type { ProjectSiteKitchenEquipmentChangeFormState } from "./ProjectSiteKitchenEquipmentChangeFormDrawer";
 import type { ProjectSiteKitchenEquipmentCreateFormState } from "./ProjectSiteKitchenEquipmentCreateFormDrawer";
@@ -92,6 +93,7 @@ export function useProjectSiteMutations({
   pendingIssueConfirm,
   setPendingIssueConfirm,
 }: UseProjectSiteMutationsOptions) {
+  const toast = useToast();
   const [siteSubmitState, setSiteSubmitState] = useState<SubmitState>("idle");
   const [usageSubmitState, setUsageSubmitState] = useState<SubmitState>("idle");
   const [issueSubmitState, setIssueSubmitState] = useState<SubmitState>("idle");
@@ -131,6 +133,7 @@ export function useProjectSiteMutations({
       setSiteForm(resetSiteFormAfterCreate());
       setSiteSubmitState("idle");
       setOpenFormDrawer(null);
+      toast.notify("项目点已保存", "success");
     } catch (error) {
       setSiteSubmitError(formatApiError(error, "项目点保存失败，请检查编码是否重复或服务模式规则。"));
       setSiteSubmitState("error");
@@ -160,6 +163,7 @@ export function useProjectSiteMutations({
       setUsageForm(resetUsageFormAfterCreate);
       setUsageSubmitState("idle");
       setOpenFormDrawer(null);
+      toast.notify("领用申请已提交", "success");
     } catch (error) {
       setUsageSubmitError(formatApiError(error, "领用申请保存失败，请检查必填项或单号是否重复。"));
       setUsageSubmitState("error");
@@ -189,6 +193,7 @@ export function useProjectSiteMutations({
       setIssueSubmitState("idle");
       setPendingIssueConfirm(false);
       setOpenFormDrawer(null);
+      toast.notify("领用出库已登记", "success");
     } catch (error) {
       setIssueSubmitError(formatApiError(error, "出库失败，请检查库存余额、单号或申请状态。"));
       setIssueSubmitState("error");
@@ -225,6 +230,7 @@ export function useProjectSiteMutations({
       setKitchenEquipmentForm(resetKitchenEquipmentFormAfterCreate);
       setKitchenEquipmentSubmitState("idle");
       setOpenFormDrawer(null);
+      toast.notify("厨房设备已保存", "success");
     } catch (error) {
       setKitchenEquipmentSubmitError(formatApiError(error, "厨房设备保存失败，请检查必填项或项目点。"));
       setKitchenEquipmentSubmitState("error");
@@ -250,6 +256,7 @@ export function useProjectSiteMutations({
       setKitchenEquipmentChangeRequests((current) => [created, ...current.filter((request) => request.id !== created.id)]);
       setKitchenEquipmentChangeForm(resetKitchenEquipmentChangeFormAfterCreate);
       setKitchenEquipmentChangeSubmitState("idle");
+      toast.notify("设备变更已上报", "success");
     } catch (error) {
       setKitchenEquipmentChangeSubmitError(formatApiError(error, "设备变更上报失败，请检查设备名称或项目点。"));
       setKitchenEquipmentChangeSubmitState("error");
@@ -264,6 +271,7 @@ export function useProjectSiteMutations({
         const refreshed = await loadKitchenEquipment();
         setKitchenEquipment(refreshed);
       }
+      toast.notify(reviewStatus === "approved" ? "设备变更已通过" : "设备变更已驳回", "success");
     } catch {
       setKitchenEquipmentStatus("error");
     }
