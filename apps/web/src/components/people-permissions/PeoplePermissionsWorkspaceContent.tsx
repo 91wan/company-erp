@@ -18,7 +18,7 @@ import {
   type UserAccountDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
-import { FormDrawer, SegmentedTabs, SummaryCard, WorkspaceScaffold, type TabItem } from "../ui";
+import { FormDrawer, SegmentedTabs, SummaryCard, WorkspaceScaffold, useToast, type TabItem } from "../ui";
 import { AssignmentsTab } from "./AssignmentsTab";
 import { DepartmentsTab } from "./DepartmentsTab";
 import { EmployeesTab } from "./EmployeesTab";
@@ -207,6 +207,7 @@ export function PeoplePermissionsWorkspace({
   }, [initialTab]);
   const [openFormDrawer, setOpenFormDrawer] = useState<PeopleFormDrawer | null>(null);
   const [departmentSubmit, setDepartmentSubmit] = useState<"idle" | "saving" | "error">("idle");
+  const toast = useToast();
   const [employeeSubmit, setEmployeeSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [accountSubmit, setAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
   const [externalAccountSubmit, setExternalAccountSubmit] = useState<"idle" | "saving" | "error">("idle");
@@ -412,6 +413,7 @@ export function PeoplePermissionsWorkspace({
       setDepartmentForm({ departmentCode: "", name: "", status: "enabled" });
       setDepartmentSubmit("idle");
       setOpenFormDrawer(null);
+      toast.notify("部门已保存", "success");
     } catch (error) {
       setDepartmentSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setDepartmentSubmit("error");
@@ -433,6 +435,7 @@ export function PeoplePermissionsWorkspace({
       });
       setEmployeeSubmit("idle");
       setOpenFormDrawer(null);
+      toast.notify("员工已保存", "success");
     } catch (error) {
       setEmployeeSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setEmployeeSubmit("error");
@@ -455,6 +458,7 @@ export function PeoplePermissionsWorkspace({
       });
       setAccountSubmit("idle");
       setOpenFormDrawer(null);
+      toast.notify("账号已保存", "success");
     } catch (error) {
       setAccountSubmitError(formatApiError(error, "保存失败，请检查唯一编码或稍后重试。"));
       setAccountSubmit("error");
@@ -481,6 +485,7 @@ export function PeoplePermissionsWorkspace({
       });
       setExternalAccountSubmit("idle");
       setOpenFormDrawer(null);
+      toast.notify("项目点账号已保存", "success");
     } catch (error) {
       setExternalAccountSubmitError(formatApiError(error, "保存失败，请检查账号是否重复或项目点是否已有启用项目点账号。"));
       setExternalAccountSubmit("error");
@@ -500,6 +505,7 @@ export function PeoplePermissionsWorkspace({
         ...current.filter((candidate) => candidate.id !== updated.id),
       ]);
       setExternalAccountSubmit("idle");
+      toast.notify("项目点账号已停用", "success");
     } catch (error) {
       setExternalAccountSubmitError(formatApiError(error, "停用失败，请检查项目点账号状态。"));
       setExternalAccountSubmit("error");
@@ -524,6 +530,7 @@ export function PeoplePermissionsWorkspace({
       }));
       setAssignmentSubmit("idle");
       setOpenFormDrawer(null);
+      toast.notify("分配已保存", "success");
     } catch (error) {
       setAssignmentSubmitError(formatApiError(error, "保存失败，请检查是否重复分配或项目点是否有效。"));
       setAssignmentSubmit("error");
