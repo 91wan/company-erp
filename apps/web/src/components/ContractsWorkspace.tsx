@@ -22,7 +22,7 @@ import {
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, getAttachmentDownloadUrl, getAttachments, requestJson, type AttachmentFilters } from "../apiClient";
 import { BusinessAttachmentsPanel } from "./BusinessAttachmentsPanel";
-import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold } from "./ui";
+import { DetailDrawer, EmptyState, FormDrawer, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar as UiToolbar, WorkspaceScaffold, useToast } from "./ui";
 import { contractExpiryToBadge } from "./statusMappers";
 
 type ContractsWorkspaceProps = {
@@ -129,6 +129,7 @@ export function ContractsWorkspace({
   const [expiryFilter, setExpiryFilter] = useState<"all" | ContractExpiryStateCode>("all");
   const [contractSubmitState, setContractSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [contractSubmitError, setContractSubmitError] = useState("");
+  const toast = useToast();
   const [openFormDrawer, setOpenFormDrawer] = useState<ContractFormDrawer>(null);
   const [activeTab, setActiveTab] = useState<ContractTab>(isContractTab(initialTab) ? initialTab : "risk");
   const [selectedContractId, setSelectedContractId] = useState("");
@@ -293,6 +294,7 @@ export function ContractsWorkspace({
       });
       setContractSubmitState("saved");
       setOpenFormDrawer(null);
+      toast.notify("合同已保存", "success");
     } catch (error) {
       setContractSubmitError(formatApiError(error, "合同保存失败，请检查编号、日期或金额。"));
       setContractSubmitState("error");
@@ -484,7 +486,6 @@ export function ContractsWorkspace({
             <span>备注</span>
             <input value={contractForm.remark} onChange={(event) => setContractForm((current) => ({ ...current, remark: event.target.value }))} />
           </label>
-          {contractSubmitState === "saved" ? <p className="form-success">合同已保存。</p> : null}
           {contractSubmitState === "error" ? <p className="form-error">{contractSubmitError || "合同保存失败，请检查编号、日期或金额。"}</p> : null}
           </form> : null}
         </FormDrawer>
