@@ -12,7 +12,7 @@ import {
   type WarehouseDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../apiClient";
-import { DataTable, DetailDrawer, EmptyState, FormDrawer, ListPaginationBar, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useToast } from "./ui";
+import { DataTable, DetailDrawer, EmptyState, FieldError, FormDrawer, ListPaginationBar, SectionCard, SegmentedTabs, StatusBadge, SummaryCard, Toolbar, WorkspaceScaffold, useFormErrors, useToast } from "./ui";
 import { inventoryRiskToBadge } from "./statusMappers";
 
 const INVENTORY_LEDGER_PAGE_SIZE = 20;
@@ -171,6 +171,9 @@ export function InventoryWorkspace({
   const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "error">("idle");
   const toast = useToast();
+  const { errors, errorId, fieldProps, clearError, validate, formRef } = useFormErrors<
+    "movementDate" | "warehouseId" | "materialId" | "quantity"
+  >();
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState<MovementFormState>({
     movementDate: "",
@@ -454,15 +457,24 @@ export function InventoryWorkspace({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const quantity = form.quantity.trim();
+    const valid = validate({
+      movementDate: form.movementDate.trim() ? undefined : "请填写日期",
+      warehouseId: form.warehouseId ? undefined : "请选择仓库",
+      materialId: form.materialId ? undefined : "请选择物料",
+      quantity: !quantity
+        ? "请填写数量"
+        : !Number.isInteger(Number(quantity))
+          ? "数量必须为整数"
+          : Number(quantity) <= 0
+            ? "数量必须大于 0"
+            : undefined,
+    });
+    if (!valid) return;
     setSubmitState("saving");
     setSubmitError("");
 
     try {
-      if (form.quantity && !Number.isInteger(Number(form.quantity))) {
-        setSubmitError("数量必须为整数。");
-        setSubmitState("error");
-        return;
-      }
       const created = await createInventoryMovement({
         movementDate: form.movementDate,
         movementType: form.movementType,
@@ -636,7 +648,7 @@ export function InventoryWorkspace({
         dirty={Boolean(form.quantity || form.purchaseRecordNo || form.purchaseRecordLineId || form.remark)}
         onClose={() => setMovementDrawerOpen(false)}
       >
-        {canManage ? <form className="dashboard-panel workspace-form" onSubmit={handleSubmit} aria-label="库存出入库登记表单" noValidate>
+        {canManage ? <form ref={formRef} className="dashboard-panel workspace-form" onSubmit={handleSubmit} aria-label="库存出入库登记表单" noValidate>
           <div className="panel-header people-panel-title">
             <h3>
               <PackageCheck aria-hidden="true" size={16} />
@@ -650,14 +662,16 @@ export function InventoryWorkspace({
           <label>
             <span>{isOutboundMovement ? "出库日期" : "入库日期"}</span>
             <input
+              {...fieldProps("movementDate")}
               placeholder="年-月-日，例如 2026-05-20"
               value={form.movementDate}
-              onChange={(event) => setForm({ ...form, movementDate: event.target.value })}
+              onChange={(event) => { clearError("movementDate"); setForm({ ...form, movementDate: event.target.value }); }}
             />
           </label>
+          <FieldError name="movementDate" errors={errors} errorId={errorId} />
           <label>
             <span>仓库</span>
-            <select value={form.warehouseId} onChange={(event) => setForm({ ...form, warehouseId: event.target.value })}>
+            <select {...fieldProps("warehouseId")} value={form.warehouseId} onChange={(event) => { clearError("warehouseId"); setForm({ ...form, warehouseId: event.target.value }); }}>
               <option value="">选择仓库</option>
               {warehouses.map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
@@ -666,9 +680,10 @@ export function InventoryWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="warehouseId" errors={errors} errorId={errorId} />
           <label>
             <span>物料</span>
-            <select value={form.materialId} onChange={(event) => updateSelectedMaterial(event.target.value)}>
+            <select {...fieldProps("materialId")} value={form.materialId} onChange={(event) => { clearError("materialId"); updateSelectedMaterial(event.target.value); }}>
               <option value="">选择物料</option>
               {materials.map((material) => (
                 <option key={material.id} value={material.id}>
@@ -677,18 +692,21 @@ export function InventoryWorkspace({
               ))}
             </select>
           </label>
+          <FieldError name="materialId" errors={errors} errorId={errorId} />
           <fieldset>
             <legend>数量和来源</legend>
             <label>
               <span>{quantityLabel}</span>
               <input
+                {...fieldProps("quantity")}
                 type="number"
                 min="0"
                 step="1"
                 value={form.quantity}
-                onChange={(event) => setForm({ ...form, quantity: event.target.value })}
+                onChange={(event) => { clearError("quantity"); setForm({ ...form, quantity: event.target.value }); }}
               />
             </label>
+            <FieldError name="quantity" errors={errors} errorId={errorId} />
             <label>
               <span>单位</span>
               <input value={form.unit} readOnly aria-readonly="true" />

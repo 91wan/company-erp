@@ -992,7 +992,7 @@ describe("Company ERP workspace components", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    expect(await screen.findByText("数量必须为整数。")).toBeInTheDocument();
+    expect(await screen.findByText("数量必须为整数")).toBeInTheDocument();
     expect(createInventoryMovement).not.toHaveBeenCalled();
   });
 
