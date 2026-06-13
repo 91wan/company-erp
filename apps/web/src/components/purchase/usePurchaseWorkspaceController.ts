@@ -25,6 +25,7 @@ import {
   PURCHASE_RECORD_PAGE_SIZE,
 } from "./purchaseWorkspaceTypes";
 import type { RecordFormState, RequestFormState } from "./purchaseWorkspaceTypes";
+import { useToast } from "../ui";
 
 async function defaultLoadPurchaseRequests(): Promise<PurchaseRequestDto[]> {
   const payload = await requestJson<{ purchaseRequests: PurchaseRequestDto[] }>(`${apiBaseUrl}/api/purchase-requests`);
@@ -128,6 +129,7 @@ export function usePurchaseWorkspaceController({
   const [requestSubmitState, setRequestSubmitState] = useState<PurchaseSubmitState>("idle");
   const [recordSubmitState, setRecordSubmitState] = useState<PurchaseSubmitState>("idle");
   const [reviewState, setReviewState] = useState<PurchaseSubmitState>("idle");
+  const toast = useToast();
   const [requestSubmitError, setRequestSubmitError] = useState("");
   const [recordSubmitError, setRecordSubmitError] = useState("");
   const [reviewError, setReviewError] = useState("");
@@ -303,6 +305,14 @@ export function usePurchaseWorkspaceController({
       setReviewRemark("");
       setReviewState("idle");
       setPendingReviewAction(null);
+      toast.notify(
+        action === "submit"
+          ? "采购需求已提交审核"
+          : action === "approve"
+            ? "采购需求已通过"
+            : "采购需求已驳回",
+        "success",
+      );
     } catch (error) {
       setReviewError(formatApiError(error, "审批操作失败"));
       setReviewState("error");
@@ -331,6 +341,7 @@ export function usePurchaseWorkspaceController({
       setRequestForm({ ...emptyRequestForm });
       setRequestSubmitState("idle");
       setOpenFormDrawer(null);
+      toast.notify("采购需求已保存", "success");
     } catch (error) {
       setRequestSubmitError(formatApiError(error, "保存失败，请检查单号是否重复或稍后重试。"));
       setRequestSubmitState("error");
@@ -364,6 +375,7 @@ export function usePurchaseWorkspaceController({
       setRecordForm({ ...emptyRecordForm });
       setRecordSubmitState("idle");
       setOpenFormDrawer(null);
+      toast.notify("采购记录已保存", "success");
     } catch (error) {
       setRecordSubmitError(formatApiError(error, "保存失败，请检查单号是否重复或稍后重试。"));
       setRecordSubmitState("error");
