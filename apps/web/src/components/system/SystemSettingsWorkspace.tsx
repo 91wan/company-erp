@@ -18,10 +18,12 @@ import {
   updateAppConfig,
 } from "../../apiClient";
 import {
+  FieldError,
   SectionCard,
   SegmentedTabs,
   StatusBadge as UiStatusBadge,
   WorkspaceScaffold,
+  useFormErrors,
   useToast,
   type TabItem,
 } from "../ui";
@@ -139,6 +141,10 @@ export function SystemSettingsWorkspace({
     "idle",
   );
   const toast = useToast();
+  const companyV = useFormErrors<"companyName">();
+  const attachmentV = useFormErrors<
+    "attachmentCode" | "displayName" | "storageKey" | "ownerModule" | "ownerEntityType"
+  >();
   const [appVersion, setAppVersion] = useState<AppVersionDto | null>(null);
   const [versionStatus, setVersionStatus] = useState<
     "loading" | "success" | "error"
@@ -271,6 +277,12 @@ export function SystemSettingsWorkspace({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !companyV.validate({
+        companyName: nextCompanyName.trim() ? undefined : "请填写公司名称",
+      })
+    )
+      return;
     setStatus("saving");
     setSettingsError("");
     try {
@@ -289,6 +301,16 @@ export function SystemSettingsWorkspace({
 
   async function handleAttachmentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !attachmentV.validate({
+        attachmentCode: attachmentForm.attachmentCode.trim() ? undefined : "请填写附件编号",
+        displayName: attachmentForm.displayName.trim() ? undefined : "请填写显示名称",
+        storageKey: attachmentForm.storageKey.trim() ? undefined : "请填写存储键",
+        ownerModule: attachmentForm.ownerModule.trim() ? undefined : "请填写归属模块",
+        ownerEntityType: attachmentForm.ownerEntityType.trim() ? undefined : "请填写归属对象",
+      })
+    )
+      return;
     setAttachmentSaveStatus("saving");
     setAttachmentSaveError("");
     try {
@@ -432,6 +454,8 @@ export function SystemSettingsWorkspace({
       <section className="system-settings-workspace">
         {activeTab === "company" ? (
           <form
+            ref={companyV.formRef}
+            noValidate
             className="dashboard-panel workspace-form settings-form"
             onSubmit={handleSubmit}
           >
@@ -454,13 +478,18 @@ export function SystemSettingsWorkspace({
             <label>
               <span>公司名称</span>
               <input
+                {...companyV.fieldProps("companyName")}
                 value={nextCompanyName}
-                onChange={(event) => setNextCompanyName(event.target.value)}
+                onChange={(event) => {
+                  companyV.clearError("companyName");
+                  setNextCompanyName(event.target.value);
+                }}
                 disabled={!canManage}
                 maxLength={80}
                 required
               />
             </label>
+            <FieldError name="companyName" errors={companyV.errors} errorId={companyV.errorId} />
 
             {status === "error" ? (
               <p className="form-error">
@@ -713,6 +742,8 @@ export function SystemSettingsWorkspace({
 
             {canManageAttachments ? (
               <form
+                ref={attachmentV.formRef}
+                noValidate
                 className="workspace-form settings-form"
                 onSubmit={handleAttachmentSubmit}
               >
@@ -720,71 +751,86 @@ export function SystemSettingsWorkspace({
                   <label>
                     <span>附件编号</span>
                     <input
+                      {...attachmentV.fieldProps("attachmentCode")}
                       value={attachmentForm.attachmentCode}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        attachmentV.clearError("attachmentCode");
                         setAttachmentForm((form) => ({
                           ...form,
                           attachmentCode: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       placeholder="ATT-DEMO-001"
                       required
                     />
                   </label>
+                  <FieldError name="attachmentCode" errors={attachmentV.errors} errorId={attachmentV.errorId} />
                   <label>
                     <span>显示名称</span>
                     <input
+                      {...attachmentV.fieldProps("displayName")}
                       value={attachmentForm.displayName}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        attachmentV.clearError("displayName");
                         setAttachmentForm((form) => ({
                           ...form,
                           displayName: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       placeholder="合同附件"
                       required
                     />
                   </label>
+                  <FieldError name="displayName" errors={attachmentV.errors} errorId={attachmentV.errorId} />
                   <label>
                     <span>存储键</span>
                     <input
+                      {...attachmentV.fieldProps("storageKey")}
                       value={attachmentForm.storageKey}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        attachmentV.clearError("storageKey");
                         setAttachmentForm((form) => ({
                           ...form,
                           storageKey: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       placeholder="contracts/uuid.pdf"
                       required
                     />
                   </label>
+                  <FieldError name="storageKey" errors={attachmentV.errors} errorId={attachmentV.errorId} />
                   <label>
                     <span>归属模块</span>
                     <input
+                      {...attachmentV.fieldProps("ownerModule")}
                       value={attachmentForm.ownerModule}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        attachmentV.clearError("ownerModule");
                         setAttachmentForm((form) => ({
                           ...form,
                           ownerModule: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       required
                     />
                   </label>
+                  <FieldError name="ownerModule" errors={attachmentV.errors} errorId={attachmentV.errorId} />
                   <label>
                     <span>归属对象</span>
                     <input
+                      {...attachmentV.fieldProps("ownerEntityType")}
                       value={attachmentForm.ownerEntityType}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        attachmentV.clearError("ownerEntityType");
                         setAttachmentForm((form) => ({
                           ...form,
                           ownerEntityType: event.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                       required
                     />
                   </label>
+                  <FieldError name="ownerEntityType" errors={attachmentV.errors} errorId={attachmentV.errorId} />
                   <label>
                     <span>归属 ID（可选）</span>
                     <input

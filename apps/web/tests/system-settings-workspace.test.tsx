@@ -39,6 +39,38 @@ describe("SystemSettingsWorkspace", () => {
     });
   });
 
+  it("validates company name inline before calling the settings API", async () => {
+    const fetchSpy = mockShellFetch(adminUser, { companyName: "Company ERP" });
+
+    render(
+      <ToastProvider>
+        <SystemSettingsWorkspace
+          companyName="Company ERP"
+          canManage={true}
+          canReadAuditLogs={false}
+          canReadAttachments={false}
+          canManageAttachments={false}
+          onCompanyNameChange={vi.fn()}
+        />
+      </ToastProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText("公司名称"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(await screen.findByText("请填写公司名称")).toBeInTheDocument();
+    expect(screen.getByLabelText("公司名称")).toHaveAttribute("aria-invalid", "true");
+    expect(document.activeElement).toBe(screen.getByLabelText("公司名称"));
+    expect(
+      fetchSpy.mock.calls.some(([input, init]) => {
+        const url = String(input);
+        return url.endsWith("/api/app-config") && init?.method === "PATCH";
+      }),
+    ).toBe(false);
+  });
+
   it("shows a clear deployment version failure state", async () => {
     mockShellFetch(adminUser, undefined, "error");
 
@@ -246,6 +278,46 @@ describe("SystemSettingsWorkspace", () => {
     );
     expect(error).toBeInTheDocument();
     expect(error).not.toHaveTextContent("/volume1");
+  });
+
+  it("validates attachment registration fields inline before calling the attachment API", async () => {
+    const fetchSpy = mockShellFetch(adminUser, undefined, defaultAppVersion, {
+      attachments: [],
+    });
+
+    render(
+      <SystemSettingsWorkspace
+        companyName="Company ERP"
+        canManage={true}
+        canReadAuditLogs={false}
+        canReadAttachments={true}
+        canManageAttachments={true}
+        onCompanyNameChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
+    await screen.findByRole("heading", { name: "附件管理" });
+    fireEvent.change(screen.getByLabelText("归属模块"), {
+      target: { value: "   " },
+    });
+    fireEvent.change(screen.getByLabelText("归属对象"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
+
+    expect(await screen.findByText("请填写附件编号")).toBeInTheDocument();
+    expect(screen.getByText("请填写显示名称")).toBeInTheDocument();
+    expect(screen.getByText("请填写存储键")).toBeInTheDocument();
+    expect(screen.getByText("请填写归属模块")).toBeInTheDocument();
+    expect(screen.getByText("请填写归属对象")).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByLabelText("附件编号"));
+    expect(
+      fetchSpy.mock.calls.some(([input, init]) => {
+        const url = String(input);
+        return url.includes("/api/attachments") && init?.method === "POST";
+      }),
+    ).toBe(false);
   });
 
   it("keeps viewer sessions read-only in system settings", async () => {
