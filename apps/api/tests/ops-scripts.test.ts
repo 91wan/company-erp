@@ -489,6 +489,15 @@ describe("backup restore drill script", () => {
     expect(result.stdout).not.toContain("Backup/restore verification passed");
   });
 
+  it("uses explicit TCP host for temporary PostgreSQL commands instead of relying on Unix sockets", () => {
+    const source = readFile(join(repoRoot, "scripts/test-backup-restore.sh"));
+
+    expect(source).toContain('POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"');
+    expect(source).toContain('pg_isready -h "$POSTGRES_HOST"');
+    expect(source).toContain('psql -h "$POSTGRES_HOST"');
+    expect(source).toContain('pg_dump -h "$POSTGRES_HOST"');
+  });
+
   it("checks production restore drill evidence folders before production review", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-restore-evidence-"));
     const completeEvidenceDir = join(tempRoot, "complete");
