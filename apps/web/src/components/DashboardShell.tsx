@@ -206,7 +206,6 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
                 canManage={canManage(currentUser.roles, "systemSettings")}
                 canReadAuditLogs={canRead(currentUser.roles, "auditLogs")}
                 canReadAttachments={canRead(currentUser.roles, "attachments")}
-                canManageAttachments={canManage(currentUser.roles, "attachments")}
                 onCompanyNameChange={onAppConfigChange}
               />
             </Suspense>

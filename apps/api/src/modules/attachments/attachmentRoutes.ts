@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { AttachmentRecordDto } from "@company-erp/shared";
 import { createReadStream } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
@@ -26,6 +27,7 @@ import {
   AttachmentUploadQuotaExceededError,
   ensureAttachmentStorageHasFreeSpace,
 } from "../appCore/diskSpaceGuard.js";
+import type { AttachmentRecord } from "./attachments.js";
 
 function actorFields(request: unknown) {
   const user = (request as AuthenticatedRequest).currentUser;
@@ -72,8 +74,13 @@ async function filterAttachmentsForScope<T extends { ownerEntityType: string; ow
   return visible;
 }
 
-function redactAttachmentStorageKeyForScopedRequest<T extends { storageKey: string }>(request: unknown, attachment: T): T {
-  return scopedProjectSiteIds(request) === null ? attachment : { ...attachment, storageKey: "" };
+function toAttachmentRecordDto(attachment: AttachmentRecord): AttachmentRecordDto {
+  const { storageKey: _storageKey, ...dto } = attachment;
+  return dto;
+}
+
+function redactAttachmentForAudit(attachment: AttachmentRecord): AttachmentRecord & { storageKey: string } {
+  return { ...attachment, storageKey: "[redacted]" };
 }
 
 function resolveAttachmentContentPath(storageKey: string): string {
@@ -315,7 +322,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       const attachments = await options.attachmentRepository.list(filters);
       const scopedAttachments = await filterAttachmentsForScope(request, options, attachments);
       return {
-        attachments: scopedAttachments.map((attachment) => redactAttachmentStorageKeyForScopedRequest(request, attachment)),
+        attachments: scopedAttachments.map(toAttachmentRecordDto),
       };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
@@ -336,7 +343,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
     if (await isAttachmentOutsideScope(request, options, attachment)) {
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
-    return { attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) };
+    return { attachment: toAttachmentRecordDto(attachment) };
   });
 
   app.get("/api/attachments/:id/content", { config: { rateLimit: attachmentContentIpRateLimit } }, async (request, reply) => {
@@ -437,11 +444,11 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
           action: "attachment.create",
           entityType: "attachment",
           entityId: created.id,
-          afterJson: created,
+          afterJson: redactAttachmentForAudit(created),
         }, { tx: txOptions });
         return created;
       });
-      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
+      return reply.status(201).send({ attachment: toAttachmentRecordDto(attachment) });
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -520,7 +527,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
         }, { tx: txOptions });
         return created;
       });
-      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
+      return reply.status(201).send({ attachment: toAttachmentRecordDto(attachment) });
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -568,7 +575,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
         }, { tx: txOptions });
         return created;
       });
-      return reply.status(201).send({ attachment: redactAttachmentStorageKeyForScopedRequest(request, attachment) });
+      return reply.status(201).send({ attachment: toAttachmentRecordDto(attachment) });
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });
@@ -597,13 +604,13 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
           action: "attachment.update",
           entityType: "attachment",
           entityId: updated.id,
-          beforeJson: before,
-          afterJson: updated,
+          beforeJson: redactAttachmentForAudit(before),
+          afterJson: redactAttachmentForAudit(updated),
         }, { tx: txOptions });
         return updated;
       });
       if (!attachment) return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
-      return { attachment };
+      return { attachment: toAttachmentRecordDto(attachment) };
     } catch (error) {
       if (error instanceof AttachmentValidationError) {
         return reply.status(400).send({ error: "ATTACHMENT_VALIDATION_FAILED", issues: error.issues });

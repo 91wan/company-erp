@@ -2699,6 +2699,12 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/src/modules/auth/auth.ts") {
           return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
         }
+        if (path === "apps/api/src/modules/auth/authRoutes.ts") {
+          return "MFA_REQUIRED MFA_SETUP_REQUIRED";
+        }
+        if (path === "apps/api/src/modules/auth/mfaRoutes.ts") {
+          return "/api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        }
         if (path === "apps/api/src/modules/auth/routePermission.ts") {
           return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         }
@@ -2715,6 +2721,9 @@ describe("public internet readiness gate", () => {
           return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
         }
         if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") {
+          return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        }
+        if (path === "apps/api/src/infra/prisma/prismaAuthRepository.ts") {
           return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         }
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") {
@@ -2767,6 +2776,8 @@ describe("public internet readiness gate", () => {
       if (path === "apps/api/src/middleware/securityHeaders.ts") return "Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options";
       if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
       if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+      if (path === "apps/api/src/modules/auth/authRoutes.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED";
+      if (path === "apps/api/src/modules/auth/mfaRoutes.ts") return "/api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
       if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
       if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
       if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
@@ -2826,12 +2837,15 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
         if (path === "apps/api/src/modules/auth/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
         if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/modules/auth/authRoutes.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED";
+        if (path === "apps/api/src/modules/auth/mfaRoutes.ts") return "/api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
         if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED setup-challenge activate-challenge";
         if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/src/infra/prisma/prismaAuthRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
         if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
         if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") return "private, no-store Content-Disposition";
@@ -2878,12 +2892,15 @@ describe("public internet readiness gate", () => {
         if (path === "apps/api/src/middleware/fetchMetadataProtection.ts") return "FETCH_METADATA_BLOCKED sec-fetch-site cross-site";
         if (path === "apps/api/src/modules/auth/mfa.ts") return "generateTotpSecret verifyTotp encryptMfaSecret createPendingMfaToken verifyPendingMfaToken createMfaSetupToken verifyMfaSetupToken requiresMfa RECOVERY_CODE_PEPPER";
         if (path === "apps/api/src/modules/auth/auth.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED /api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
+        if (path === "apps/api/src/modules/auth/authRoutes.ts") return "MFA_REQUIRED MFA_SETUP_REQUIRED";
+        if (path === "apps/api/src/modules/auth/mfaRoutes.ts") return "/api/auth/mfa/verify-login /api/auth/mfa/setup-challenge /api/auth/mfa/activate-challenge";
         if (path === "apps/api/src/modules/auth/routePermission.ts") return "isPublicInternetPath isPublicPath isAuthenticatedAuthSelfServicePath";
         if (path === "database/prisma/schema.prisma") return "UserMfaFactor UserMfaRecoveryCode AuthSession user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "database/migrations/20260531183000_mfa_factor_constraints/migration.sql") return "user_mfa_factors_type_check user_mfa_factors_status_check user_mfa_factors_one_pending_per_user_idx user_mfa_factors_one_active_per_user_idx";
         if (path === "apps/api/tests/mfa.test.ts") return "generateTotpSecret verifyTotp createPendingMfaToken";
         if (path === "apps/api/tests/public-internet-auth-mfa-flow.test.ts") return "MFA_SETUP_REQUIRED no session cookie setup-challenge MFA_SETUP_ALREADY_PENDING not.toContain(\"recoveryCodes\") activate-challenge MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE MFA_CODE_INVALID not.toContain(\"otpauth://\") mfaSetupToken";
         if (path === "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
+        if (path === "apps/api/src/infra/prisma/prismaAuthRepository.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes activateMfaFactor disableMfaFactor findActiveMfaFactor hasActiveMfaFactor createMfaRecoveryCodes findUnusedMfaRecoveryCode useMfaRecoveryCode findMfaFactorById findPendingMfaFactor mfaFactorId";
         if (path === "apps/api/tests/prisma-mfa-repository.test.ts") return "createMfaFactor createMfaFactorWithRecoveryCodes findActiveMfaFactor useMfaRecoveryCode resolves.toBe(false) disabled mfaFactorId";
         if (path === "apps/api/tests/security-hardening.test.ts") return "rate limit login";
         if (path === "apps/api/src/modules/attachments/attachmentRoutes.ts") return "private, no-store Content-Disposition";

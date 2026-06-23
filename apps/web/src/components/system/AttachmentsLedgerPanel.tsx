@@ -3,11 +3,7 @@ import type { AttachmentRecordDto } from "@company-erp/shared";
 import { apiBaseUrl, getAttachmentDownloadUrl, getAttachments } from "../../apiClient";
 import { SectionCard, StatusBadge as UiStatusBadge } from "../ui";
 
-type AttachmentsLedgerPanelProps = {
-  canManageAttachments: boolean;
-};
-
-export function AttachmentsLedgerPanel({ canManageAttachments }: AttachmentsLedgerPanelProps) {
+export function AttachmentsLedgerPanel() {
   const [attachments, setAttachments] = useState<AttachmentRecordDto[]>([]);
   const [attachmentStatus, setAttachmentStatus] = useState<"idle" | "loading" | "success" | "error">("loading");
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
@@ -47,9 +43,8 @@ export function AttachmentsLedgerPanel({ canManageAttachments }: AttachmentsLedg
   }
 
   return (
-    <SectionCard title="附件管理" badge={<UiStatusBadge tone={canManageAttachments ? "info" : "disabled"}>{canManageAttachments ? "只读台账" : "只读"}</UiStatusBadge>}>
+    <SectionCard title="附件管理" badge={<UiStatusBadge tone="info">只读台账</UiStatusBadge>}>
       <p className="form-hint">附件上传和绑定请从合同、证照、项目点等业务模块进入；系统设置只提供只读附件台账和下载复核。</p>
-      {!canManageAttachments ? <p className="form-hint">当前账号只能查看附件元数据，不能登记或修改附件引用。</p> : null}
       {attachmentStatus === "loading" ? <p className="form-hint">附件元数据加载中。</p> : null}
       {attachmentStatus === "error" ? <p className="form-error">附件元数据暂不可用</p> : null}
       {attachmentStatus === "success" && attachments.length === 0 ? <p className="form-hint">暂无附件元数据。</p> : null}

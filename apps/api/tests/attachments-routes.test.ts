@@ -3,19 +3,21 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
-  AttachmentRecordDto,
   CertificateRecordDto,
-  CreateAttachmentRecordInput,
   ProjectSiteComplianceSummaryDto,
   ProjectSiteDto,
   ProjectSiteEmployerLiabilityInsuranceCoveredPersonDto,
   ProjectSiteEmployerLiabilityInsurancePolicyDto,
   ProjectSitePayrollSubmissionDto,
   ProjectSiteRosterPersonDto,
-  UpdateAttachmentRecordInput,
 } from "@company-erp/shared";
 import { buildApp } from "../src/app";
-import type { AttachmentRecordRepository } from "../src/modules/attachments/attachments";
+import type {
+  AttachmentRecord,
+  AttachmentRecordRepository,
+  CreateAttachmentRecordInput,
+  UpdateAttachmentRecordInput,
+} from "../src/modules/attachments/attachments";
 import type { AuditLogRepository } from "../src/modules/audit/auditLogs";
 import type { AuthAccountRecord, AuthRepository } from "../src/modules/auth/auth";
 import type { CertificateListFilters, CertificateRepository } from "../src/modules/certificates/certificates";
@@ -72,7 +74,7 @@ function createFakeAuthRepository(seed: AuthAccountRecord[]): AuthRepository {
   };
 }
 
-function makeAttachment(overrides: Partial<AttachmentRecordDto> = {}): AttachmentRecordDto {
+function makeAttachment(overrides: Partial<AttachmentRecord> = {}): AttachmentRecord {
   return {
     id: "22222222-2222-4222-8222-222222222222",
     attachmentCode: "ATT-DEMO-001",
@@ -219,7 +221,7 @@ function makePayrollSubmission(overrides: Partial<ProjectSitePayrollSubmissionDt
   };
 }
 
-function createFakeAttachmentRepository(seed: AttachmentRecordDto[] = [makeAttachment()]): AttachmentRecordRepository {
+function createFakeAttachmentRepository(seed: AttachmentRecord[] = [makeAttachment()]): AttachmentRecordRepository {
   const attachments = [...seed];
   return {
     async list(filters) {
@@ -525,7 +527,11 @@ describe("attachments API", () => {
     expect(list.statusCode).toBe(200);
     expect(list.json()).toEqual({ attachments: [expect.objectContaining({ attachmentCode: "ATT-DEMO-001" })] });
     expect(detail.statusCode).toBe(200);
-    expect(detail.json()).toEqual({ attachment: expect.objectContaining({ storageKey: "contracts/demo-contract.pdf" }) });
+    expect(detail.json()).toEqual({ attachment: expect.objectContaining({ attachmentCode: "ATT-DEMO-001" }) });
+    expect(JSON.stringify(list.json())).not.toContain("storageKey");
+    expect(JSON.stringify(list.json())).not.toContain("contracts/demo-contract.pdf");
+    expect(JSON.stringify(detail.json())).not.toContain("storageKey");
+    expect(JSON.stringify(detail.json())).not.toContain("contracts/demo-contract.pdf");
     expect(forbiddenRead.statusCode).toBe(403);
     expect(forbiddenWrite.statusCode).toBe(403);
     expect(forbiddenWrite.json()).toMatchObject({ permissionArea: "attachments", requiredLevel: "manage" });
@@ -575,22 +581,25 @@ describe("attachments API", () => {
     expect(created.json()).toEqual({
       attachment: expect.objectContaining({
         attachmentCode: "ATT-DEMO-002",
-        storageKey: "certificates/demo-certificate.jpg",
         createdByUserId: "11111111-1111-4111-8111-111111111111",
         createdByUsername: "admin",
       }),
     });
+    expect(JSON.stringify(created.json())).not.toContain("storageKey");
+    expect(JSON.stringify(created.json())).not.toContain("certificates/demo-certificate.jpg");
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toEqual({ attachment: expect.objectContaining({ displayName: "DEMO 证照附件 v2", status: "disabled" }) });
+    expect(JSON.stringify(updated.json())).not.toContain("storageKey");
     expect(logs.map((log) => log.action)).toEqual(["attachment.create", "attachment.update"]);
     expect(JSON.stringify(logs)).not.toContain("secret");
+    expect(JSON.stringify(logs)).not.toContain("certificates/demo-certificate.jpg");
   });
 
   it("rolls back attachment metadata updates when audit logging fails inside a transaction", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const id = "22222222-2222-4222-8222-222222222222";
     let persistedAttachment = makeAttachment({ id, displayName: "原始附件", status: "active" });
-    function repositoryFor(get: () => AttachmentRecordDto, set: (attachment: AttachmentRecordDto) => void): AttachmentRecordRepository {
+    function repositoryFor(get: () => AttachmentRecord, set: (attachment: AttachmentRecord) => void): AttachmentRecordRepository {
       return {
         async list() {
           return [get()];
@@ -692,7 +701,8 @@ describe("attachments API", () => {
         headers: csrfHeaders(session, uploadPayload.headers),
       });
       const body = uploaded.json();
-      const storedPath = join(root, body.attachment.storageKey);
+      const [createdAttachment] = await attachmentRepository.list({});
+      const storedPath = join(root, createdAttachment.storageKey);
       const storedContent = await readFile(storedPath, "utf8");
       const logs = await auditLogRepository.list({});
 
@@ -701,7 +711,6 @@ describe("attachments API", () => {
         attachment: expect.objectContaining({
           attachmentCode: expect.stringMatching(/^ATT-\d{8}-[A-F0-9]{8}$/),
           displayName: "合同盖章扫描件",
-          storageKey: expect.stringMatching(/^contracts\/[0-9a-f-]+\.pdf$/),
           originalFileName: "signed-contract.pdf",
           fileType: "application/pdf",
           fileSize: Buffer.byteLength("PDF demo content"),
@@ -711,6 +720,9 @@ describe("attachments API", () => {
           createdByUsername: "admin",
         }),
       });
+      expect(createdAttachment.storageKey).toMatch(/^contracts\/[0-9a-f-]+\.pdf$/);
+      expect(JSON.stringify(body)).not.toContain("storageKey");
+      expect(JSON.stringify(body)).not.toContain(createdAttachment.storageKey);
       expect(storedContent).toBe("PDF demo content");
       expect(logs.map((log) => log.action)).toContain("attachment.upload");
       expect(JSON.stringify(logs)).not.toContain(root);
@@ -940,7 +952,6 @@ describe("attachments API", () => {
         attachment: expect.objectContaining({
           attachmentCode: expect.stringMatching(/^ATT-\d{8}-[A-F0-9]{8}$/),
           displayName: "食品经营许可证附件",
-          storageKey: "",
           originalFileName: "food-license.pdf",
           fileType: "application/pdf",
           fileSize: Buffer.byteLength("PDF demo content"),
@@ -951,6 +962,7 @@ describe("attachments API", () => {
         }),
       });
       expect(createdAttachment.storageKey).toMatch(/^certificates\/[0-9a-f-]+\.pdf$/);
+      expect(JSON.stringify(body)).not.toContain("storageKey");
       expect(JSON.stringify(body)).not.toContain(createdAttachment.storageKey);
       expect(storedContent).toBe("PDF demo content");
       expect(logs.map((log) => log.action)).toContain("attachment.business_upload");
@@ -1008,7 +1020,7 @@ describe("attachments API", () => {
         });
 
         expect(response.statusCode).toBe(201);
-        expect(response.json().attachment.storageKey).toBe("");
+        expect(JSON.stringify(response.json())).not.toContain("storageKey");
       }
 
       const attachments = await attachmentRepository.list({});
@@ -1342,15 +1354,17 @@ describe("attachments API", () => {
 
     expect(list.statusCode).toBe(200);
     expect(list.json()).toEqual({
-      attachments: [expect.objectContaining({ attachmentCode: "ATT-SITE-001", storageKey: "" })],
+      attachments: [expect.objectContaining({ attachmentCode: "ATT-SITE-001" })],
     });
+    expect(JSON.stringify(list.json())).not.toContain("storageKey");
     expect(JSON.stringify(list.json())).not.toContain("project-sites/site-license.pdf");
     expect(ownerFilteredOutOfScopeList.statusCode).toBe(200);
     expect(ownerFilteredOutOfScopeList.json()).toEqual({ attachments: [] });
     expect(assignedDetail.statusCode).toBe(200);
     expect(assignedDetail.json()).toEqual({
-      attachment: expect.objectContaining({ attachmentCode: "ATT-SITE-001", storageKey: "" }),
+      attachment: expect.objectContaining({ attachmentCode: "ATT-SITE-001" }),
     });
+    expect(JSON.stringify(assignedDetail.json())).not.toContain("storageKey");
     expect(JSON.stringify(assignedDetail.json())).not.toContain("project-sites/site-license.pdf");
     expect(outOfScopeDetail.statusCode).toBe(404);
     expect(outOfScopeDetail.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });

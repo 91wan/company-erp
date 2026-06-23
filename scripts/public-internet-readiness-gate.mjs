@@ -155,31 +155,31 @@ export function evaluatePublicInternetReadiness({
   ]});
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/modules/auth/auth.ts",
+    path: "apps/api/src/modules/auth/authRoutes.ts",
     marker: "MFA_REQUIRED",
     description: "MFA_REQUIRED login flow",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/modules/auth/auth.ts",
+    path: "apps/api/src/modules/auth/authRoutes.ts",
     marker: "MFA_SETUP_REQUIRED",
     description: "MFA_SETUP_REQUIRED first-time setup flow",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/modules/auth/auth.ts",
+    path: "apps/api/src/modules/auth/mfaRoutes.ts",
     marker: "/api/auth/mfa/verify-login",
     description: "MFA verify-login route",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/modules/auth/auth.ts",
+    path: "apps/api/src/modules/auth/mfaRoutes.ts",
     marker: "/api/auth/mfa/setup-challenge",
     description: "MFA setup-challenge route (first-time setup without session)",
   });
   requireSourceMarker({
     blockers: mfaBlockers, readText,
-    path: "apps/api/src/modules/auth/auth.ts",
+    path: "apps/api/src/modules/auth/mfaRoutes.ts",
     marker: "/api/auth/mfa/activate-challenge",
     description: "MFA activate-challenge route",
   });
@@ -233,7 +233,7 @@ export function evaluatePublicInternetReadiness({
   }
   // Prisma repository must implement MFA methods
   requireText({ blockers: mfaBlockers, readText,
-    path: "apps/api/src/infra/prisma/prismaPeoplePermissionsRepository.ts",
+    path: "apps/api/src/infra/prisma/prismaAuthRepository.ts",
     markers: [
       "createMfaFactor",
       "createMfaFactorWithRecoveryCodes",

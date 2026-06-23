@@ -22,7 +22,6 @@ describe("SystemSettingsWorkspace", () => {
           canManage={true}
           canReadAuditLogs={false}
           canReadAttachments={false}
-          canManageAttachments={false}
           onCompanyNameChange={onCompanyNameChange}
         />
       </ToastProvider>,
@@ -49,7 +48,6 @@ describe("SystemSettingsWorkspace", () => {
           canManage={true}
           canReadAuditLogs={false}
           canReadAttachments={false}
-          canManageAttachments={false}
           onCompanyNameChange={vi.fn()}
         />
       </ToastProvider>,
@@ -80,7 +78,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={false}
         canReadAttachments={false}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -114,7 +111,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={true}
         canReadAttachments={false}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -171,7 +167,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={true}
         canReadAttachments={false}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -233,7 +228,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={true}
         canReadAttachments={false}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -260,7 +254,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={false}
         canReadAttachments={true}
-        canManageAttachments={true}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -289,7 +282,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={false}
         canReadAttachments={true}
-        canManageAttachments={true}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -317,7 +309,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={false}
         canReadAuditLogs={false}
         canReadAttachments={true}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -334,7 +325,7 @@ describe("SystemSettingsWorkspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
     expect(
       await screen.findByText(
-        "当前账号只能查看附件元数据，不能登记或修改附件引用。",
+        "附件上传和绑定请从合同、证照、项目点等业务模块进入；系统设置只提供只读附件台账和下载复核。",
       ),
     ).toBeInTheDocument();
   });
@@ -348,7 +339,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={true}
         canReadAuditLogs={true}
         canReadAttachments={true}
-        canManageAttachments={true}
         onCompanyNameChange={vi.fn()}
       />,
     );
@@ -372,7 +362,6 @@ describe("SystemSettingsWorkspace", () => {
         canManage={false}
         canReadAuditLogs={false}
         canReadAttachments={true}
-        canManageAttachments={false}
         onCompanyNameChange={vi.fn()}
       />,
     );

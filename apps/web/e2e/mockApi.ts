@@ -514,7 +514,6 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
         id: "fafafafa-fafa-4afa-8afa-fafafafafafa",
         attachmentCode: "ATT-DEMO-001",
         displayName: "DEMO 合同附件",
-        storageKey: "contracts/demo-contract.pdf",
         originalFileName: "demo-contract.pdf",
         fileType: "application/pdf",
         fileSize: 1024,

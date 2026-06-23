@@ -1,13 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 import { isRecordNotFound,isUniqueViolation } from "./prismaErrors.js";
-import type { AttachmentRecordDto, AttachmentStatusCode, CreateAttachmentRecordInput, UpdateAttachmentRecordInput } from "@company-erp/shared";
+import type { AttachmentStatusCode } from "@company-erp/shared";
 import {
   AttachmentConflictError,
+  type AttachmentRecord,
   type AttachmentRecordListFilters,
   type AttachmentRecordRepository,
+  type CreateAttachmentRecordInput,
+  type UpdateAttachmentRecordInput,
 } from "../../modules/attachments/attachments.js";
 
-export type AttachmentRecord = {
+export type PrismaAttachmentRecord = {
   id: string;
   attachmentCode: string;
   displayName: string;
@@ -65,14 +68,14 @@ export type AttachmentRecordPrismaClient = {
       where: AttachmentWhere;
       orderBy: { createdAt: "desc" };
       take: number;
-    }): Promise<AttachmentRecord[]>;
-    findUnique(args: { where: { id: string } }): Promise<AttachmentRecord | null>;
-    create(args: { data: AttachmentCreateData }): Promise<AttachmentRecord>;
-    update(args: { where: { id: string }; data: AttachmentUpdateData }): Promise<AttachmentRecord>;
+    }): Promise<PrismaAttachmentRecord[]>;
+    findUnique(args: { where: { id: string } }): Promise<PrismaAttachmentRecord | null>;
+    create(args: { data: AttachmentCreateData }): Promise<PrismaAttachmentRecord>;
+    update(args: { where: { id: string }; data: AttachmentUpdateData }): Promise<PrismaAttachmentRecord>;
   };
 };
 
-function toDto(record: AttachmentRecord): AttachmentRecordDto {
+function toRecord(record: PrismaAttachmentRecord): AttachmentRecord {
   return {
     id: record.id,
     attachmentCode: record.attachmentCode,
@@ -162,16 +165,16 @@ export function createPrismaAttachmentRepository(prisma: PrismaClient | Attachme
         orderBy: { createdAt: "desc" },
         take: Math.min(filters.limit ?? 100, 100),
       });
-      return records.map(toDto);
+      return records.map(toRecord);
     },
     async getById(id) {
       const record = await client.attachmentRecord.findUnique({ where: { id } });
-      return record ? toDto(record) : null;
+      return record ? toRecord(record) : null;
     },
     async create(input) {
       try {
         const record = await client.attachmentRecord.create({ data: createData(input) });
-        return toDto(record);
+        return toRecord(record);
       } catch (error) {
         mapPrismaError(error);
       }
@@ -179,7 +182,7 @@ export function createPrismaAttachmentRepository(prisma: PrismaClient | Attachme
     async update(id, input) {
       try {
         const record = await client.attachmentRecord.update({ where: { id }, data: updateData(input) });
-        return toDto(record);
+        return toRecord(record);
       } catch (error) {
         if (isRecordNotFound(error)) return null;
         mapPrismaError(error);

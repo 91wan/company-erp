@@ -287,7 +287,8 @@ export function mockShellFetch(
           ],
         }, false, 400));
       }
-      return Promise.resolve(jsonResponse({ attachment: { ...attachmentRecord, ...payload, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" } }));
+      const { storageKey: _storageKey, ...publicPayload } = payload;
+      return Promise.resolve(jsonResponse({ attachment: { ...attachmentRecord, ...publicPayload, id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd" } }));
     }
     if (url.includes("/api/attachments")) return Promise.resolve(jsonResponse({ attachments: data.attachments ?? [] }));
     if (url.endsWith("/health")) return Promise.resolve(jsonResponse({ status: "ok", service: "company-erp-api" }));
@@ -965,7 +966,6 @@ export const attachmentRecord: AttachmentRecordDto = {
   id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
   attachmentCode: "ATT-DEMO-001",
   displayName: "DEMO 合同附件",
-  storageKey: "contracts/demo-contract.pdf",
   originalFileName: "demo-contract.pdf",
   fileType: "application/pdf",
   fileSize: 1024,

@@ -11,7 +11,6 @@ type SystemSettingsWorkspaceProps = {
   canManage: boolean;
   canReadAuditLogs: boolean;
   canReadAttachments: boolean;
-  canManageAttachments: boolean;
   onCompanyNameChange: (appConfig: AppConfigDto) => void;
 };
 
@@ -22,7 +21,6 @@ export function SystemSettingsWorkspace({
   canManage,
   canReadAuditLogs,
   canReadAttachments,
-  canManageAttachments,
   onCompanyNameChange,
 }: SystemSettingsWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<SystemSettingsTab>("company");
@@ -46,9 +44,7 @@ export function SystemSettingsWorkspace({
           <CompanySettingsPanel companyName={companyName} canManage={canManage} onCompanyNameChange={onCompanyNameChange} />
         ) : null}
         {activeTab === "version" ? <VersionPanel /> : null}
-        {activeTab === "attachments" && canReadAttachments ? (
-          <AttachmentsLedgerPanel canManageAttachments={canManageAttachments} />
-        ) : null}
+        {activeTab === "attachments" && canReadAttachments ? <AttachmentsLedgerPanel /> : null}
         {activeTab === "audit" && canReadAuditLogs ? <AuditLogPanel /> : null}
       </section>
     </WorkspaceScaffold>

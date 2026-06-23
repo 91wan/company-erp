@@ -56,7 +56,7 @@ function mockSubmitPanelFetch() {
       return Promise.resolve(jsonResponse({ coveredPerson: { id: "covered-new" } }, true, 201));
     }
     if (method === "POST" && url.includes("/api/project-site-attachment-uploads")) {
-      return Promise.resolve(jsonResponse({ attachment: { id: "attachment-new", storageKey: "" } }, true, 201));
+      return Promise.resolve(jsonResponse({ attachment: { id: "attachment-new" } }, true, 201));
     }
 
     return Promise.resolve(jsonResponse({}));

@@ -1,4 +1,4 @@
-import type { AttachmentDownloadDto, AttachmentRecordDto, CreateAttachmentRecordInput } from "@company-erp/shared";
+import type { AttachmentDownloadDto, AttachmentRecordDto } from "@company-erp/shared";
 import { apiBaseUrl, requestJson } from "./http";
 
 export type AttachmentFilters = {
@@ -25,14 +25,6 @@ export async function getAttachmentDownloadUrl(id: string): Promise<string> {
     `${apiBaseUrl}/api/attachments/${id}/download-url`,
   );
   return payload.attachmentDownload.url;
-}
-
-export async function createAttachment(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto> {
-  const payload = await requestJson<{ attachment: AttachmentRecordDto }>(`${apiBaseUrl}/api/attachments`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-  return payload.attachment;
 }
 
 export type UploadAttachmentInput = {
