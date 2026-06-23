@@ -12,11 +12,11 @@ The current build can enter a controlled NAS intranet trial. 可进入 NAS 内�
 
 The trial evidence package must be stored outside Git and cross-checked before sign-off.
 
-- `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` creates the local evidence package and manifest.
-- `npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>` is the manifest verifier. It must pass against `manifest.json`, `manifest.sha256`, and all listed evidence files.
-- `legacy report` evidence must be retained as count-only output from `attachments:legacy-report`; it must not include raw legacy paths, NAS roots, attachment bytes, or real business data.
+- `npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path>` creates the local evidence package and manifest.
+- `npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>` is the manifest verifier. It must pass against `manifest.json`, `manifest.sha256`, and all listed evidence files.
+- `legacy report` evidence must be retained as count-only output from `npm run ops -- attachments-legacy-report`; it must not include raw legacy paths, NAS roots, attachment bytes, or real business data.
 - `audit CSV` export must be retained with its UI/API filters, export operator, deploy revision, response record count, and response SHA256.
-- `npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>` is the audit export verifier. It must pass before the CSV is treated as retained evidence.
+- `npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>` is the audit export verifier. It must pass before the CSV is treated as retained evidence.
 
 ## Role coverage
 
