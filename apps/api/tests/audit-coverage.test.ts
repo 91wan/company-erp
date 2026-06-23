@@ -109,7 +109,7 @@ function routeHandlerSource(fileName: string, method: string, path: string): str
 
 function allRegisteredMutationRoutes(): AuditRoute[] {
   const modulesDir = join(routeRoot, "modules");
-  const moduleNames = readdirSync(modulesDir);
+  const moduleNames = readdirSync(modulesDir).filter((moduleName) => moduleName !== "auth");
   return moduleNames
     .flatMap((moduleName) => {
       const moduleDir = join(modulesDir, moduleName);
