@@ -166,8 +166,10 @@ test("business contract details use unified attachments instead of legacy contra
   await page.getByRole("button", { name: "合同", exact: true }).click();
   await page.getByRole("tab", { name: "合同台账" }).click();
   await page.getByRole("cell", { name: "DEMO-HT-001", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "合同详情" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "统一附件" })).toBeVisible();
+  const contractDetail = page.getByRole("dialog", { name: "合同详情" });
+  await expect(contractDetail.getByRole("heading", { name: "合同详情" })).toBeVisible();
+  await contractDetail.getByRole("tab", { name: "附件" }).click();
+  await expect(contractDetail.getByRole("heading", { name: "统一附件" })).toBeVisible();
   await expect(page.getByRole("button", { name: "登记附件路径" })).toHaveCount(
     0,
   );

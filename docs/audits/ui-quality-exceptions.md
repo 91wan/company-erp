@@ -7,7 +7,6 @@ This file records existing workspace files that exceed the default 300 line qual
 | File | Current reason | Follow-up direction |
 | --- | --- | --- |
 | `apps/web/src/components/BusinessProjectsWorkspace.tsx` | Still owns tab state, project detail, investment summary, and create drawer wiring in one file. | Split controller/view/detail drawer after project-site and purchase patterns. |
-| `apps/web/src/components/ContractsWorkspace.tsx` | Still owns contract risk tabs, form state, detail drawer, and attachment boundary display. | Split controller, tab views, and drawer forms. |
 | `apps/web/src/components/ExcelImportWorkspace.tsx` | Import preview, confirmation state, permissions, and result tables remain co-located. | Split import controller and preview/result tabs. |
 | `apps/web/src/components/InventoryWorkspace.tsx` | Inventory risk, balance, movement form, and detail drawer remain co-located. | Split inventory controller, risk tab, movement tabs, and movement drawer. |
 | `apps/web/src/components/MaterialsWarehousesWorkspace.tsx` | Materials and warehouses remain in one workspace with multiple forms and tables. | Split materials and warehouses tab components and drawer forms. |

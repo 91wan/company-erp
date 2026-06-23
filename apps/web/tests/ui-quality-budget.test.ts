@@ -50,6 +50,7 @@ describe("UI quality budget", () => {
       ["src/components/PurchaseWorkspace.tsx", 120],
       ["src/components/CertificatesWorkspace.tsx", 120],
       ["src/components/PeoplePermissionsWorkspace.tsx", 120],
+      ["src/components/ContractsWorkspace.tsx", 120],
       ["src/components/system/SystemSettingsWorkspace.tsx", 120],
       ["src/components/dashboard/DashboardOverview.tsx", 120],
     ]);
