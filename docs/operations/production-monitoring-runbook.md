@@ -19,7 +19,7 @@
 部署后可运行：
 
 ```bash
-npm run production:health-check -- --base-url http://<nas>:8080
+npm run ops -- health-check -- --base-url http://<nas>:8080
 ```
 
 该命令检查 Web 首页、同源静态资源、`/health` 和 `/api/app-version`，不读取 `.env`，不访问 NAS 文件系统，不启动容器。
@@ -28,7 +28,7 @@ npm run production:health-check -- --base-url http://<nas>:8080
 
 每周至少复核：
 
-- `audit export` 结果和 `audit:verify-export` 校验结果。
+- `audit export` 结果和 `npm run ops -- audit-verify-export` 校验结果。
 - `attachments legacy gap` 是否变化。
 - backup restore drill evidence 是否齐全。
 - 是否存在 previewed 但未确认的导入批次。

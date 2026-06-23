@@ -202,7 +202,7 @@ describe("SystemSettingsWorkspace", () => {
     expect(await screen.findByText("audit-export-sha256-demo")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(
-      screen.getByText(/npm run audit:verify-export -- --csv audit-export.csv --sha256 audit-export-sha256-demo --record-count 2/),
+      screen.getByText(/npm run ops -- audit-verify-export --csv audit-export.csv --sha256 audit-export-sha256-demo --record-count 2/),
     ).toBeInTheDocument();
     expect(anchorClick).toHaveBeenCalledTimes(1);
 
@@ -351,7 +351,7 @@ describe("SystemSettingsWorkspace", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the production go-live evidence panel only to system managers", async () => {
+  it("keeps shell operations runbooks out of the product UI", async () => {
     mockShellFetch(adminUser, undefined, defaultAppVersion);
 
     render(
@@ -365,30 +365,17 @@ describe("SystemSettingsWorkspace", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "正式上线证据" }));
-
-    expect(await screen.findByText("正式上线证据")).toBeInTheDocument();
-    expect(screen.getAllByText(/production:go-live-check/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/production:evidence-template/)).toBeInTheDocument();
-    expect(screen.getByText(/production:ready/)).toBeInTheDocument();
-    expect(screen.getByText(/production:health-check/)).toBeInTheDocument();
-    expect(screen.getByText(/production:restore-drill-check/)).toBeInTheDocument();
-    expect(screen.getByText(/attachments:production-check/)).toBeInTheDocument();
-    expect(screen.getAllByText(/access:review-check/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/--public-internet/)).toBeInTheDocument();
-    expect(screen.getByText(/高权限账号必须 mfaEnabled=true/)).toBeInTheDocument();
-    expect(screen.getByText(/audit:verify-export/)).toBeInTheDocument();
-    expect(screen.getAllByText(/证据目录必须在 Git 仓库外/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/不保存 \.env、数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git/)).toBeInTheDocument();
-    expect(
-      screen.getByText("docs/operations/production-go-live-evidence-checklist.md"),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "正式上线证据" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/production:go-live-check/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/production:evidence-template/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/access:review-check/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/attachments:production-check/)).not.toBeInTheDocument();
     expect(screen.queryByText(/POSTGRES_PASSWORD/)).not.toBeInTheDocument();
     expect(screen.queryByText(/AUTH_SESSION_SECRET/)).not.toBeInTheDocument();
     expect(screen.queryByText(/IDENTITY_ENCRYPTION_SECRET/)).not.toBeInTheDocument();
   });
 
-  it("hides the production go-live evidence panel from read-only viewers", async () => {
+  it("does not show the old production go-live evidence panel to read-only viewers", async () => {
     mockShellFetch(viewerUser);
 
     render(

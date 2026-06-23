@@ -7,7 +7,7 @@ const BLOCKED = "BLOCKED";
 const requiredFields = ["module", "legacyCount", "unifiedCount", "gapEstimate", "pendingPlaceholderCount", "notes"];
 
 function usage() {
-  console.log(`Usage: npm run attachments:production-check -- --legacy-report <report.json>
+  console.log(`Usage: npm run ops -- attachments-production-check -- --legacy-report <report.json>
        node scripts/attachment-production-check.mjs --legacy-report <report.json>
 
 Checks a machine-readable attachments:legacy-report JSON file for production readiness blockers and warnings.

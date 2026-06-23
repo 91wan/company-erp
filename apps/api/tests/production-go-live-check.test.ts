@@ -92,7 +92,7 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
     "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
     "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
     "production-cutover-checklist.md":
-      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
     "production-cutover-check.txt": "PRODUCTION_CUTOVER_CHECK_PASS\n",
     "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
     "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
@@ -107,7 +107,7 @@ function writeFixture(evidenceDir: string, overrides: Record<string, string | nu
       `是否可逆: 是\n` +
       `restore point: 不适用\n` +
       `迁移前数据库备份: backup-2026-05-25\n` +
-      `迁移后验证 SQL 或验证步骤: npm run production:health-check\n` +
+      `迁移后验证 SQL 或验证步骤: npm run ops -- health-check\n` +
       `migration output: /tmp/migration-output.log\n` +
       `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
     "production-migration-plan-check.txt": "PRODUCTION_MIGRATION_PLAN_PASS\n",
@@ -386,7 +386,7 @@ describe("production-go-live-check fixture gate", () => {
         "production-go-live-manifest.json": `${JSON.stringify({ ...baseManifest, attachmentScope: "metadata_only" })}\n`,
       "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n附件范围已知并接受\n",
         "production-cutover-checklist.md":
-          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
       });
 
       const missingBusiness = await evaluateGoLiveEvidence({ evidenceDir: missingBusinessDir, expectedCommit });
@@ -674,12 +674,12 @@ describe("production-go-live-check fixture gate", () => {
       const mismatchDir = join(tempRoot, "mismatch");
       writeFixture(mismatchDir, {
         "production-cutover-checklist.md":
-          "previousCommitSha: cccccccccccccccccccccccccccccccccccccccc\nreleaseCommitSha: dddddddddddddddddddddddddddddddddddddddd\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+          "previousCommitSha: cccccccccccccccccccccccccccccccccccccccc\nreleaseCommitSha: dddddddddddddddddddddddddddddddddddddddd\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
       });
       const noGoDir = join(tempRoot, "no-go");
       writeFixture(noGoDir, {
         "production-cutover-checklist.md":
-          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: no-go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: no-go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
       });
 
       const missingCheck = await evaluateGoLiveEvidence({ evidenceDir: missingCheckDir, expectedCommit });
@@ -763,7 +763,7 @@ describe("production-go-live-check fixture gate", () => {
       const approverMismatchDir = join(tempRoot, "approver-mismatch");
       writeFixture(approverMismatchDir, {
         "production-cutover-checklist.md":
-          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: other-approver\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+          "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: other-approver\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
       });
 
       const missingChecklist = await evaluateGoLiveEvidence({ evidenceDir: missingChecklistDir, expectedCommit });
@@ -823,7 +823,7 @@ describe("production-go-live-check fixture gate", () => {
           `是否可逆: 是\n` +
           `restore point: 不适用\n` +
           `迁移前数据库备份: backup-2026-05-25\n` +
-          `迁移后验证 SQL 或验证步骤: npm run production:health-check\n` +
+          `迁移后验证 SQL 或验证步骤: npm run ops -- health-check\n` +
           `migration output: /tmp/migration-output.log\n` +
           `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
       });
@@ -857,7 +857,7 @@ describe("production-go-live-check fixture gate", () => {
         `是否可逆: 否\n` +
         `restore point: backup-2026-05-25\n` +
         `迁移前数据库备份: backup-2026-05-25\n` +
-        `迁移后验证 SQL 或验证步骤: npm run production:health-check\n` +
+        `迁移后验证 SQL 或验证步骤: npm run ops -- health-check\n` +
         `migration output: /tmp/migration-output.log\n` +
         `rollback strategy: 使用数据库备份恢复并切回 previousCommitSha\n`;
       const irreversibleDir = join(tempRoot, "irreversible");
@@ -1037,7 +1037,7 @@ describe("production-cutover-check fixture gate", () => {
     "finishedAt: 2026-05-25T09:59:00.000Z\n" +
     "go/no-go: go\n" +
     "migration 已执行时不能只回滚代码\n" +
-    "production:health-check\n" +
+    "ops -- health-check\n" +
     "docker compose ps\n";
 
   it("accepts a valid cutover checklist", async () => {

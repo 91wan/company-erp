@@ -4,9 +4,9 @@
 
 | 证据项 | 要求 | 阻断 NAS 试点 |
 | --- | --- | --- |
-| `npm run pilot:ready` 输出 | 保存完整命令输出，确认最终无失败。 | 是 |
-| `npm run import:pilot-check` 输出 | 显示 `NAS 试点导入前置检查` 且全部通过。 | 是 |
-| `npm run import:pilot-smoke` 输出 | 显示 `导入试点 smoke 通过`。 | 是 |
+| `npm run ops -- trial-ready` 输出 | 保存完整命令输出，确认最终无失败。 | 是 |
+| `npm run ops -- import-pilot-check` 输出 | 显示 `NAS 试点导入前置检查` 且全部通过。 | 是 |
+| `npm run ops -- import-pilot-smoke` 输出 | 显示 `导入试点 smoke 通过`。 | 是 |
 | 模板包下载文件名 | 记录下载的模板包或单模板文件名。 | 是 |
 | health_certificates 预检截图 | 截图需显示健康证归属类型、姓名、到期日期，不出现身份证后四位、健康证编号、发证机关。 | 是 |
 | `error-report.xlsx` | 保存一份可读错误报告，包含“问题行”和“导入说明”sheet。 | 是 |

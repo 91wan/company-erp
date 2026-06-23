@@ -68,7 +68,7 @@
 使用账号导出文件运行：
 
 ```bash
-npm run access:review-check -- --export <outside-git-path>/user-accounts-export.json
+npm run ops -- access-review-check -- --export <outside-git-path>/user-accounts-export.json
 ```
 
 脚本只读导出文件，不连接数据库，不读取 `.env`，不访问 NAS 文件系统。脚本通过只代表导出文件满足最小结构门禁，仍需要业务负责人签字确认。

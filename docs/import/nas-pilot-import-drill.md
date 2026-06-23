@@ -19,10 +19,10 @@
 在进入 NAS 内网试点导入窗口前，先在本地或 CI 环境完成：
 
 ```bash
-npm run pilot:ready
+npm run ops -- trial-ready
 ```
 
-`pilot:ready` 会串联数据库校验、类型检查、单元测试、构建、浏览器 E2E、导入静态门禁、导入 smoke 演练和 NAS 试点 readiness gate。通过后只代表可以安排 1-3 个项目点的 NAS 内网小范围试点，不代表正式上线。
+`npm run ops -- trial-ready` 会串联数据库校验、类型检查、单元测试、构建、浏览器 E2E、导入静态门禁、导入 smoke 演练和 NAS 试点 readiness gate。通过后只代表可以安排 1-3 个项目点的 NAS 内网小范围试点，不代表正式上线。
 
 如需分步排查，可逐项运行：
 
@@ -33,11 +33,11 @@ npm run typecheck
 npm run test
 npm run build
 npm run test:e2e -w @company-erp/web
-npm run import:pilot-check
-npm run import:pilot-smoke
+npm run ops -- import-pilot-check
+npm run ops -- import-pilot-smoke
 ```
 
-其中 `import:pilot-check` 是静态门禁；`import:pilot-smoke` 是 mock 模式真实导入演练，不读取 NAS、不需要真实附件、不连接生产数据库。
+其中 `npm run ops -- import-pilot-check` 是静态门禁；`npm run ops -- import-pilot-smoke` 是 mock 模式真实导入演练，不读取 NAS、不需要真实附件、不连接生产数据库。
 当前阶段不做 OCR、ZIP 图片批量入库、合同 PDF 扫描件批量上传、导入一键回滚或覆盖式更新导入。导错后到业务模块作废、停用或修正，不要直接删数据库。
 
 ---
@@ -166,8 +166,8 @@ npm run import:pilot-smoke
 
 ## NAS 试点前最后检查清单
 
-1. `npm run import:pilot-check` 通过。
-2. `npm run import:pilot-smoke` 通过，完成真实导入演练。
+1. `npm run ops -- import-pilot-check` 通过。
+2. `npm run ops -- import-pilot-smoke` 通过，完成真实导入演练。
 3. Excel 导入模板包可下载。
 4. 试导入 1 个项目点。
 5. 试导入项目点现场人员。

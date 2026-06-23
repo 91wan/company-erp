@@ -19,7 +19,7 @@ const REQUIRED_ACCEPTANCE_ITEMS = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md [--json]
+  console.log(`Usage: npm run ops -- business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md [--json]
 
 Validates the business acceptance sign-off before internal production go-live.
 The acceptance document must be signed by the business owner and cover all required acceptance items.`);

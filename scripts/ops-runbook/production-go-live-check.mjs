@@ -75,7 +75,7 @@ export const requiredGoLiveManifestFields = [
 const appVersionFields = ["commitSha", "buildTime", "deployedAt", "packageVersion", "environment"];
 
 function usage() {
-  console.log(`Usage: npm run production:go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--fail-on-warnings] [--require-seal] [--json]
+  console.log(`Usage: npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path> [--base-url http://<nas>:8080] [--expected-commit <sha>] [--fail-on-warnings] [--require-seal] [--json]
        node scripts/production-go-live-check.mjs --evidence-dir <outside-git-path>
 
 Checks the Git-external evidence package required before internal production go-live approval.

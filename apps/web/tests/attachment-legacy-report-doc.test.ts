@@ -7,13 +7,13 @@ describe("attachment legacy report deployment docs", () => {
     const docPath = join(process.cwd(), "..", "..", "docs", "deployment", "nas-docker.md");
     const doc = readFileSync(docPath, "utf8");
 
-    expect(doc).toContain("npm run attachments:legacy-report");
+    expect(doc).toContain("npm run ops -- attachments-legacy-report");
     expect(doc).toContain("--dry-run");
     expect(doc).toContain("--json");
     expect(doc).toContain("--csv");
     expect(doc).toContain("--output");
-    expect(doc).toContain("npm run pilot:verify-evidence");
-    expect(doc).toContain("npm run audit:verify-export");
+    expect(doc).toContain("npm run ops -- pilot-verify-evidence");
+    expect(doc).toContain("npm run ops -- audit-verify-export");
     expect(doc).toContain("outside the Git repository");
     expect(doc).toContain("不是正式合规档案系统全面上线");
     expect(doc).toContain("禁止公网暴露 API/PostgreSQL");

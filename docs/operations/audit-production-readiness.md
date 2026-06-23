@@ -28,7 +28,7 @@
 正式上线前至少保留一份审计 CSV 导出证据，并运行：
 
 ```bash
-npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
+npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
 ```
 
 复核要求：
@@ -61,6 +61,6 @@ npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <head
 - `apps/api/tests/audit-coverage.test.ts` 通过，且 `auditedMutationRoutes` 非空。
 - 附件 content/download 读操作仍写入 `attachment.content_read` / `attachment.download_url`。
 - `import_job.preview` / `import_job.confirm` 可在审计日志中查询。
-- 审计 CSV 导出为 admin-only，并通过 `audit:verify-export`。
+- 审计 CSV 导出为 admin-only，并通过 `npm run ops -- audit-verify-export`。
 - 审计导出证据和签字记录保存在 Git 仓库外。
 

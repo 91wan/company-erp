@@ -10,7 +10,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const BACKUP_KEYWORDS = ["backup", "备份", "snapshot", "dump"];
 
 function usage() {
-  console.log(`Usage: npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md [--json]
+  console.log(`Usage: npm run ops -- migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md [--json]
 
 Validates the internal production migration plan before the evidence package is accepted.`);
 }

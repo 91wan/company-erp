@@ -7,7 +7,7 @@ import {
   viewerUser,
 } from "./mockApi";
 
-test("admin can use the production go-live evidence panel without exposing secrets", async ({
+test("admin system settings keeps operations commands out of the product UI", async ({
   page,
 }) => {
   const issues = trackBrowserIssues(page);
@@ -15,38 +15,23 @@ test("admin can use the production go-live evidence panel without exposing secre
 
   await page.goto("/");
   await page.getByRole("button", { name: "系统设置", exact: true }).click();
-  await page.getByRole("tab", { name: "正式上线证据" }).click();
 
   await expect(page.getByRole("heading", { name: "系统设置" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "正式上线证据包" }),
-  ).toBeVisible();
-  await expect(page.getByText(/production:go-live-check/).first()).toBeVisible();
-  await expect(page.getByText(/--json > <outside-git-path>\/production-go-live-check\.json/)).toBeVisible();
-  await expect(page.getByText(/production:evidence-template/)).toBeVisible();
-  await expect(page.getByText(/production:evidence-collect/)).toBeVisible();
-  await expect(page.getByText(/production:cutover-check/)).toBeVisible();
-  await expect(page.getByText(/production:post-go-live-24h-check/)).toBeVisible();
-  await expect(page.getByText(/production:health-check/)).toBeVisible();
-  await expect(page.getByText(/production:data-quality-check/)).toBeVisible();
-  await expect(page.getByText(/production:business-acceptance-check/)).toBeVisible();
-  await expect(page.getByText(/production:evidence-seal/)).toBeVisible();
-  await expect(page.locator("code", { hasText: /--require-seal/ })).toBeVisible();
-  await expect(page.getByText("docs/operations/post-go-live-24h-checklist.md")).toBeVisible();
+    page.getByRole("tab", { name: "正式上线证据" }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/production:go-live-check/)).toHaveCount(0);
+  await expect(page.getByText(/production:evidence-template/)).toHaveCount(0);
+  await expect(page.getByText(/access:review-check/)).toHaveCount(0);
 
-  const accessExportRequest = page.waitForRequest(
-    /\/api\/user-accounts\/export-access-review$/,
-  );
-  await page.getByRole("button", { name: "导出权限复核 JSON" }).click();
-  await accessExportRequest;
-
+  await page.getByRole("tab", { name: "审计日志" }).click();
   const auditExportRequest = page.waitForRequest(/\/api\/audit-logs\/export\.csv/);
-  await page.getByRole("button", { name: "导出审计 CSV" }).click();
+  await page.getByRole("button", { name: "导出 CSV" }).click();
   await auditExportRequest;
-  await expect(page.getByLabel("正式上线审计导出校验信息")).toContainText(
+  await expect(page.getByLabel("审计导出校验信息")).toContainText(
     "record count",
   );
-  await expect(page.getByLabel("正式上线审计导出校验信息")).toContainText(
+  await expect(page.getByLabel("审计导出校验信息")).toContainText(
     "sha256",
   );
 
@@ -83,6 +68,5 @@ test("viewer and external project-site users cannot see production go-live evide
   await expect(externalPage.getByText("正式上线证据包")).toHaveCount(0);
   await expect(externalPage.getByText(/production:go-live-check/)).toHaveCount(0);
   await expect(externalPage.getByText("导出权限复核 JSON")).toHaveCount(0);
-  await expect(externalPage.getByText("导出审计 CSV")).toHaveCount(0);
   await expectHealthyShell(externalPage, externalIssues);
 });

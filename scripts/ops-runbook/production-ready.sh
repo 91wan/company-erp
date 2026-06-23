@@ -10,7 +10,7 @@ run_step() {
   echo "==> ${label}"
   if ! "$@"; then
     echo "BLOCKED: ${label} failed." >&2
-    echo "处理建议: 修复该阻塞项后重新运行 npm run production:ready。" >&2
+    echo "处理建议: 修复该阻塞项后重新运行 npm run ops -- internal-ready。" >&2
     return 1
   fi
 }
@@ -31,10 +31,10 @@ check_docker_for_restore_drill() {
   fi
 }
 
-run_step "pilot readiness" npm run pilot:ready
+run_step "pilot readiness" npm run ops -- trial-ready
 check_docker_for_restore_drill
 run_step "backup restore verification" npm run test:backup-restore
-run_step "attachment legacy dry-run" npm run attachments:legacy-report -- --dry-run
-run_step "audit export verifier smoke" npm run audit:verify-export -- --help
-run_step "pilot evidence verifier smoke" npm run pilot:verify-evidence -- --help
-run_step "production readiness gate" npm run production:readiness-gate
+run_step "attachment legacy dry-run" npm run ops -- attachments-legacy-report -- --dry-run
+run_step "audit export verifier smoke" npm run ops -- audit-verify-export -- --help
+run_step "pilot evidence verifier smoke" npm run ops -- pilot-verify-evidence -- --help
+run_step "production readiness gate" npm run ops -- readiness-gate

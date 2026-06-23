@@ -194,7 +194,7 @@ describe("production cutover and post go-live gates", () => {
       const checklist = join(tempRoot, "production-cutover-checklist.md");
       writeFileSync(
         checklist,
-        "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T10:00:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+        "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T10:00:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
       );
       const pass = await runNode(["scripts/ops-runbook/production-cutover-check.mjs", "--checklist", checklist]);
       expect(pass.status).toBe(0);
@@ -280,10 +280,10 @@ describe("production evidence template consistency", () => {
         expect(manifestExample).toHaveProperty(field);
       }
       const commands = readText(join(output, "commands.md"));
-      expect(commands).toContain("production:go-live-check");
-      expect(commands).toContain("production:health-check");
-      expect(commands).toContain("access:review-check");
-      expect(commands).toContain("audit:verify-export");
+      expect(commands).toContain("internal-go-live-check");
+      expect(commands).toContain("ops -- health-check");
+      expect(commands).toContain("access-review-check");
+      expect(commands).toContain("audit-verify-export");
       for (const fakePass of [
         "pilot-ready.txt",
         "production-ready.txt",

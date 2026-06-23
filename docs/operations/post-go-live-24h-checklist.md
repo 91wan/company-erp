@@ -5,7 +5,7 @@
 复核证据保存到 Git 外目录后运行：
 
 ```bash
-npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
+npm run ops -- post-go-live-24h -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
 ## 登录检查

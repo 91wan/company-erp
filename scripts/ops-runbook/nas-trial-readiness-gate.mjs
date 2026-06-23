@@ -6,7 +6,7 @@ const READY = "READY_FOR_NAS_INTRAnet_TRIAL";
 const BLOCKED = "BLOCKED";
 
 function usage() {
-  console.log(`Usage: npm run nas:trial-readiness
+  console.log(`Usage: npm run ops -- nas-trial-readiness
        node scripts/nas-trial-readiness-gate.mjs [--help]
 
 Runs a local, read-only NAS intranet trial readiness gate.
@@ -21,13 +21,13 @@ The gate does not read .env, does not access NAS roots, does not start productio
 const checks = [
   { label: "git status", command: "git", args: ["status", "--short", "--branch"], kind: "git-status" },
   { label: "open PRs", command: "gh", args: ["pr", "list", "--state", "open", "--json", "number,title,headRefName", "--limit", "20"], kind: "open-prs" },
-  { label: "preflight help", command: "npm", args: ["run", "preflight:nas", "--", "--help"], expect: "Usage: npm run preflight:nas" },
-  { label: "pilot local dry-run", command: "npm", args: ["run", "pilot:verify-local", "--", "--dry-run"], expect: "Pilot local verification dry-run" },
-  { label: "pilot evidence help", command: "npm", args: ["run", "pilot:verify-evidence", "--", "--help"], expect: "Usage: npm run pilot:verify-evidence" },
-  { label: "audit export help", command: "npm", args: ["run", "audit:verify-export", "--", "--help"], expect: "Usage: npm run audit:verify-export" },
-  { label: "legacy report help", command: "npm", args: ["run", "attachments:legacy-report", "--", "--help"], expect: "Usage: npm run attachments:legacy-report" },
-  { label: "import pilot static gate", command: "npm", args: ["run", "import:pilot-check"], expect: "NAS 试点导入前置检查" },
-  { label: "import pilot smoke", command: "npm", args: ["run", "import:pilot-smoke"], expect: "导入试点 smoke 通过" },
+  { label: "preflight help", command: "npm", args: ["run", "ops", "--", "preflight-nas", "--help"], expect: "Usage:" },
+  { label: "pilot local dry-run", command: "npm", args: ["run", "ops", "--", "pilot-verify-local", "--dry-run"], expect: "Pilot local verification dry-run" },
+  { label: "pilot evidence help", command: "npm", args: ["run", "ops", "--", "pilot-verify-evidence", "--help"], expect: "Usage:" },
+  { label: "audit export help", command: "npm", args: ["run", "ops", "--", "audit-verify-export", "--help"], expect: "Usage:" },
+  { label: "legacy report help", command: "npm", args: ["run", "ops", "--", "attachments-legacy-report", "--help"], expect: "Usage:" },
+  { label: "import pilot static gate", command: "npm", args: ["run", "ops", "--", "import-pilot-check"], expect: "NAS 试点导入前置检查" },
+  { label: "import pilot smoke", command: "npm", args: ["run", "ops", "--", "import-pilot-smoke"], expect: "导入试点 smoke 通过" },
   {
     label: "doc static gate",
     command: "npm",
@@ -133,7 +133,7 @@ function main() {
   for (const blocker of result.blockers) {
     console.error(`- ${blocker}`);
   }
-  console.error("处理建议: 先修复上述阻塞项并重新运行 npm run nas:trial-readiness。");
+  console.error("处理建议: 先修复上述阻塞项并重新运行 npm run ops -- nas-trial-readiness。");
   return 1;
 }
 

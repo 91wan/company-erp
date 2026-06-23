@@ -13,25 +13,25 @@
 2. 在部署前运行 NAS env preflight，并将输出保存到 Git 仓库外的证据目录:
 
    ```bash
-   npm run preflight:nas
+   npm run ops -- preflight-nas
    ```
 
 3. 生成本地试点证据包。证据目录必须在 Git 仓库外，不能放到 `docs/`、`test-results/` 或任何 tracked path:
 
    ```bash
-   npm run pilot:verify-local -- --evidence-dir <outside-git-path>
+   npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path>
    ```
 
 4. 复核证据包 manifest:
 
    ```bash
-   npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>
+   npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>
    ```
 
 5. 生成 legacy attachment gap snapshot。该报告只保留 count，不保留 raw path、附件原文或 NAS filesystem 内容:
 
    ```bash
-   npm run attachments:legacy-report -- --json --output <outside-git-path>/legacy-report.json
+   npm run ops -- attachments-legacy-report -- --json --output <outside-git-path>/legacy-report.json
    ```
 
 6. 从 admin-only 审计日志页面或 `/api/audit-logs/export.csv` 导出 audit CSV，并记录导出人、筛选条件、deploy revision、响应头 `X-Audit-Export-SHA256` 和 `X-Audit-Export-Record-Count`。
@@ -39,7 +39,7 @@
 7. 用响应头复核 retained audit CSV:
 
    ```bash
-   npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
+   npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
    ```
 
 8. 运行本地 backup restore drill，或记录依赖缺失时的 `BLOCKED` 输出:
@@ -67,11 +67,11 @@
 操作员在正式收集证据前可以先运行这些只读 smoke 命令，确认本机脚本入口可用。它们不读取真实 `.env`、不访问 NAS、不连接生产数据库，也不写 Git 仓库内文件。
 
 ```bash
-npm run preflight:nas -- --help
-npm run pilot:verify-local -- --dry-run
-npm run pilot:verify-evidence -- --help
-npm run attachments:legacy-report -- --help
-npm run audit:verify-export -- --help
+npm run ops -- preflight-nas -- --help
+npm run ops -- pilot-verify-local -- --dry-run
+npm run ops -- pilot-verify-evidence -- --help
+npm run ops -- attachments-legacy-report -- --help
+npm run ops -- audit-verify-export -- --help
 ```
 
 ## 可部署通知 gate
@@ -79,7 +79,7 @@ npm run audit:verify-export -- --help
 在通知业务方或运维窗口“可以部署 NAS 内网试点”前，先运行只读 readiness gate：
 
 ```bash
-npm run nas:trial-readiness
+npm run ops -- nas-trial-readiness
 ```
 
 只有输出 `READY_FOR_NAS_INTRAnet_TRIAL` 时，才可以发出通知：可以部署 NAS 内网试点；不要公网暴露 API/PostgreSQL。这个通知只表示进入 NAS 内网试点部署窗口，不是正式合规档案系统全面上线。
@@ -99,7 +99,7 @@ npm run nas:trial-readiness
 - 业务页面只使用统一附件引用；legacy `attachmentPath`、`sourceAttachmentPath`、`filePath` 只能作为迁移参考。
 - raw path 下载入口禁止；附件下载只能走统一附件接口和已鉴权的 content/download-url 流程。
 - 审计导出必须是 admin-only，并保留 `action`、`entityType`、`actorUsername`、date range 筛选条件。
-- 审计 CSV 归档前必须通过 `audit:verify-export`，不能只记录 SHA256。
+- 审计 CSV 归档前必须通过 `npm run ops -- audit-verify-export`，不能只记录 SHA256。
 
 ## 证据边界
 

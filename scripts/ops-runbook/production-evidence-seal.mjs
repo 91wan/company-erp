@@ -27,7 +27,7 @@ const SENSITIVE_PATTERNS = [
 const SCREENSHOT_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
 function usage() {
-  console.log(`Usage: npm run production:evidence-seal -- --evidence-dir <outside-git-path> [--json]
+  console.log(`Usage: npm run ops -- evidence-seal -- --evidence-dir <outside-git-path> [--json]
 
 Computes SHA-256 hashes for all evidence files and writes:
   evidence-sha256-manifest.json

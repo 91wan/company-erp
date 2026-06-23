@@ -17,7 +17,7 @@ const requiredFiles = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run production:restore-drill-check -- --evidence-dir <path>
+  console.log(`Usage: npm run ops -- restore-drill-check -- --evidence-dir <path>
        node scripts/production-restore-drill-check.mjs --evidence-dir <path>
 
 Checks that a manual production-shaped restore drill evidence folder contains the required proof files.

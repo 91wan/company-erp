@@ -23,4 +23,4 @@
 
 ## 试点边界
 
-试点前必须运行 `npm run import:pilot-check` 和 `npm run import:pilot-smoke`。导错后不要直接删数据库，应到对应业务模块作废、停用或修正。
+试点前必须运行 `npm run ops -- import-pilot-check` 和 `npm run ops -- import-pilot-smoke`。导错后不要直接删数据库，应到对应业务模块作废、停用或修正。

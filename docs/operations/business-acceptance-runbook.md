@@ -15,7 +15,7 @@
 5. 运行检查脚本，保存输出
 
 ```bash
-npm run production:business-acceptance-check -- \
+npm run ops -- business-acceptance-check -- \
   --acceptance <outside-git-path>/business-acceptance.md
 ```
 

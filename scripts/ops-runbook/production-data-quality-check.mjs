@@ -16,7 +16,7 @@ const STORAGE_KEY_BAD_PATTERNS = [
 ];
 
 function usage() {
-  console.log(`Usage: DATABASE_URL=postgresql://... npm run production:data-quality-check -- [--json] [--output <outside-git-path>/data-quality-report.json] [--allow-empty-audit]
+  console.log(`Usage: DATABASE_URL=postgresql://... npm run ops -- data-quality-check -- [--json] [--output <outside-git-path>/data-quality-report.json] [--allow-empty-audit]
 
 Read-only database quality gate before internal production go-live.
 Does not read .env — DATABASE_URL must be set explicitly.

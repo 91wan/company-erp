@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * P2-2: NAS 试点前导入前置检查脚本
- * 用法: npm run import:pilot-check
+ * 用法: npm run ops -- import-pilot-check
  * 不需要连接真实数据库 — 全部为静态检查
  */
 
@@ -37,6 +37,10 @@ function readSrc(relPath) {
   return readFileSync(join(apiSrc, relPath), "utf8");
 }
 
+const importTemplatesPath = "modules/importJobs/importTemplates.ts";
+const importJobRoutesPath = "modules/importJobs/importJobRoutes.ts";
+const trialDataPath = "bootstrap/trialData.ts";
+
 function readWeb(relPath) {
   return readFileSync(join(webSrc, relPath), "utf8");
 }
@@ -60,7 +64,7 @@ check("import:pilot-smoke 脚本存在", () => {
 
 // 1. IMPORT_TEMPLATE_DEFINITIONS 八个模板均存在
 check("importTemplates.ts 定义了全部 8 个模板", () => {
-  const src = readSrc("importTemplates.ts");
+  const src = readSrc(importTemplatesPath);
   const required = ["parties", "materials", "employees", "project_sites", "opening_inventory",
     "contracts", "project_site_roster_people", "health_certificates"];
   for (const t of required) {
@@ -71,7 +75,7 @@ check("importTemplates.ts 定义了全部 8 个模板", () => {
 
 // 2. health_certificates 不含旧字段
 check("health_certificates 模板不含身份证后四位/健康证编号/发证机关", () => {
-  const src = readSrc("importTemplates.ts");
+  const src = readSrc(importTemplatesPath);
   const start = Math.max(src.indexOf('"health_certificates"'), src.indexOf("health_certificates:"));
   const end = src.indexOf("};", start);
   const block = src.slice(start, end);
@@ -86,7 +90,7 @@ check("health_certificates 模板不含身份证后四位/健康证编号/发证
 
 // 3. 图片文件名存在于 health_certificates 模板
 check("health_certificates 包含图片文件名字段", () => {
-  const src = readSrc("importTemplates.ts");
+  const src = readSrc(importTemplatesPath);
   const start = Math.max(src.indexOf('"health_certificates"'), src.indexOf("health_certificates:"));
   const end = src.indexOf("};", start);
   const block = src.slice(start, end);
@@ -95,26 +99,26 @@ check("health_certificates 包含图片文件名字段", () => {
 
 // 4. isSensitiveImportField 包含授权
 check("isSensitiveImportField 包含授权中文敏感模式", () => {
-  const src = readSrc("importJobRoutes.ts");
+  const src = readSrc(importJobRoutesPath);
   if (!src.includes("授权")) throw new Error("importJobRoutes.ts 缺少授权敏感词");
   if (!src.includes("isSensitiveImportField")) throw new Error("缺少 isSensitiveImportField 函数");
 });
 
 // 5. error-report 生成失败有 500 保护
 check("error-report 路由有生成失败保护 (IMPORT_REPORT_GENERATION_FAILED)", () => {
-  const src = readSrc("importJobRoutes.ts");
+  const src = readSrc(importJobRoutesPath);
   if (!src.includes("IMPORT_REPORT_GENERATION_FAILED")) throw new Error("缺少 IMPORT_REPORT_GENERATION_FAILED 错误处理");
 });
 
 // 6. 错误报告 XLSX 有冻结行
 check("error-report XLSX 有 views freeze (header row frozen)", () => {
-  const src = readSrc("importJobRoutes.ts");
+  const src = readSrc(importJobRoutesPath);
   if (!src.includes("frozen")) throw new Error("问题行 sheet 未设置冻结行");
 });
 
 // 6b. error-report 有导入说明 sheet
 check("error-report XLSX 有导入说明 sheet", () => {
-  const src = readSrc("importJobRoutes.ts");
+  const src = readSrc(importJobRoutesPath);
   if (!src.includes("导入说明")) throw new Error("缺少导入说明 sheet");
 });
 
@@ -134,8 +138,8 @@ check("docs/import/nas-pilot-import-drill.md 存在", () => {
 
 check("nas-pilot-import-drill.md 包含静态检查和真实导入演练命令", () => {
   const src = readFileSync(join(root, "docs/import/nas-pilot-import-drill.md"), "utf8");
-  if (!src.includes("npm run import:pilot-check")) throw new Error("缺少 import:pilot-check 命令");
-  if (!src.includes("npm run import:pilot-smoke")) throw new Error("缺少 import:pilot-smoke 命令");
+  if (!src.includes("npm run ops -- import-pilot-check")) throw new Error("缺少 import:pilot-check 命令");
+  if (!src.includes("npm run ops -- import-pilot-smoke")) throw new Error("缺少 import:pilot-smoke 命令");
 });
 
 // 9. nas-pilot-import-drill.md 包含不能回滚说明
@@ -268,17 +272,17 @@ check("确认导入 UI 包含不能一键回滚提示", () => {
 
 // 19. 默认仓库名
 check("默认仓库名为无锡总部仓库", () => {
-  const trial = readSrc("trialData.ts");
-  const templates = readSrc("importTemplates.ts");
+  const trial = readSrc(trialDataPath);
+  const templates = readSrc(importTemplatesPath);
   if (!trial.includes('warehouseName: "无锡总部仓库"')) throw new Error("trialData 默认仓库名不是无锡总部仓库");
   if (!templates.includes("无锡总部仓库")) throw new Error("导入模板示例未使用无锡总部仓库");
 });
 
 console.log(`\n─── 结果：${passed} 通过 / ${failed} 失败 ───`);
 if (failed === 0) {
-  console.log("静态检查已通过；请继续运行 node scripts/ops-runbook/import-pilot-smoke.mjs 完成真实导入演练。\n");
+  console.log("静态检查已通过；请继续运行 npm run ops -- import-pilot-smoke 完成真实导入演练。\n");
 } else {
-  console.log("");
+  console.log("修复上述阻塞项后，请继续运行 npm run ops -- import-pilot-smoke 完成真实导入演练。\n");
 }
 if (failed > 0) {
   process.exit(1);

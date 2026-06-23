@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function usage() {
-  console.log(`Usage: npm run pilot:verify-evidence -- --evidence-dir <path>
+  console.log(`Usage: npm run ops -- pilot-verify-evidence -- --evidence-dir <path>
        node scripts/verify-pilot-evidence-manifest.mjs [--help|--evidence-dir <path>]
 
 Verifies a local NAS pilot evidence manifest without reading .env, NAS data,
@@ -16,7 +16,7 @@ Options:
   --evidence-dir <path>  Repository-external evidence directory containing manifest.json and manifest.sha256.`);
 }
 
-function fail(message, suggestion = "重新运行 npm run pilot:verify-local -- --evidence-dir <outside-git-path> 生成仓库外证据包，然后再运行 npm run pilot:verify-evidence 复核。") {
+function fail(message, suggestion = "重新运行 npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path> 生成仓库外证据包，然后再运行 npm run ops -- pilot-verify-evidence 复核。") {
   console.error(message);
   console.error(`处理建议: ${suggestion}`);
   process.exit(1);

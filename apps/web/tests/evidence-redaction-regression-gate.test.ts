@@ -15,8 +15,8 @@ describe("evidence redaction regression gate", () => {
     const evidenceChecklist = readRepoFile("docs/audits/2026-05-20-nas-pilot-evidence-checklist.md");
 
     for (const content of [runbook, readinessV5, evidenceChecklist]) {
-      expect(content).toContain("npm run pilot:verify-evidence");
-      expect(content).toContain("npm run audit:verify-export");
+      expect(content).toContain("npm run ops -- pilot-verify-evidence");
+      expect(content).toContain("npm run ops -- audit-verify-export");
       expect(content).toMatch(/Git 仓库外|outside.*Git|outside-git-path/i);
       expect(content).toMatch(/禁止公网暴露 API\/PostgreSQL|API\/PostgreSQL.*not.*public/i);
       expect(content).toMatch(/不是正式合规档案系统全面上线|not.*formal compliance archive/i);
