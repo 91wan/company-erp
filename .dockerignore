@@ -12,12 +12,12 @@ coverage
 .env
 .env.*
 !.env.example
-data
-storage
-attachments
-backups
-exports
-tmp
+/data
+/storage
+/attachments
+/backups
+/exports
+/tmp
 .codex-work
 
 # Git and editor noise

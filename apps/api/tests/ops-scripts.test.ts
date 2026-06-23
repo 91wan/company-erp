@@ -255,6 +255,20 @@ describe("account ops", () => {
   });
 });
 
+describe("docker build context", () => {
+  it("does not exclude the API attachments source module", () => {
+    const dockerignore = readFile(join(repoRoot, ".dockerignore"))
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"));
+
+    expect(dockerignore).not.toContain("attachments");
+    expect(dockerignore).toContain("/attachments");
+    expect(existsSync(join(repoRoot, "apps/api/src/modules/attachments/attachmentRoutes.ts"))).toBe(true);
+    expect(existsSync(join(repoRoot, "apps/api/src/modules/attachments/attachments.ts"))).toBe(true);
+  });
+});
+
 describe("demo cleanup ops", () => {
   it("uses only fixed DEMO smoke identifiers and never targets the headquarters warehouse", () => {
     expect(DEMO_CLEANUP_TARGETS.partyCodes).toEqual([
