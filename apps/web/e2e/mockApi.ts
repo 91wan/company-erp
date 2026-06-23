@@ -1017,7 +1017,7 @@ export async function createMockCompanyErpApi(page: Page, options: MockApiOption
 
     if (path.match(/^\/api\/attachments\/[^/]+\/download-url$/) && method === "GET") {
       const id = path.split("/")[3];
-      return fulfill(route, { downloadRef: `/api/attachments/${id}/content` });
+      return fulfill(route, { attachmentDownload: { id, url: `/api/attachments/${id}/content`, expiresAt: null } });
     }
 
     if (path === "/api/user-accounts/export-access-review" && method === "GET") {

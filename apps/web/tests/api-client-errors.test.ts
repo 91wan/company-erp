@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { ApiRequestError, formatApiError } from "../src/apiClient";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiRequestError, formatApiError, getAttachmentDownloadUrl } from "../src/apiClient";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("API error display", () => {
   it("translates backend validation issues before showing them to users", () => {
@@ -27,5 +31,26 @@ describe("API error display", () => {
     );
 
     expect(message).toBe("证照类型不支持；固定到期证照必须填写到期日期；人员证照必须绑定一个人员归属");
+  });
+
+  it("reads attachment download URLs from the shared url contract", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        attachmentDownload: {
+          id: "attachment-1",
+          url: "/api/attachments/attachment-1/content",
+          expiresAt: null,
+        },
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(getAttachmentDownloadUrl("attachment-1")).resolves.toBe("/api/attachments/attachment-1/content");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/attachments/attachment-1/download-url",
+      expect.objectContaining({ credentials: "include" }),
+    );
   });
 });

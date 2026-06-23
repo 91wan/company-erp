@@ -1181,7 +1181,7 @@ describe("attachments API", () => {
     expect(notFound.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
   });
 
-  it("returns scoped download references without exposing absolute storage paths", async () => {
+  it("returns unified download DTOs without exposing storage keys or absolute storage paths", async () => {
     const passwordHash = await hashPassword("ChangeMe123!");
     const siteId = "77777777-7777-4777-8777-777777777777";
     const otherSiteId = "88888888-8888-4888-8888-888888888888";
@@ -1241,14 +1241,25 @@ describe("attachments API", () => {
 
     expect(adminDownload.statusCode).toBe(200);
     expect(scopedDownload.statusCode).toBe(200);
-    expect(scopedDownload.json()).toEqual({
+    expect(adminDownload.json()).toEqual({
       attachmentDownload: {
-        attachmentId: "22222222-2222-4222-8222-222222222222",
-        storageKey: "",
-        downloadRef: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+        id: "22222222-2222-4222-8222-222222222222",
+        url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+        expiresAt: null,
       },
     });
+    expect(scopedDownload.json()).toEqual({
+      attachmentDownload: {
+        id: "22222222-2222-4222-8222-222222222222",
+        url: "/api/attachments/22222222-2222-4222-8222-222222222222/content",
+        expiresAt: null,
+      },
+    });
+    expect(JSON.stringify(adminDownload.json())).not.toContain("storageKey");
+    expect(JSON.stringify(adminDownload.json())).not.toContain("downloadRef");
     expect(JSON.stringify(scopedDownload.json())).not.toContain("project-sites/site-license.pdf");
+    expect(JSON.stringify(scopedDownload.json())).not.toContain("storageKey");
+    expect(JSON.stringify(scopedDownload.json())).not.toContain("downloadRef");
     expect(JSON.stringify(scopedDownload.json())).not.toContain("/volume1");
     expect(outOfScope.statusCode).toBe(404);
     expect(outOfScope.json()).toEqual({ error: "ATTACHMENT_NOT_FOUND" });
