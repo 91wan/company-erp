@@ -6,7 +6,6 @@ import {
   defaultDashboardSummary,
   mockShellFetch,
   projectSiteUser,
-  purchaseRequest,
 } from "./appTestHelpers";
 
 describe("DashboardOverview module", () => {
@@ -39,22 +38,15 @@ describe("DashboardOverview module", () => {
     const onNavigate = vi.fn();
     const fetchSpy = mockShellFetch(adminUser, undefined, undefined, {
       dashboardSummary: "error",
-      purchaseRequests: [
-        {
-          ...purchaseRequest,
-          requestNo: "PR-FALLBACK-001",
-          status: "pending_approval",
-          submittedAt: "2026-05-13T09:00:00.000Z",
-          updatedAt: "2026-05-13T09:00:00.000Z",
-        },
-      ],
     });
 
     render(<DashboardOverview currentUser={adminUser} onNavigate={onNavigate} />);
 
     expect(await screen.findByRole("heading", { name: "工作台" })).toBeInTheDocument();
-    expect(await screen.findByText("采购待办数据暂不可用")).toBeInTheDocument();
+    expect(await screen.findByText("无法加载工作台 summary")).toBeInTheDocument();
+    expect(screen.getByText(/当前不会展示伪零数据/)).toBeInTheDocument();
     expect(screen.queryByText("采购需求 PR-FALLBACK-001")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /今日待办\s+0/ })).not.toBeInTheDocument();
 
     const urls = fetchSpy.mock.calls.map(([input]) => String(input));
     expect(urls.some((url) => url.endsWith("/api/dashboard/summary"))).toBe(true);

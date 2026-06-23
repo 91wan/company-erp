@@ -531,6 +531,7 @@ describe("Company ERP app shell", () => {
     expect(
       await screen.findByRole("heading", { name: "工作台" }),
     ).toBeInTheDocument();
+    expect(await screen.findByText("今日待办")).toBeInTheDocument();
     for (const step of [
       "采购需求",
       "待审批",
