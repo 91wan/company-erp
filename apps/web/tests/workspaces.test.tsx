@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   CreateMaterialInput,
   GenerateReplenishmentSuggestionsResult,
+  ContractDto,
   ImportJobDto,
   InventoryBalanceDto,
 } from "@company-erp/shared";
@@ -57,6 +58,11 @@ import {
 } from "./appTestHelpers";
 import { ApiRequestError } from "../src/apiClient";
 import { complianceStatusTone } from "../src/components/project-sites/projectSiteComplianceStatus";
+
+function openContractDetailAttachmentsTab() {
+  const detailDialog = screen.getByRole("dialog", { name: "合同详情" });
+  fireEvent.click(within(detailDialog).getByRole("tab", { name: "附件" }));
+}
 
 describe("Company ERP workspace components", () => {
   it("renders populated counterparty master data", async () => {
@@ -1961,6 +1967,7 @@ describe("Company ERP workspace components", () => {
     expect(screen.getAllByText("合同形态").length).toBeGreaterThan(0);
     expect(screen.getAllByText("合同标的").length).toBeGreaterThan(0);
     expect(screen.getAllByText("业务项目").length).toBeGreaterThan(0);
+    openContractDetailAttachmentsTab();
     expect(await screen.findByText("统一附件")).toBeInTheDocument();
     expect(screen.getByText("历史路径/兼容字段")).toBeInTheDocument();
     expect(screen.getByText("主附件引用（历史路径）")).toBeInTheDocument();
@@ -1983,6 +1990,7 @@ describe("Company ERP workspace components", () => {
 
     await screen.findByText("HT20260511001");
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    openContractDetailAttachmentsTab();
 
     expect(await screen.findByText("统一附件")).toBeInTheDocument();
     expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
@@ -2022,6 +2030,7 @@ describe("Company ERP workspace components", () => {
 
     await screen.findByText("HT20260511001");
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    openContractDetailAttachmentsTab();
     fireEvent.click(
       await screen.findByRole("button", { name: "下载/打开 DEMO 合同附件" }),
     );
@@ -2052,6 +2061,7 @@ describe("Company ERP workspace components", () => {
 
     await screen.findByText("HT20260511001");
     fireEvent.click(screen.getByRole("cell", { name: "HT20260511001" }));
+    openContractDetailAttachmentsTab();
     fireEvent.click(
       await screen.findByRole("button", { name: "下载/打开 DEMO 合同附件" }),
     );
@@ -2062,6 +2072,70 @@ describe("Company ERP workspace components", () => {
     expect(
       screen.queryByText(/\/volume1|Users\/|attachments\/real/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("supports contract list search, filters, sorting, and pagination", async () => {
+    const contracts: ContractDto[] = Array.from({ length: 21 }, (_, index) => ({
+      ...contract,
+      id: `contract-list-${index + 1}`,
+      contractNo: `HT-PAGE-${String(index + 1).padStart(2, "0")}`,
+      contractName: `分页合同 ${String(index + 1).padStart(2, "0")}`,
+      endDate: `2026-07-${String(index + 1).padStart(2, "0")}`,
+      expiryState: "normal" as const,
+      status: "active" as const,
+    }));
+    contracts[2] = {
+      ...contracts[2],
+      contractNo: "HT-DONE-03",
+      contractName: "分页合同 00 归档完成",
+      status: "completed" as const,
+      expiryState: "expired" as const,
+    };
+
+    render(
+      <ContractsWorkspace
+        initialTab="ledger"
+        loadContracts={() => Promise.resolve(contracts)}
+        loadParties={() => Promise.resolve([party])}
+        loadProjectSites={() => Promise.resolve([projectSite])}
+        loadBusinessProjects={() => Promise.resolve([businessProject])}
+      />,
+    );
+
+    expect(await screen.findByText("HT-PAGE-01")).toBeInTheDocument();
+    expect(screen.queryByText("HT-PAGE-21")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    expect(await screen.findByText("HT-PAGE-21")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("搜索合同编号、名称、相对方、业务项目、项目点"), {
+      target: { value: "归档完成" },
+    });
+    expect(await screen.findByText("HT-DONE-03")).toBeInTheDocument();
+    expect(screen.queryByText("HT-PAGE-21")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("合同状态筛选"), {
+      target: { value: "completed" },
+    });
+    expect(await screen.findByText("分页合同 00 归档完成")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("到期状态筛选"), {
+      target: { value: "expired" },
+    });
+    const expiredRow = (await screen.findByRole("cell", { name: "HT-DONE-03" })).closest("tr");
+    expect(expiredRow).not.toBeNull();
+    expect(within(expiredRow!).getByText("已到期")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("搜索合同编号、名称、相对方、业务项目、项目点"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("合同状态筛选"), {
+      target: { value: "all" },
+    });
+    fireEvent.change(screen.getByLabelText("到期状态筛选"), {
+      target: { value: "all" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /名称/ }));
+    const firstDataRow = screen.getAllByRole("row")[1];
+    expect(within(firstDataRow).getByText("分页合同 00 归档完成")).toBeInTheDocument();
   });
 
   it("renders contract empty and error states", async () => {
