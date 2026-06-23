@@ -1,5 +1,6 @@
 import { Check, X } from "lucide-react";
-import type { PurchaseRequestDto } from "@company-erp/shared";
+import type { PurchaseRequestActionCode, PurchaseRequestDto } from "@company-erp/shared";
+import { allowedPurchaseRequestActions } from "@company-erp/shared";
 import { ConfirmAction, InlineActions, SectionCard, WorkspaceTableContainer } from "../ui";
 import { formatDateTime, PurchaseStateMessage } from "./PurchaseWorkspaceParts";
 import type { PurchasePendingReviewAction, PurchaseSubmitState } from "./purchaseWorkspaceTypes";
@@ -21,7 +22,7 @@ export function PurchaseTodoTab({
   reviewError: string;
   reviewRemark: string;
   reviewState: PurchaseSubmitState;
-  onReview: (action: "submit" | "approve" | "reject", target: PurchaseRequestDto) => void;
+  onReview: (action: PurchaseRequestActionCode, target: PurchaseRequestDto) => void;
   onReviewRemarkChange: (value: string) => void;
   onPendingReviewActionChange: (action: PurchasePendingReviewAction) => void;
 }) {
@@ -46,55 +47,64 @@ export function PurchaseTodoTab({
                 </tr>
               </thead>
               <tbody>
-                {pendingApprovalRequests.map((request) => (
-                  <tr key={request.id}>
-                    <td>{request.requestNo}</td>
-                    <td>{request.requesterName}</td>
-                    <td>{request.lines[0]?.materialName ?? "-"}</td>
-                    <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
-                    <td>
-                      {canManage ? (
-                        <InlineActions>
-                          <ConfirmAction
-                            actionLabel={(
-                              <>
-                                <Check aria-hidden="true" size={14} />
-                                审批通过 {request.requestNo}
-                              </>
-                            )}
-                            confirmationText={`确认审批通过 ${request.requestNo}？`}
-                            confirmLabel="确认审批通过"
-                            disabled={reviewState === "saving"}
-                            pending={reviewState === "saving" && pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "approve"}
-                            confirming={pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "approve"}
-                            onRequestConfirm={() => onPendingReviewActionChange({ action: "approve", requestId: request.id })}
-                            onCancel={() => onPendingReviewActionChange(null)}
-                            onConfirm={() => onReview("approve", request)}
-                          />
-                          <ConfirmAction
-                            actionLabel={(
-                              <>
-                                <X aria-hidden="true" size={14} />
-                                驳回 {request.requestNo}
-                              </>
-                            )}
-                            confirmationText={`确认驳回 ${request.requestNo}？`}
-                            confirmLabel="确认驳回"
-                            danger
-                            disabled={reviewState === "saving"}
-                            pending={reviewState === "saving" && pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "reject"}
-                            confirming={pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "reject"}
-                            onRequestConfirm={() => onPendingReviewActionChange({ action: "reject", requestId: request.id })}
-                            onCancel={() => onPendingReviewActionChange(null)}
-                            onConfirm={() => onReview("reject", request)}
-                          />
-                        </InlineActions>
-                      ) : (
-                        "只读"
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {pendingApprovalRequests.map((request) => {
+                  const actions = allowedPurchaseRequestActions(request.status);
+                  const canApprove = actions.includes("approve");
+                  const canReject = actions.includes("reject");
+                  return (
+                    <tr key={request.id}>
+                      <td>{request.requestNo}</td>
+                      <td>{request.requesterName}</td>
+                      <td>{request.lines[0]?.materialName ?? "-"}</td>
+                      <td>{request.submittedAt ? formatDateTime(request.submittedAt) : "-"}</td>
+                      <td>
+                        {canManage && (canApprove || canReject) ? (
+                          <InlineActions>
+                            {canApprove ? (
+                              <ConfirmAction
+                                actionLabel={(
+                                  <>
+                                    <Check aria-hidden="true" size={14} />
+                                    审批通过 {request.requestNo}
+                                  </>
+                                )}
+                                confirmationText={`确认审批通过 ${request.requestNo}？`}
+                                confirmLabel="确认审批通过"
+                                disabled={reviewState === "saving"}
+                                pending={reviewState === "saving" && pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "approve"}
+                                confirming={pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "approve"}
+                                onRequestConfirm={() => onPendingReviewActionChange({ action: "approve", requestId: request.id })}
+                                onCancel={() => onPendingReviewActionChange(null)}
+                                onConfirm={() => onReview("approve", request)}
+                              />
+                            ) : null}
+                            {canReject ? (
+                              <ConfirmAction
+                                actionLabel={(
+                                  <>
+                                    <X aria-hidden="true" size={14} />
+                                    驳回 {request.requestNo}
+                                  </>
+                                )}
+                                confirmationText={`确认驳回 ${request.requestNo}？`}
+                                confirmLabel="确认驳回"
+                                danger
+                                disabled={reviewState === "saving"}
+                                pending={reviewState === "saving" && pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "reject"}
+                                confirming={pendingReviewAction?.requestId === request.id && pendingReviewAction.action === "reject"}
+                                onRequestConfirm={() => onPendingReviewActionChange({ action: "reject", requestId: request.id })}
+                                onCancel={() => onPendingReviewActionChange(null)}
+                                onConfirm={() => onReview("reject", request)}
+                              />
+                            ) : null}
+                          </InlineActions>
+                        ) : (
+                          "只读"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </WorkspaceTableContainer>

@@ -4,6 +4,7 @@ import type {
   CreatePurchaseRequestInput,
   PurchaseRecordDto,
   PurchaseRecordStatusCode,
+  PurchaseRequestActionCode,
   PurchaseRequestDto,
   PurchaseRequestStatusCode,
   PurchaseSourceTypeCode,
@@ -74,7 +75,7 @@ export type PurchaseTab = "todo" | "requests" | "records" | "arrivals";
 export type PurchaseLoadState = "loading" | "ready" | "error";
 export type PurchaseSubmitState = "idle" | "saving" | "error";
 export type PurchasePendingReviewAction = {
-  action: "approve" | "reject";
+  action: Extract<PurchaseRequestActionCode, "approve" | "reject">;
   requestId: string;
 } | null;
 

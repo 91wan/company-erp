@@ -10,6 +10,7 @@ import {
   PURCHASE_RECORD_STATUSES,
   PURCHASE_REQUEST_STATUSES,
   PURCHASE_SOURCE_TYPES,
+  allowedPurchaseRequestActions,
 } from "@company-erp/shared";
 import { SortHeaderButton, StatusBadge, Toolbar as UiToolbar, WorkspaceTableContainer } from "../ui";
 import type { PurchaseRecordSortField } from "./purchaseWorkspaceTypes";
@@ -94,6 +95,7 @@ export function PurchaseRequestsTable({
         <tbody>
           {requests.map((request) => {
             const firstLine = request.lines[0];
+            const canSubmit = allowedPurchaseRequestActions(request.status).includes("submit");
             return (
               <tr key={request.id} tabIndex={0} onClick={() => onSelectRequest(request)} onKeyDown={(event) => { if (event.key === "Enter") onSelectRequest(request); }}>
                 <td>{request.requestNo}</td>
@@ -112,7 +114,7 @@ export function PurchaseRequestsTable({
                 </td>
                 <td>{request.expectedArrivalDate || "-"}</td>
                 <td>
-                  {canManage && request.status === "draft" ? (
+                  {canManage && canSubmit ? (
                     <button type="button" disabled={reviewState === "saving"} onClick={(event) => { event.stopPropagation(); onSubmitRequest(request); }}>
                       提交 {request.requestNo}
                     </button>
