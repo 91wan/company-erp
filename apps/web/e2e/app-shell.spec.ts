@@ -139,7 +139,8 @@ test("admin can inspect audit logs and unified attachments in system settings", 
   await page.getByRole("tab", { name: "附件管理" }).click();
   await expect(page.getByRole("heading", { name: "附件管理" })).toBeVisible();
   await expect(page.getByText("DEMO 合同附件")).toBeVisible();
-  await expect(page.getByText("contracts/demo-contract.pdf")).toBeVisible();
+  await expect(page.getByText(/附件上传和绑定请从合同、证照、项目点等业务模块进入/)).toBeVisible();
+  await expect(page.getByText("contracts/demo-contract.pdf")).toHaveCount(0);
 
   const downloadRequest = page.waitForRequest(
     /\/api\/attachments\/fafafafa-fafa-4afa-8afa-fafafafafafa\/download-url$/,

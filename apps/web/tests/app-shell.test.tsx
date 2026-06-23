@@ -349,7 +349,7 @@ describe("Company ERP app shell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows and creates attachment metadata from system settings for attachment managers", async () => {
+  it("shows read-only attachment metadata from system settings for attachment managers", async () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     mockShellFetch(
       adminUser,
@@ -368,7 +368,10 @@ describe("Company ERP app shell", () => {
     expect(
       await screen.findByRole("heading", { name: "附件管理" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("contracts/demo-contract.pdf")).toBeInTheDocument();
+    expect(screen.getByText("DEMO 合同附件")).toBeInTheDocument();
+    expect(screen.queryByLabelText("存储键")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "登记附件引用" })).not.toBeInTheDocument();
+    expect(screen.getByText(/附件上传和绑定请从合同、证照、项目点等业务模块进入/)).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }),
     );
@@ -379,28 +382,6 @@ describe("Company ERP app shell", () => {
         "noopener,noreferrer",
       );
     });
-
-    fireEvent.change(screen.getByLabelText("附件编号"), {
-      target: { value: "ATT-DEMO-002" },
-    });
-    fireEvent.change(screen.getByLabelText("显示名称"), {
-      target: { value: "DEMO 证照附件" },
-    });
-    fireEvent.change(screen.getByLabelText("存储键"), {
-      target: { value: "certificates/demo-certificate.jpg" },
-    });
-    fireEvent.change(screen.getByLabelText("归属模块"), {
-      target: { value: "certificates" },
-    });
-    fireEvent.change(screen.getByLabelText("归属对象"), {
-      target: { value: "certificate" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
-
-    expect(await screen.findByText("附件引用已登记")).toBeInTheDocument();
-    expect(
-      screen.getByText("certificates/demo-certificate.jpg"),
-    ).toBeInTheDocument();
   });
 
   it("shows a clear attachment content error when download metadata cannot be resolved", async () => {
@@ -433,7 +414,7 @@ describe("Company ERP app shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows attachment format failures and hides attachment metadata from viewers", async () => {
+  it("does not expose raw attachment registration and hides attachment metadata from viewers", async () => {
     mockShellFetch(adminUser);
 
     render(<App />);
@@ -443,25 +424,9 @@ describe("Company ERP app shell", () => {
     expect(
       await screen.findByRole("heading", { name: "附件管理" }),
     ).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("附件编号"), {
-      target: { value: "ATT-DEMO-003" },
-    });
-    fireEvent.change(screen.getByLabelText("显示名称"), {
-      target: { value: "错误附件" },
-    });
-    fireEvent.change(screen.getByLabelText("存储键"), {
-      target: { value: "../bad.pdf" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
-
-    expect(
-      await screen.findByText(
-        /存储键只能使用 contracts\/<uuid>\.pdf 这类相对路径/,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/password=\[已隐藏\]/)).toBeInTheDocument();
-    expect(screen.getByText(/identityNo=\[已隐藏\]/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("附件编号")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("存储键")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "登记附件引用" })).not.toBeInTheDocument();
     expect(
       screen.queryByText(new RegExp(`${"Secret"}${"123"}`)),
     ).not.toBeInTheDocument();

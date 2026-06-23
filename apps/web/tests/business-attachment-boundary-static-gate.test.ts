@@ -5,8 +5,8 @@ import { externalProjectSiteUser } from "./appTestHelpers";
 import { buildVisibleNavigationGroups } from "../src/components/shell/dashboardShellNavigation";
 
 const componentsRoot = path.resolve(__dirname, "../src/components");
-const allowedStorageKeyFiles = new Set(["system/SystemSettingsWorkspace.tsx"]);
-const allowedDownloadOpenFiles = new Set(["BusinessAttachmentsPanel.tsx", "system/SystemSettingsWorkspace.tsx"]);
+const allowedStorageKeyFiles = new Set<string>();
+const allowedDownloadOpenFiles = new Set(["BusinessAttachmentsPanel.tsx", "system/AttachmentsLedgerPanel.tsx"]);
 
 function collectSourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -38,7 +38,7 @@ describe("business attachment boundary static gate", () => {
     (filePath) => !allowedDownloadOpenFiles.has(relativeComponentPath(filePath)),
   );
 
-  it("keeps Storage Key metadata editing inside system settings only", () => {
+  it("keeps Storage Key metadata editing out of component source", () => {
     expect(matchingLines(/\bStorage Key\b|storageKey/i, businessFiles)).toEqual([]);
   });
 
