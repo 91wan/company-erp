@@ -13,7 +13,6 @@ This file records existing workspace files that exceed the default 300 line qual
 | `apps/web/src/components/MaterialsWarehousesWorkspace.tsx` | Materials and warehouses remain in one workspace with multiple forms and tables. | Split materials and warehouses tab components and drawer forms. |
 | `apps/web/src/components/PartiesWorkspace.tsx` | Party filters, form, table, and detail state remain co-located. | Split party controller, tab view, and detail drawer. |
 | `apps/web/src/components/ReplenishmentSuggestionsWorkspace.tsx` | Replenishment summary, filtering, and conversion form remain co-located. | Split suggestion list, review state, and conversion drawer. |
-| `apps/web/src/components/system/SystemSettingsWorkspace.tsx` | Company info, version health, attachments, audit logs, and security settings remain in one settings workspace. | Split settings sections and keep audit/attachment panels isolated. |
 
 ## DataTable Column Budget Exceptions
 

@@ -266,9 +266,7 @@ describe("SystemSettingsWorkspace", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
-    expect(
-      await screen.findByText("contracts/demo-contract.pdf"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("DEMO 合同附件")).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "下载/打开 DEMO 合同附件" }),
     );
@@ -280,7 +278,7 @@ describe("SystemSettingsWorkspace", () => {
     expect(error).not.toHaveTextContent("/volume1");
   });
 
-  it("validates attachment registration fields inline before calling the attachment API", async () => {
+  it("keeps the system attachment tab as a read-only ledger without editable storage key registration", async () => {
     const fetchSpy = mockShellFetch(adminUser, undefined, defaultAppVersion, {
       attachments: [],
     });
@@ -298,20 +296,10 @@ describe("SystemSettingsWorkspace", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "附件管理" }));
     await screen.findByRole("heading", { name: "附件管理" });
-    fireEvent.change(screen.getByLabelText("归属模块"), {
-      target: { value: "   " },
-    });
-    fireEvent.change(screen.getByLabelText("归属对象"), {
-      target: { value: "   " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登记附件引用" }));
 
-    expect(await screen.findByText("请填写附件编号")).toBeInTheDocument();
-    expect(screen.getByText("请填写显示名称")).toBeInTheDocument();
-    expect(screen.getByText("请填写存储键")).toBeInTheDocument();
-    expect(screen.getByText("请填写归属模块")).toBeInTheDocument();
-    expect(screen.getByText("请填写归属对象")).toBeInTheDocument();
-    expect(document.activeElement).toBe(screen.getByLabelText("附件编号"));
+    expect(screen.queryByRole("button", { name: "登记附件引用" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("存储键")).not.toBeInTheDocument();
+    expect(screen.getByText(/附件上传和绑定请从合同、证照、项目点等业务模块进入/)).toBeInTheDocument();
     expect(
       fetchSpy.mock.calls.some(([input, init]) => {
         const url = String(input);
