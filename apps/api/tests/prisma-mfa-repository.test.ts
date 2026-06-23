@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPrismaAuthRepository } from "../src/infra/prisma/prismaPeoplePermissionsRepository";
+import { createPrismaAuthRepository } from "../src/infra/prisma/prismaAuthRepository";
 
 describe("Prisma MFA repository", () => {
   it("findActiveMfaFactor returns null for pending factor", async () => {
