@@ -130,7 +130,12 @@ export function PurchaseWorkspaceView({ model }: { model: PurchaseWorkspaceContr
         onSubmit={model.handleRecordSubmit}
         onFormChange={model.setRecordForm}
       />
-      <PurchaseRequestDetailDrawer request={model.selectedRequest} onClose={() => model.setSelectedRequestId("")} />
+      <PurchaseRequestDetailDrawer
+        request={model.selectedRequest}
+        canManage={model.canManage}
+        canReadAuditLogs={model.canReadAuditLogs}
+        onClose={() => model.setSelectedRequestId("")}
+      />
       <PurchaseRecordDetailDrawer record={model.selectedRecord} onClose={() => model.setSelectedRecordId("")} />
     </WorkspaceScaffold>
   );

@@ -3,6 +3,7 @@ import { apiBaseUrl, ApiRequestError, requestJson } from "./http";
 
 export type AuditLogFilters = {
   entityType?: string;
+  entityId?: string;
   action?: string;
   actorUsername?: string;
   dateFrom?: string;
@@ -13,7 +14,7 @@ export type AuditLogFilters = {
 function buildAuditLogSearchParams(filters: AuditLogFilters = {}): URLSearchParams {
   const params = new URLSearchParams();
   params.set("limit", String(filters.limit ?? 20));
-  for (const key of ["entityType", "action", "actorUsername", "dateFrom", "dateTo"] as const) {
+  for (const key of ["entityType", "entityId", "action", "actorUsername", "dateFrom", "dateTo"] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
   return params;

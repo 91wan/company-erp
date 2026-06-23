@@ -120,6 +120,7 @@ export function DashboardShell({ currentUser, appConfig, onAppConfigChange, onLo
             <Suspense fallback={<WorkspaceLoadingPlaceholder />}>
               <PurchaseWorkspace
                 canManage={canManage(currentUser.roles, "procurement")}
+                canReadAuditLogs={canRead(currentUser.roles, "auditLogs")}
                 initialTab={activeWorkspaceTab("采购")}
               />
             </Suspense>
