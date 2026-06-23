@@ -86,7 +86,7 @@ describe("PeoplePermissions access-review export", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "用户账号" }));
 
     expect(
-      await screen.findByText("正式上线前用于 access:review-check，不包含密码、token、身份证号。"),
+      await screen.findByText("正式上线前用于 npm run ops -- access-review-check，不包含密码、token、身份证号。"),
     ).toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole("button", { name: "导出权限复核 JSON" }));
@@ -106,7 +106,7 @@ describe("PeoplePermissions access-review export", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "用户账号" }));
 
     expect(screen.queryByRole("button", { name: "导出权限复核 JSON" })).not.toBeInTheDocument();
-    expect(screen.queryByText("正式上线前用于 access:review-check")).not.toBeInTheDocument();
+    expect(screen.queryByText("正式上线前用于 npm run ops -- access-review-check")).not.toBeInTheDocument();
   });
 
   it("shows a clear error when access review JSON download fails", async () => {

@@ -10,6 +10,6 @@ npm run typecheck
 npm run test
 npm run build
 npm run test:e2e -w @company-erp/web
-npm run import:pilot-check
-npm run import:pilot-smoke
-npm run nas:trial-readiness
+npm run ops -- import-pilot-check
+npm run ops -- import-pilot-smoke
+npm run ops -- nas-trial-readiness

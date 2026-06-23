@@ -60,7 +60,7 @@ export function UserAccountsTab({
         </div>
         <p className="form-hint">总部内部账号按固定角色授权；项目点账号不混入普通用户账号操作区。</p>
         {canManage ? (
-          <p className="form-hint">正式上线前用于 access:review-check，不包含密码、token、身份证号。</p>
+          <p className="form-hint">正式上线前用于 npm run ops -- access-review-check，不包含密码、token、身份证号。</p>
         ) : null}
         {exportState === "error" ? (
           <p className="form-error" role="alert">

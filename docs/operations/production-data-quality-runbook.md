@@ -12,7 +12,7 @@
 
 ```bash
 DATABASE_URL=postgresql://company_erp:<password>@<nas>:5432/company_erp \
-  npm run production:data-quality-check -- \
+  npm run ops -- data-quality-check -- \
   --json \
   --output <outside-git-path>/data-quality-report.json
 ```

@@ -49,7 +49,7 @@ const plannedChecks = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run attachments:legacy-report [-- --dry-run|--json|--csv|--output <path>]
+  console.log(`Usage: npm run ops -- attachments-legacy-report [-- --dry-run|--json|--csv|--output <path>]
        scripts/attachments-legacy-report.mjs [--help|--dry-run|--json|--csv|--output <path>]
 
 Generates a read-only attachment migration readiness report from DATABASE_URL.
@@ -279,7 +279,7 @@ async function main() {
   const unknown = args.find((arg) => arg !== "--json" && arg !== "--csv");
   if (unknown) {
     usage();
-    fail(`Unknown option: ${unknown}`, "检查命令参数；可先运行 npm run attachments:legacy-report -- --help。", 2);
+    fail(`Unknown option: ${unknown}`, "检查命令参数；可先运行 npm run ops -- attachments-legacy-report -- --help。", 2);
   }
   if (outputPath && !outputModes[0]) {
     fail("--output requires --json or --csv", "选择 --json 或 --csv 后再写入仓库外 evidence 文件。", 2);

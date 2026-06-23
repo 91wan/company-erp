@@ -8,7 +8,7 @@ const BLOCKED = "BLOCKED";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
-  console.log(`Usage: npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md [--json]
+  console.log(`Usage: npm run ops -- cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md [--json]
 
 Validates the internal production cutover checklist before the evidence package is accepted.`);
 }
@@ -92,7 +92,7 @@ export function evaluateProductionCutoverChecklist({ checklistPath, text = "" } 
     "approver",
     "go/no-go",
     "migration 已执行时不能只回滚代码",
-    "production:health-check",
+    "ops -- health-check",
     "docker compose ps",
   ]) {
     if (!checklist.includes(marker)) blockers.push(`checklist must contain ${marker}`);

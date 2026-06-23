@@ -18,8 +18,8 @@ fail() {
 
 print_usage() {
   cat <<'EOF'
-Usage: npm run preflight:nas
-       PREFLIGHT_ENV_FILE=/path/to/nas.env npm run preflight:nas
+Usage: npm run ops -- preflight-nas
+       PREFLIGHT_ENV_FILE=/path/to/nas.env npm run ops -- preflight-nas
 
 Checks:
   - APP_ENVIRONMENT is nas or production

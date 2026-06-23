@@ -28,7 +28,7 @@ npm install
 cp .env.example .env
 docker compose up -d postgres
 npm run db:generate
-npm run bootstrap:admin -w @company-erp/api
+npm run -w @company-erp/api bootstrap:admin
 npm run dev
 ```
 
@@ -49,7 +49,7 @@ DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci 
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run typecheck
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run test
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run build
-npm run test:e2e -w @company-erp/web
+npm run -w @company-erp/web test:e2e
 ```
 
 文档-only 变更至少检查 diff、`git diff --check`、`git status --short --branch` 和敏感信息扫描。

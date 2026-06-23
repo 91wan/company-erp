@@ -3,7 +3,7 @@
 正式上线切换 checklist 必须保存在 Git 外 evidence directory，完成后运行：
 
 ```bash
-npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
+npm run ops -- cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
 ```
 
 ## 切换前 24 小时
@@ -29,7 +29,7 @@ npm run production:cutover-check -- --checklist <outside-git-path>/production-cu
 - docker compose run --rm migrate。
 - docker compose up -d api web。
 - docker compose ps。
-- production:health-check。
+- npm run ops -- health-check。
 
 ## 切换后 30 分钟
 

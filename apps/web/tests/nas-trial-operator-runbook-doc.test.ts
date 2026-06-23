@@ -9,11 +9,11 @@ describe("NAS trial operator runbook", () => {
 
     const orderedCommands = [
       "git rev-parse HEAD",
-      "npm run preflight:nas",
-      "npm run pilot:verify-local -- --evidence-dir <outside-git-path>",
-      "npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>",
-      "npm run attachments:legacy-report -- --json --output <outside-git-path>/legacy-report.json",
-      "npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>",
+      "npm run ops -- preflight-nas",
+      "npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path>",
+      "npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>",
+      "npm run ops -- attachments-legacy-report -- --json --output <outside-git-path>/legacy-report.json",
+      "npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>",
       "npm run test:backup-restore",
       "/health",
       "/api/app-version",

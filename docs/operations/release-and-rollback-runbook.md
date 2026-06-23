@@ -6,7 +6,7 @@
 
 发布前必须完成：
 
-- `npm run production:ready`
+- `npm run ops -- internal-ready`
 - 手动数据库备份。
 - 附件快照。
 - 记录当前 commit sha。
@@ -14,8 +14,8 @@
 - 记录当前 `.deploy-revision.json`。
 - 记录数据库 migration 状态。
 - 确认 `production-go-live-evidence-checklist.md` 中 P0 证据齐全。
-- 完成 `production-cutover-checklist.md` 并运行 `npm run production:cutover-check`。
-- 运行 `npm run production:go-live-check`，确认 evidence package 已纳入 cutover checklist。
+- 完成 `production-cutover-checklist.md` 并运行 `npm run ops -- cutover-check`。
+- 运行 `npm run ops -- internal-go-live-check`，确认 evidence package 已纳入 cutover checklist。
 
 发布前备份和证据必须保存在 Git 仓库外，不得提交 `.env`、数据库 dump、合同扫描件、健康证图片、工资表或真实附件原文。
 
@@ -30,7 +30,7 @@ docker compose build api web
 docker compose run --rm migrate
 docker compose up -d api web
 docker compose ps
-npm run production:health-check -- --base-url http://<nas>:8080
+npm run ops -- health-check -- --base-url http://<nas>:8080
 ```
 
 其中 production health check 必须确认：
@@ -59,7 +59,7 @@ git checkout <previous-commit-sha>
 docker compose build api web
 docker compose up -d api web
 docker compose ps
-npm run production:health-check -- --base-url http://<nas>:8080
+npm run ops -- health-check -- --base-url http://<nas>:8080
 ```
 
 如果需要恢复数据库或附件，不要只执行代码回滚。

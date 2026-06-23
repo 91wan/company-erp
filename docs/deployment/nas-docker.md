@@ -33,23 +33,23 @@ public DNS or router forwarding is configured. The minimum public-access gate is
 
 Use the two readiness levels separately:
 
-- `npm run pilot:ready`: local gates for arranging a controlled NAS intranet
+- `npm run ops -- trial-ready`: local gates for arranging a controlled NAS intranet
   trial with 1-3 project sites.
-- `npm run production:ready`: local gates for entering internal production
+- `npm run ops -- internal-ready`: local gates for entering internal production
   review after the trial evidence is ready.
-- `npm run production:evidence-template -- --output <outside-git-path>`:
+- `npm run ops -- evidence-template -- --output <outside-git-path>`:
   creates the Git 外 evidence directory skeleton and sign-off templates.
-- `npm run production:go-live-check -- --evidence-dir <outside-git-path>`:
+- `npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path>`:
   checks the Git 外 evidence directory for restore drill, attachment readiness,
   audit export, access review, data freeze, health check, app-version, and
   release sign-off evidence.
-- `npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>`:
-  runs `production:ready` first, then runs the evidence package gate with the
+- `npm run ops -- internal-go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>`:
+  runs `internal-ready` first, then runs the evidence package gate with the
   same arguments.
 
-只有 production:ready + production:go-live-check 通过后，才允许从试点切正式。
+只有 npm run ops -- internal-ready + npm run ops -- internal-go-live-check 通过后，才允许从试点切正式。
 如果没有恢复演练和访问复核，只能保持试点状态。Passing
-`production:ready` does not authorize public internet exposure. If the team has
+`internal-ready` does not authorize public internet exposure. If the team has
 not completed restore drill evidence, access review sign-off, audit export
 verification, attachment readiness review, data freeze sign-off, and
 release/rollback approval, the system must remain in trial status. Any future
@@ -179,12 +179,12 @@ Before importing real attachments or asking operators to rely on the unified
 attachment panel, run a read-only legacy attachment readiness report:
 
 ```bash
-npm run attachments:legacy-report -- --dry-run
-DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report
-DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --json
-DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --csv
-DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --json --output /path/outside/git/legacy-report.json
-DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run attachments:legacy-report -- --csv --output /path/outside/git/legacy-report.csv
+npm run ops -- attachments-legacy-report -- --dry-run
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run ops -- attachments-legacy-report
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run ops -- attachments-legacy-report -- --json
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run ops -- attachments-legacy-report -- --csv
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run ops -- attachments-legacy-report -- --json --output /path/outside/git/legacy-report.json
+DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp npm run ops -- attachments-legacy-report -- --csv --output /path/outside/git/legacy-report.csv
 ```
 
 The report groups counts for contracts, certificates, payroll submissions,
@@ -201,8 +201,8 @@ For trial evidence retention, also verify the local evidence manifest and the
 retained audit CSV export before sign-off:
 
 ```bash
-npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>
-npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
+npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>
+npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>
 ```
 
 These commands are local evidence checks only. They do not deploy NAS, read
@@ -245,10 +245,10 @@ expected revision.
 Before scheduling a NAS intranet trial, run the full local readiness command:
 
 ```bash
-npm run pilot:ready
+npm run ops -- trial-ready
 ```
 
-Passing `pilot:ready` only means the team can arrange a small NAS intranet trial
+Passing `trial-ready` only means the team can arrange a small NAS intranet trial
 for 1-3 project sites. It is not a formal production launch. The command does
 not start production containers or read real NAS attachment roots; it runs local
 verification, browser E2E, Excel import gates, and the NAS readiness gate. A
@@ -258,45 +258,45 @@ Before company-internal formal go-live approval, follow the six-stage lifecycle:
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
-| 1. pilot:ready | `npm run pilot:ready` | Code, import, NAS trial gate |
-| 2. production:ready | `npm run production:ready` | Static code and backup/restore gate |
-| 3. migration-plan-check | `npm run production:migration-plan-check` | Schema/data change field validation |
-| 4. cutover + evidence | `npm run production:cutover-check` + `npm run production:go-live-check` | Cutover go/no-go + evidence package |
-| 5. data quality + acceptance + seal | `production:data-quality-check` + `production:business-acceptance-check` + `production:evidence-seal` + `production:go-live-check --require-seal` | Final go-live approval |
-| 6. post go-live 24h | `npm run production:post-go-live-24h-check` | Post-cutover review (not a pre-go-live blocker) |
+| 1. trial-ready | `npm run ops -- trial-ready` | Code, import, NAS trial gate |
+| 2. internal-ready | `npm run ops -- internal-ready` | Static code and backup/restore gate |
+| 3. migration-plan-check | `npm run ops -- migration-plan-check` | Schema/data change field validation |
+| 4. cutover + evidence | `npm run ops -- cutover-check` + `npm run ops -- internal-go-live-check` | Cutover go/no-go + evidence package |
+| 5. data quality + acceptance + seal | `npm run ops -- data-quality-check` + `npm run ops -- business-acceptance-check` + `npm run ops -- evidence-seal` + `npm run ops -- internal-go-live-check --require-seal` | Final go-live approval |
+| 6. post go-live 24h | `npm run ops -- post-go-live-24h` | Post-cutover review (not a pre-go-live blocker) |
 
 ```bash
-npm run production:ready
-npm run production:evidence-template -- --output <outside-git-path>
-npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
-npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
-npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
-DATABASE_URL=postgresql://... npm run production:data-quality-check -- --json --output <outside-git-path>/data-quality-report.json
-npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md
-npm run production:evidence-seal -- --evidence-dir <outside-git-path>
-npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal
-npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
+npm run ops -- internal-ready
+npm run ops -- evidence-template -- --output <outside-git-path>
+npm run ops -- evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run ops -- migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
+npm run ops -- cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
+DATABASE_URL=postgresql://... npm run ops -- data-quality-check -- --json --output <outside-git-path>/data-quality-report.json
+npm run ops -- business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md
+npm run ops -- evidence-seal -- --evidence-dir <outside-git-path>
+npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path> --require-seal
+npm run ops -- post-go-live-24h -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
-`production:go-live-check --require-seal` is the final go-live approval command.
-`production:ready` is not the final go-live authorization.
-`production:data-quality-check` is read-only and does not modify data.
+`npm run ops -- internal-go-live-check --require-seal` is the final go-live approval command.
+`internal-ready` is not the final go-live authorization.
+`npm run ops -- data-quality-check` is read-only and does not modify data.
 Business acceptance is a human sign-off; no script can substitute for it.
 Company-internal go-live only — do not expose to the public internet.
 
-`production:ready` can run in CI or a local workstation without production
+`internal-ready` can run in CI or a local workstation without production
 evidence, but it requires a working Docker daemon because it must execute
 `test:backup-restore`. If Docker is missing or the daemon is not accessible, it
 fails fast with `BLOCKED_DOCKER_UNAVAILABLE`; treat that as an environment
-blocker, not an application test failure. `production:go-live-check` is the
+blocker, not an application test failure. `internal-go-live-check` is the
 formal evidence gate and requires a Git 外 evidence directory; the directory must
 not be committed.
 
-`production:evidence-collect` is a safe helper for health-check/app-version and
+`npm run ops -- evidence-collect` is a safe helper for health-check/app-version and
 draft manifest evidence only. It does not read `.env`, database dumps, NAS
 attachment bytes, contract scans, health certificate images, or payroll files.
-`production:cutover-check` validates the cutover-day checklist before it is
-accepted by `production:go-live-check`. `production:post-go-live-24h-check` is
+`npm run ops -- cutover-check` validates the cutover-day checklist before it is
+accepted by `internal-go-live-check`. `npm run ops -- post-go-live-24h` is
 run after go-live to verify the first 24 hours of operation.
 
 The go-live manifest must keep the boundary explicit: `businessScope` is
@@ -318,14 +318,14 @@ checks placeholder secrets, enforces the public-access guardrails, and runs
 `docker compose config`.
 
 ```bash
-npm run preflight:nas
+npm run ops -- preflight-nas
 ```
 
 For rehearsals that must not read the real `.env`, point the script at a
 temporary file:
 
 ```bash
-PREFLIGHT_ENV_FILE=/path/to/nas.env npm run preflight:nas
+PREFLIGHT_ENV_FILE=/path/to/nas.env npm run ops -- preflight-nas
 ```
 
 The preflight must fail if production secrets are missing, short, empty, or
@@ -560,11 +560,11 @@ Keep these artifacts together for a recoverable snapshot:
 - `.deploy-revision.json` or the exact Git commit used for the Docker build.
 - A record that `npm run test:backup-restore` passed before the trial deploy, or
   a documented blocker if Docker was not available on the operator machine.
-- A read-only `npm run attachments:legacy-report` summary if legacy attachment
+- A read-only `npm run ops -- attachments-legacy-report` summary if legacy attachment
   fields still exist; keep only counts and migration notes, not raw file paths.
-- `npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>` output
+- `npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>` output
   proving the retained manifest and evidence files still match.
-- `npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>`
+- `npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>`
   output proving the retained audit CSV matches the response headers.
 
 ## Restore
@@ -595,7 +595,7 @@ docker compose ps
 ```
 
 To roll back application code without restoring data, sync the previous Git
-revision, refresh `.deploy-revision.json`, run `npm run preflight:nas`, rebuild
+revision, refresh `.deploy-revision.json`, run `npm run ops -- preflight-nas`, rebuild
 `api` and `web`, run migrations only if that revision requires them, and then
 start the services again with `docker compose up -d api web`. Do not roll back
 the database unless you are intentionally restoring from a known backup.

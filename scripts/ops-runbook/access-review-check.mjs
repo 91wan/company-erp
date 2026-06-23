@@ -7,7 +7,7 @@ const REQUIRED_PROJECT_SITE_ROLE = "project_site";
 const HIGH_PRIVILEGE_ROLES_FOR_MFA = new Set(["admin", "systemSettings.manage", "userAccounts.manage", "auditLogs.read"]);
 
 function usage() {
-  return `Usage: npm run access:review-check -- --export <outside-git-path>/user-accounts-export.json [--public-internet]
+  return `Usage: npm run ops -- access-review-check -- --export <outside-git-path>/user-accounts-export.json [--public-internet]
 
 Checks a production access review export before internal go-live approval.
 This script is read-only. It does not read .env, connect to the database, or inspect NAS files.
@@ -27,7 +27,7 @@ function sanitize(value) {
 function fail(messages) {
   console.error("BLOCKED");
   for (const message of messages) console.error(`- ${sanitize(message)}`);
-  console.error("处理建议: 修正账号导出或完成权限复核后重新运行 npm run access:review-check。");
+  console.error("处理建议: 修正账号导出或完成权限复核后重新运行 npm run ops -- access-review-check。");
   process.exitCode = 1;
 }
 

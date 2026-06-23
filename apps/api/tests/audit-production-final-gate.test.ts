@@ -56,7 +56,7 @@ describe("audit production readiness final gate", () => {
       "项目点领用",
       "雇主责任险/工资表/项目点现场人员",
       "180 天",
-      "audit:verify-export",
+      "npm run ops -- audit-verify-export",
       "passwordHash",
       "token",
       "cookie",

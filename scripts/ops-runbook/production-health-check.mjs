@@ -4,7 +4,7 @@ const PASS = "PRODUCTION_HEALTH_PASS";
 const BLOCKED = "BLOCKED";
 
 function usage() {
-  return `Usage: npm run production:health-check -- --base-url http://<nas>:8080
+  return `Usage: npm run ops -- health-check -- --base-url http://<nas>:8080
 
 Checks deployed Web UI, static assets, /health, and /api/app-version after internal production deployment.
 This script does not read .env, does not access NAS roots, and does not start containers.`;

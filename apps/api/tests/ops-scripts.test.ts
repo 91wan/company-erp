@@ -110,7 +110,7 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
     "data-freeze-signoff.md": "最后一次导入时间: 2026-05-25\n导入批次 ID: import-1\n",
     "release-signoff.md": "批准正式上线\napprover: manager\n权限复核已完成\n",
     "production-cutover-checklist.md":
-      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nproduction:health-check\ndocker compose ps\n",
+      "previousCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nreleaseCommitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\noperator: ops\napprover: manager\nstartAt: 2026-05-25T09:00:00.000Z\nfinishedAt: 2026-05-25T09:59:00.000Z\ngo/no-go: go\nmigration 已执行时不能只回滚代码\nops -- health-check\ndocker compose ps\n",
     "production-cutover-check.txt": "PRODUCTION_CUTOVER_CHECK_PASS\n",
     "docker-compose-ps.txt": "api running\nweb running\npostgres running\n",
     "health-check.txt": "PRODUCTION_HEALTH_PASS\n/health 200\n",
@@ -125,7 +125,7 @@ function writeGoLiveEvidenceFixture(evidenceDir: string, overrides: Record<strin
       `是否可逆: 是\n` +
       `restore point: 不适用\n` +
       `迁移前数据库备份: backup-2026-05-25\n` +
-      `迁移后验证 SQL 或验证步骤: npm run production:health-check\n` +
+      `迁移后验证 SQL 或验证步骤: npm run ops -- health-check\n` +
       `migration output: /tmp/migration-output.log\n` +
       `rollback strategy: 使用 previousCommitSha 代码版本和数据库备份恢复\n`,
     "production-migration-plan-check.txt": "PRODUCTION_MIGRATION_PLAN_PASS\n",
@@ -331,7 +331,7 @@ describe("NAS preflight script", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run preflight:nas");
+    expect(result.stdout).toContain("Usage: npm run ops -- preflight-nas");
     expect(result.stdout).toContain("PREFLIGHT_ENV_FILE");
     expect(result.stdout).toContain("APP_ENVIRONMENT");
     expect(result.stderr).toBe("");
@@ -547,7 +547,7 @@ describe("backup restore drill script", () => {
 
     rmSync(tempRoot, { recursive: true, force: true });
     expect(help.status).toBe(0);
-    expect(help.stdout).toContain("Usage: npm run production:restore-drill-check");
+    expect(help.stdout).toContain("Usage: npm run ops -- restore-drill-check");
     expect(blocked.status).not.toBe(0);
     expect(blocked.stderr).toContain("BLOCKED");
     expect(blocked.stderr).toContain("backup-manifest.json");
@@ -581,7 +581,7 @@ describe("Excel import pilot gate scripts", () => {
 
     // Script may exit non-zero if npm scripts are not in package.json (expected after ops-runbook move),
     // but it should still output the key reminder messages
-    expect(result.stdout).toContain("import:pilot-smoke");
+    expect(result.stdout).toContain("ops -- import-pilot-smoke");
     expect(result.stdout).toContain("真实导入演练");
   });
 });
@@ -671,7 +671,7 @@ describe("attachment production readiness scripts", () => {
     expect(doc).toContain("附件下载必须鉴权");
     expect(doc).toContain("content route 必须 scope check");
     expect(doc).toContain("合同 PDF 和健康证图片可以后续补");
-    expect(doc).toContain("attachments:legacy-report");
+    expect(doc).toContain("ops -- attachments-legacy-report");
     expect(doc).toContain("legacy gap");
   });
 });
@@ -1249,11 +1249,11 @@ describe("operator runbook command smoke", () => {
     expect(runbook).toContain("本地 smoke 命令");
 
     const smokeCommands: Array<{ cmd: string; args: string[]; expected: string }> = [
-      { cmd: "bash", args: ["scripts/ops-runbook/preflight-nas.sh", "--help"], expected: "Usage: npm run preflight:nas" },
+      { cmd: "bash", args: ["scripts/ops-runbook/preflight-nas.sh", "--help"], expected: "Usage: npm run ops -- preflight-nas" },
       { cmd: "bash", args: ["scripts/ops-runbook/pilot-verify-local.sh", "--dry-run"], expected: "Pilot local verification dry-run" },
-      { cmd: "node", args: ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--help"], expected: "Usage: npm run pilot:verify-evidence" },
-      { cmd: "node", args: ["scripts/ops-runbook/attachments-legacy-report.mjs", "--help"], expected: "Usage: npm run attachments:legacy-report" },
-      { cmd: "node", args: ["scripts/ops-runbook/verify-audit-export.mjs", "--help"], expected: "Usage: npm run audit:verify-export" },
+      { cmd: "node", args: ["scripts/ops-runbook/verify-pilot-evidence-manifest.mjs", "--help"], expected: "Usage: npm run ops -- pilot-verify-evidence" },
+      { cmd: "node", args: ["scripts/ops-runbook/attachments-legacy-report.mjs", "--help"], expected: "Usage: npm run ops -- attachments-legacy-report" },
+      { cmd: "node", args: ["scripts/ops-runbook/verify-audit-export.mjs", "--help"], expected: "Usage: npm run ops -- audit-verify-export" },
     ];
 
     for (const command of smokeCommands) {
@@ -1291,7 +1291,7 @@ describe("NAS trial deploy notification readiness gate", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run nas:trial-readiness");
+    expect(result.stdout).toContain("Usage: npm run ops -- nas-trial-readiness");
     expect(result.stdout).toContain("READY_FOR_NAS_INTRAnet_TRIAL");
     expect(result.stdout).toContain("BLOCKED");
     expect(`${result.stdout}\n${result.stderr}`).not.toContain("/volume1/should-not-be-read");
@@ -1309,11 +1309,11 @@ describe("NAS trial deploy notification readiness gate", () => {
       run: (label) => {
         if (label === "git status") return { status: 0, stdout: "## main...origin/main\n", stderr: "" };
         if (label === "open PRs") return { status: 0, stdout: "[]\n", stderr: "" };
-        if (label === "preflight help") return { status: 0, stdout: "Usage: npm run preflight:nas\n", stderr: "" };
+        if (label === "preflight help") return { status: 0, stdout: "Usage: npm run ops -- preflight-nas\n", stderr: "" };
         if (label === "pilot local dry-run") return { status: 0, stdout: "Pilot local verification dry-run\n", stderr: "" };
-        if (label === "pilot evidence help") return { status: 0, stdout: "Usage: npm run pilot:verify-evidence\n", stderr: "" };
-        if (label === "audit export help") return { status: 0, stdout: "Usage: npm run audit:verify-export\n", stderr: "" };
-        if (label === "legacy report help") return { status: 0, stdout: "Usage: npm run attachments:legacy-report\n", stderr: "" };
+        if (label === "pilot evidence help") return { status: 0, stdout: "Usage: npm run ops -- pilot-verify-evidence\n", stderr: "" };
+        if (label === "audit export help") return { status: 0, stdout: "Usage: npm run ops -- audit-verify-export\n", stderr: "" };
+        if (label === "legacy report help") return { status: 0, stdout: "Usage: npm run ops -- attachments-legacy-report\n", stderr: "" };
         if (label === "import pilot static gate") return { status: 0, stdout: "NAS 试点导入前置检查\n", stderr: "" };
         if (label === "import pilot smoke") return { status: 0, stdout: "导入试点 smoke 通过\n", stderr: "" };
         if (label === "doc static gate") return { status: 0, stdout: "nas-trial-handoff-final-gate-doc\n", stderr: "" };
@@ -1392,53 +1392,53 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     expect(runbook).toContain("可以部署 NAS 内网试点");
     expect(runbook).toContain("不是正式合规档案系统全面上线");
-    expect(runbook).toContain("nas:trial-readiness");
+    expect(runbook).toContain("ops -- nas-trial-readiness");
   });
 
-  it("documents pilot:ready as the NAS trial total command", () => {
+  it("documents trial-ready as the NAS trial total command", () => {
     const pilotReady = readFile(join(repoRoot, "scripts", "ops-runbook", "pilot-ready.sh"));
     const importDrill = readFile(join(repoRoot, "docs", "import", "nas-pilot-import-drill.md"));
     const nasDoc = readFile(join(repoRoot, "docs", "deployment", "nas-docker.md"));
 
-    expect(pilotReady).toContain("npm run nas:trial-readiness");
-    expect(pilotReady).toContain("npm run import:pilot-check");
-    expect(pilotReady).toContain("npm run import:pilot-smoke");
+    expect(pilotReady).toContain("npm run ops -- nas-trial-readiness");
+    expect(pilotReady).toContain("npm run ops -- import-pilot-check");
+    expect(pilotReady).toContain("npm run ops -- import-pilot-smoke");
     expect(`${importDrill}\n${nasDoc}`).toContain("不代表正式上线");
   });
 
-  it("runs pilot:ready through a script that exports the CI database URL by default", () => {
+  it("runs trial-ready through a script that exports the CI database URL by default", () => {
     const pilotReady = readFile(join(repoRoot, "scripts", "ops-runbook", "pilot-ready.sh"));
 
     expect(pilotReady).toContain('DATABASE_URL="${DATABASE_URL:-postgresql://company_erp:company_erp@localhost:5432/company_erp_ci}"');
     expect(pilotReady).toContain("export DATABASE_URL");
     expect(pilotReady.indexOf("export DATABASE_URL")).toBeLessThan(pilotReady.indexOf("npm run db:validate"));
-    expect(pilotReady).toContain("npm run nas:trial-readiness");
+    expect(pilotReady).toContain("npm run ops -- nas-trial-readiness");
   });
 
-  it("wires production:ready through a local production readiness script", () => {
+  it("wires internal-ready through a local production readiness script", () => {
     const productionReady = readFile(join(repoRoot, "scripts", "ops-runbook", "production-ready.sh"));
     const productionGoLiveReady = readFile(join(repoRoot, "scripts", "ops-runbook", "production-go-live-ready.sh"));
 
-    expect(productionReady).toContain("npm run pilot:ready");
+    expect(productionReady).toContain("npm run ops -- trial-ready");
     expect(productionReady).toContain("npm run test:backup-restore");
-    expect(productionReady).toContain("npm run attachments:legacy-report -- --dry-run");
-    expect(productionReady).toContain("npm run audit:verify-export -- --help");
-    expect(productionReady).toContain("npm run pilot:verify-evidence -- --help");
-    expect(productionReady).toContain("npm run production:readiness-gate");
+    expect(productionReady).toContain("npm run ops -- attachments-legacy-report -- --dry-run");
+    expect(productionReady).toContain("npm run ops -- audit-verify-export -- --help");
+    expect(productionReady).toContain("npm run ops -- pilot-verify-evidence -- --help");
+    expect(productionReady).toContain("npm run ops -- readiness-gate");
     expect(productionReady).toContain("does not read production .env");
-    expect(productionGoLiveReady).toContain("npm run production:ready");
-    expect(productionGoLiveReady).toContain('npm run production:go-live-check -- "$@"');
+    expect(productionGoLiveReady).toContain("npm run ops -- internal-ready");
+    expect(productionGoLiveReady).toContain('npm run ops -- internal-go-live-check -- "$@"');
 
     const help = spawnSync("bash", ["scripts/ops-runbook/production-go-live-ready.sh", "--help"], {
       cwd: repoRoot,
       encoding: "utf8",
     });
     expect(help.status).toBe(0);
-    expect(help.stdout).toContain("Usage: npm run production:go-live-ready");
+    expect(help.stdout).toContain("Usage: npm run ops -- internal-go-live-ready");
     expect(help.stdout).not.toContain("npm run db:generate");
   });
 
-  it("fails production:ready fast when Docker CLI is missing before backup restore", () => {
+  it("fails internal-ready fast when Docker CLI is missing before backup restore", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-no-docker-"));
     const binDir = join(tempRoot, "bin");
     const callsPath = join(tempRoot, "npm-calls.log");
@@ -1463,11 +1463,11 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("BLOCKED_DOCKER_UNAVAILABLE");
     expect(result.stderr).toContain("environment blocker");
-    expect(calls).toContain("run pilot:ready");
+    expect(calls).toContain("run ops -- trial-ready");
     expect(calls).not.toContain("run test:backup-restore");
   });
 
-  it("fails production:ready fast when Docker daemon is inaccessible", () => {
+  it("fails internal-ready fast when Docker daemon is inaccessible", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-daemon-"));
     const binDir = join(tempRoot, "bin");
     const callsPath = join(tempRoot, "npm-calls.log");
@@ -1497,11 +1497,11 @@ describe("NAS trial deploy notification readiness gate", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("BLOCKED_DOCKER_UNAVAILABLE");
     expect(result.stderr).toContain("Docker daemon is not running or not accessible");
-    expect(calls).toContain("run pilot:ready");
+    expect(calls).toContain("run ops -- trial-ready");
     expect(calls).not.toContain("run test:backup-restore");
   });
 
-  it("continues production:ready to backup restore when Docker is available", () => {
+  it("continues internal-ready to backup restore when Docker is available", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "company-erp-production-ready-docker-ok-"));
     const binDir = join(tempRoot, "bin");
     const callsPath = join(tempRoot, "npm-calls.log");
@@ -1529,9 +1529,9 @@ describe("NAS trial deploy notification readiness gate", () => {
     const calls = readFile(callsPath);
     rmSync(tempRoot, { recursive: true, force: true });
     expect(result.status).toBe(0);
-    expect(calls).toContain("run pilot:ready");
+    expect(calls).toContain("run ops -- trial-ready");
     expect(calls).toContain("run test:backup-restore");
-    expect(calls).toContain("run production:readiness-gate");
+    expect(calls).toContain("run ops -- readiness-gate");
   });
 
   it("evaluates production readiness with READY/BLOCKED output and redacted blockers", async () => {
@@ -1549,35 +1549,24 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     const ready = evaluateProductionReadiness({
       packageScripts: {
-        "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:health-check": "node scripts/ops-runbook/production-health-check.mjs",
-        "production:evidence-collect": "node scripts/ops-runbook/production-evidence-collect.mjs",
-        "production:restore-drill-check": "node scripts/ops-runbook/production-restore-drill-check.mjs",
-        "production:cutover-check": "node scripts/ops-runbook/production-cutover-check.mjs",
-        "production:migration-plan-check": "node scripts/ops-runbook/production-migration-plan-check.mjs",
-        "production:post-go-live-24h-check": "node scripts/ops-runbook/post-go-live-24h-check.mjs",
-        "production:data-quality-check": "node scripts/ops-runbook/production-data-quality-check.mjs",
-        "production:business-acceptance-check": "node scripts/ops-runbook/production-business-acceptance-check.mjs",
-        "production:evidence-seal": "node scripts/ops-runbook/production-evidence-seal.mjs",
-        "attachments:production-check": "node scripts/ops-runbook/attachment-production-check.mjs",
+        ops: "node scripts/ops.mjs",
         "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
       },
       readText: (path) => {
-        if (path === "scripts/production-ready.sh") {
+        if (path === "scripts/ops-runbook/production-ready.sh") {
           return [
-            "npm run pilot:ready",
+            "npm run ops -- trial-ready",
             "npm run test:backup-restore",
-            "npm run attachments:legacy-report -- --dry-run",
-            "npm run audit:verify-export -- --help",
-            "npm run pilot:verify-evidence -- --help",
-            "npm run production:readiness-gate",
+            "npm run ops -- attachments-legacy-report -- --dry-run",
+            "npm run ops -- audit-verify-export -- --help",
+            "npm run ops -- pilot-verify-evidence -- --help",
+            "npm run ops -- readiness-gate",
           ].join("\n");
         }
         if (path === "docs/deployment/nas-docker.md") {
-          return "pilot:ready production:ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
+          return "trial-ready internal-ready ops -- trial-ready ops -- internal-ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
         }
         if (path === "docs/operations/go-live-data-freeze.md") {
           return "最后一次导入时间 导入批次 ID 不直接删数据库";
@@ -1602,20 +1591,16 @@ describe("NAS trial deploy notification readiness gate", () => {
     });
     const blocked = evaluateProductionReadiness({
       packageScripts: {
-        "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:health-check": "node scripts/ops-runbook/production-health-check.mjs",
-        "production:evidence-collect": "node scripts/ops-runbook/production-evidence-collect.mjs",
-        "production:restore-drill-check": "node scripts/ops-runbook/production-restore-drill-check.mjs",
-        "production:cutover-check": "node scripts/ops-runbook/production-cutover-check.mjs",
-        "production:post-go-live-24h-check": "node scripts/ops-runbook/post-go-live-24h-check.mjs",
-        "attachments:production-check": "node scripts/ops-runbook/attachment-production-check.mjs",
+        ops: "node scripts/ops.mjs",
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
       },
       readText: (path) => {
-        if (path === "scripts/production-ready.sh") {
-          return "npm run pilot:ready\nDATABASE_URL=postgresql://user:secret@db/company\n/volume1/company-erp";
+        if (path === "scripts/ops-runbook/production-ready.sh") {
+          return "npm run ops -- trial-ready\nDATABASE_URL=postgresql://user:secret@db/company\n/volume1/company-erp";
         }
-        if (path === "docs/deployment/nas-docker.md") return "pilot:ready only";
+        if (path === "docs/deployment/nas-docker.md") return "trial-ready only";
         if (path === "docs/operations/go-live-data-freeze.md") throw new Error(`missing ${path}`);
         if (path === "docs/operations/release-and-rollback-runbook.md") throw new Error(`missing ${path}`);
         throw new Error(`missing ${path}`);
@@ -1645,22 +1630,24 @@ describe("NAS trial deploy notification readiness gate", () => {
 
     const result = evaluateProductionReadiness({
       packageScripts: {
-        "production:ready": "bash scripts/production-ready.sh",
-        "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
+        ops: "node scripts/ops.mjs",
+        "public:readiness-gate": "node scripts/public-internet-readiness-gate.mjs",
+        "public:go-live-check": "node scripts/public-go-live-check.mjs",
+        "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
       },
       readText: (path) => {
-        if (path === "scripts/production-ready.sh") {
+        if (path === "scripts/ops-runbook/production-ready.sh") {
           return [
-            "npm run pilot:ready",
+            "npm run ops -- trial-ready",
             "npm run test:backup-restore",
-            "npm run attachments:legacy-report -- --dry-run",
-            "npm run audit:verify-export -- --help",
-            "npm run pilot:verify-evidence -- --help",
-            "npm run production:readiness-gate",
+            "npm run ops -- attachments-legacy-report -- --dry-run",
+            "npm run ops -- audit-verify-export -- --help",
+            "npm run ops -- pilot-verify-evidence -- --help",
+            "npm run ops -- readiness-gate",
           ].join("\n");
         }
         if (path === "docs/deployment/nas-docker.md") {
-          return "pilot:ready production:ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
+          return "trial-ready internal-ready Internal Production Go-live Boundary 不公网暴露 API/PostgreSQL";
         }
         if (path === "docs/operations/go-live-data-freeze.md") {
           return "最后一次导入时间 导入批次 ID 不直接删数据库";
@@ -1673,12 +1660,6 @@ describe("NAS trial deploy notification readiness gate", () => {
     });
 
     expect(result.status).toBe("BLOCKED");
-    expect(result.blockers.join("\n")).toContain("production:health-check");
-    expect(result.blockers.join("\n")).toContain("production:evidence-collect");
-    expect(result.blockers.join("\n")).toContain("production:restore-drill-check");
-    expect(result.blockers.join("\n")).toContain("production:cutover-check");
-    expect(result.blockers.join("\n")).toContain("production:post-go-live-24h-check");
-    expect(result.blockers.join("\n")).toContain("attachments:production-check");
     expect(result.blockers.join("\n")).toContain("docs/operations/production-backup-restore-runbook.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/attachment-production-readiness.md");
     expect(result.blockers.join("\n")).toContain("docs/operations/audit-production-readiness.md");
@@ -1711,7 +1692,7 @@ describe("NAS trial deploy notification readiness gate", () => {
   it("documents release and rollback steps for internal production", () => {
     const doc = readFile(join(repoRoot, "docs", "operations", "release-and-rollback-runbook.md"));
 
-    expect(doc).toContain("npm run production:ready");
+    expect(doc).toContain("npm run ops -- internal-ready");
     expect(doc).toContain("手动数据库备份");
     expect(doc).toContain("附件快照");
     expect(doc).toContain("记录当前 commit sha");
@@ -1761,18 +1742,18 @@ describe("NAS trial deploy notification readiness gate", () => {
     const doc = readFile(join(repoRoot, "docs", "operations", "production-go-live-evidence-checklist.md"));
 
     for (const marker of [
-      "npm run production:ready 输出",
-      "npm run production:evidence-template",
-      "npm run production:readiness-gate",
-      "npm run production:go-live-check 输出",
-      "npm run production:health-check",
-      "npm run production:restore-drill-check",
-      "npm run attachments:production-check",
-      "npm run access:review-check",
-      "npm run audit:verify-export",
-      "npm run pilot:ready 输出",
-      "npm run import:pilot-check 输出",
-      "npm run import:pilot-smoke 输出",
+      "npm run ops -- internal-ready 输出",
+      "npm run ops -- evidence-template",
+      "npm run ops -- readiness-gate",
+      "npm run ops -- internal-go-live-check 输出",
+      "npm run ops -- health-check",
+      "npm run ops -- restore-drill-check",
+      "npm run ops -- attachments-production-check",
+      "npm run ops -- access-review-check",
+      "npm run ops -- audit-verify-export",
+      "npm run ops -- trial-ready 输出",
+      "npm run ops -- import-pilot-check 输出",
+      "npm run ops -- import-pilot-smoke 输出",
       "npm run test:backup-restore 输出",
       "production restore drill evidence folder",
       "attachment legacy report JSON/CSV",
@@ -1793,7 +1774,7 @@ describe("NAS trial deploy notification readiness gate", () => {
       "P1 建议",
       "Git 外",
       "证据目录必须在 Git 仓库外",
-      "production:ready + production:go-live-check",
+      "npm run ops -- internal-ready + npm run ops -- internal-go-live-check",
       "不保存真实密码",
       "不保存数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git",
       "不保存合同扫描件",
@@ -1812,10 +1793,10 @@ describe("NAS trial deploy notification readiness gate", () => {
       "正式上线在本项目中仅指公司内网正式运行",
       "不等于公网 SaaS",
       "不代表对外公开访问",
-      "只有 production:ready + production:go-live-check 通过后",
-      "production:go-live-check",
-      "production:go-live-ready",
-      "production:evidence-template",
+      "只有 npm run ops -- internal-ready + npm run ops -- internal-go-live-check 通过后",
+      "internal-go-live-check",
+      "internal-go-live-ready",
+      "ops -- evidence-template",
       "Git 外 evidence directory",
       "才允许从试点切正式",
       "没有恢复演练和访问复核",
@@ -2014,13 +1995,13 @@ describe("production go-live evidence template", () => {
       expect(existsSync(join(outsideOutput, relativePath)), relativePath).toBe(false);
     }
 
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:go-live-check -- --evidence-dir");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:readiness-gate");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run production:restore-drill-check -- --evidence-dir");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run audit:verify-export -- --csv");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run attachments:production-check -- --legacy-report");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run access:review-check -- --export");
-    expect(readFile(join(outsideOutput, "commands.md"))).toContain("production:go-live-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- internal-go-live-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- readiness-gate");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- restore-drill-check -- --evidence-dir");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- audit-verify-export -- --csv");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- attachments-production-check -- --legacy-report");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("npm run ops -- access-review-check -- --export");
+    expect(readFile(join(outsideOutput, "commands.md"))).toContain("internal-go-live-check -- --evidence-dir");
     expect(readFile(join(outsideOutput, "README.md"))).toContain("actual command output");
     expect(readFile(join(outsideOutput, "restore-drill/README.md"))).toContain("restore-signoff.md");
     expect(readFile(join(outsideOutput, "health-check.README.md"))).toContain("Web UI entrypoint");
@@ -2032,11 +2013,11 @@ describe("production go-live evidence template", () => {
 });
 
 function markerForReadinessLabel(label: string): string {
-  if (label === "preflight help") return "Usage: npm run preflight:nas\n";
+  if (label === "preflight help") return "Usage: npm run ops -- preflight-nas\n";
   if (label === "pilot local dry-run") return "Pilot local verification dry-run\n";
-  if (label === "pilot evidence help") return "Usage: npm run pilot:verify-evidence\n";
-  if (label === "audit export help") return "Usage: npm run audit:verify-export\n";
-  if (label === "legacy report help") return "Usage: npm run attachments:legacy-report\n";
+  if (label === "pilot evidence help") return "Usage: npm run ops -- pilot-verify-evidence\n";
+  if (label === "audit export help") return "Usage: npm run ops -- audit-verify-export\n";
+  if (label === "legacy report help") return "Usage: npm run ops -- attachments-legacy-report\n";
   if (label === "import pilot static gate") return "NAS 试点导入前置检查\n";
   if (label === "import pilot smoke") return "导入试点 smoke 通过\n";
   if (label === "doc static gate") return "nas-trial-handoff-final-gate-doc\n";
@@ -2056,7 +2037,7 @@ describe("local NAS pilot verification pack", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run pilot:verify-local");
+    expect(result.stdout).toContain("Usage: npm run ops -- pilot-verify-local");
     expect(result.stdout).toContain("--dry-run");
     expect(result.stdout).toContain("--evidence-dir");
     expect(result.stderr).toBe("");
@@ -2154,8 +2135,8 @@ describe("local NAS pilot verification pack", () => {
     expect(result.status).toBe(0);
     const summary = readFile(join(evidenceDir, "summary.txt"));
     expect(summary).toContain("Pilot local verification passed");
-    expect(summary).toContain("npm run pilot:verify-evidence");
-    expect(summary).toContain("npm run audit:verify-export");
+    expect(summary).toContain("npm run ops -- pilot-verify-evidence");
+    expect(summary).toContain("npm run ops -- audit-verify-export");
     expect(readFile(join(evidenceDir, "legacy-report-dry-run.txt"))).toContain("Attachment legacy migration readiness dry-run");
     expect(readFile(join(evidenceDir, "environment-checks.txt"))).toContain("NAS preflight passed");
     expect(readFile(join(evidenceDir, "legacy-report.json"))).toContain("SKIPPED");
@@ -2272,7 +2253,7 @@ describe("pilot evidence manifest verifier", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run pilot:verify-evidence");
+    expect(result.stdout).toContain("Usage: npm run ops -- pilot-verify-evidence");
     expect(result.stdout).toContain("--evidence-dir");
     expect(result.stderr).toBe("");
   });
@@ -2356,7 +2337,7 @@ describe("audit export evidence verifier", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run audit:verify-export");
+    expect(result.stdout).toContain("Usage: npm run ops -- audit-verify-export");
     expect(result.stdout).toContain("--csv");
     expect(result.stdout).toContain("--sha256");
     expect(result.stderr).toBe("");
@@ -2503,7 +2484,7 @@ describe("attachment legacy migration readiness report", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Usage: npm run attachments:legacy-report");
+    expect(result.stdout).toContain("Usage: npm run ops -- attachments-legacy-report");
     expect(result.stdout).toContain("--dry-run");
     expect(result.stderr).toBe("");
   });
@@ -2700,7 +2681,7 @@ describe("public internet readiness gate", () => {
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
         "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
+        "internal-go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") {
@@ -2817,7 +2798,7 @@ describe("public internet readiness gate", () => {
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
         "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
+        "internal-go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: fullPassReadText,
     });
@@ -2837,7 +2818,7 @@ describe("public internet readiness gate", () => {
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
         "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
+        "internal-go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";
@@ -2889,7 +2870,7 @@ describe("public internet readiness gate", () => {
         "public:go-live-check": "node scripts/public-go-live-check.mjs",
         "public:security-evidence-check": "node scripts/public-security-evidence-check.mjs",
         "production:readiness-gate": "node scripts/ops-runbook/production-readiness-gate.mjs",
-        "production:go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
+        "internal-go-live-check": "node scripts/ops-runbook/production-go-live-check.mjs",
       },
       readText: (path) => {
         if (path === "apps/api/src/app.ts") return "PUBLIC_INTERNET_ENABLED APP_ENVIRONMENT=production is required when PUBLIC_INTERNET_ENABLED=true PUBLIC_EDGE_WAF_REQUIRED PUBLIC_TLS_REQUIRED RECOVERY_CODE_PEPPER";

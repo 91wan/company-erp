@@ -37,88 +37,7 @@ type SystemSettingsWorkspaceProps = {
   onCompanyNameChange: (appConfig: AppConfigDto) => void;
 };
 
-type SystemSettingsTab = "company" | "version" | "attachments" | "audit" | "goLive";
-
-type GoLiveEvidenceSection = {
-  title: string;
-  description: string;
-  commands: string[];
-};
-
-const goLiveEvidenceSections: GoLiveEvidenceSection[] = [
-  {
-    title: "试点与构建门禁",
-    description: "先确认代码、试点导入和正式上线静态门禁全部通过。",
-    commands: [
-      "npm run pilot:ready",
-      "npm run production:ready",
-      "npm run production:readiness-gate",
-    ],
-  },
-  {
-    title: "证据包",
-    description: "证据目录必须在 Git 仓库外。运行时证据由 evidence-collect 命令收集，go-live-check 是正式上线前的证据包门禁，通过后才允许进入公司内网正式上线审批。",
-    commands: [
-      "npm run production:evidence-template -- --output <outside-git-path>",
-      "npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
-      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>",
-      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json",
-      "npm run production:health-check -- --base-url http://<nas>:8080",
-    ],
-  },
-  {
-    title: "权限复核",
-    description: "下载权限复核 JSON 后保存到证据目录，再运行 access review gate。公网审查时，高权限账号必须 mfaEnabled=true。",
-    commands: [
-      "GET /api/user-accounts/export-access-review",
-      "npm run access:review-check -- --export <file>",
-      "npm run access:review-check -- --export <file> --public-internet",
-    ],
-  },
-  {
-    title: "审计导出",
-    description: "导出 CSV 后记录响应头中的 sha256 和 record count，再进行复核。",
-    commands: [
-      "GET /api/audit-logs/export.csv",
-      "npm run audit:verify-export -- --csv <file> --sha256 <header-sha256> --record-count <header-count>",
-    ],
-  },
-  {
-    title: "附件与恢复",
-    description: "附件 legacy gap、附件 readiness 和恢复演练证据必须进入正式上线证据包。",
-    commands: [
-      "npm run attachments:legacy-report -- --json",
-      "npm run attachments:production-check -- --legacy-report <file>",
-      "npm run production:restore-drill-check -- --evidence-dir <restore-drill-dir>",
-    ],
-  },
-  {
-    title: "切换与上线后复核",
-    description: "migration-plan-check 是 schema/data 变更门禁，cutover-check 是切换当天 go/no-go 证据，post-go-live 24h check 是上线后 24 小时复核，不作为上线前阻断。",
-    commands: [
-      "npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md",
-      "npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md",
-      "npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h",
-    ],
-  },
-  {
-    title: "最终正式上线审批",
-    description: "data-quality-check 是只读数据质量门禁（需设置 DATABASE_URL 环境变量），business-acceptance-check 是业务负责人签收门禁，evidence-seal 用于证据包防篡改，go-live-check --require-seal 是最终正式上线审批命令。",
-    commands: [
-      "npm run production:data-quality-check -- --json --output <outside-git-path>/data-quality-report.json",
-      "npm run production:business-acceptance-check -- --acceptance <outside-git-path>/business-acceptance.md",
-      "npm run production:evidence-seal -- --evidence-dir <outside-git-path>",
-      "npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal",
-    ],
-  },
-];
-
-const goLiveEvidenceDocs = [
-  "docs/operations/production-go-live-evidence-checklist.md",
-  "docs/operations/access-review-runbook.md",
-  "docs/operations/production-backup-restore-runbook.md",
-  "docs/operations/post-go-live-24h-checklist.md",
-];
+type SystemSettingsTab = "company" | "version" | "attachments" | "audit";
 
 function toAuditDateTime(
   date: string,
@@ -193,10 +112,6 @@ export function SystemSettingsWorkspace({
     recordCount: string;
     sha256: string;
   } | null>(null);
-  const [accessReviewExportStatus, setAccessReviewExportStatus] = useState<
-    "idle" | "downloading" | "error"
-  >("idle");
-
   const auditFilterInput = {
     entityType: auditFilters.entityType.trim() || undefined,
     action: auditFilters.action.trim() || undefined,
@@ -397,31 +312,6 @@ export function SystemSettingsWorkspace({
     }
   }
 
-  async function handleAccessReviewExport() {
-    setAccessReviewExportStatus("downloading");
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/user-accounts/export-access-review`,
-        { credentials: "include" },
-      );
-      if (!response.ok) {
-        throw new Error("access review export failed");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "access-review-export.json";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setAccessReviewExportStatus("idle");
-    } catch {
-      setAccessReviewExportStatus("error");
-    }
-  }
-
   const tabs: TabItem<SystemSettingsTab>[] = [
     { key: "company", label: "公司信息" },
     { key: "version", label: "版本与健康检查" },
@@ -429,7 +319,6 @@ export function SystemSettingsWorkspace({
       ? [{ key: "attachments" as const, label: "附件管理" }]
       : []),
     ...(canReadAuditLogs ? [{ key: "audit" as const, label: "审计日志" }] : []),
-    ...(canManage ? [{ key: "goLive" as const, label: "正式上线证据" }] : []),
   ];
 
   return (
@@ -592,7 +481,7 @@ export function SystemSettingsWorkspace({
                 </dl>
                 <pre className="settings-command-block">
                   <code>
-                    {`npm run audit:verify-export -- --csv ${auditExportEvidence.fileName} --sha256 ${auditExportEvidence.sha256} --record-count ${auditExportEvidence.recordCount}`}
+                    {`npm run ops -- audit-verify-export --csv ${auditExportEvidence.fileName} --sha256 ${auditExportEvidence.sha256} --record-count ${auditExportEvidence.recordCount}`}
                   </code>
                 </pre>
               </div>
@@ -939,137 +828,7 @@ export function SystemSettingsWorkspace({
             ) : null}
           </SectionCard>
         ) : null}
-
-        {activeTab === "goLive" && canManage ? (
-          <ProductionGoLiveEvidencePanel
-            accessReviewExportStatus={accessReviewExportStatus}
-            auditExportEvidence={auditExportEvidence}
-            auditExportStatus={auditExportStatus}
-            canReadAuditLogs={canReadAuditLogs}
-            onAccessReviewExport={() => void handleAccessReviewExport()}
-            onAuditExport={() => void handleAuditExport()}
-          />
-        ) : null}
       </section>
     </WorkspaceScaffold>
-  );
-}
-
-function ProductionGoLiveEvidencePanel({
-  accessReviewExportStatus,
-  auditExportEvidence,
-  auditExportStatus,
-  canReadAuditLogs,
-  onAccessReviewExport,
-  onAuditExport,
-}: {
-  accessReviewExportStatus: "idle" | "downloading" | "error";
-  auditExportEvidence: {
-    fileName: string;
-    recordCount: string;
-    sha256: string;
-  } | null;
-  auditExportStatus: "idle" | "downloading" | "success" | "error";
-  canReadAuditLogs: boolean;
-  onAccessReviewExport: () => void;
-  onAuditExport: () => void;
-}) {
-  return (
-    <SectionCard
-      title="正式上线证据包"
-      badge={<UiStatusBadge tone="warning">运维只读</UiStatusBadge>}
-    >
-      <p className="form-hint">
-        以下内容用于公司内网正式上线审批。浏览器只展示命令和证据要求；不要在页面中输入
-        secret，不要使用 Git 仓库内路径保存证据包。
-      </p>
-      <p className="form-hint">
-        证据目录必须在 Git 仓库外；不保存 .env、数据库 dump 原文、附件原件、合同扫描件、健康证图片、工资表到 Git。
-        证据包校验命令才是正式上线证据包门禁。
-      </p>
-      <div className="settings-ops-grid">
-        {goLiveEvidenceSections.map((section) => (
-          <article className="settings-ops-card" key={section.title}>
-            <h3>{section.title}</h3>
-            <p className="form-hint">{section.description}</p>
-            {section.title === "权限复核" ? (
-              <div className="section-actions">
-                <button
-                  type="button"
-                  className="secondary-action"
-                  onClick={onAccessReviewExport}
-                  disabled={accessReviewExportStatus === "downloading"}
-                >
-                  {accessReviewExportStatus === "downloading"
-                    ? "正在导出..."
-                    : "导出权限复核 JSON"}
-                </button>
-              </div>
-            ) : null}
-            {section.title === "权限复核" &&
-            accessReviewExportStatus === "error" ? (
-              <p className="form-error" role="alert">
-                权限复核 JSON 导出失败，请稍后重试或联系管理员。
-              </p>
-            ) : null}
-            {section.title === "审计导出" && canReadAuditLogs ? (
-              <div className="section-actions">
-                <button
-                  type="button"
-                  className="secondary-action"
-                  onClick={onAuditExport}
-                  disabled={auditExportStatus === "downloading"}
-                >
-                  {auditExportStatus === "downloading"
-                    ? "导出中"
-                    : "导出审计 CSV"}
-                </button>
-              </div>
-            ) : null}
-            {section.title === "审计导出" && auditExportStatus === "error" ? (
-              <p className="form-error">审计 CSV 导出失败，请检查权限或稍后重试。</p>
-            ) : null}
-            {section.title === "审计导出" && auditExportEvidence ? (
-              <div
-                className="settings-export-evidence"
-                aria-label="正式上线审计导出校验信息"
-              >
-                <dl>
-                  <div>
-                    <dt>文件名</dt>
-                    <dd>{auditExportEvidence.fileName}</dd>
-                  </div>
-                  <div>
-                    <dt>record count</dt>
-                    <dd>{auditExportEvidence.recordCount}</dd>
-                  </div>
-                  <div>
-                    <dt>sha256</dt>
-                    <dd>{auditExportEvidence.sha256}</dd>
-                  </div>
-                </dl>
-              </div>
-            ) : null}
-            <div className="settings-command-list" aria-label={`${section.title}命令`}>
-              {section.commands.map((command) => (
-                <pre className="settings-command-block" key={command}>
-                  <code>{command}</code>
-                </pre>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-      <div className="settings-doc-links" aria-label="正式上线证据文档">
-        <h3>相关文档</h3>
-        <ul>
-          {goLiveEvidenceDocs.map((docPath) => (
-            <li key={docPath}>
-              <code>{docPath}</code>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </SectionCard>
   );
 }

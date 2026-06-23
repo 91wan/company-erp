@@ -23,7 +23,7 @@
 ## 运行门禁
 
 ```bash
-npm run production:migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
+npm run ops -- migration-plan-check -- --plan <outside-git-path>/production-migration-plan.md
 ```
 
 保存输出为 `production-migration-plan-check.txt`。
@@ -42,8 +42,8 @@ npm run production:migration-plan-check -- --plan <outside-git-path>/production-
 
 ## 五阶段上线链路
 
-1. `pilot:ready` — 试点门禁
-2. `production:ready` — 本地静态门禁
+1. `npm run ops -- trial-ready` — 试点门禁
+2. `npm run ops -- internal-ready` — 本地静态门禁
 3. `production:migration-plan-check` — 迁移计划门禁
-4. `production:cutover-check` + `production:go-live-check` — 切换当天 go/no-go + 证据包门禁
+4. `npm run ops -- cutover-check` + `npm run ops -- internal-go-live-check` — 切换当天 go/no-go + 证据包门禁
 5. `production:post-go-live-24h-check` — 上线后 24 小时验收

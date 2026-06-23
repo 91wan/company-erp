@@ -12,14 +12,14 @@ The current system can enter a controlled NAS intranet trial after the evidence 
 
 Keep these files or command outputs in the non-Git trial evidence folder for the deployment date:
 
-- `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` output, including the local verification summary and any explicit `BLOCKED` or `SKIPPED` dependency messages. The evidence directory must stay outside the repository.
-- `npm run pilot:verify-evidence -- --evidence-dir <outside-git-path>` output proving `manifest.json`, `manifest.sha256`, and all listed evidence file hashes still match.
-- `npm run preflight:nas` output from the final deployment environment file, with real secrets redacted before sharing outside the deployment operator group.
+- `npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path>` output, including the local verification summary and any explicit `BLOCKED` or `SKIPPED` dependency messages. The evidence directory must stay outside the repository.
+- `npm run ops -- pilot-verify-evidence -- --evidence-dir <outside-git-path>` output proving `manifest.json`, `manifest.sha256`, and all listed evidence file hashes still match.
+- `npm run ops -- preflight-nas` output from the final deployment environment file, with real secrets redacted before sharing outside the deployment operator group.
 - `backup restore drill` result, including the dry-run or local restore evidence and the exact tool versions used.
-- `legacy-report.json` from `npm run pilot:verify-local -- --evidence-dir <outside-git-path>` when `PILOT_LEGACY_REPORT_DATABASE_URL` is explicitly set to a temporary or approved pilot database URL. If the variable is not set, retain the generated `SKIPPED` record and run `npm run attachments:legacy-report -- --json --output <outside-git-path>/legacy-report.json` separately before sign-off.
-- `npm run attachments:legacy-report -- --json` or `npm run attachments:legacy-report -- --csv` output, retained as the legacy attachment gap snapshot.
+- `legacy-report.json` from `npm run ops -- pilot-verify-local -- --evidence-dir <outside-git-path>` when `PILOT_LEGACY_REPORT_DATABASE_URL` is explicitly set to a temporary or approved pilot database URL. If the variable is not set, retain the generated `SKIPPED` record and run `npm run ops -- attachments-legacy-report -- --json --output <outside-git-path>/legacy-report.json` separately before sign-off.
+- `npm run ops -- attachments-legacy-report -- --json` or `npm run ops -- attachments-legacy-report -- --csv` output, retained as the legacy attachment gap snapshot.
 - `audit CSV export` from `/api/audit-logs/export.csv`, filtered for the trial period or the pre-trial smoke window.
-- `npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>` output proving the retained audit CSV matches the export response headers.
+- `npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>` output proving the retained audit CSV matches the export response headers.
 - `deploy revision`, including Git commit SHA, PR number or release note, build time, and operator.
 - `/health` and `/api/app-version` responses captured after deployment.
 - Docker Compose service status from the trial host, with secrets and host-specific internal addresses redacted before sharing.
@@ -68,6 +68,6 @@ The NAS trial is intranet-only.
 
 - Store the evidence outside Git.
 - Record SHA256 for exported evidence files when they are used for trial sign-off.
-- Verify retained evidence with `npm run pilot:verify-evidence` and retained audit CSV files with `npm run audit:verify-export` before sign-off.
+- Verify retained evidence with `npm run ops -- pilot-verify-evidence` and retained audit CSV files with `npm run ops -- audit-verify-export` before sign-off.
 - Record the operator, export time, filter conditions, and deploy revision beside each export.
 - Keep `.env`, NAS credentials, database dumps, real business records, and attachment files out of Git.

@@ -22,9 +22,9 @@
 上线前必须运行：
 
 ```bash
-npm run attachments:legacy-report -- --dry-run
-DATABASE_URL=<temporary-or-pilot-db-url> npm run attachments:legacy-report -- --json --output <outside-git-path>/legacy-report.json
-npm run attachments:production-check -- --legacy-report <outside-git-path>/legacy-report.json
+npm run ops -- attachments-legacy-report -- --dry-run
+DATABASE_URL=<temporary-or-pilot-db-url> npm run ops -- attachments-legacy-report -- --json --output <outside-git-path>/legacy-report.json
+npm run ops -- attachments-production-check -- --legacy-report <outside-git-path>/legacy-report.json
 ```
 
 如果 `gapEstimate > 0`，必须记录为 legacy gap，不伪装为已迁移。`pendingPlaceholderCount > 0` 也必须记录为待总部登记或后续补齐项。

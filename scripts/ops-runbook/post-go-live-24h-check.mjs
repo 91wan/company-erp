@@ -35,7 +35,7 @@ const sensitivePatterns = [
 ];
 
 function usage() {
-  console.log(`Usage: npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h [--json]
+  console.log(`Usage: npm run ops -- post-go-live-24h -- --evidence-dir <outside-git-path>/post-go-live-24h [--json]
 
 Validates the post go-live 24-hour evidence package. This is intended after cutover, not as a pre-go-live blocker.`);
 }

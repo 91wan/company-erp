@@ -10,7 +10,7 @@ const BLOCKED = "BLOCKED";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
-  console.log(`Usage: npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 [--expected-commit <sha>]
+  console.log(`Usage: npm run ops -- evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 [--expected-commit <sha>]
 
 Collects safe runtime evidence only: health-check.txt, app-version.json, docker-compose-ps evidence when available, a draft manifest, and collection-log.txt.
 This script does not read .env, database dumps, attachment bytes, contract scans, health certificate images, or payroll files.`);

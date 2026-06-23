@@ -11,7 +11,7 @@ workflows rather than finance automation, OCR, or mobile apps.
 Before scheduling a NAS intranet trial, run:
 
 ```bash
-npm run pilot:ready
+npm run ops -- trial-ready
 ```
 
 Passing this command only means the team can arrange a small NAS trial for 1-3
@@ -29,10 +29,10 @@ Before moving from the NAS intranet trial to company-internal formal operation,
 run the local static gate:
 
 ```bash
-npm run production:ready
+npm run ops -- internal-ready
 ```
 
-`production:ready` requires a working Docker daemon because it must run
+`npm run ops -- internal-ready` requires a working Docker daemon because it must run
 `test:backup-restore`. If Docker is missing or the daemon is not accessible, the
 command fails fast with `BLOCKED_DOCKER_UNAVAILABLE`. That is an environment
 blocker, not an application test failure; rerun the gate on a CI or operations
@@ -41,35 +41,35 @@ machine with Docker before internal production approval.
 Then run the Git-external evidence package gate:
 
 ```bash
-npm run production:evidence-template -- --output <outside-git-path>
-npm run production:evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
-npm run production:cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
-npm run production:go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
-npm run production:go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json
-npm run production:post-go-live-24h-check -- --evidence-dir <outside-git-path>/post-go-live-24h
+npm run ops -- evidence-template -- --output <outside-git-path>
+npm run ops -- evidence-collect -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run ops -- cutover-check -- --checklist <outside-git-path>/production-cutover-checklist.md
+npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path> --expected-commit <sha> --json > <outside-git-path>/production-go-live-check.json
+npm run ops -- post-go-live-24h -- --evidence-dir <outside-git-path>/post-go-live-24h
 ```
 
 For the final operator handoff, run both in sequence:
 
 ```bash
-npm run production:go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
+npm run ops -- internal-go-live-ready -- --evidence-dir <outside-git-path> --base-url http://<nas>:8080 --expected-commit <sha>
 ```
 
-`pilot:ready` means the system can be scheduled for a controlled 1-3 project
-site trial. `production:ready` means the repository can enter internal
-production review after the local gates pass. `production:evidence-template`
-creates the Git-external evidence directory skeleton. `production:go-live-check`
+`npm run ops -- trial-ready` means the system can be scheduled for a controlled 1-3 project
+site trial. `npm run ops -- internal-ready` means the repository can enter internal
+production review after the local gates pass. `npm run ops -- evidence-template`
+creates the Git-external evidence directory skeleton. `npm run ops -- internal-go-live-check`
 means the Git-external evidence directory has the required restore drill,
 attachment readiness, audit export, access review, data freeze, health check,
-cutover checklist, and release sign-off proof. `production:evidence-collect`
+cutover checklist, and release sign-off proof. `npm run ops -- evidence-collect`
 can safely collect health/app-version/draft-manifest evidence without reading
 `.env`, database dumps, attachment bytes, contracts, health certificate images,
 or payroll files. Internal formal go-live requires
-`production:ready` + `production:go-live-check`.
+`npm run ops -- internal-ready` + `npm run ops -- internal-go-live-check`.
 
 The go-live manifest must keep the scope explicit: `businessScope=internal_erp`,
 selected `dataScope`, and selected `attachmentScope`.
-`production:health-check` verifies the Web UI entrypoint, a same-origin
+`npm run ops -- health-check` verifies the Web UI entrypoint, a same-origin
 `/assets` file, `/health`, and `/api/app-version`.
 
 ## Current Capabilities
@@ -109,7 +109,7 @@ npm install
 cp .env.example .env
 docker compose up -d postgres
 npm run db:generate
-npm run bootstrap:admin -w @company-erp/api
+npm run -w @company-erp/api bootstrap:admin
 npm run dev
 ```
 
@@ -128,7 +128,7 @@ DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci 
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run typecheck
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run test
 DATABASE_URL=postgresql://company_erp:company_erp@localhost:5432/company_erp_ci npm run build
-npm run test:e2e -w @company-erp/web
+npm run -w @company-erp/web test:e2e
 ```
 
 ## NAS Deployment

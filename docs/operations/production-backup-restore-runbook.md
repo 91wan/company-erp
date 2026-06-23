@@ -53,7 +53,7 @@
 用脚本检查证据目录：
 
 ```bash
-npm run production:restore-drill-check -- --evidence-dir <outside-git-path>
+npm run ops -- restore-drill-check -- --evidence-dir <outside-git-path>
 ```
 
 ## 禁止事项

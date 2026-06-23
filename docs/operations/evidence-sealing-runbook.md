@@ -10,13 +10,13 @@
 
 ```bash
 # 1. 确认所有 P0 证据文件已就位（包括 data-quality-check.txt、business-acceptance.md 等）
-npm run production:go-live-check -- --evidence-dir <outside-git-path>
+npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path>
 
 # 2. 生成证据包 SHA-256 seal
-npm run production:evidence-seal -- --evidence-dir <outside-git-path>
+npm run ops -- evidence-seal -- --evidence-dir <outside-git-path>
 
 # 3. 最终审批（带 seal 验证）
-npm run production:go-live-check -- --evidence-dir <outside-git-path> --require-seal
+npm run ops -- internal-go-live-check -- --evidence-dir <outside-git-path> --require-seal
 ```
 
 ## seal 输出文件

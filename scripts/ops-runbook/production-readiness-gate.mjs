@@ -6,7 +6,7 @@ const READY = "READY_FOR_INTERNAL_PRODUCTION_REVIEW";
 const BLOCKED = "BLOCKED";
 
 function usage() {
-  console.log(`Usage: npm run production:readiness-gate
+  console.log(`Usage: npm run ops -- readiness-gate
        node scripts/ops-runbook/production-readiness-gate.mjs [--help]
 
 Runs a local, read-only internal production review gate.
@@ -72,74 +72,8 @@ export function evaluateProductionReadiness({
     requireScript({
       blockers,
       packageScripts,
-      name: "production:ready",
-      command: "bash scripts/production-ready.sh",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:readiness-gate",
-      command: "node scripts/ops-runbook/production-readiness-gate.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:health-check",
-      command: "node scripts/ops-runbook/production-health-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:evidence-collect",
-      command: "node scripts/ops-runbook/production-evidence-collect.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:restore-drill-check",
-      command: "node scripts/ops-runbook/production-restore-drill-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:cutover-check",
-      command: "node scripts/ops-runbook/production-cutover-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:migration-plan-check",
-      command: "node scripts/ops-runbook/production-migration-plan-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:post-go-live-24h-check",
-      command: "node scripts/ops-runbook/post-go-live-24h-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:data-quality-check",
-      command: "node scripts/ops-runbook/production-data-quality-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:business-acceptance-check",
-      command: "node scripts/ops-runbook/production-business-acceptance-check.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "production:evidence-seal",
-      command: "node scripts/ops-runbook/production-evidence-seal.mjs",
-    }),
-    requireScript({
-      blockers,
-      packageScripts,
-      name: "attachments:production-check",
-      command: "node scripts/ops-runbook/attachment-production-check.mjs",
+      name: "ops",
+      command: "node scripts/ops.mjs",
     }),
     requireScript({
       blockers,
@@ -168,14 +102,14 @@ export function evaluateProductionReadiness({
   requireText({
     blockers,
     readText,
-    path: "scripts/production-ready.sh",
+    path: "scripts/ops-runbook/production-ready.sh",
     markers: [
-      "npm run pilot:ready",
+      "npm run ops -- trial-ready",
       "npm run test:backup-restore",
-      "npm run attachments:legacy-report -- --dry-run",
-      "npm run audit:verify-export -- --help",
-      "npm run pilot:verify-evidence -- --help",
-      "npm run production:readiness-gate",
+      "npm run ops -- attachments-legacy-report -- --dry-run",
+      "npm run ops -- audit-verify-export -- --help",
+      "npm run ops -- pilot-verify-evidence -- --help",
+      "npm run ops -- readiness-gate",
     ],
   });
 
@@ -183,7 +117,7 @@ export function evaluateProductionReadiness({
     blockers,
     readText,
     path: "docs/deployment/nas-docker.md",
-    markers: ["Internal Production Go-live Boundary", "pilot:ready", "production:ready", "不公网暴露 API/PostgreSQL"],
+    markers: ["Internal Production Go-live Boundary", "ops -- trial-ready", "ops -- internal-ready", "不公网暴露 API/PostgreSQL"],
   });
 
   for (const path of [
@@ -288,7 +222,7 @@ function main() {
   for (const blocker of result.blockers) {
     console.error(`- ${blocker}`);
   }
-  console.error("处理建议: 先修复上述阻塞项并重新运行 npm run production:readiness-gate。");
+  console.error("处理建议: 先修复上述阻塞项并重新运行 npm run ops -- readiness-gate。");
   return 1;
 }
 

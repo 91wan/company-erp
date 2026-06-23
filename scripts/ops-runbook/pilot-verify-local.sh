@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: npm run pilot:verify-local
+Usage: npm run ops -- pilot-verify-local
        scripts/pilot-verify-local.sh [--help|--dry-run|--evidence-dir <path>]
 
 Runs the local NAS pilot readiness pack without reading real .env files,
@@ -205,7 +205,7 @@ pilot_identity_secret="pilot-local-identity-value-32"
 
 if ! docker compose --env-file "$safe_env" config >/dev/null 2>&1; then
   echo "BLOCKED: Docker Compose v2 with --env-file support is required for NAS preflight." >&2
-  echo "Install or update Docker Compose locally, then rerun npm run pilot:verify-local." >&2
+  echo "Install or update Docker Compose locally, then rerun npm run ops -- pilot-verify-local." >&2
   exit 1
 fi
 
@@ -273,8 +273,8 @@ if [[ -n "$evidence_dir" ]]; then
     echo "No real .env, NAS data, or production container was read."
     echo ""
     echo "Next evidence checks:"
-    echo "1. npm run pilot:verify-evidence -- --evidence-dir $evidence_dir"
-    echo "2. npm run audit:verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>"
+    echo "1. npm run ops -- pilot-verify-evidence -- --evidence-dir $evidence_dir"
+    echo "2. npm run ops -- audit-verify-export -- --csv <outside-git-path>/audit.csv --sha256 <header-sha256> --record-count <header-count>"
   } > "$evidence_dir/summary.txt"
   write_evidence_manifest
 fi

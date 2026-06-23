@@ -5,7 +5,7 @@ import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function usage() {
-  console.log(`Usage: npm run audit:verify-export -- --csv <path> --sha256 <hash> --record-count <count>
+  console.log(`Usage: npm run ops -- audit-verify-export -- --csv <path> --sha256 <hash> --record-count <count>
        node scripts/verify-audit-export.mjs [--help|--csv <path> --sha256 <hash> --record-count <count>]
 
 Verifies a retained audit CSV export against the SHA256 and record count
@@ -13,7 +13,7 @@ returned by /api/audit-logs/export.csv. The CSV evidence file must be outside
 the Git repository.`);
 }
 
-function fail(message, suggestion = "从审计日志导出重新记录 CSV、X-Audit-Export-SHA256、X-Audit-Export-Record-Count 和筛选条件，然后再运行 npm run audit:verify-export 复核。") {
+function fail(message, suggestion = "从审计日志导出重新记录 CSV、X-Audit-Export-SHA256、X-Audit-Export-Record-Count 和筛选条件，然后再运行 npm run ops -- audit-verify-export 复核。") {
   console.error(message);
   console.error(`处理建议: ${suggestion}`);
   process.exit(1);
