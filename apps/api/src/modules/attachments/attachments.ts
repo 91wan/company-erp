@@ -2,8 +2,6 @@ import type {
   AttachmentDownloadDto,
   AttachmentRecordDto,
   AttachmentStatusCode,
-  CreateAttachmentRecordInput,
-  UpdateAttachmentRecordInput,
 } from "@company-erp/shared";
 
 export type AttachmentRecordListFilters = {
@@ -15,11 +13,35 @@ export type AttachmentRecordListFilters = {
   limit?: number;
 };
 
+export type AttachmentRecord = AttachmentRecordDto & {
+  storageKey: string;
+};
+
+export type CreateAttachmentRecordInput = {
+  attachmentCode: string;
+  displayName: string;
+  storageKey: string;
+  originalFileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  ownerModule: string;
+  ownerEntityType: string;
+  ownerEntityId?: string | null;
+  status?: AttachmentStatusCode;
+  createdByUserId?: string | null;
+  createdByUsername?: string | null;
+  remark?: string | null;
+};
+
+export type UpdateAttachmentRecordInput = Partial<Omit<CreateAttachmentRecordInput, "attachmentCode" | "createdByUserId" | "createdByUsername">> & {
+  attachmentCode?: string;
+};
+
 export type AttachmentRecordRepository = {
-  list(filters: AttachmentRecordListFilters): Promise<AttachmentRecordDto[]>;
-  getById(id: string): Promise<AttachmentRecordDto | null>;
-  create(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto>;
-  update(id: string, input: UpdateAttachmentRecordInput): Promise<AttachmentRecordDto | null>;
+  list(filters: AttachmentRecordListFilters): Promise<AttachmentRecord[]>;
+  getById(id: string): Promise<AttachmentRecord | null>;
+  create(input: CreateAttachmentRecordInput): Promise<AttachmentRecord>;
+  update(id: string, input: UpdateAttachmentRecordInput): Promise<AttachmentRecord | null>;
 };
 
 export class AttachmentValidationError extends Error {
@@ -85,7 +107,7 @@ function isUnsafeStorageKey(storageKey: string): boolean {
   return false;
 }
 
-export function createAttachmentDownloadDto(attachment: Pick<AttachmentRecordDto, "id" | "storageKey">): AttachmentDownloadDto {
+export function createAttachmentDownloadDto(attachment: Pick<AttachmentRecord, "id" | "storageKey">): AttachmentDownloadDto {
   if (isUnsafeStorageKey(attachment.storageKey)) {
     throw new AttachmentValidationError(["storageKey must be a safe relative storage key"]);
   }

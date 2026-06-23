@@ -8,7 +8,6 @@ describe("BusinessAttachmentsPanel", () => {
       id: "attachment-1",
       attachmentCode: "ATT-20260519-ABCDEF01",
       displayName: "合同盖章扫描件",
-      storageKey: "contracts/generated.pdf",
       originalFileName: "signed-contract.pdf",
       fileType: "application/pdf",
       fileSize: 12,

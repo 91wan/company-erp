@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   createPrismaAttachmentRepository,
-  type AttachmentRecord,
+  type PrismaAttachmentRecord,
   type AttachmentRecordPrismaClient,
 } from "../src/infra/prisma/prismaAttachmentsRepository";
 import { AttachmentConflictError } from "../src/modules/attachments/attachments";
@@ -17,7 +17,7 @@ function knownRequestError(code: string, meta?: Record<string, unknown>) {
   });
 }
 
-function makeAttachment(overrides: Partial<AttachmentRecord> = {}): AttachmentRecord {
+function makeAttachment(overrides: Partial<PrismaAttachmentRecord> = {}): PrismaAttachmentRecord {
   return {
     id: "22222222-2222-4222-8222-222222222222",
     attachmentCode: "ATT-DEMO-001",

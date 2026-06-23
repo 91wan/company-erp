@@ -141,7 +141,6 @@ export type AttachmentRecordDto = {
   id: string;
   attachmentCode: string;
   displayName: string;
-  storageKey: string;
   originalFileName?: string | null;
   fileType?: string | null;
   fileSize?: number | null;
@@ -160,26 +159,6 @@ export type AttachmentDownloadDto = {
   id: string;
   url: string;
   expiresAt: string | null;
-};
-
-export type CreateAttachmentRecordInput = {
-  attachmentCode: string;
-  displayName: string;
-  storageKey: string;
-  originalFileName?: string | null;
-  fileType?: string | null;
-  fileSize?: number | null;
-  ownerModule: string;
-  ownerEntityType: string;
-  ownerEntityId?: string | null;
-  status?: AttachmentStatusCode;
-  createdByUserId?: string | null;
-  createdByUsername?: string | null;
-  remark?: string | null;
-};
-
-export type UpdateAttachmentRecordInput = Partial<Omit<CreateAttachmentRecordInput, "attachmentCode" | "createdByUserId" | "createdByUsername">> & {
-  attachmentCode?: string;
 };
 
 export type MvpDictionary = {
