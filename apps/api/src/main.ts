@@ -8,8 +8,8 @@ import {
   createPrismaWarehouseRepository,
 } from "./infra/prisma/prismaMaterialsWarehousesRepository.js";
 import { createPrismaPartyRepository } from "./infra/prisma/prismaPartyRepository.js";
+import { createPrismaAuthRepository } from "./infra/prisma/prismaAuthRepository.js";
 import {
-  createPrismaAuthRepository,
   createPrismaDepartmentRepository,
   createPrismaEmployeeRepository,
   createPrismaExternalProjectSiteAccountRepository,
