@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { createPrismaAuthRepository } from "../src/infra/prisma/prismaAuthRepository";
 
+function withTransaction<T extends object>(prisma: T): T & { $transaction<TResult>(callback: (tx: T) => Promise<TResult>): Promise<TResult> } {
+  if (typeof (prisma as { $transaction?: unknown }).$transaction === "function") {
+    return prisma as T & { $transaction<TResult>(callback: (tx: T) => Promise<TResult>): Promise<TResult> };
+  }
+  return {
+    ...prisma,
+    async $transaction<TResult>(callback: (tx: T) => Promise<TResult>) {
+      return callback(prisma);
+    },
+  };
+}
+
 describe("Prisma MFA repository", () => {
   it("findActiveMfaFactor returns null for pending factor", async () => {
     const prisma = {
@@ -23,7 +35,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const result = await repo.findActiveMfaFactor!("u1");
     expect(result).toBeNull();
   });
@@ -45,7 +57,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     expect(await repo.hasActiveMfaFactor!("u1")).toBe(false);
   });
 
@@ -70,7 +82,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const factor = await repo.createMfaFactor!({ userAccountId: "u1", type: "totp", secretEncrypted: "enc" });
     expect(factor.status).toBe("pending");
     expect(created[0]).toMatchObject({ status: "pending" });
@@ -117,7 +129,7 @@ describe("Prisma MFA repository", () => {
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
 
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const factor = await repo.createMfaFactorWithRecoveryCodes!({
       userAccountId: "u1",
       type: "totp",
@@ -152,7 +164,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const at = new Date();
     const activated = await repo.activateMfaFactor!("f1", at);
     expect(activated).toBe(true);
@@ -176,7 +188,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     await expect(repo.activateMfaFactor!("f1", new Date())).resolves.toBe(false);
   });
 
@@ -223,7 +235,7 @@ describe("Prisma MFA repository", () => {
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
 
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const at = new Date();
     await expect(repo.activateMfaFactor!("f1", at)).resolves.toBe(true);
 
@@ -251,7 +263,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const at = new Date();
     await expect(repo.disableMfaFactor!("f1", at)).resolves.toBe(true);
     expect(factorCalls[0]).toMatchObject({ where: { id: "f1" }, data: { status: "disabled", disabledAt: at } });
@@ -280,7 +292,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     const code1 = await repo.findUnusedMfaRecoveryCode!("u1", "f1", "h1");
     expect(code1).not.toBeNull();
     await expect(repo.useMfaRecoveryCode!(code1!.id, new Date())).resolves.toBe(true);
@@ -313,7 +325,7 @@ describe("Prisma MFA repository", () => {
       authSession: { async groupBy() { return []; } },
       userAccount: { async findUnique() { return null; }, async update() { return null; } },
     };
-    const repo = createPrismaAuthRepository(prisma as never);
+    const repo = createPrismaAuthRepository(withTransaction(prisma) as never);
     await repo.findUnusedMfaRecoveryCode!("u1", "active-factor", "h1");
     expect(calls[0]).toMatchObject({ where: { userAccountId: "u1", mfaFactorId: "active-factor", codeHash: "h1", usedAt: null } });
     await expect(repo.useMfaRecoveryCode!("rc1", new Date())).resolves.toBe(true);

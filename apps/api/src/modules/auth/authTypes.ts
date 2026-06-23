@@ -16,12 +16,15 @@ export type AuthAccountRecord = AuthenticatedUserDto & {
   updatedAt: string;
 };
 
+export type MfaFactorType = "totp";
+export type MfaFactorStatus = "pending" | "active" | "disabled";
+
 export type MfaFactorRecord = {
   id: string;
   userAccountId: string;
-  type: string;
+  type: MfaFactorType;
   secretEncrypted: string;
-  status: string;
+  status: MfaFactorStatus;
   createdAt: string;
   activatedAt?: string | null;
   disabledAt?: string | null;
@@ -54,12 +57,12 @@ export type AuthRepository = {
   hasActiveMfaFactor?(userAccountId: string): Promise<boolean>;
   createMfaFactor?(input: {
     userAccountId: string;
-    type: string;
+    type: MfaFactorType;
     secretEncrypted: string;
   }): Promise<MfaFactorRecord>;
   createMfaFactorWithRecoveryCodes?(input: {
     userAccountId: string;
-    type: string;
+    type: MfaFactorType;
     secretEncrypted: string;
     codeHashes: readonly string[];
     pendingExpiresBefore?: Date;
