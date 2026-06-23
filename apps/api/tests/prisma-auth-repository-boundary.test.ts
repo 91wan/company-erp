@@ -23,4 +23,17 @@ describe("Prisma auth repository boundary", () => {
     expect(peoplePermissionsRepository).not.toContain("type PrismaAuthAccount");
     expect(peoplePermissionsRepository).not.toContain("type PrismaAuthSession");
   });
+
+  it("keeps auth transactions and MFA record types explicit", () => {
+    const authRepository = readRepoFile("apps/api/src/infra/prisma/prismaAuthRepository.ts");
+    const authTypes = readRepoFile("apps/api/src/modules/auth/authTypes.ts");
+
+    expect(authRepository).toContain("PRISMA_AUTH_REPOSITORY_TRANSACTION_NOT_CONFIGURED");
+    expect(authRepository).not.toContain("callback(prisma as unknown as PrismaTransactionClient)");
+    expect(authRepository).toContain("isDateWindowActive");
+    expect(authTypes).toContain('export type MfaFactorType = "totp"');
+    expect(authTypes).toContain('export type MfaFactorStatus = "pending" | "active" | "disabled"');
+    expect(authTypes).not.toContain("type: string;\n  secretEncrypted");
+    expect(authTypes).not.toContain("status: string;\n  createdAt");
+  });
 });

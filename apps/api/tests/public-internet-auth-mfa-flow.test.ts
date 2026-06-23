@@ -131,6 +131,32 @@ function createMfaAuthRepository(seed: AuthAccountRecord[], opts: { hasMfa?: boo
       mfaFactors.push(factor);
       return factor;
     },
+    async createMfaFactorWithRecoveryCodes(input) {
+      const existing = mfaFactors.find((factor) => factor.userAccountId === input.userAccountId && ["pending", "active"].includes(factor.status));
+      if (existing) return null;
+      const factor: MfaFactorRecord = {
+        id: `factor-${mfaFactors.length + 1}`,
+        userAccountId: input.userAccountId,
+        type: input.type,
+        secretEncrypted: input.secretEncrypted,
+        status: "pending",
+        createdAt: (input.now ?? new Date()).toISOString(),
+        activatedAt: null,
+        disabledAt: null,
+      };
+      mfaFactors.push(factor);
+      for (const codeHash of input.codeHashes) {
+        recoveryCodes.push({
+          id: `rc-${recoveryCodes.length + 1}`,
+          userAccountId: input.userAccountId,
+          mfaFactorId: factor.id,
+          codeHash,
+          usedAt: null,
+          createdAt: factor.createdAt,
+        });
+      }
+      return factor;
+    },
     async activateMfaFactor(id, at) {
       const f = mfaFactors.find((x) => x.id === id && x.status === "pending");
       if (!f) return false;
@@ -300,6 +326,35 @@ describe("P0-1: MFA_SETUP_REQUIRED flow (public internet mode, no active MFA fac
     expect(body.recoveryCodes).toHaveLength(10);
     // No session cookie during setup
     expect(sessions).toHaveLength(0);
+  });
+
+  it("blocks MFA setup when the repository lacks transactional factor and recovery code creation", async () => {
+    const { repo, auditLogRepository } = createMfaAuthRepository([
+      { ...makeAdminAccount(), passwordHash: await hashPassword("Admin123!Pass") },
+    ]);
+    const app = await buildApp({
+      auth: { enabled: true, sessionSecret: TEST_SECRET },
+      authRepository: {
+        ...repo,
+        createMfaFactorWithRecoveryCodes: undefined,
+      },
+      auditLogRepository,
+    });
+
+    const loginRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Admin123!Pass" },
+    });
+    const setupRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/setup-challenge",
+      payload: { mfaSetupToken: loginRes.json().mfaSetupToken },
+    });
+    await app.close();
+
+    expect(setupRes.statusCode).toBe(503);
+    expect(setupRes.json()).toEqual({ error: "MFA_NOT_CONFIGURED" });
   });
 
   it("rejects replayed setup token instead of issuing a second recovery code batch", async () => {

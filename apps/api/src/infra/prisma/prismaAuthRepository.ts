@@ -1,7 +1,13 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { MvpRoleCode } from "@company-erp/shared";
 import { isUniqueViolation } from "./prismaErrors.js";
-import type { AuthAccountRecord, AuthRepository, AuthSessionRecord } from "../../modules/auth/authTypes.js";
+import type {
+  AuthAccountRecord,
+  AuthRepository,
+  AuthSessionRecord,
+  MfaFactorStatus,
+  MfaFactorType,
+} from "../../modules/auth/authTypes.js";
 
 type PrismaAuthAccount = Prisma.UserAccountGetPayload<{
   include: {
@@ -34,25 +40,36 @@ const mfaFactorSelect = {
 
 type PrismaTransactionClient = Prisma.TransactionClient;
 type PrismaMfaFactor = Prisma.UserMfaFactorGetPayload<{ select: typeof mfaFactorSelect }>;
+type PrismaTransactionHost = {
+  $transaction<TResult>(callback: (tx: PrismaTransactionClient) => Promise<TResult>): Promise<TResult>;
+};
+type PrismaAuthRepositoryOptions = {
+  now?: () => Date;
+};
 
-function activeDateWindowIncludesToday(assignment: { startDate?: Date | null; endDate?: Date | null }): boolean {
-  const today = new Date();
-  const todayDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const starts = !assignment.startDate || assignment.startDate <= todayDate;
-  const notEnded = !assignment.endDate || assignment.endDate >= todayDate;
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+export function isDateWindowActive(
+  assignment: { startDate?: Date | null; endDate?: Date | null },
+  asOfDate: Date,
+): boolean {
+  const starts = !assignment.startDate || assignment.startDate <= asOfDate;
+  const notEnded = !assignment.endDate || assignment.endDate >= asOfDate;
   return starts && notEnded;
 }
 
-function toAuthAccountRecord(account: PrismaAuthAccount): AuthAccountRecord {
+function toAuthAccountRecord(account: PrismaAuthAccount, asOfDate: Date): AuthAccountRecord {
   const externalSiteAccount = account.externalProjectSiteAccount;
   const externalSiteIds =
     externalSiteAccount &&
     externalSiteAccount.status === "active" &&
-    activeDateWindowIncludesToday(externalSiteAccount)
+    isDateWindowActive(externalSiteAccount, asOfDate)
       ? [externalSiteAccount.projectSiteId]
       : [];
   const employeeSiteIds = (account.employee?.projectSiteAssignments ?? [])
-    .filter(activeDateWindowIncludesToday)
+    .filter((assignment) => isDateWindowActive(assignment, asOfDate))
     .map((assignment) => assignment.projectSiteId);
 
   return {
@@ -94,14 +111,23 @@ function toAuthSessionRecord(session: PrismaAuthSession): AuthSessionRecord {
 
 function toMfaFactorRecord(factor: PrismaMfaFactor) {
   return {
-    ...factor,
+    id: factor.id,
+    userAccountId: factor.userAccountId,
+    type: factor.type as MfaFactorType,
+    secretEncrypted: factor.secretEncrypted,
+    status: factor.status as MfaFactorStatus,
     createdAt: factor.createdAt.toISOString(),
     activatedAt: factor.activatedAt?.toISOString() ?? null,
     disabledAt: factor.disabledAt?.toISOString() ?? null,
   };
 }
 
-export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository {
+export function createPrismaAuthRepository(prisma: PrismaClient, options: PrismaAuthRepositoryOptions = {}): AuthRepository {
+  const transactionHost = prisma as PrismaClient & Partial<PrismaTransactionHost>;
+  if (typeof transactionHost.$transaction !== "function") {
+    throw new Error("PRISMA_AUTH_REPOSITORY_TRANSACTION_NOT_CONFIGURED");
+  }
+  const now = options.now ?? (() => new Date());
   const include = {
     employee: { include: { projectSiteAssignments: true } },
     roles: true,
@@ -109,13 +135,11 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
   } satisfies Prisma.UserAccountInclude;
 
   async function runTransaction<T>(callback: (tx: PrismaTransactionClient) => Promise<T>): Promise<T> {
-    const maybeTransactional = prisma as PrismaClient & {
-      $transaction?: <TResult>(callback: (tx: PrismaTransactionClient) => Promise<TResult>) => Promise<TResult>;
-    };
-    if (typeof maybeTransactional.$transaction === "function") {
-      return maybeTransactional.$transaction(callback);
-    }
-    return callback(prisma as unknown as PrismaTransactionClient);
+    return transactionHost.$transaction!(callback);
+  }
+
+  function currentScopeDate(): Date {
+    return startOfUtcDay(now());
   }
 
   async function cleanupExpiredPendingMfaFactorsForUser(
@@ -144,11 +168,11 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
   return {
     async findByUsername(username: string) {
       const account = await prisma.userAccount.findUnique({ where: { username }, include });
-      return account ? toAuthAccountRecord(account) : null;
+      return account ? toAuthAccountRecord(account, currentScopeDate()) : null;
     },
     async findById(id: string) {
       const account = await prisma.userAccount.findUnique({ where: { id }, include });
-      return account ? toAuthAccountRecord(account) : null;
+      return account ? toAuthAccountRecord(account, currentScopeDate()) : null;
     },
     async updateLastLogin(id: string, at: Date) {
       await prisma.userAccount.update({
@@ -224,7 +248,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
       const count = await prisma.userMfaFactor.count({ where: { userAccountId, status: "active" } });
       return count > 0;
     },
-    async createMfaFactor(input: { userAccountId: string; type: string; secretEncrypted: string }) {
+    async createMfaFactor(input: { userAccountId: string; type: MfaFactorType; secretEncrypted: string }) {
       const factor = await prisma.userMfaFactor.create({
         data: {
           userAccountId: input.userAccountId,
@@ -238,7 +262,7 @@ export function createPrismaAuthRepository(prisma: PrismaClient): AuthRepository
     },
     async createMfaFactorWithRecoveryCodes(input: {
       userAccountId: string;
-      type: string;
+      type: MfaFactorType;
       secretEncrypted: string;
       codeHashes: readonly string[];
       pendingExpiresBefore?: Date;

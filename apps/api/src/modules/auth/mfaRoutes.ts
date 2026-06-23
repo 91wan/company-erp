@@ -45,6 +45,35 @@ function isPendingMfaFactorExpired(factor: MfaFactorRecord, now: Date): boolean 
   return Number.isFinite(createdAt) && createdAt <= pendingMfaFactorExpiresBefore(now).getTime();
 }
 
+function hasTransactionalMfaSetupRepository(authRepository: AuthRouteContext["authRepository"]): authRepository is NonNullable<AuthRouteContext["authRepository"]> & Required<Pick<NonNullable<AuthRouteContext["authRepository"]>, "createMfaFactorWithRecoveryCodes" | "findPendingMfaFactor" | "hasActiveMfaFactor">> {
+  return Boolean(
+    authRepository &&
+    typeof authRepository.createMfaFactorWithRecoveryCodes === "function" &&
+    typeof authRepository.findPendingMfaFactor === "function" &&
+    typeof authRepository.hasActiveMfaFactor === "function"
+  );
+}
+
+function hasMfaLoginRepository(authRepository: AuthRouteContext["authRepository"]): authRepository is NonNullable<AuthRouteContext["authRepository"]> & Required<Pick<NonNullable<AuthRouteContext["authRepository"]>, "findActiveMfaFactor">> {
+  return Boolean(authRepository && typeof authRepository.findActiveMfaFactor === "function");
+}
+
+function hasMfaActivationRepository(authRepository: AuthRouteContext["authRepository"]): authRepository is NonNullable<AuthRouteContext["authRepository"]> & Required<Pick<NonNullable<AuthRouteContext["authRepository"]>, "activateMfaFactor" | "findMfaFactorById">> {
+  return Boolean(
+    authRepository &&
+    typeof authRepository.activateMfaFactor === "function" &&
+    typeof authRepository.findMfaFactorById === "function"
+  );
+}
+
+function hasMfaDisableRepository(authRepository: AuthRouteContext["authRepository"]): authRepository is NonNullable<AuthRouteContext["authRepository"]> & Required<Pick<NonNullable<AuthRouteContext["authRepository"]>, "disableMfaFactor" | "findActiveMfaFactor">> {
+  return Boolean(
+    authRepository &&
+    typeof authRepository.disableMfaFactor === "function" &&
+    typeof authRepository.findActiveMfaFactor === "function"
+  );
+}
+
 export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContext): void {
   const { authRepository, sessionStore, authOptions, ttlSeconds, secure, writeAuthAudit } = context;
 
@@ -105,6 +134,9 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
       if (!authRepository || !sessionStore) {
         return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
       }
+      if (!hasMfaLoginRepository(authRepository)) {
+        return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
+      }
       const body = request.body as { pendingMfaToken?: unknown; code?: unknown };
       const pendingMfaToken = typeof body.pendingMfaToken === "string" ? body.pendingMfaToken : "";
       const code = typeof body.code === "string" ? body.code.trim() : "";
@@ -127,7 +159,7 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
         return reply.status(429).send({ error: "TOO_MANY_MFA_ATTEMPTS" });
       }
 
-      const factor = await authRepository.findActiveMfaFactor?.(userAccountId);
+      const factor = await authRepository.findActiveMfaFactor(userAccountId);
       let mfaOk = false;
       let mfaMethod: "totp" | "recovery_code" = "totp";
 
@@ -207,11 +239,7 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
     if (!authRepository || !sessionStore) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     }
-    const hasTransactionalMfaSetup = typeof authRepository.createMfaFactorWithRecoveryCodes === "function";
-    if (
-      !hasTransactionalMfaSetup &&
-      (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor)
-    ) {
+    if (!hasTransactionalMfaSetupRepository(authRepository)) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
     const body = request.body as { mfaSetupToken?: unknown };
@@ -231,40 +259,29 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
       return reply.status(401).send({ error: "INVALID_CREDENTIALS" });
     }
 
-    if ((await authRepository.hasActiveMfaFactor?.(userAccountId)) === true) {
+    if ((await authRepository.hasActiveMfaFactor(userAccountId)) === true) {
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
     const setupNow = new Date();
-    const existing = await authRepository.findPendingMfaFactor?.(userAccountId);
+    const existing = await authRepository.findPendingMfaFactor(userAccountId);
     if (existing && await cleanupExpiredPendingMfaSetup(request, account, existing, setupNow)) {
       // Expired pending setup was disabled; continue and create a fresh factor.
-    } else if (!hasTransactionalMfaSetup && existing) {
-      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
     const secretEncrypted = encryptMfaSecret(totpSecret);
     const recoveryCodes = generateRecoveryCodes();
     const codeHashes = recoveryCodes.map(hashRecoveryCode);
-    const factor = hasTransactionalMfaSetup
-      ? await authRepository.createMfaFactorWithRecoveryCodes!({
+    const factor = await authRepository.createMfaFactorWithRecoveryCodes({
           userAccountId: account.id,
           type: "totp",
           secretEncrypted,
           codeHashes,
           pendingExpiresBefore: pendingMfaFactorExpiresBefore(setupNow),
           now: setupNow,
-        })
-      : await authRepository.createMfaFactor!({
-          userAccountId: account.id,
-          type: "totp",
-          secretEncrypted,
         });
     if (!factor) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
-    }
-    if (!hasTransactionalMfaSetup) {
-      await authRepository.createMfaRecoveryCodes!(factor.id, account.id, codeHashes);
     }
 
     const totpUri = buildTotpUri(totpSecret, account.username);
@@ -281,7 +298,7 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
     if (!authRepository || !sessionStore) {
       return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     }
-    if (!authRepository.activateMfaFactor || !authRepository.findMfaFactorById) {
+    if (!hasMfaActivationRepository(authRepository)) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
     const body = request.body as { mfaSetupToken?: unknown; factorId?: unknown; code?: unknown };
@@ -363,48 +380,33 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
     if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     const user = (request as AuthenticatedRequest).currentUser;
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
-    const hasTransactionalMfaSetup = typeof authRepository.createMfaFactorWithRecoveryCodes === "function";
-    if (
-      !hasTransactionalMfaSetup &&
-      (!authRepository.createMfaFactor || !authRepository.createMfaRecoveryCodes || !authRepository.findPendingMfaFactor)
-    ) {
+    if (!hasTransactionalMfaSetupRepository(authRepository)) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
 
-    if ((await authRepository.hasActiveMfaFactor?.(user.id)) === true) {
+    if ((await authRepository.hasActiveMfaFactor(user.id)) === true) {
       return reply.status(409).send({ error: "MFA_ALREADY_ENABLED" });
     }
     const setupNow = new Date();
-    const existing = await authRepository.findPendingMfaFactor?.(user.id);
+    const existing = await authRepository.findPendingMfaFactor(user.id);
     if (existing && await cleanupExpiredPendingMfaSetup(request, user, existing, setupNow)) {
       // Expired pending setup was disabled; continue and create a fresh factor.
-    } else if (!hasTransactionalMfaSetup && existing) {
-      return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
     }
 
     const totpSecret = generateTotpSecret();
     const secretEncrypted = encryptMfaSecret(totpSecret);
     const recoveryCodes = generateRecoveryCodes();
     const codeHashes = recoveryCodes.map(hashRecoveryCode);
-    const factor = hasTransactionalMfaSetup
-      ? await authRepository.createMfaFactorWithRecoveryCodes!({
+    const factor = await authRepository.createMfaFactorWithRecoveryCodes({
           userAccountId: user.id,
           type: "totp",
           secretEncrypted,
           codeHashes,
           pendingExpiresBefore: pendingMfaFactorExpiresBefore(setupNow),
           now: setupNow,
-        })
-      : await authRepository.createMfaFactor!({
-          userAccountId: user.id,
-          type: "totp",
-          secretEncrypted,
         });
     if (!factor) {
       return reply.status(409).send({ error: "MFA_SETUP_ALREADY_PENDING" });
-    }
-    if (!hasTransactionalMfaSetup) {
-      await authRepository.createMfaRecoveryCodes!(factor.id, user.id, codeHashes);
     }
 
     const totpUri = buildTotpUri(totpSecret, user.username);
@@ -425,11 +427,11 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
     const factorId = typeof body.factorId === "string" ? body.factorId : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
     if (!factorId || !code) return reply.status(400).send({ error: "MFA_ACTIVATE_VALIDATION_FAILED" });
-    if (!authRepository.findActiveMfaFactor || !authRepository.activateMfaFactor) {
+    if (!hasMfaActivationRepository(authRepository)) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
 
-    const factor = await authRepository.findMfaFactorById?.(factorId) ?? null;
+    const factor = await authRepository.findMfaFactorById(factorId);
     if (!factor || factor.userAccountId !== user.id || factor.status !== "pending") {
       return reply.status(400).send({ error: "MFA_FACTOR_NOT_FOUND_OR_ALREADY_ACTIVE" });
     }
@@ -460,7 +462,7 @@ export function registerMfaRoutes(app: FastifyInstance, context: AuthRouteContex
     if (!authRepository) return reply.status(503).send({ error: "AUTH_REPOSITORY_NOT_CONFIGURED" });
     const user = (request as AuthenticatedRequest).currentUser;
     if (!user) return reply.status(401).send({ error: "AUTH_REQUIRED" });
-    if (!authRepository.findActiveMfaFactor || !authRepository.disableMfaFactor) {
+    if (!hasMfaDisableRepository(authRepository)) {
       return reply.status(503).send({ error: "MFA_NOT_CONFIGURED" });
     }
     const body = request.body as { code?: unknown };
