@@ -156,6 +156,12 @@ export type AttachmentRecordDto = {
   updatedAt: string;
 };
 
+export type AttachmentDownloadDto = {
+  id: string;
+  url: string;
+  expiresAt: string | null;
+};
+
 export type CreateAttachmentRecordInput = {
   attachmentCode: string;
   displayName: string;

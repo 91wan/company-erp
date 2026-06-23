@@ -1,4 +1,5 @@
 import type {
+  AttachmentDownloadDto,
   AttachmentRecordDto,
   AttachmentStatusCode,
   CreateAttachmentRecordInput,
@@ -19,12 +20,6 @@ export type AttachmentRecordRepository = {
   getById(id: string): Promise<AttachmentRecordDto | null>;
   create(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto>;
   update(id: string, input: UpdateAttachmentRecordInput): Promise<AttachmentRecordDto | null>;
-};
-
-export type AttachmentDownloadRef = {
-  attachmentId: string;
-  storageKey: string;
-  downloadRef: string;
 };
 
 export class AttachmentValidationError extends Error {
@@ -90,14 +85,14 @@ function isUnsafeStorageKey(storageKey: string): boolean {
   return false;
 }
 
-export function createAttachmentDownloadRef(attachment: Pick<AttachmentRecordDto, "id" | "storageKey">): AttachmentDownloadRef {
+export function createAttachmentDownloadDto(attachment: Pick<AttachmentRecordDto, "id" | "storageKey">): AttachmentDownloadDto {
   if (isUnsafeStorageKey(attachment.storageKey)) {
     throw new AttachmentValidationError(["storageKey must be a safe relative storage key"]);
   }
   return {
-    attachmentId: attachment.id,
-    storageKey: attachment.storageKey,
-    downloadRef: `/api/attachments/${attachment.id}/content`,
+    id: attachment.id,
+    url: `/api/attachments/${attachment.id}/content`,
+    expiresAt: null,
   };
 }
 

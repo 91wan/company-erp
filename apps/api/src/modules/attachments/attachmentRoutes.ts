@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   AttachmentConflictError,
   AttachmentValidationError,
-  createAttachmentDownloadRef,
+  createAttachmentDownloadDto,
   normalizeCreateAttachmentInput,
   normalizeAttachmentFilters,
   normalizeUpdateAttachmentInput,
@@ -76,12 +76,8 @@ function redactAttachmentStorageKeyForScopedRequest<T extends { storageKey: stri
   return scopedProjectSiteIds(request) === null ? attachment : { ...attachment, storageKey: "" };
 }
 
-function redactAttachmentDownloadRefForScopedRequest<T extends { storageKey: string }>(request: unknown, downloadRef: T): T {
-  return scopedProjectSiteIds(request) === null ? downloadRef : { ...downloadRef, storageKey: "" };
-}
-
 function resolveAttachmentContentPath(storageKey: string): string {
-  createAttachmentDownloadRef({ id: "attachment", storageKey });
+  createAttachmentDownloadDto({ id: "attachment", storageKey });
   const root = resolve(process.env.NAS_ATTACHMENTS_ROOT?.trim() || "/attachments");
   const filePath = resolve(root, storageKey);
   const relativePath = relative(root, filePath);
@@ -403,17 +399,7 @@ export function registerAttachmentRoutes(app: FastifyInstance, options: BuildApp
       return reply.status(404).send({ error: "ATTACHMENT_NOT_FOUND" });
     }
     try {
-      const isPublicInternet = process.env.PUBLIC_INTERNET_ENABLED === "true";
-      let attachmentDownload;
-      if (isPublicInternet) {
-        attachmentDownload = {
-          id: attachment.id,
-          url: `/api/attachments/${attachment.id}/content`,
-          expiresAt: null,
-        };
-      } else {
-        attachmentDownload = redactAttachmentDownloadRefForScopedRequest(request, createAttachmentDownloadRef(attachment));
-      }
+      const attachmentDownload = createAttachmentDownloadDto(attachment);
       await writeAuditLog(request, options, {
         action: "attachment.download_url",
         entityType: "attachment",

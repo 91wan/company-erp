@@ -270,12 +270,12 @@ export function SystemSettingsWorkspace({
     setDownloadingAttachmentId(attachment.id);
     setAttachmentDownloadError(null);
     try {
-      const downloadRef = await getAttachmentDownloadUrl(attachment.id);
-      if (!downloadRef.startsWith("/") || downloadRef.startsWith("//")) {
+      const downloadUrl = await getAttachmentDownloadUrl(attachment.id);
+      if (!downloadUrl.startsWith("/") || downloadUrl.startsWith("//")) {
         throw new Error("Unsafe attachment download reference");
       }
       window.open(
-        new URL(downloadRef, apiBaseUrl).toString(),
+        new URL(downloadUrl, apiBaseUrl).toString(),
         "_blank",
         "noopener,noreferrer",
       );

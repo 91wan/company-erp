@@ -269,9 +269,9 @@ export function mockShellFetch(
       }
       return Promise.resolve(jsonResponse({
         attachmentDownload: {
-          attachmentId,
-          storageKey: attachmentRecord.storageKey,
-          downloadRef: `/api/attachments/${attachmentId}/content`,
+          id: attachmentId,
+          url: `/api/attachments/${attachmentId}/content`,
+          expiresAt: null,
         },
       }));
     }

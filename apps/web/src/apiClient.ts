@@ -1,6 +1,7 @@
 import type {
   AppConfigDto,
   AppVersionDto,
+  AttachmentDownloadDto,
   AttachmentRecordDto,
   AuditLogDto,
   AuthenticatedUserDto,
@@ -262,10 +263,10 @@ export async function getAttachments(filters: AttachmentFilters = {}): Promise<A
 }
 
 export async function getAttachmentDownloadUrl(id: string): Promise<string> {
-  const payload = await requestJson<{ attachmentDownload: { downloadRef: string } }>(
+  const payload = await requestJson<{ attachmentDownload: AttachmentDownloadDto }>(
     `${apiBaseUrl}/api/attachments/${id}/download-url`,
   );
-  return payload.attachmentDownload.downloadRef;
+  return payload.attachmentDownload.url;
 }
 
 export async function createAttachment(input: CreateAttachmentRecordInput): Promise<AttachmentRecordDto> {

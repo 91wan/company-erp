@@ -79,10 +79,10 @@ export function BusinessAttachmentsPanel({
   async function handleDownload(attachment: AttachmentRecordDto) {
     setDownloadError("");
     try {
-      const downloadRef = await getAttachmentDownloadUrl(attachment.id);
-      if (!downloadRef.startsWith("/") || downloadRef.startsWith("//")) throw new Error("Unsafe download reference");
+      const downloadUrl = await getAttachmentDownloadUrl(attachment.id);
+      if (!downloadUrl.startsWith("/") || downloadUrl.startsWith("//")) throw new Error("Unsafe download reference");
       const baseUrl = apiBaseUrl || window.location.origin;
-      window.open(new URL(downloadRef, baseUrl).toString(), "_blank", "noopener,noreferrer");
+      window.open(new URL(downloadUrl, baseUrl).toString(), "_blank", "noopener,noreferrer");
     } catch (error) {
       setDownloadError(formatAttachmentDownloadError(error));
     }
