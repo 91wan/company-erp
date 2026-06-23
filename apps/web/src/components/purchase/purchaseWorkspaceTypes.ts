@@ -38,6 +38,7 @@ export type PurchaseWorkspaceProps = {
   approvePurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
   rejectPurchaseRequest?: (id: string, input: PurchaseRequestReviewPayload) => Promise<PurchaseRequestDto>;
   canManage?: boolean;
+  canReadAuditLogs?: boolean;
   initialTab?: string;
 };
 

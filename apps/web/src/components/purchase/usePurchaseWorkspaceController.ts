@@ -109,6 +109,7 @@ export function usePurchaseWorkspaceController({
   approvePurchaseRequest = defaultApprovePurchaseRequest,
   rejectPurchaseRequest = defaultRejectPurchaseRequest,
   canManage = true,
+  canReadAuditLogs = false,
   initialTab,
 }: PurchaseWorkspaceProps) {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDto[]>([]);
@@ -386,6 +387,7 @@ export function usePurchaseWorkspaceController({
   return {
     activeTab,
     canManage,
+    canReadAuditLogs,
     contracts,
     filteredRecords: purchaseRecords,
     filteredRequests,
