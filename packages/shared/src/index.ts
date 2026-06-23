@@ -182,6 +182,8 @@ export type PurchaseRequestStatusCode =
   | "rejected"
   | "cancelled";
 
+export type PurchaseRequestActionCode = "submit" | "approve" | "reject";
+
 export type PurchaseRecordStatusCode =
   | "pending_purchase"
   | "ordered"
@@ -1624,6 +1626,41 @@ export const PURCHASE_REQUEST_STATUSES = [
   { code: "rejected", label: "已驳回" },
   { code: "cancelled", label: "已取消" },
 ] as const satisfies readonly StatusMeta<PurchaseRequestStatusCode>[];
+
+const purchaseRequestActionByStatus = {
+  draft: ["submit"],
+  pending_approval: ["approve", "reject"],
+  pending_purchase: [],
+  purchasing: [],
+  partially_received: [],
+  completed: [],
+  rejected: [],
+  cancelled: [],
+} as const satisfies Record<
+  PurchaseRequestStatusCode,
+  readonly PurchaseRequestActionCode[]
+>;
+
+const purchaseRequestStatusTransitions = {
+  submit: "pending_approval",
+  approve: "pending_purchase",
+  reject: "rejected",
+} as const satisfies Record<PurchaseRequestActionCode, PurchaseRequestStatusCode>;
+
+export function allowedPurchaseRequestActions(
+  status: PurchaseRequestStatusCode,
+): readonly PurchaseRequestActionCode[] {
+  return purchaseRequestActionByStatus[status];
+}
+
+export function nextPurchaseRequestStatus(
+  status: PurchaseRequestStatusCode,
+  action: PurchaseRequestActionCode,
+): PurchaseRequestStatusCode | null {
+  return allowedPurchaseRequestActions(status).includes(action)
+    ? purchaseRequestStatusTransitions[action]
+    : null;
+}
 
 export const PURCHASE_RECORD_STATUSES = [
   { code: "pending_purchase", label: "待采购" },

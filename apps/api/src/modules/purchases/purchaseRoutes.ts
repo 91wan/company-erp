@@ -1,4 +1,10 @@
 import type { FastifyInstance } from "fastify";
+import {
+  allowedPurchaseRequestActions,
+  nextPurchaseRequestStatus,
+  type PurchaseRequestActionCode,
+  type PurchaseRequestStatusCode,
+} from "@company-erp/shared";
 import type { BuildAppOptions } from "../../appRouteContext.js";
 import { isOutsideProjectSiteScope, runWithAuditTransaction, scopedProjectSiteIds, writeAuditLog } from "../../appRouteContext.js";
 import { DEFAULT_LIST_LIMIT } from "../../listPaging.js";
@@ -14,6 +20,20 @@ import {
   normalizePurchaseRequestInput,
   normalizePurchaseRequestReviewInput,
 } from "./purchases.js";
+
+function purchaseRequestStateConflictPayload(
+  currentStatus?: PurchaseRequestStatusCode,
+  action?: PurchaseRequestActionCode,
+) {
+  return {
+    error: "PURCHASE_REQUEST_STATE_CONFLICT",
+    ...(currentStatus ? { currentStatus } : {}),
+    ...(action ? { action } : {}),
+    ...(currentStatus
+      ? { allowedActions: allowedPurchaseRequestActions(currentStatus) }
+      : {}),
+  };
+}
 
 export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOptions) {
   app.get("/api/purchase-requests", async (request, reply) => {
@@ -125,8 +145,13 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
 
     try {
       const { id } = request.params as { id: string };
+      const before = await options.purchaseRequestRepository.getById(id);
+      if (!before) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      if (!nextPurchaseRequestStatus(before.status, "submit")) {
+        return reply.status(409).send(purchaseRequestStateConflictPayload(before.status, "submit"));
+      }
       const purchaseRequest = await runWithAuditTransaction(options, async (txOptions) => {
-        const submitted = await txOptions.purchaseRequestRepository!.submit(id, "draft");
+        const submitted = await txOptions.purchaseRequestRepository!.submit(id, before.status);
         if (!submitted) return null;
         await writeAuditLog(request, options, {
           action: "purchase_request.submit",
@@ -140,7 +165,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
       return { purchaseRequest };
     } catch (error) {
       if (error instanceof PurchaseRequestStateConflictError) {
-        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+        return reply.status(409).send(purchaseRequestStateConflictPayload());
       }
       throw error;
     }
@@ -154,9 +179,14 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
     const { id } = request.params as { id: string };
 
     try {
+      const before = await options.purchaseRequestRepository.getById(id);
+      if (!before) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      if (!nextPurchaseRequestStatus(before.status, "approve")) {
+        return reply.status(409).send(purchaseRequestStateConflictPayload(before.status, "approve"));
+      }
       const input = normalizePurchaseRequestReviewInput(request.body, "approve");
       const purchaseRequest = await runWithAuditTransaction(options, async (txOptions) => {
-        const approved = await txOptions.purchaseRequestRepository!.approve(id, "pending_approval", input);
+        const approved = await txOptions.purchaseRequestRepository!.approve(id, before.status, input);
         if (!approved) return null;
         await writeAuditLog(request, options, {
           action: "purchase_request.approve",
@@ -173,7 +203,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
         return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
       }
       if (error instanceof PurchaseRequestStateConflictError) {
-        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+        return reply.status(409).send(purchaseRequestStateConflictPayload());
       }
       throw error;
     }
@@ -187,9 +217,14 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
     const { id } = request.params as { id: string };
 
     try {
+      const before = await options.purchaseRequestRepository.getById(id);
+      if (!before) return reply.status(404).send({ error: "PURCHASE_REQUEST_NOT_FOUND" });
+      if (!nextPurchaseRequestStatus(before.status, "reject")) {
+        return reply.status(409).send(purchaseRequestStateConflictPayload(before.status, "reject"));
+      }
       const input = normalizePurchaseRequestReviewInput(request.body, "reject");
       const purchaseRequest = await runWithAuditTransaction(options, async (txOptions) => {
-        const rejected = await txOptions.purchaseRequestRepository!.reject(id, "pending_approval", input);
+        const rejected = await txOptions.purchaseRequestRepository!.reject(id, before.status, input);
         if (!rejected) return null;
         await writeAuditLog(request, options, {
           action: "purchase_request.reject",
@@ -206,7 +241,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, options: BuildAppOp
         return reply.status(400).send({ error: "PURCHASE_REQUEST_VALIDATION_FAILED", issues: error.issues });
       }
       if (error instanceof PurchaseRequestStateConflictError) {
-        return reply.status(409).send({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+        return reply.status(409).send(purchaseRequestStateConflictPayload());
       }
       throw error;
     }

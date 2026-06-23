@@ -500,9 +500,19 @@ describe("purchase requests API", () => {
     await app.close();
 
     expect(invalidSubmitResponse.statusCode).toBe(409);
-    expect(invalidSubmitResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+    expect(invalidSubmitResponse.json()).toMatchObject({
+      error: "PURCHASE_REQUEST_STATE_CONFLICT",
+      action: "submit",
+      currentStatus: "purchasing",
+      allowedActions: [],
+    });
     expect(invalidApproveResponse.statusCode).toBe(409);
-    expect(invalidApproveResponse.json()).toMatchObject({ error: "PURCHASE_REQUEST_STATE_CONFLICT" });
+    expect(invalidApproveResponse.json()).toMatchObject({
+      error: "PURCHASE_REQUEST_STATE_CONFLICT",
+      action: "approve",
+      currentStatus: "draft",
+      allowedActions: ["submit"],
+    });
     expect(missingResponse.statusCode).toBe(404);
   });
 

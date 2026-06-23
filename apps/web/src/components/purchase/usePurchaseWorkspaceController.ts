@@ -4,6 +4,7 @@ import type {
   CreatePurchaseRecordInput,
   CreatePurchaseRequestInput,
   PurchaseRecordDto,
+  PurchaseRequestActionCode,
   PurchaseRequestDto,
 } from "@company-erp/shared";
 import { apiBaseUrl, formatApiError, requestJson } from "../../apiClient";
@@ -290,7 +291,7 @@ export function usePurchaseWorkspaceController({
     setPurchaseRequests((current) => current.map((request) => (request.id === nextRequest.id ? nextRequest : request)));
   }
 
-  async function handleRequestReview(action: "submit" | "approve" | "reject", target: PurchaseRequestDto) {
+  async function handleRequestReview(action: PurchaseRequestActionCode, target: PurchaseRequestDto) {
     setReviewState("saving");
     setReviewError("");
     try {
