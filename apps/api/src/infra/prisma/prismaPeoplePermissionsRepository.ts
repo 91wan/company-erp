@@ -87,6 +87,18 @@ type PrismaProjectSiteAssignment = Prisma.EmployeeProjectSiteAssignmentGetPayloa
   };
 }>;
 
+type PeoplePermissionsPrismaClient = PrismaClient | Prisma.TransactionClient;
+
+async function runPeoplePermissionsTransaction<T>(
+  prisma: PeoplePermissionsPrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if ("$transaction" in prisma && typeof prisma.$transaction === "function") {
+    return prisma.$transaction(callback);
+  }
+  return callback(prisma);
+}
+
 function dateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
@@ -261,7 +273,7 @@ function mapExternalProjectSiteConflict(error: unknown): never {
   throw error;
 }
 
-export function createPrismaDepartmentRepository(prisma: PrismaClient): DepartmentRepository {
+export function createPrismaDepartmentRepository(prisma: PeoplePermissionsPrismaClient): DepartmentRepository {
   const include = { parent: true, managerEmployee: true } satisfies Prisma.DepartmentInclude;
 
   return {
@@ -332,7 +344,7 @@ export function createPrismaDepartmentRepository(prisma: PrismaClient): Departme
   };
 }
 
-export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRepository {
+export function createPrismaEmployeeRepository(prisma: PeoplePermissionsPrismaClient): EmployeeRepository {
   const include = { department: true, userAccount: true } satisfies Prisma.EmployeeInclude;
 
   return {
@@ -386,7 +398,7 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
     },
     async update(id: string, input: UpdateEmployeeInput) {
       try {
-        const employee = await prisma.$transaction(async (tx) => {
+        const employee = await runPeoplePermissionsTransaction(prisma, async (tx) => {
           const updated = await tx.employee.update({
             where: { id },
             data: {
@@ -427,7 +439,7 @@ export function createPrismaEmployeeRepository(prisma: PrismaClient): EmployeeRe
   };
 }
 
-export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAccountRepository {
+export function createPrismaUserAccountRepository(prisma: PeoplePermissionsPrismaClient): UserAccountRepository {
   const include = {
     employee: { include: { projectSiteAssignments: true } },
     roles: true,
@@ -481,7 +493,7 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
     },
     async update(id: string, input: UpdateUserAccountInput) {
       try {
-        const userAccount = await prisma.$transaction(async (tx) => {
+        const userAccount = await runPeoplePermissionsTransaction(prisma, async (tx) => {
           const nextStatus = input.status;
           const roles = (
             input.roles === undefined
@@ -534,7 +546,7 @@ export function createPrismaUserAccountRepository(prisma: PrismaClient): UserAcc
 }
 
 export function createPrismaExternalProjectSiteAccountRepository(
-  prisma: PrismaClient,
+  prisma: PeoplePermissionsPrismaClient,
 ): ExternalProjectSiteAccountRepository {
   const include = {
     userAccount: true,
@@ -586,7 +598,7 @@ export function createPrismaExternalProjectSiteAccountRepository(
       try {
         if ((input.status ?? "active") === "active") await assertNoActiveProjectManager(input.projectSiteId);
         const passwordHash = await hashPassword(input.initialPassword);
-        const account = await prisma.$transaction(async (tx) => {
+        const account = await runPeoplePermissionsTransaction(prisma, async (tx) => {
           const userAccount = await tx.userAccount.create({
             data: {
               username: input.username,
@@ -642,7 +654,7 @@ export function createPrismaExternalProjectSiteAccountRepository(
           input.startDate !== undefined ||
           input.endDate !== undefined;
 
-        const account = await prisma.$transaction(async (tx) => {
+        const account = await runPeoplePermissionsTransaction(prisma, async (tx) => {
           await tx.userAccount.update({
             where: { id: current.userAccountId },
             data: {
@@ -695,7 +707,9 @@ export function createPrismaExternalProjectSiteAccountRepository(
   };
 }
 
-export function createPrismaProjectSiteAssignmentRepository(prisma: PrismaClient): EmployeeProjectSiteAssignmentRepository {
+export function createPrismaProjectSiteAssignmentRepository(
+  prisma: PeoplePermissionsPrismaClient,
+): EmployeeProjectSiteAssignmentRepository {
   const include = { employee: true, projectSite: true } satisfies Prisma.EmployeeProjectSiteAssignmentInclude;
 
   function where(filters: EmployeeProjectSiteAssignmentListFilters): Prisma.EmployeeProjectSiteAssignmentWhereInput {

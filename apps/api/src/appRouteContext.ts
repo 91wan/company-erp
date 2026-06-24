@@ -54,7 +54,13 @@ export type BuildAppOptions = {
   certificateRepository?: CertificateRepository;
   importJobRepository?: ImportJobRepository;
   marketOperationsHandoffRepository?: MarketOperationsHandoffRepository;
-  runInTransaction?: <T>(callback: (txOptions: BuildAppOptions) => Promise<T>) => Promise<T>;
+  runInTransaction?: <T>(callback: (txOptions: TransactionalAppOptions) => Promise<T>) => Promise<T>;
+};
+
+export type TransactionalAppOptions = Omit<BuildAppOptions, "auth" | "authRepository" | "runInTransaction"> & {
+  auth?: never;
+  authRepository?: never;
+  runInTransaction?: never;
 };
 
 const SCOPED_PROJECT_SITE_ROLES = new Set<MvpRoleCode>(USER_ROLE_ASSIGNMENT_POLICY.exclusiveRoles);
@@ -185,7 +191,10 @@ export async function writeAuditLog(
 
 export async function runWithAuditTransaction<T>(
   options: BuildAppOptions,
-  callback: (txOptions: BuildAppOptions) => Promise<T>,
+  callback: (txOptions: TransactionalAppOptions) => Promise<T>,
 ): Promise<T> {
-  return options.runInTransaction ? options.runInTransaction(callback) : callback(options);
+  if (options.runInTransaction) return options.runInTransaction(callback);
+  const { auth: _auth, authRepository: _authRepository, runInTransaction: _runInTransaction, ...transactionOptions } =
+    options;
+  return callback(transactionOptions);
 }

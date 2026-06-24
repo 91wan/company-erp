@@ -12,7 +12,7 @@ type SmokeStep = {
 };
 
 type SmokeStepPayload = Pick<SmokeStep, "targetRecordType" | "targetRecordId">;
-type ImportSmokeTransactionClient = Parameters<Parameters<ImportJobPrismaClient["$transaction"]>[0]>[0];
+type ImportSmokeTransactionClient = Parameters<Parameters<NonNullable<ImportJobPrismaClient["$transaction"]>>[0]>[0];
 
 type SmokeResult = {
   ok: boolean;

@@ -40,6 +40,18 @@ const purchaseRequestInclude = {
   lines: { orderBy: { createdAt: "asc" } },
 } as const satisfies Prisma.PurchaseRequestInclude;
 
+type ReplenishmentPrismaClient = PrismaClient | Prisma.TransactionClient;
+
+async function runReplenishmentTransaction<T>(
+  prisma: ReplenishmentPrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if ("$transaction" in prisma && typeof prisma.$transaction === "function") {
+    return prisma.$transaction(callback);
+  }
+  return callback(prisma);
+}
+
 type ReplenishmentSuggestionRecord = Prisma.ReplenishmentSuggestionGetPayload<{ include: typeof include }>;
 type PurchaseRequestRecord = Prisma.PurchaseRequestGetPayload<{ include: typeof purchaseRequestInclude }>;
 type StockGroupRow = {
@@ -223,7 +235,7 @@ function mapConflict(error: unknown): never {
 }
 
 export function createPrismaReplenishmentSuggestionRepository(
-  prisma: PrismaClient,
+  prisma: ReplenishmentPrismaClient,
 ): ReplenishmentSuggestionRepository {
   const client = prisma;
 
@@ -337,55 +349,58 @@ export function createPrismaReplenishmentSuggestionRepository(
 
     async convertToPurchaseRequest(id, input): Promise<ReplenishmentConversionResult | null> {
       try {
-        const result = await client.$transaction(async (tx): Promise<ReplenishmentConversionResult | null> => {
-          const suggestion = await tx.replenishmentSuggestion.findUnique({ where: { id }, include });
-          if (!suggestion) return null;
-          if (suggestion.status !== "open") {
-            throw new ReplenishmentSuggestionConflictError("alreadyConverted");
-          }
+        const result = await runReplenishmentTransaction(
+          client,
+          async (tx): Promise<ReplenishmentConversionResult | null> => {
+            const suggestion = await tx.replenishmentSuggestion.findUnique({ where: { id }, include });
+            if (!suggestion) return null;
+            if (suggestion.status !== "open") {
+              throw new ReplenishmentSuggestionConflictError("alreadyConverted");
+            }
 
-          const request = await tx.purchaseRequest.create({
-            data: {
-              requestNo: input.requestNo,
-              requesterName: input.requesterName,
-              requester: input.requesterEmployeeId ? { connect: { id: input.requesterEmployeeId } } : undefined,
-              departmentName: input.departmentName,
-              department: input.departmentId ? { connect: { id: input.departmentId } } : undefined,
-              expectedArrivalDate: nullableDate(input.expectedArrivalDate),
-              purpose: input.purpose ?? "库存补货建议",
-              status: "pending_purchase",
-              remark: input.remark,
-              lines: {
-                create: [
-                  {
-                    material: { connect: { id: suggestion.materialId } },
-                    materialCode: suggestion.material.materialCode,
-                    materialName: suggestion.material.materialName,
-                    specification: suggestion.material.specification,
-                    requestedQuantity: suggestion.suggestedQuantity,
-                    unit: suggestion.material.baseUnit,
-                    remark: "来源：库存补货建议",
-                  },
-                ],
+            const request = await tx.purchaseRequest.create({
+              data: {
+                requestNo: input.requestNo,
+                requesterName: input.requesterName,
+                requester: input.requesterEmployeeId ? { connect: { id: input.requesterEmployeeId } } : undefined,
+                departmentName: input.departmentName,
+                department: input.departmentId ? { connect: { id: input.departmentId } } : undefined,
+                expectedArrivalDate: nullableDate(input.expectedArrivalDate),
+                purpose: input.purpose ?? "库存补货建议",
+                status: "pending_purchase",
+                remark: input.remark,
+                lines: {
+                  create: [
+                    {
+                      material: { connect: { id: suggestion.materialId } },
+                      materialCode: suggestion.material.materialCode,
+                      materialName: suggestion.material.materialName,
+                      specification: suggestion.material.specification,
+                      requestedQuantity: suggestion.suggestedQuantity,
+                      unit: suggestion.material.baseUnit,
+                      remark: "来源：库存补货建议",
+                    },
+                  ],
+                },
               },
-            },
-            include: purchaseRequestInclude,
-          });
+              include: purchaseRequestInclude,
+            });
 
-          const updated = await tx.replenishmentSuggestion.update({
-            where: { id },
-            data: {
-              status: "converted",
-              convertedPurchaseRequest: { connect: { id: request.id } },
-            },
-            include,
-          });
+            const updated = await tx.replenishmentSuggestion.update({
+              where: { id },
+              data: {
+                status: "converted",
+                convertedPurchaseRequest: { connect: { id: request.id } },
+              },
+              include,
+            });
 
-          return {
-            suggestion: toSuggestionDto(updated),
-            purchaseRequest: toPurchaseRequestDto(request),
-          };
-        });
+            return {
+              suggestion: toSuggestionDto(updated),
+              purchaseRequest: toPurchaseRequestDto(request),
+            };
+          },
+        );
         return result;
       } catch (error) {
         mapConflict(error);

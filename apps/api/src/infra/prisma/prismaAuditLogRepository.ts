@@ -66,7 +66,9 @@ function jsonOrNull(value: unknown | null | undefined): Prisma.InputJsonValue | 
   return value as Prisma.InputJsonValue;
 }
 
-export function createPrismaAuditLogRepository(prisma: PrismaClient | AuditLogPrismaClient): AuditLogRepository {
+export function createPrismaAuditLogRepository(
+  prisma: PrismaClient | Prisma.TransactionClient | AuditLogPrismaClient,
+): AuditLogRepository {
   const client = prisma as AuditLogPrismaClient;
   return {
     async list(filters: AuditLogListFilters) {

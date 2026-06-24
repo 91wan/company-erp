@@ -104,7 +104,7 @@ function mapConflict(error: unknown): never {
   throw error;
 }
 
-export function createPrismaPartyRepository(prisma: PrismaClient): PartyRepository {
+export function createPrismaPartyRepository(prisma: PrismaClient | Prisma.TransactionClient): PartyRepository {
   return {
     async list(filters: PartyListFilters) {
       const parties = await prisma.party.findMany({
