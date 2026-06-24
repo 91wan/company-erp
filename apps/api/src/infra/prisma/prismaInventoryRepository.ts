@@ -102,8 +102,18 @@ export type InventoryPrismaClient = {
   material: {
     findMany(args: Prisma.MaterialFindManyArgs): Promise<MaterialLookupRecord[]>;
   };
-  $transaction<T>(callback: (tx: InventoryPrismaTransactionClient) => Promise<T>): Promise<T>;
+  $transaction?<T>(callback: (tx: InventoryPrismaTransactionClient) => Promise<T>): Promise<T>;
 };
+
+async function runInventoryTransaction<T>(
+  prisma: InventoryPrismaClient,
+  callback: (tx: InventoryPrismaTransactionClient) => Promise<T>,
+): Promise<T> {
+  if (typeof prisma.$transaction === "function") {
+    return prisma.$transaction(callback);
+  }
+  return callback(prisma);
+}
 
 function dateToString(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -382,7 +392,7 @@ export function createPrismaInventoryRepository(prisma: InventoryPrismaClient): 
           return toInventoryMovementDto(movement);
         }
 
-        const movement = await client.$transaction(async (tx) => {
+        const movement = await runInventoryTransaction(client, async (tx) => {
           const created = await tx.inventoryMovement.create({
             data: createMovementData(input),
             include,

@@ -49,6 +49,18 @@ import {
   type ProjectUsageRequestRepository,
 } from "../../modules/projectSites/projectSites.js";
 
+type ProjectSitesPrismaClient = PrismaClient | Prisma.TransactionClient;
+
+async function runProjectSitesTransaction<T>(
+  prisma: ProjectSitesPrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if ("$transaction" in prisma && typeof prisma.$transaction === "function") {
+    return prisma.$transaction(callback);
+  }
+  return callback(prisma);
+}
+
 function decimalToNullableNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   return decimalToNumber(value);
@@ -752,7 +764,7 @@ function currentPayrollMonth(now = new Date()): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function createPrismaProjectSiteRepository(prisma: PrismaClient): ProjectSiteRepository {
+export function createPrismaProjectSiteRepository(prisma: ProjectSitesPrismaClient): ProjectSiteRepository {
   const client = prisma;
 
   return {
@@ -840,7 +852,9 @@ export function createPrismaProjectSiteRepository(prisma: PrismaClient): Project
   };
 }
 
-export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient): ProjectSiteComplianceRepository {
+export function createPrismaProjectSiteComplianceRepository(
+  prisma: ProjectSitesPrismaClient,
+): ProjectSiteComplianceRepository {
   const client = prisma;
 
   return {
@@ -1263,7 +1277,9 @@ export function createPrismaProjectSiteComplianceRepository(prisma: PrismaClient
   };
 }
 
-export function createPrismaProjectSiteKitchenEquipmentRepository(prisma: PrismaClient): ProjectSiteKitchenEquipmentRepository {
+export function createPrismaProjectSiteKitchenEquipmentRepository(
+  prisma: ProjectSitesPrismaClient,
+): ProjectSiteKitchenEquipmentRepository {
   const client = prisma;
 
   return {
@@ -1320,7 +1336,7 @@ export function createPrismaProjectSiteKitchenEquipmentRepository(prisma: Prisma
     },
     async reviewChangeRequest(id: string, input: ReviewProjectSiteKitchenEquipmentChangeRequestInput) {
       try {
-        return await client.$transaction(async (tx) => {
+        return await runProjectSitesTransaction(client, async (tx) => {
           const existing = await tx.projectSiteKitchenEquipmentChangeRequest.findUnique({ where: { id } });
           if (!existing) return null;
 
@@ -1373,7 +1389,9 @@ export function createPrismaProjectSiteKitchenEquipmentRepository(prisma: Prisma
   };
 }
 
-export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient): ProjectUsageRequestRepository {
+export function createPrismaProjectUsageRequestRepository(
+  prisma: ProjectSitesPrismaClient,
+): ProjectUsageRequestRepository {
   const client = prisma;
 
   return {
@@ -1417,7 +1435,7 @@ export function createPrismaProjectUsageRequestRepository(prisma: PrismaClient):
     },
     async issue(id: string, input: IssueProjectUsageRequestInput) {
       try {
-        const issued = await client.$transaction(async (tx) => {
+        const issued = await runProjectSitesTransaction(client, async (tx) => {
           const request = await tx.projectUsageRequest.findUnique({
             where: { id },
             include: usageInclude,

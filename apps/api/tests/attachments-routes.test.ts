@@ -643,7 +643,12 @@ describe("attachments API", () => {
           transactionAttachment = attachment;
         });
         try {
-          const result = await callback({ ...options, attachmentRepository: transactionRepository });
+          const {
+            auth: _auth,
+            authRepository: _authRepository,
+            ...transactionOptions
+          } = options;
+          const result = await callback({ ...transactionOptions, attachmentRepository: transactionRepository });
           persistedAttachment = transactionAttachment;
           return result;
         } catch (error) {

@@ -292,7 +292,9 @@ function reviewData(
   };
 }
 
-export function createPrismaPurchaseRequestRepository(prisma: PrismaClient): PurchaseRequestRepository {
+export function createPrismaPurchaseRequestRepository(
+  prisma: PrismaClient | Prisma.TransactionClient,
+): PurchaseRequestRepository {
   const include = {
     projectSite: true,
     lines: { orderBy: { createdAt: "asc" } },
@@ -423,7 +425,9 @@ function purchaseRecordOrderBy(filters: PurchaseRecordListFilters): Prisma.Purch
   }
 }
 
-export function createPrismaPurchaseRecordRepository(prisma: PrismaClient): PurchaseRecordRepository {
+export function createPrismaPurchaseRecordRepository(
+  prisma: PrismaClient | Prisma.TransactionClient,
+): PurchaseRecordRepository {
   const include = {
     purchaseRequest: { include: { projectSite: true } },
     supplierParty: true,

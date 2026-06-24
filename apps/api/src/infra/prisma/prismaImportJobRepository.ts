@@ -217,8 +217,18 @@ export type ImportJobPrismaClient = {
     update(args: Prisma.ImportJobUpdateArgs): Promise<ImportJobRecord>;
   };
   importJobRow: ImportTransactionClient["importJobRow"];
-  $transaction<T>(callback: (tx: ImportTransactionClient) => Promise<T>): Promise<T>;
+  $transaction?<T>(callback: (tx: ImportTransactionClient) => Promise<T>): Promise<T>;
 };
+
+async function runImportTransaction<T>(
+  prisma: ImportJobPrismaClient,
+  callback: (tx: ImportTransactionClient) => Promise<T>,
+): Promise<T> {
+  if (typeof prisma.$transaction === "function") {
+    return prisma.$transaction(callback);
+  }
+  return callback(prisma);
+}
 
 export const REQUIRED_HEADERS: Record<ImportTemplateTypeCode, readonly string[]> = {
   parties: ["供应商编码", "供应商名称", "状态"],
@@ -1368,7 +1378,7 @@ export function createPrismaImportJobRepository(prisma: ImportJobPrismaClient): 
       return toJobDto(job);
     },
     async confirm(id: string) {
-      const confirmed = await client.$transaction(async (tx) => {
+      const confirmed = await runImportTransaction(client, async (tx) => {
         const job = await tx.importJob.findUnique({ where: { id }, include: includeRows });
         if (!job) return null;
         if (job.status !== "previewed") throw new ImportJobValidationError(["Import job cannot be confirmed again"]);

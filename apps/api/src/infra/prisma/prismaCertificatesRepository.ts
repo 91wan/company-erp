@@ -169,7 +169,7 @@ function mapCertificateError(error: unknown): never {
   throw error;
 }
 
-export function createPrismaCertificateRepository(prisma: PrismaClient): CertificateRepository {
+export function createPrismaCertificateRepository(prisma: PrismaClient | Prisma.TransactionClient): CertificateRepository {
   const include = {
     ownerEmployee: true,
     ownerRosterPerson: true,

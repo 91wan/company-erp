@@ -204,7 +204,7 @@ function mapWarehouseConflict(error: unknown): never {
   throw error;
 }
 
-export function createPrismaMaterialRepository(prisma: PrismaClient): MaterialRepository {
+export function createPrismaMaterialRepository(prisma: PrismaClient | Prisma.TransactionClient): MaterialRepository {
   const include = {
     defaultWarehouse: true,
     defaultSupplierParty: true,
@@ -267,7 +267,7 @@ export function createPrismaMaterialRepository(prisma: PrismaClient): MaterialRe
   };
 }
 
-export function createPrismaWarehouseRepository(prisma: PrismaClient): WarehouseRepository {
+export function createPrismaWarehouseRepository(prisma: PrismaClient | Prisma.TransactionClient): WarehouseRepository {
   return {
     async list(filters: WarehouseListFilters) {
       const warehouses = await prisma.warehouse.findMany({

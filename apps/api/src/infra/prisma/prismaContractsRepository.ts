@@ -92,7 +92,7 @@ function relationUpdate<TConnect extends string>(id: string | null | undefined, 
 }
 
 async function resolveCounterpartySnapshot(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   input: Pick<CreateContractInput | UpdateContractInput, "counterpartyPartyId" | "counterpartyNameSnapshot">,
 ): Promise<string | undefined> {
   if (input.counterpartyNameSnapshot !== undefined && input.counterpartyNameSnapshot !== null) {
@@ -111,7 +111,7 @@ async function resolveCounterpartySnapshot(
 }
 
 async function contractCreateData(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   input: CreateContractInput,
 ): Promise<Prisma.ContractCreateInput> {
   const counterpartyNameSnapshot = await resolveCounterpartySnapshot(prisma, input);
@@ -140,7 +140,7 @@ async function contractCreateData(
 }
 
 async function contractUpdateData(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   input: UpdateContractInput,
 ): Promise<Prisma.ContractUpdateInput> {
   const snapshot = await resolveCounterpartySnapshot(prisma, input);
@@ -210,7 +210,7 @@ function mapContractError(error: unknown): never {
   throw error;
 }
 
-export function createPrismaContractRepository(prisma: PrismaClient): ContractRepository {
+export function createPrismaContractRepository(prisma: PrismaClient | Prisma.TransactionClient): ContractRepository {
   const include = {
     counterpartyParty: true,
     businessProject: true,
